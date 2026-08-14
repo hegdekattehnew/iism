@@ -7,9 +7,11 @@ from app.core.security import get_current_user
 from app.modules.identity import service
 from app.modules.identity.models import User
 from app.modules.identity.schemas import (
+    AccountClaimConfirm,
     EmailVerificationConfirm,
     LoginRequest,
     LogoutRequest,
+    OrganizationRegisterRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
@@ -27,6 +29,45 @@ async def register(
 ) -> TokenPair:
     _, tokens = await service.register_user(db, data)
     return tokens
+
+
+@router.post(
+    "/register/employer", response_model=TokenPair, status_code=status.HTTP_201_CREATED
+)
+async def register_employer(
+    data: OrganizationRegisterRequest, db: AsyncSession = Depends(get_db_session)
+) -> TokenPair:
+    _, tokens = await service.register_organization(db, data, "employer")
+    return tokens
+
+
+@router.post(
+    "/register/course-provider", response_model=TokenPair, status_code=status.HTTP_201_CREATED
+)
+async def register_course_provider(
+    data: OrganizationRegisterRequest, db: AsyncSession = Depends(get_db_session)
+) -> TokenPair:
+    _, tokens = await service.register_organization(db, data, "course_provider")
+    return tokens
+
+
+@router.post(
+    "/register/assessment-provider",
+    response_model=TokenPair,
+    status_code=status.HTTP_201_CREATED,
+)
+async def register_assessment_provider(
+    data: OrganizationRegisterRequest, db: AsyncSession = Depends(get_db_session)
+) -> TokenPair:
+    _, tokens = await service.register_organization(db, data, "assessment_provider")
+    return tokens
+
+
+@router.post("/claim-account/confirm", response_model=TokenPair)
+async def confirm_account_claim(
+    data: AccountClaimConfirm, db: AsyncSession = Depends(get_db_session)
+) -> TokenPair:
+    return await service.confirm_account_claim(db, data.token, data.password)
 
 
 @router.post("/login", response_model=TokenPair)

@@ -1,18 +1,20 @@
+import hashlib
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.cache import get_redis
 from app.core.database import get_db_session
-from app.modules.identity.models import User
+from app.modules.identity.models import ServiceAccount, User
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -147,3 +149,25 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or inactive")
     return user
+
+
+def generate_api_key() -> str:
+    return f"sk_live_{secrets.token_urlsafe(32)}"
+
+
+def hash_api_key(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode()).hexdigest()
+
+
+async def get_service_account(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    db: AsyncSession = Depends(get_db_session),
+) -> ServiceAccount:
+    if x_api_key is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing API key")
+    service_account = await db.scalar(
+        select(ServiceAccount).where(ServiceAccount.hashed_key == hash_api_key(x_api_key))
+    )
+    if service_account is None or not service_account.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid API key")
+    return service_account

@@ -19,6 +19,7 @@ dependencies = [
     "sentence-transformers>=3.0",
     "httpx>=0.27",
     "email-validator>=2.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +50,11 @@ extend-immutable-calls = [
     "fastapi.Path",
     "fastapi.Body",
     "fastapi.Cookie",
+    "fastapi.File",
+    "app.core.permissions.require_tenant_role",
+    "app.core.permissions.require_tenant_role_path",
+    "app.core.permissions.require_platform_role",
+    "app.core.permissions.require_tenant_role_or_platform_staff",
 ]
 
 [tool.pytest.ini_options]

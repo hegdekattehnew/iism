@@ -1,12 +1,25 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+OrganizationTenantType = Literal[
+    "employer", "course_provider", "assessment_provider", "government_agency"
+]
+PlatformRole = Literal["admin", "super_admin"]
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: str = Field(min_length=1)
+
+
+class OrganizationRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    full_name: str = Field(min_length=1)
+    organization_name: str = Field(min_length=1)
 
 
 class LoginRequest(BaseModel):
@@ -56,3 +69,53 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str = Field(min_length=8)
+
+
+class AccountClaimConfirm(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
+
+
+class AdminOrganizationInviteRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1)
+    organization_name: str = Field(min_length=1)
+    tenant_type: OrganizationTenantType
+
+
+class StaffInviteRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1)
+    platform_role: PlatformRole
+
+
+class CandidateRecord(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1)
+
+
+class BulkUploadError(BaseModel):
+    row: int
+    email: str | None
+    reason: str
+
+
+class BulkUploadResult(BaseModel):
+    created: int
+    skipped: list[BulkUploadError]
+
+
+class ExternalCandidateIntakeRequest(BaseModel):
+    candidates: list[CandidateRecord] = Field(min_length=1, max_length=100)
+
+
+class ServiceAccountCreateRequest(BaseModel):
+    name: str = Field(min_length=1)
+
+
+class ServiceAccountCreateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    api_key: str

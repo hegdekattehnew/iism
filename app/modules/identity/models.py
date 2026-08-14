@@ -17,7 +17,7 @@ class User(Base):
     google_id: Mapped[str | None] = mapped_column(unique=True, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
     is_email_verified: Mapped[bool] = mapped_column(default=False)
-    is_superuser: Mapped[bool] = mapped_column(default=False)
+    platform_role: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
@@ -48,3 +48,14 @@ class Membership(Base):
 
     user: Mapped["User"] = relationship(back_populates="memberships")
     tenant: Mapped["Tenant"] = relationship(back_populates="memberships")
+
+
+class ServiceAccount(Base):
+    __tablename__ = "service_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
+    name: Mapped[str] = mapped_column()
+    hashed_key: Mapped[str] = mapped_column(unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

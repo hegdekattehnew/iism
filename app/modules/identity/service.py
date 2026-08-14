@@ -26,6 +26,7 @@ from app.core.security import decode_token as _decode_token
 from app.modules.identity.models import Membership, Tenant, User
 from app.modules.identity.schemas import (
     LoginRequest,
+    OrganizationRegisterRequest,
     RegisterRequest,
     TokenPair,
 )
@@ -36,16 +37,20 @@ def _generate_slug(base: str) -> str:
     return f"{normalized}-{secrets.token_hex(4)}"
 
 
-async def _create_personal_tenant(db: AsyncSession, user: User) -> Tenant:
-    tenant = Tenant(
-        name=f"{user.full_name}'s workspace",
-        slug=_generate_slug(user.full_name or user.email),
-        tenant_type="personal",
-    )
+async def _create_tenant_with_owner(
+    db: AsyncSession, user: User, name: str, tenant_type: str
+) -> Tenant:
+    tenant = Tenant(name=name, slug=_generate_slug(name), tenant_type=tenant_type)
     db.add(tenant)
     await db.flush()
     db.add(Membership(user_id=user.id, tenant_id=tenant.id, role="owner"))
     return tenant
+
+
+async def _create_personal_tenant(db: AsyncSession, user: User) -> Tenant:
+    return await _create_tenant_with_owner(
+        db, user, f"{user.full_name}'s workspace", "personal"
+    )
 
 
 async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
@@ -62,24 +67,61 @@ async def _send_verification_email(user: User) -> None:
     )
 
 
-async def register_user(db: AsyncSession, data: RegisterRequest) -> tuple[User, TokenPair]:
-    if await _get_user_by_email(db, data.email) is not None:
+async def request_account_claim(user: User) -> None:
+    token = await create_opaque_token(
+        "account_claim", user.id, timedelta(hours=settings.email_verification_token_expire_hours)
+    )
+    link = f"{settings.app_base_url}/auth/claim-account/confirm?token={token}"
+    await get_email_adapter().send(
+        user.email, "Activate your account", f"Set your password to activate your account: {link}"
+    )
+
+
+async def confirm_account_claim(db: AsyncSession, token: str, password: str) -> TokenPair:
+    user_id = await consume_opaque_token("account_claim", token)
+    if user_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired token")
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired token")
+    user.hashed_password = hash_password(password)
+    user.is_email_verified = True
+    await db.commit()
+
+    access_token, refresh_token = await issue_token_pair(user.id)
+    return TokenPair(access_token=access_token, refresh_token=refresh_token)
+
+
+async def _register_new_user(
+    db: AsyncSession, email: str, password: str, full_name: str, tenant_name: str, tenant_type: str
+) -> tuple[User, TokenPair]:
+    if await _get_user_by_email(db, email) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
-    user = User(
-        email=data.email,
-        hashed_password=hash_password(data.password),
-        full_name=data.full_name,
-    )
+    user = User(email=email, hashed_password=hash_password(password), full_name=full_name)
     db.add(user)
     await db.flush()
-    await _create_personal_tenant(db, user)
+    await _create_tenant_with_owner(db, user, tenant_name, tenant_type)
     await db.commit()
     await db.refresh(user)
 
     await _send_verification_email(user)
     access_token, refresh_token = await issue_token_pair(user.id)
     return user, TokenPair(access_token=access_token, refresh_token=refresh_token)
+
+
+async def register_user(db: AsyncSession, data: RegisterRequest) -> tuple[User, TokenPair]:
+    return await _register_new_user(
+        db, data.email, data.password, data.full_name, f"{data.full_name}'s workspace", "personal"
+    )
+
+
+async def register_organization(
+    db: AsyncSession, data: OrganizationRegisterRequest, tenant_type: str
+) -> tuple[User, TokenPair]:
+    return await _register_new_user(
+        db, data.email, data.password, data.full_name, data.organization_name, tenant_type
+    )
 
 
 async def authenticate_user(db: AsyncSession, data: LoginRequest) -> tuple[User, TokenPair]:
