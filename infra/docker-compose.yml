@@ -28,5 +28,27 @@ services:
       timeout: 3s
       retries: 10
 
+  # Master of the raw NSQF feed (ADR-034). Postgres remains the operational
+  # store; this holds the authoritative QP/NOS documents it is projected from.
+  #
+  # Pinned to 7.0 deliberately: mongo:8.0 refuses to start on Linux kernel
+  # 6.19+ (SERVER-121912), and Docker Desktop's VM here is 7.0-linuxkit.
+  mongo:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: iism
+      MONGO_INITDB_ROOT_PASSWORD: iism
+      MONGO_INITDB_DATABASE: nsqf
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   pgdata:
+  mongodata:

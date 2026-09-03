@@ -56,6 +56,10 @@ seed: ## Seed the taxonomy and marketplace inventory (idempotent)
 	$(PY) scripts/seed_skills.py
 	$(PY) scripts/seed_marketplace.py
 
+.PHONY: mongosh
+mongosh: ## Open a mongosh shell against the NSQF source
+	docker exec -it iism-mongo-1 mongosh -u iism -p iism --authenticationDatabase admin nsqf
+
 .PHONY: psql
 psql: ## Open a psql shell in the container
 	docker exec -it iism-postgres-1 psql -U iism -d iism

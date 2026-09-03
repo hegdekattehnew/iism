@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://iism:iism@localhost:5433/iism"
     redis_url: str = "redis://localhost:6380/0"
 
+    # Master of the raw NSQF feed (ADR-034). Postgres remains the operational
+    # store; this is the source it is projected from, never read at request time.
+    # Host port 27018, matching the 5433/6380 convention.
+    mongo_url: str = "mongodb://iism:iism@localhost:27018/?authSource=admin"
+    mongo_database: str = "nsqf"
+
     # Echo SQL only in development; noisy and leaks values into logs otherwise.
     db_echo: bool = False
 
