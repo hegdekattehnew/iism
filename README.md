@@ -6,7 +6,7 @@ what a person is missing for the work they want, and which training closes that 
 
 India-first, Hindi and English at launch. See
 [docs/IISM-Product-Definition.docx](docs/IISM-Product-Definition.docx) for what we are building
-and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 33 ADRs
+and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
 ## Status — Sprints 1–5 complete

@@ -7,6 +7,7 @@
 > **Amendment record.** ADR-001 to ADR-023 originate from the March 2026 source spreadsheet.
 > ADR-024 to ADR-033 were added in September 2026 to record decisions the original set left open —
 > concrete stack choices, monetization, supply acquisition, credential model and language scope.
+> ADR-034 was added when real NSQF data arrived.
 >
 > Changes to the original set:
 > - **ADR-014** — `Status` was malformed in the source conversion; corrected to `Accepted`.
@@ -14,6 +15,8 @@
 > - **ADR-023** — `Final decision` was empty in the source; now resolved.
 > - **ADR-006** — amended by ADR-027 (task runner implementation only; the principle stands).
 > - **ADR-021** — qualified by ADR-033 for Hindi-language search.
+> - **ADR-003** — qualified by ADR-034. Its rejection of a second store for *vector search* stands
+>   and pgvector is unchanged; ADR-034 adds a document store for *source data* only.
 
 ## ADR-001: Overall Product Architecture
 
@@ -981,6 +984,82 @@ no Hindi text-search configuration — no stemmer and no stopword list. Hindi wi
 the `simple` configuration together with `pg_trgm` for fuzzy matching, leaning on pgvector semantic
 search to carry Hindi relevance. This must be validated early, and may pull ADR-021's OpenSearch
 migration forward.
+
+
+---
+
+## ADR-034: NSQF Source of Record
+
+**Status:** Accepted (September 2026)
+
+**Context:** The skill taxonomy has until now been 52 hand-curated rows, sufficient to prove
+search and matching shape but not a national taxonomy and not defensible to an employer or a
+regulator. Real NSQF data — Qualification Packs and National Occupational Standards with aligned
+levels — now exists in MongoDB, covering all Sector Skill Councils and on the order of ten
+thousand NOS.
+
+That data is hierarchical, versioned and irregular: Qualification Packs are revised and re-issued,
+a NOS may be shared across several QPs, and field coverage differs between Sector Skill Councils.
+It is a poor fit for a relational schema in its raw form and a natural fit for document storage.
+
+The question is not where the data can be stored but **which store is authoritative**, and
+whether the application reads it directly.
+
+**Decision:** MongoDB is the source of record for the raw NSQF feed. PostgreSQL remains the
+operational store, into which the feed is projected by an importer. The relationship is
+one-directional and the projection is re-runnable.
+
+**Options considered:** 1. PostgreSQL only — import once, then retire MongoDB
+2. MongoDB as the live operational store for the taxonomy
+3. MongoDB as master of the raw feed, PostgreSQL as the operational projection
+
+**Trade-offs:**
+
+- Option 1: ✅ Single datastore, nothing new to operate
+✅ Fully consistent with ADR-003
+❌ The raw source is lost; re-deriving after a mapping error means sourcing the data again
+❌ Discards the natural home for versioned, irregular QP/NOS documents
+
+- Option 2: ✅ Matches the intuition that NSQF data "lives" in MongoDB
+❌ Five foreign keys point at `skills.id` — `job_skills`, `course_skills`, `candidate_skills`,
+`candidate_certifications`, `skill_aliases` — and foreign keys cannot span datastores; every one
+becomes an application-enforced reference with no integrity
+❌ Matching joins skills against jobs and candidates; a cross-store join executes in Python, and
+measured load testing puts the ceiling at ~137 requests per second on Python CPU while PostgreSQL
+answers the same query in 1.5 ms
+❌ Embeddings must sit beside the skill rows for HNSW search (ADR-013, ADR-031)
+
+- Option 3: ✅ Each store does what it is good at: documents for the versioned source, relational
+for the operational graph
+✅ Every existing foreign key and index survives untouched
+✅ PostgreSQL can be rebuilt from MongoDB at any time, which is what makes MongoDB the master
+rather than merely a staging area
+❌ A second datastore to run, back up and secure
+❌ Two representations that can drift if the importer is not re-run
+
+**Final decision:** MongoDB is master of the raw NSQF feed; PostgreSQL is the operational
+projection. Four constraints make this a bounded exception rather than a general licence to add
+datastores:
+
+1. **The application never reads MongoDB at request time.** Only the importer opens a connection.
+   Any endpoint reading MongoDB directly is a defect, not an extension of this decision.
+2. **The projection is re-runnable and idempotent**, keyed on `qp_code` and `nos_code` and aware
+   of version. PostgreSQL holds no NSQF state that cannot be regenerated.
+3. **Access sits behind an adapter** in `api/adapters/nsqf/` per ADR-017. No module imports a
+   MongoDB driver, and a file-based source implementation keeps the test suite free of MongoDB.
+4. **This applies to NSQF source data only.** It is not a precedent for candidate, job, course or
+   identity data, all of which remain relational.
+
+This qualifies ADR-003 rather than superseding it. ADR-003 rejected a second store for *vector
+search* and that reasoning is untouched — pgvector remains the vector store, adjacent to the rows
+it indexes. What is added here is a second store for *source data*, a different axis, and the
+operational database is still one.
+
+Two operational notes are recorded because they cost time to discover. MongoDB is pinned to
+**7.0**: version 8.0 refuses to start on Linux kernel 6.19 and newer (SERVER-121912), which
+includes the Linux VM that Docker Desktop runs on macOS. And the container is exposed on host port
+**27018** rather than 27017, following the same convention as PostgreSQL on 5433 and Redis on
+6380, so a pre-existing local installation is never disturbed.
 
 
 ---
