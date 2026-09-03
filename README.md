@@ -1,47 +1,102 @@
 # Intelligent Integrated Skill Marketplace (IISM)
 
-Workforce Mobility OS — marketplace + intelligence layer for skills, jobs, courses, and
-career progression. India-first, single-sector MVP.
+A marketplace connecting candidates, vocational courses and vocational jobs, with an
+intelligence layer that decomposes all three into NSQF-aligned skills so the system can compute
+what a person is missing for the work they want, and which training closes that gap.
 
-Architecture rationale: [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-Working conventions for this repo: [CLAUDE.md](CLAUDE.md)
+India-first, Hindi and English at launch. See
+[docs/IISM-Product-Definition.docx](docs/IISM-Product-Definition.docx) for what we are building
+and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 33 ADRs
+that govern how.
 
-## Status
+## Status — Sprints 1–4 complete
 
-Identity module implemented: authentication (email/password + Google OAuth, JWT
-access/refresh, email verification, password reset) and registration for all actor types
-(Candidate, Employer, Course Provider, Assessment Provider, Government Agency, Platform Admin,
-Super Admin), plus CSV bulk upload and API-key based external intake for candidates. Other
-modules are still skeletons. MVP feature scope beyond identity is being defined next.
+**Sprint 4 — identity and candidate profiles.** Passwordless sign-in with a phone number and a
+6-digit code. Build a profile and declare skills against the taxonomy — search in English, Hindi
+or transliteration. No SMS provider needed in development: the code is returned by the API and
+shown on screen.
 
-## Stack
+**Sprint 3 — marketplace.** 8 organisations, 20 jobs and 20 courses, all bilingual and expressed
+as the skills they require or teach. Open any skill and see both the jobs that need it and the
+courses that teach it — the taxonomy is now a navigable graph rather than a glossary.
 
-Python 3.11 · FastAPI · PostgreSQL + pgvector · Redis · Celery
+**Sprint 2 — skill taxonomy.** 52 bilingual skills, 149 aliases, and search that resolves a
+skill however a real person types it: English, Devanagari, or Hindi in Latin script. Try
+`khoon nikalna` at `/skills` — it finds "Blood sample collection" and tells you why it matched.
 
-## Local setup
+**Sprint 1 — walking skeleton.** Every architectural layer exists and is connected.
+
+| | |
+|---|---|
+| ✅ Postgres 16 + pgvector, Redis 7 | via Docker Compose |
+| ✅ FastAPI, async end to end | health, deep health, demo task endpoints |
+| ✅ Alembic | migration 0001 enables pgvector |
+| ✅ ARQ worker | heartbeat-based liveness (ADR-027) |
+| ✅ Next.js PWA | mobile-first, Hindi + English |
+| ✅ Generated TypeScript client | from the OpenAPI schema |
+| ✅ pytest + testcontainers, CI | disposable Postgres/Redis per run |
+
+**Visible deliverables:** the homepage at `localhost:3000/en` (and `/hi`), browsers at `/skills`,
+`/jobs` and `/courses`, sign-in at `/signin`, the candidate profile at `/profile`, and the System
+Status panel at the foot of the homepage.
+
+Not yet built: matching (Sprint 5), organisation/email login, self-serve publishing, a real SMS
+provider, the NSQF hierarchy above Skill, skill relations, embeddings.
+
+## Prerequisites
+
+- Docker Desktop (running)
+- [uv](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Node 24 (`nvm install 24`)
+
+## Setup
 
 ```bash
 cp .env.example .env
-docker compose up -d          # Postgres + Redis
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-alembic upgrade head
-uvicorn app.main:app --reload
+make install
+make up
+make migrate
+make seed
 ```
 
-Health check: `curl http://localhost:8000/health`
+`make seed` loads the skill taxonomy and the marketplace inventory. It is idempotent — run it
+as often as you like.
 
-### Bootstrapping the first Super Admin
+## Run
 
-`/admin/staff` (for creating more platform staff) requires an existing super admin, so the
-first one must be created directly against the database:
+Three processes, three terminals:
 
 ```bash
-python scripts/create_superuser.py
+make api
 ```
-
-## Tests
 
 ```bash
-pytest
+make worker
 ```
+
+```bash
+make web
+```
+
+Then open **http://localhost:3000** — it redirects to `/en`. All four status cards should be
+green. "Run test task" enqueues a real background job through Redis; the worker picks it up and
+the result appears in the UI.
+
+`make help` lists every target.
+
+## Verify
+
+```bash
+make check
+```
+
+Runs Ruff, mypy and the test suite. Tests start their own throwaway Postgres and Redis
+containers, so they never touch your development data and behave identically in CI.
+
+## Notes
+
+- Host ports are **5433** (Postgres) and **6380** (Redis) so a pre-existing local install is
+  left alone.
+- After changing any API endpoint, run `make gen-api` to regenerate the TypeScript client.
+- Configuration is always read through `get_settings()`. Never bind `settings` at module import
+  time — it cannot then be overridden, and tests silently hit the wrong database.

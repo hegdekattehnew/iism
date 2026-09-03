@@ -4,6 +4,17 @@
 
 > Source: `Intelligent_Integrated_Skill_Marketplace - ADR.xlsx` (converted to Markdown for version control)
 
+> **Amendment record.** ADR-001 to ADR-023 originate from the March 2026 source spreadsheet.
+> ADR-024 to ADR-033 were added in September 2026 to record decisions the original set left open —
+> concrete stack choices, monetization, supply acquisition, credential model and language scope.
+>
+> Changes to the original set:
+> - **ADR-014** — `Status` was malformed in the source conversion; corrected to `Accepted`.
+> - **ADR-015** — superseded by ADR-024. India-first is retained; the single-sector constraint is withdrawn.
+> - **ADR-023** — `Final decision` was empty in the source; now resolved.
+> - **ADR-006** — amended by ADR-027 (task runner implementation only; the principle stands).
+> - **ADR-021** — qualified by ADR-033 for Hindi-language search.
+
 ## ADR-001: Overall Product Architecture
 
 **Status:** Accepted
@@ -328,7 +339,7 @@
 
 ## ADR-014: Deployment Strategy
 
-**Status:** `
+**Status:** Accepted
 
 **Context:** Need scalable infra
 
@@ -351,7 +362,7 @@
 
 ## ADR-015: Target Market Strategy
 
-**Status:** Accepted
+**Status:** Superseded by ADR-024 (September 2026)
 
 **Context:** Need focused GTM
 
@@ -366,7 +377,8 @@
 
 - Option 2: ✅ Faster validation
 
-**Final decision:** Single sector (initial)
+**Final decision:** Single sector (initial) — **superseded by ADR-024.** India-first is retained and
+unaffected; only the single-sector constraint is withdrawn.
 
 
 ---
@@ -528,7 +540,447 @@ Move to OpenSearch later
 
 **Decision:** Encrypted data
 
-**Final decision:** 
+**Options considered:** 1. Application-level encryption of sensitive fields
+2. Database/disk-level encryption only
+3. No encryption, access control only
+
+**Trade-offs:**
+
+- Option 1: ✅ Protects against DB compromise, backup leakage and operator access
+✅ Explicit, auditable boundary
+❌ Key management burden
+❌ Encrypted columns are not searchable
+
+- Option 2: ✅ Nearly free to enable
+❌ Anyone with DB access reads plaintext
+❌ Does not satisfy a data-protection audit on its own
+
+- Option 3: ❌ Unacceptable for Aadhaar and biometric-adjacent data
+
+**Final decision:** Field-level application encryption for Aadhaar numbers, resume documents and
+their extracted text, and assessment results. AES-256-GCM envelope encryption, data keys wrapped by
+a managed KMS; keys never live in application config or environment variables. Ciphertext at rest,
+decrypted only in the service layer at the point of use. These fields are excluded from logs,
+traces, error payloads and analytics events by an explicit redaction filter — plaintext must never
+reach a log sink. Object storage holding resumes and certificates uses server-side encryption under
+the same key hierarchy. Data resides in the India region (see ADR-028) to meet DPDP Act 2023
+residency expectations. Vector embeddings derived from resume text are treated as sensitive
+material in their own right, since embeddings are partially invertible; they inherit the same
+access controls as their source document.
+
+
+---
+
+## ADR-024: Sector Rollout Scope
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-015 committed to a single-sector rollout for faster validation. Subsequent product
+direction prioritises building the NSQF skill taxonomy as shared base data first. The taxonomy is
+the substrate every other capability sits on — matching, career paths, course-to-job alignment —
+and it is sector-agnostic by construction. Constraining it to one sector would not make it
+meaningfully cheaper to build, but would make the eventual expansion a migration rather than a data
+load.
+
+**Decision:** Multi-sector from the outset, taxonomy-first. Supersedes ADR-015.
+
+**Options considered:** 1. Retain single-sector rollout per ADR-015
+2. Multi-sector with a sector-agnostic taxonomy and generic ingestion
+
+**Trade-offs:**
+
+- Option 1: ✅ Focused GTM and a narrow cohort to validate against
+✅ Lower content-operations cost at launch
+❌ Taxonomy would need re-work to generalise later
+❌ Little cost saving, since the schema is sector-agnostic either way
+
+- Option 2: ✅ Base data built once, correctly
+✅ No sector-specific branching enters the codebase
+❌ Larger upfront data-acquisition effort
+❌ No narrow cohort to validate against — dilutes GTM focus
+
+**Final decision:** Multi-sector rollout. The taxonomy schema and the ingestion pipeline are
+sector-agnostic and generic; no sector-specific logic is permitted in application code. Sectors are
+onboarded incrementally as source data becomes available, with three to four Sector Skill Councils
+seeded first to prove the pipeline. "All sectors" is a property of the schema and importer, not a
+day-one data-entry commitment. India-first (ADR-015) is retained.
+
+
+---
+
+## ADR-025: Monetization Model
+
+**Status:** Accepted (September 2026)
+
+**Context:** No prior ADR addressed revenue. Direction is B2C first, graduating to B2B2C. Direct
+willingness-to-pay among Indian vocational candidates is typically very low, and the product's
+core claim — recommendation quality — is unproven. Building billing infrastructure before that
+claim is validated risks investing in the wrong revenue model.
+
+**Decision:** v1 is free to all actors. The revenue model is deferred pending traction data.
+
+**Options considered:** 1. Candidate freemium subscription at launch
+2. Course-provider referral commission at launch
+3. Employer-pays candidate access
+4. Free v1, monetization deferred and instrumented
+
+**Trade-offs:**
+
+- Option 1: ✅ Direct revenue signal
+❌ Requires payment integration and entitlements before product-market fit
+❌ Low willingness-to-pay in the target cohort
+
+- Option 2: ✅ Realistic for the Indian market
+❌ Requires enrollment attribution built before there is enrollment volume
+
+- Option 3: ✅ Where the money actually is
+❌ Contradicts the B2C-first sequencing
+
+- Option 4: ✅ No billing code written against an unvalidated model
+✅ Forces measurement to exist before monetization
+❌ No revenue and no pricing signal during v1
+
+**Final decision:** Free v1, no billing implementation. Payment integration exists as an adapter
+interface only (per ADR-017), unimplemented. Because nobody pays, instrumentation is the substitute
+for a revenue signal and is mandatory, not optional: recommendation precision@5 against a
+hand-labelled golden set, candidate-to-course click-through, and provider-reported enrollment
+conversion. A successor ADR is required before any billing code is written, and must cite those
+metrics.
+
+
+---
+
+## ADR-026: Supply Acquisition Strategy
+
+**Status:** Accepted (September 2026)
+
+**Context:** Recommendations are worthless without job and course inventory. The platform faces a
+classic two-sided cold start: candidates will not come without opportunities, and providers will
+not publish without candidates.
+
+**Decision:** Hybrid — operations-curated seeding alongside provider self-serve publishing.
+
+**Options considered:** 1. Manual operations seeding only
+2. Provider self-serve only
+3. Aggregate public listings
+4. Hybrid: seeding plus self-serve
+
+**Trade-offs:**
+
+- Option 1: ✅ Highest data quality, no integration build, fastest to a working demo
+❌ Does not scale
+
+- Option 2: ✅ Scales, and is the long-term model
+❌ Requires business development to land before any inventory exists
+
+- Option 3: ✅ Volume quickly
+❌ Untagged to NSQF, messy, and legally grey depending on source
+
+- Option 4: ✅ Launch inventory exists while the scalable path is built in parallel
+❌ More build up front; two ingestion paths to maintain
+
+**Final decision:** Hybrid. Operations seeds launch inventory through an internal curation path,
+while tenant-scoped self-serve publishing APIs are built in parallel so partners can contribute as
+business development lands. Both paths write through the same service layer and validation rules —
+seeded and self-serve inventory must be indistinguishable downstream.
+
+
+---
+
+## ADR-027: Async Task Runner
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-006 specified Redis + Celery for asynchronous work. The application is
+asynchronous end to end — FastAPI with async route handlers and async SQLAlchemy sessions. Celery
+is synchronous-first; running it against this stack requires a second, synchronous database engine,
+duplicated session management, and event-loop workarounds inside task bodies.
+
+**Decision:** Use ARQ as the task runner. Amends ADR-006.
+
+**Options considered:** 1. Celery, as originally specified
+2. ARQ
+3. Dramatiq
+
+**Trade-offs:**
+
+- Option 1: ✅ Largest ecosystem, most operational precedent
+❌ Sync-first; forces a parallel sync DB engine and session layer
+❌ Async support is bolted on and awkward
+
+- Option 2: ✅ Asyncio-native; shares the application's existing session machinery directly
+✅ Redis-backed, small surface area
+❌ Smaller ecosystem and fewer operational integrations
+
+- Option 3: ✅ Simpler than Celery, good ergonomics
+❌ Also sync-first
+
+**Final decision:** ARQ. The Redis broker is unchanged and the eventual Kafka migration path in
+ADR-006 is unaffected — this amends the implementation choice only; the event-driven principle and
+the requirement that async work never run inline in request handlers both stand. Decided before any
+tasks were written, when the switching cost is zero.
+
+
+---
+
+## ADR-028: Cloud Platform and Deployment Topology
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-014 settles the modular-monolith shape but names no hosting platform. The system
+will hold Aadhaar verification data, resumes and assessment results (ADR-023), making India data
+residency under the DPDP Act 2023 a hard constraint. Government-sector credibility (ADR-004) also
+carries procurement expectations.
+
+**Decision:** AWS `ap-south-1` (Mumbai), ECS Fargate, infrastructure defined in Terraform.
+
+**Options considered:** 1. AWS ap-south-1 on ECS Fargate
+2. GCP asia-south1 on Cloud Run
+3. Managed PaaS (Render, Railway, Fly)
+4. Kubernetes (EKS/GKE)
+
+**Trade-offs:**
+
+- Option 1: ✅ India residency; managed containers without Kubernetes overhead
+✅ Strongest position in Indian government and enterprise procurement
+✅ Widest India talent pool
+❌ More expensive than scale-to-zero alternatives at low traffic
+
+- Option 2: ✅ Cheapest at low volume, excellent developer experience
+❌ Weaker procurement story in this market
+
+- Option 3: ✅ Fastest to deploy, near-zero operational burden
+❌ Most have no India region — a direct DPDP problem once real candidate data lands
+
+- Option 4: ✅ Maximum portability, aligns with the ADR-014 microservices endgame
+❌ Substantial operational burden for a pre-revenue team
+
+**Final decision:** AWS `ap-south-1` throughout. ECS Fargate running an `api` service and a `worker`
+service behind an Application Load Balancer; RDS PostgreSQL 16 with pgvector; ElastiCache Redis; S3
+with SSE-KMS for documents; Secrets Manager for secrets. All infrastructure is defined in Terraform
+— no console configuration. CI authenticates to AWS via GitHub Actions OIDC; no long-lived access
+keys exist.
+
+
+---
+
+## ADR-029: Client Architecture
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-016 names "Lovable, React, internal services" as API consumers but does not decide
+what is actually built. The primary user cohort is India-first vocational candidates: predominantly
+low-end Android devices, constrained mobile data, frequently not English-first. With no revenue in
+v1 (ADR-025), organic search is the cheapest acquisition channel available.
+
+**Decision:** A single Next.js progressive web application, mobile-first.
+
+**Options considered:** 1. Next.js PWA, mobile-first
+2. React SPA (Vite), native app later
+3. Next.js web plus Flutter mobile from day one
+4. Generated frontend (Lovable) to start
+
+**Trade-offs:**
+
+- Option 1: ✅ One codebase; installable without app-store friction
+✅ Server rendering gives job and course pages organic search visibility
+❌ Less capable than native on very constrained devices
+
+- Option 2: ✅ Simpler build
+❌ Loses server rendering, and with it the cheapest acquisition channel
+
+- Option 3: ✅ Best experience on low-end Android
+❌ Two clients to maintain pre-revenue; install friction for first-time users
+
+- Option 4: ✅ Fastest to a demoable interface
+❌ Would be rebuilt before any real launch
+
+**Final decision:** Next.js (App Router) with React and TypeScript, delivered as an installable PWA
+with aggressive payload budgets for low-end Android. The TypeScript API client is generated from the
+FastAPI OpenAPI schema, which keeps ADR-016's REST-first, fully-documented requirement honest and
+the types permanently synchronised. A native client is deferred until traction justifies it.
+
+
+---
+
+## ADR-030: Identity Implementation — Build versus Buy
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-009 mandates a centralized identity service issuing JWTs but does not decide
+whether it is built or bought. The requirements are unusual in combination: eight actor types, a
+global-user plus tenant plus membership model from day one (ADR-010), shell accounts for
+bulk-imported candidates who claim them later, API-key service accounts for external system
+intake, and optional Aadhaar verification (ADR-011) subject to ADR-023 encryption.
+
+**Decision:** Build the identity service in-house.
+
+**Options considered:** 1. Build in-house
+2. Keycloak, self-hosted
+3. Managed provider (Auth0, Clerk, WorkOS)
+4. Supabase Auth
+
+**Trade-offs:**
+
+- Option 1: ✅ The tenant/membership model, shell-account claim flow and service accounts fit natively
+✅ Aadhaar and DPDP-governed data stay entirely under our control
+❌ Roughly two sprints of build, and security-sensitive code we own forever
+
+- Option 2: ✅ Free, OIDC-standard, realms map reasonably to tenants
+❌ Heavy JVM service to operate; bulk-import shell accounts need custom extensions anyway
+
+- Option 3: ✅ Fastest to working login, MFA and social sign-in included
+❌ Per-MAU pricing is punitive with free B2C candidates
+❌ India residency and Aadhaar handling are difficult on a foreign vendor
+
+- Option 4: ✅ Cheap, Postgres-native
+❌ Couples identity to a vendor with no India region
+
+**Final decision:** Build in-house. The combination of requirements defeats the off-the-shelf
+options, and the per-monthly-active-user pricing of managed providers is structurally wrong for a
+free consumer product (ADR-025). Standard primitives — password hashing, JWT signing, OTP
+generation — use vetted libraries; no cryptography is hand-rolled.
+
+
+---
+
+## ADR-031: AI Provider Abstraction and Embedding Dimensionality
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-018 requires external LLMs with no self-hosting or fine-tuning, and ADR-013
+requires sentence-transformers embeddings stored in pgvector, but neither names a provider. Model
+pricing and quality move quickly, and ADR-017 requires every external system to sit behind an
+adapter. A non-obvious constraint applies: pgvector's HNSW index requires a fixed column dimension,
+while providers differ natively — MiniLM is 384, OpenAI `text-embedding-3-small` is 1536, Gemini is
+768. Without a common dimension, changing embedding provider means a schema migration plus a full
+corpus re-embed, which defeats the purpose of the abstraction.
+
+**Decision:** `LLMProvider` and `EmbeddingProvider` adapter protocols with multiple
+implementations, and a platform embedding dimension pinned at 384.
+
+**Options considered:** 1. Single provider, called directly
+2. Adapter protocols, dimension unpinned
+3. Adapter protocols, dimension pinned at 384
+
+**Trade-offs:**
+
+- Option 1: ✅ Simplest
+❌ Violates ADR-017; vendor lock-in on a fast-moving market
+
+- Option 2: ✅ Swappable LLMs
+❌ Embedding providers remain effectively locked in by the schema
+
+- Option 3: ✅ Genuinely swappable embedding providers with no schema change
+✅ Enables shadow-running a candidate model against production traffic
+❌ Forfeits any quality gain from higher-dimensional embeddings
+
+**Final decision:** Two adapter protocols. `LLMProvider` (`complete`, `extract_structured`) with
+Anthropic as the default implementation, plus OpenAI and Gemini. `EmbeddingProvider` (`embed`) with
+self-hosted sentence-transformers `paraphrase-multilingual-MiniLM-L12-v2` as the default — 384
+dimensions, CPU-only, free at inference, and multilingual, which ADR-033 makes load-bearing.
+
+Every adapter must emit 384-dimension vectors. 384 is chosen because it is MiniLM's native size and
+because both OpenAI `text-embedding-3-*` and Gemini support Matryoshka dimension reduction to it via
+an API parameter — so all three providers are interchangeable without touching the schema. Any other
+choice silently breaks the abstraction. Every stored vector records the provider, model identifier
+and model version that produced it, so a shadow model can be run during migration and no vector's
+provenance is ever ambiguous. Consistent with ADR-005, embeddings contribute to a deterministic
+score; no LLM decides a match.
+
+
+---
+
+## ADR-032: Primary Credential by Actor Type
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-009 and ADR-011 describe an email-centric identity — email and password, Google
+OAuth, email verification, email password reset. This is a poor fit for the primary user cohort.
+India-first vocational candidates are phone-first; many have no regularly used email address, and
+Google OAuth presumes an account they may not hold. Organizational actors — employers, course
+providers, assessment providers, government agencies, platform staff — are reliably email-native and
+will expect email and eventually SSO.
+
+**Decision:** Phone with one-time passcode for candidates; email and password for organizational
+actors. Both linkable on a single account.
+
+**Options considered:** 1. Email-first for all actors, per ADR-009 as written
+2. Phone and OTP for all actors
+3. Phone/OTP for candidates, email for organizations
+4. Email primary with phone as a second factor
+
+**Trade-offs:**
+
+- Option 1: ✅ Cheapest build; no SMS vendor or per-message cost
+❌ A signup wall for precisely the candidates the product exists to serve
+
+- Option 2: ✅ One authentication path to build and reason about
+❌ Organizational users expect email and SSO; weakens the eventual B2B2C story
+
+- Option 3: ✅ Matches how each cohort actually behaves
+❌ Two authentication paths to build, test and secure
+
+- Option 4: ✅ Preserves the existing ADR-009 design
+❌ Does not solve the problem; candidates without email still cannot register
+
+**Final decision:** Dual credential. The user record carries both phone and email as independently
+nullable, independently verified, independently unique identifiers — neither is mandatory, and the
+UUID remains the primary key per ADR-011. Both login paths converge on a single token issuance
+path, so nothing downstream of authentication knows or cares which was used. Which credential is
+required is determined by actor type at registration, in the service layer, not scattered across
+route handlers.
+
+This promotes SMS to the critical path: one-time passcode delivery becomes a login availability
+concern rather than a notification convenience. It requires per-phone rate limiting, a second SMS
+provider configured for failover behind the same adapter (ADR-017), and DLT registration for Indian
+transactional messaging. The bulk-import shell-account claim flow becomes SMS-first for candidates,
+keyed on phone rather than email.
+
+
+---
+
+## ADR-033: Language Scope at Launch
+
+**Status:** Accepted (September 2026)
+
+**Context:** The product is India-first with later global adaptation. The candidate cohort is
+substantially not English-first. ADR-021 specifies PostgreSQL full-text search, and ADR-004
+specifies an NSQF-aligned taxonomy whose source material is largely English-only.
+
+**Decision:** Hindi and English both live at launch.
+
+**Options considered:** 1. English only, internationalisation deferred
+2. English at launch, internationalisation scaffolded
+3. Hindi and English at launch
+4. Hindi, English and two to three regional languages at launch
+
+**Trade-offs:**
+
+- Option 1: ✅ Leanest v1
+❌ Retrofitting internationalisation is an expensive refactor
+
+- Option 2: ✅ Cheap now, inexpensive to extend later
+❌ Launches without reach into much of the intended cohort
+
+- Option 3: ✅ Real reach into the actual candidate base from day one
+❌ Roughly doubles content operations; adds translation QA to every sprint
+
+- Option 4: ✅ Widest reach; strongest government-partnership position
+❌ Substantial recurring translation cost with no revenue
+
+**Final decision:** Hindi and English at launch. Locale routing, externalised strings and
+Devanagari-capable typography are day-one requirements in the client (ADR-029). Translated content
+is modelled as first-class fields rather than bolted on later. First-pass translation of seeded job,
+course and NSQF skill content uses the LLM adapter already required by ADR-031, with human review —
+translation is not sourced as a separate workstream.
+
+Two consequences are recorded explicitly. First, this makes the multilingual embedding model in
+ADR-031 load-bearing rather than a hedge. Second, it partially undercuts ADR-021: PostgreSQL ships
+no Hindi text-search configuration — no stemmer and no stopword list. Hindi will be indexed using
+the `simple` configuration together with `pg_trgm` for fuzzy matching, leaning on pgvector semantic
+search to carry Hindi relevance. This must be validated early, and may pull ADR-021's OpenSearch
+migration forward.
 
 
 ---
