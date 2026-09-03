@@ -1,0 +1,12 @@
+{
+  "name": "Intelligent Integrated Skill Marketplace",
+  "short_name": "IISM",
+  "description": "Connecting candidates, courses and jobs through a shared skill graph",
+  "start_url": "/en",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1f4e79",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

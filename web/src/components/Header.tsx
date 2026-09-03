@@ -1,0 +1,87 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { useState } from "react";
+
+import { AuthNav } from "@/components/AuthNav";
+import { LocaleToggle } from "@/components/LocaleToggle";
+import { Logo } from "@/components/ui";
+import { Link } from "@/i18n/navigation";
+
+const NAV = [
+  { key: "jobs", href: "/jobs" },
+  { key: "courses", href: "/courses" },
+  { key: "skills", href: "/skills" },
+  { key: "howItWorks", href: "/#how-it-works" },
+] as const;
+
+export function Header() {
+  const t = useTranslations("nav");
+  const [open, setOpen] = useState(false);
+  // Closed on click rather than in an effect keyed to the path: the effect form
+  // sets state during render-commit, which React 19 flags.
+  const close = () => setOpen(false);
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-border-token bg-background/85 backdrop-blur">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-5">
+        <Link href="/" aria-label="IISM" className="shrink-0">
+          <Logo />
+        </Link>
+
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
+          {NAV.map(({ key, href }) => (
+            <Link
+              key={key}
+              href={href}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+            >
+              {t(key)}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="hidden items-center gap-2 lg:flex">
+          <LocaleToggle />
+          <AuthNav />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="mobile-nav"
+          aria-label={open ? t("closeMenu") : t("openMenu")}
+          className="rounded-lg border border-border-token p-2 lg:hidden"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+          </svg>
+        </button>
+      </div>
+
+      {open && (
+        <div id="mobile-nav" className="border-t border-border-token bg-background lg:hidden">
+          <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4" aria-label="Main">
+            {NAV.map(({ key, href }) => (
+              <Link
+                key={key}
+                href={href}
+                onClick={close}
+                className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-surface-muted"
+              >
+                {t(key)}
+              </Link>
+            ))}
+            <div onClick={close} className="mt-3 flex flex-col gap-2 border-t border-border-token pt-4">
+              <AuthNav stacked />
+              <div className="pt-2">
+                <LocaleToggle />
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+}

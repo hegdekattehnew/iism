@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Design tokens. Light is the base; dark overrides only what changes, so a new
+   colour can never be defined for one theme and missing in the other. */
+:root {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --brand: #1f4e79;
+  --brand-strong: #163a5a;
+  --brand-contrast: #ffffff;
+  --accent-soft: #eff5fb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #020617;
+    --surface: #0b1220;
+    --surface-muted: #0f172a;
+    --foreground: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #1e293b;
+    --brand: #5b9bd5;
+    --brand-strong: #7db3e3;
+    --brand-contrast: #041022;
+    --accent-soft: #0e1c2d;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border-token: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-accent-soft: var(--accent-soft);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Devanagari",
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Devanagari needs slightly more line height than Latin at the same size. */
+html[lang="hi"] body {
+  line-height: 1.7;
+}
