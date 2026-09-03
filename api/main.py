@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from arq.jobs import Job, JobStatus
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -82,7 +82,13 @@ async def health_deep() -> DeepHealth:
 
 
 # ------------------------------------------------------------------ demo task
-# Sprint 1 only: proves the enqueue -> worker -> result path is real and visible.
+# Sprint 1 verification for the homepage dev panel. Registered ONLY in local
+# environments: unauthenticated and it enqueues work, so in production it would
+# be an open queue-flooding vector. The dev panel is not part of the product
+# surface, so removing it outside development costs nothing.
+
+
+tasks_router = APIRouter()
 
 
 class TaskEnqueued(BaseModel):
@@ -95,7 +101,7 @@ class TaskStatus(BaseModel):
     result: dict[str, Any] | None = None
 
 
-@app.post("/tasks/ping", response_model=TaskEnqueued, tags=["tasks"])
+@tasks_router.post("/tasks/ping", response_model=TaskEnqueued, tags=["tasks"])
 async def enqueue_ping(note: str = "") -> TaskEnqueued:
     pool = await get_task_pool()
     job = await pool.enqueue_job("ping", note)
@@ -104,7 +110,7 @@ async def enqueue_ping(note: str = "") -> TaskEnqueued:
     return TaskEnqueued(job_id=job.job_id)
 
 
-@app.get("/tasks/{job_id}", response_model=TaskStatus, tags=["tasks"])
+@tasks_router.get("/tasks/{job_id}", response_model=TaskStatus, tags=["tasks"])
 async def task_status(job_id: str) -> TaskStatus:
     pool = await get_task_pool()
     job = Job(job_id, pool)
@@ -116,3 +122,8 @@ async def task_status(job_id: str) -> TaskStatus:
         except Exception:
             result = None
     return TaskStatus(job_id=job_id, status=status.value, result=result)
+
+
+# Only mounted locally; in any other environment these paths do not exist.
+if _settings.is_local:
+    app.include_router(tasks_router)

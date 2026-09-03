@@ -4,7 +4,7 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-02 · Sprints 1–5 built; matching is now Sprint 6, unplanned
+**Last updated:** 2026-09-02 · Sprints 1–5 built + a security/perf pass; matching is Sprint 6
 
 ---
 
@@ -223,6 +223,17 @@ Three processes must run for the full stack: **api, worker, web.**
     only fails to diff **changed** bodies. Both were seen this project.
 20. **Adding a NOT NULL column to a populated table needs `server_default`,** or the ALTER fails
     outright on the existing rows.
+21. **Routes mounted via `include_router` do not expose `.path` on `app.routes`** in this FastAPI
+    version — they are wrapped in `_IncludedRouter`. Inspect `app.openapi()["paths"]` instead;
+    checking `app.routes` silently finds nothing and looks like the route is missing.
+22. **Never purge `sys.modules` to rebuild the app in-process.** It leaves other tests in the same
+    file holding a different `get_settings` with its own `lru_cache`, and the contamination only
+    shows up as an unrelated test failing. Use a subprocess.
+23. **pytest's logging plugin swallows handler output for our loggers.** A `StreamHandler` capture
+    comes back empty, so log-content assertions pass vacuously. Assert on the rendered record via
+    monkeypatch, and always assert the capture is non-empty first.
+24. **String-replace edits silently no-op after ruff reformats.** Three separate edits this project
+    reported success while changing nothing. Always `assert old in s` before replacing.
 
 ## 9. Conventions that must not be broken
 
@@ -273,6 +284,54 @@ Two things must land with or before it, and neither exists:
 Deliberately still unscheduled: the NSQF hierarchy above Skill (SSC → Sector → Occupation → QP →
 NOS) and its importer. Acquiring real NSQF data is a project in itself — per-SSC documents, no clean
 public API — and remains the single most underestimated line item in the plan.
+
+## 12a. Measured performance ceiling (audited 2026-09-02)
+
+Load-tested locally. **The bottleneck is Python CPU, not the database.**
+
+- `GET /jobs` — flat at **~137 rps** on one uvicorn worker regardless of
+  concurrency; p99 degrades 208ms → 2,192ms from c=10 to c=200.
+- `GET /skills/search` — peaks ~420 rps at c=100 then **collapses to 160 rps**.
+- The database answers in **1.5 ms** while uvicorn pegs **94.8% of one core**.
+- Four workers gave ~255 rps, not 4× (the load generator shares the box, so
+  treat all throughput figures as a floor).
+
+**Not ready for 1000 concurrent users.** Fixed in this pass: the four missing
+filter indexes. Still outstanding, in order:
+
+1. **No caching.** Redis is present but serves only OTP, refresh tokens and the
+   ARQ broker — ADR-020 is unimplemented. The taxonomy is near-static.
+2. **Connection pool maths.** 15 connections per process against Postgres
+   `max_connections=100` caps you at ~6 processes. PgBouncer before that.
+3. **The browsers fetch `limit=200` and filter client-side.** This does not
+   degrade with catalogue growth — it stops working.
+4. Run uvicorn with multiple workers; it is single-process today.
+
+## 12b. Security posture (audited 2026-09-02)
+
+**Fixed in this pass:**
+- `POST /tasks/ping` was unauthenticated and enqueued work — 25 anonymous
+  requests queued 26 jobs. The demo router is now mounted only when
+  `settings.is_local`, so the path does not exist in production.
+- The console notification provider logged the OTP **and** the full phone
+  number. It now logs `notification dispatched to +9198*****999 (63 chars)`.
+- Added composite indexes on the columns every listing filters by.
+
+**Still open, in rough priority order:**
+1. **No rate limiting outside the OTP path.** `/skills/search` runs a 4-way
+   UNION with trigram matching, completely unthrottled.
+2. **No security headers** — no HSTS, CSP, X-Frame-Options, X-Content-Type-
+   Options. Missing CSP matters more than usual because tokens sit in
+   `localStorage`, so any XSS is full account takeover.
+3. **No DPDP erasure or export endpoints.** Zero routes for deletion, export or
+   consent. Legally required in the target market.
+4. `/health/deep` is public and returns raw exception strings.
+5. No request body size limit; a 3 MB body is parsed before rejection.
+
+**Verified safe, so do not re-litigate:** SQL injection is not possible — the
+raw search query is fully parameterised and `x'; DROP TABLE skills; --` left
+the table intact. Cross-user isolation is correct and tested. No tokens reach
+the logs. CORS is restricted to one origin.
 
 ## 12. Open risks — state these honestly, do not soften
 

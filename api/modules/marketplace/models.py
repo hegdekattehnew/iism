@@ -66,6 +66,10 @@ class Job(Base):
         ),
         Index("ix_jobs_tenant_id", "tenant_id"),
         Index("ix_jobs_status", "status"),
+        # Every listing filters on status first, so the composite is what the
+        # planner can actually use; a lone column index still scans drafts.
+        Index("ix_jobs_status_state", "status", "location_state"),
+        Index("ix_jobs_status_employment", "status", "employment_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -140,6 +144,8 @@ class Course(Base):
         ),
         Index("ix_courses_tenant_id", "tenant_id"),
         Index("ix_courses_status", "status"),
+        Index("ix_courses_status_mode", "status", "mode"),
+        Index("ix_courses_status_language", "status", "language"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

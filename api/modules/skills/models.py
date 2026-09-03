@@ -30,6 +30,7 @@ class Skill(Base):
             "nsqf_level IS NULL OR (nsqf_level BETWEEN 1 AND 10)",
             name="ck_skills_nsqf_level",
         ),
+        Index("ix_skills_type_level", "skill_type", "nsqf_level"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
