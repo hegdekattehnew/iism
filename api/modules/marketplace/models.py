@@ -1,9 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
     Computed,
+    Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -202,6 +204,20 @@ class CandidateProfile(Base):
             "years_experience >= 0 AND years_experience <= 60",
             name="ck_candidate_experience",
         ),
+        CheckConstraint(
+            "gender IS NULL OR gender IN ('female', 'male', 'other', 'prefer_not_to_say')",
+            name="ck_candidate_gender",
+        ),
+        CheckConstraint(
+            "notice_period IS NULL OR notice_period IN "
+            "('immediate', 'within_15_days', 'within_30_days', 'over_30_days')",
+            name="ck_candidate_notice",
+        ),
+        CheckConstraint(
+            "expected_salary_min_inr IS NULL OR expected_salary_max_inr IS NULL "
+            "OR expected_salary_max_inr >= expected_salary_min_inr",
+            name="ck_candidate_salary_range",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -215,10 +231,47 @@ class CandidateProfile(Base):
     years_experience: Mapped[int] = mapped_column(default=0)
     education_level: Mapped[str | None] = mapped_column(default=None)
 
+    # --- personal (all optional; DPDP-sensitive, never required) ---
+    date_of_birth: Mapped[date | None] = mapped_column(Date, default=None)
+    gender: Mapped[str | None] = mapped_column(default=None)
+
+    # --- what the candidate wants -------------------------------------
+    # Without these the matching engine knows what someone can do but not what
+    # they are aiming for, and the core loop starts with a target.
+    willing_to_relocate: Mapped[bool] = mapped_column(default=False)
+    preferred_employment_type: Mapped[str | None] = mapped_column(default=None)
+    expected_salary_min_inr: Mapped[int | None] = mapped_column(default=None)
+    expected_salary_max_inr: Mapped[int | None] = mapped_column(default=None)
+    notice_period: Mapped[str | None] = mapped_column(default=None)
+
+    # Set when the guided first-run wizard is finished, so returning users get
+    # the sectioned editor instead.
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     skills: Mapped[list["CandidateSkill"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    experiences: Mapped[list["CandidateExperience"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    educations: Mapped[list["CandidateEducation"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    certifications: Mapped[list["CandidateCertification"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    languages: Mapped[list["CandidateLanguage"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    preferred_roles: Mapped[list["CandidatePreferredRole"]] = relationship(
+        back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
+    )
+    preferred_locations: Mapped[list["CandidatePreferredLocation"]] = relationship(
         back_populates="profile", lazy="selectin", cascade="all, delete-orphan"
     )
 
@@ -248,3 +301,166 @@ class CandidateSkill(Base):
 
     profile: Mapped["CandidateProfile"] = relationship(back_populates="skills")
     skill: Mapped["Skill"] = relationship(lazy="selectin")
+
+
+class CandidateExperience(Base):
+    """One period of employment.
+
+    Replaces a bare years_experience integer: "three years" tells a match score
+    nothing, whereas three years as a Ward Attendant is evidence for a specific
+    set of skills.
+    """
+
+    __tablename__ = "candidate_experiences"
+    __table_args__ = (
+        CheckConstraint("ended_on IS NULL OR ended_on >= started_on", name="ck_experience_dates"),
+        CheckConstraint("is_current = false OR ended_on IS NULL", name="ck_experience_current"),
+        Index("ix_candidate_experiences_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    employer_name: Mapped[str] = mapped_column()
+    role_title: Mapped[str] = mapped_column()
+    location: Mapped[str | None] = mapped_column(default=None)
+    started_on: Mapped[date] = mapped_column(Date)
+    ended_on: Mapped[date | None] = mapped_column(Date, default=None)
+    is_current: Mapped[bool] = mapped_column(default=False)
+    description: Mapped[str | None] = mapped_column(default=None)
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="experiences")
+
+
+class CandidateEducation(Base):
+    """One qualification."""
+
+    __tablename__ = "candidate_educations"
+    __table_args__ = (
+        CheckConstraint(
+            "year_completed IS NULL OR (year_completed BETWEEN 1950 AND 2100)",
+            name="ck_education_year",
+        ),
+        Index("ix_candidate_educations_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    qualification: Mapped[str] = mapped_column()
+    institution: Mapped[str | None] = mapped_column(default=None)
+    specialisation: Mapped[str | None] = mapped_column(default=None)
+    education_level: Mapped[str | None] = mapped_column(default=None)
+    year_completed: Mapped[int | None] = mapped_column(default=None)
+    is_pursuing: Mapped[bool] = mapped_column(default=False)
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="educations")
+
+
+class CandidateCertification(Base):
+    """A credential, optionally tied to a skill in the taxonomy.
+
+    `skill_id` is the important column: a verified certificate is what will let
+    a skill be recorded with source='certified' rather than 'self_declared',
+    which is how evidence outranks a self-claim in scoring (ADR-007).
+    """
+
+    __tablename__ = "candidate_certifications"
+    __table_args__ = (
+        CheckConstraint(
+            "expires_on IS NULL OR issued_on IS NULL OR expires_on >= issued_on",
+            name="ck_certification_dates",
+        ),
+        Index("ix_candidate_certifications_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column()
+    issuing_body: Mapped[str | None] = mapped_column(default=None)
+    credential_id: Mapped[str | None] = mapped_column(default=None)
+    issued_on: Mapped[date | None] = mapped_column(Date, default=None)
+    expires_on: Mapped[date | None] = mapped_column(Date, default=None)
+    nsqf_level: Mapped[int | None] = mapped_column(default=None)
+    skill_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("skills.id", ondelete="SET NULL"), default=None
+    )
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="certifications")
+    skill: Mapped["Skill | None"] = relationship(lazy="selectin")
+
+
+class CandidateLanguage(Base):
+    """A language the candidate speaks, and how well.
+
+    Materially affects which courses are usable: a course taught only in English
+    is not an option for someone whose English is basic, however well the skills
+    line up.
+    """
+
+    __tablename__ = "candidate_languages"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "language", name="uq_candidate_language"),
+        CheckConstraint(
+            "proficiency IN ('basic', 'conversational', 'fluent', 'native')",
+            name="ck_language_proficiency",
+        ),
+        Index("ix_candidate_languages_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    language: Mapped[str] = mapped_column()
+    proficiency: Mapped[str] = mapped_column(default="conversational")
+    can_read: Mapped[bool] = mapped_column(default=True)
+    can_write: Mapped[bool] = mapped_column(default=True)
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="languages")
+
+
+class CandidatePreferredRole(Base):
+    """A role the candidate is aiming for.
+
+    Free text for now: the NSQF Occupation entity does not exist yet, and
+    forcing a taxonomy choice would exclude anyone whose target is not in it.
+    Matching resolves these against job titles until the hierarchy lands.
+    """
+
+    __tablename__ = "candidate_preferred_roles"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "title", name="uq_candidate_preferred_role"),
+        Index("ix_candidate_preferred_roles_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column()
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="preferred_roles")
+
+
+class CandidatePreferredLocation(Base):
+    """Somewhere the candidate would work. Distinct from where they live."""
+
+    __tablename__ = "candidate_preferred_locations"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "state", "district", name="uq_candidate_preferred_location"),
+        Index("ix_candidate_preferred_locations_profile_id", "profile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    state: Mapped[str] = mapped_column()
+    district: Mapped[str | None] = mapped_column(default=None)
+
+    profile: Mapped["CandidateProfile"] = relationship(back_populates="preferred_locations")

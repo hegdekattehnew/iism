@@ -320,6 +320,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/profile/onboarding/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Onboarding */
+        post: operations["complete_onboarding_me_profile_onboarding_complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/profile/skills": {
         parameters: {
             query?: never;
@@ -349,6 +366,41 @@ export interface paths {
         post?: never;
         /** Remove Skill */
         delete: operations["remove_skill_me_profile_skills__skill_slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/profile/{collection}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Entry */
+        post: operations["add_entry_me_profile__collection__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/profile/{collection}/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Entry */
+        put: operations["update_entry_me_profile__collection___entry_id__put"];
+        post?: never;
+        /** Remove Entry */
+        delete: operations["remove_entry_me_profile__collection___entry_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -442,13 +494,15 @@ export interface components {
              */
             script: "latin" | "devanagari" | "transliteration";
         };
-        /** CandidateProfileOut */
-        CandidateProfileOut: {
+        /** CandidateProfileFull */
+        CandidateProfileFull: {
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Full Name */
+            full_name?: string | null;
             /** Headline */
             headline?: string | null;
             /** Location State */
@@ -459,24 +513,73 @@ export interface components {
             years_experience: number;
             /** Education Level */
             education_level?: ("none" | "primary" | "secondary" | "higher_secondary" | "iti" | "diploma" | "graduate" | "postgraduate") | null;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Gender */
+            gender?: ("female" | "male" | "other" | "prefer_not_to_say") | null;
+            /**
+             * Willing To Relocate
+             * @default false
+             */
+            willing_to_relocate: boolean;
+            /** Preferred Employment Type */
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            /** Expected Salary Min Inr */
+            expected_salary_min_inr?: number | null;
+            /** Expected Salary Max Inr */
+            expected_salary_max_inr?: number | null;
+            /** Notice Period */
+            notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
+            /** Onboarding Completed At */
+            onboarding_completed_at?: string | null;
             /** Skills */
             skills?: components["schemas"]["CandidateSkillOut"][];
+            /** Experiences */
+            experiences?: components["schemas"]["ExperienceOut"][];
+            /** Educations */
+            educations?: components["schemas"]["EducationOut"][];
+            /** Certifications */
+            certifications?: components["schemas"]["CertificationOut"][];
+            /** Languages */
+            languages?: components["schemas"]["LanguageOut"][];
+            /** Preferred Roles */
+            preferred_roles?: components["schemas"]["PreferredRoleOut"][];
+            /** Preferred Locations */
+            preferred_locations?: components["schemas"]["PreferredLocationOut"][];
+            completeness?: components["schemas"]["ProfileCompleteness"];
         };
-        /** CandidateProfileUpdate */
-        CandidateProfileUpdate: {
+        /**
+         * CandidateProfileUpdateFull
+         * @description Every field optional: sections save independently, so a partial payload
+         *     must not blank out fields the user was not editing.
+         */
+        CandidateProfileUpdateFull: {
+            /** Full Name */
+            full_name?: string | null;
             /** Headline */
             headline?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
             location_district?: string | null;
-            /**
-             * Years Experience
-             * @default 0
-             */
-            years_experience: number;
+            /** Years Experience */
+            years_experience?: number | null;
             /** Education Level */
             education_level?: ("none" | "primary" | "secondary" | "higher_secondary" | "iti" | "diploma" | "graduate" | "postgraduate") | null;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Gender */
+            gender?: ("female" | "male" | "other" | "prefer_not_to_say") | null;
+            /** Willing To Relocate */
+            willing_to_relocate?: boolean | null;
+            /** Preferred Employment Type */
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            /** Expected Salary Min Inr */
+            expected_salary_min_inr?: number | null;
+            /** Expected Salary Max Inr */
+            expected_salary_max_inr?: number | null;
+            /** Notice Period */
+            notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
         };
         /** CandidateSkillAdd */
         CandidateSkillAdd: {
@@ -498,6 +601,27 @@ export interface components {
              * @enum {string}
              */
             source: "self_declared" | "inferred" | "assessed" | "certified";
+        };
+        /** CertificationOut */
+        CertificationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Issuing Body */
+            issuing_body?: string | null;
+            /** Credential Id */
+            credential_id?: string | null;
+            /** Issued On */
+            issued_on?: string | null;
+            /** Expires On */
+            expires_on?: string | null;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            skill?: components["schemas"]["SkillOut"] | null;
         };
         /** ComponentHealth */
         ComponentHealth: {
@@ -620,6 +744,57 @@ export interface components {
             /** Components */
             components: components["schemas"]["ComponentHealth"][];
         };
+        /** EducationOut */
+        EducationOut: {
+            /** Qualification */
+            qualification: string;
+            /** Institution */
+            institution?: string | null;
+            /** Specialisation */
+            specialisation?: string | null;
+            /** Education Level */
+            education_level?: ("none" | "primary" | "secondary" | "higher_secondary" | "iti" | "diploma" | "graduate" | "postgraduate") | null;
+            /** Year Completed */
+            year_completed?: number | null;
+            /**
+             * Is Pursuing
+             * @default false
+             */
+            is_pursuing: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** ExperienceOut */
+        ExperienceOut: {
+            /** Employer Name */
+            employer_name: string;
+            /** Role Title */
+            role_title: string;
+            /** Location */
+            location?: string | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /** Ended On */
+            ended_on?: string | null;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -722,6 +897,32 @@ export interface components {
             /** Is Mandatory */
             is_mandatory: boolean;
         };
+        /** LanguageOut */
+        LanguageOut: {
+            /** Language */
+            language: string;
+            /**
+             * Proficiency
+             * @default conversational
+             * @enum {string}
+             */
+            proficiency: "basic" | "conversational" | "fluent" | "native";
+            /**
+             * Can Read
+             * @default true
+             */
+            can_read: boolean;
+            /**
+             * Can Write
+             * @default true
+             */
+            can_write: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** MarketplaceCounts */
         MarketplaceCounts: {
             /** Jobs */
@@ -758,6 +959,41 @@ export interface components {
             phone: string;
             /** Code */
             code: string;
+        };
+        /** PreferredLocationOut */
+        PreferredLocationOut: {
+            /** State */
+            state: string;
+            /** District */
+            district?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** PreferredRoleOut */
+        PreferredRoleOut: {
+            /** Title */
+            title: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /**
+         * ProfileCompleteness
+         * @description Drives the progress meter and tells the candidate what to do next.
+         */
+        ProfileCompleteness: {
+            /**
+             * Percent
+             * @default 0
+             */
+            percent: number;
+            /** Missing */
+            missing?: string[];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -1485,7 +1721,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CandidateProfileOut"];
+                    "application/json": components["schemas"]["CandidateProfileFull"];
                 };
             };
         };
@@ -1499,7 +1735,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CandidateProfileUpdate"];
+                "application/json": components["schemas"]["CandidateProfileUpdateFull"];
             };
         };
         responses: {
@@ -1509,7 +1745,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CandidateProfileOut"];
+                    "application/json": components["schemas"]["CandidateProfileFull"];
                 };
             };
             /** @description Validation Error */
@@ -1519,6 +1755,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_onboarding_me_profile_onboarding_complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateProfileFull"];
                 };
             };
         };
@@ -1542,7 +1798,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CandidateProfileOut"];
+                    "application/json": components["schemas"]["CandidateProfileFull"];
                 };
             };
             /** @description Validation Error */
@@ -1573,7 +1829,114 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CandidateProfileOut"];
+                    "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_entry_me_profile__collection__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collection: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_entry_me_profile__collection___entry_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collection: string;
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_entry_me_profile__collection___entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collection: string;
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateProfileFull"];
                 };
             };
             /** @description Validation Error */

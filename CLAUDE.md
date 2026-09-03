@@ -138,6 +138,19 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
+preferences, plus six repeating collections: experiences, educations, certifications, languages,
+preferred roles and preferred locations. `/profile` is a guided 5-step wizard on first visit and
+a sectioned editor thereafter, with a weighted completeness meter.
+
+Two things to respect:
+- **The six collections share one generic route and one generic editor.** `/me/profile/{collection}`
+  takes an untyped body, which means FastAPI's automatic 422 does **not** apply — the handler
+  translates `ValidationError` itself. Adding a section is an entry in `CHILD_MODELS`, `_PAYLOADS`
+  and `useSectionDefs`, not a new module.
+- **`/me/profile/skills` is declared before `/me/profile/{collection}`** or the literal path gets
+  captured as a collection name. There is a test guarding it.
+
 Sprint 4 (identity + candidate profile) is complete. `identity` holds `User`, `Tenant` and
 `Membership` with passwordless phone/OTP sign-in; `marketplace` gained `CandidateProfile` and
 `CandidateSkill`. `/signin` and `/profile` are live in both locales, and the header reflects
@@ -189,7 +202,7 @@ The public homepage template is also in place: header with nav and CTAs, hero wi
 how-it-works, audience cards, browse panels, CTA band, footer, and the dev/status panel last.
 All 13 routes exist in both locales; content is placeholder where the feature is not built.
 
-Still to come: matching (Sprint 5) — which needs analytics instrumentation and a golden-set
+Still to come: matching (Sprint 6) — which needs analytics instrumentation and a golden-set
 evaluation harness alongside it. Also outstanding: organisation/email login and self-serve
 publishing, a real SMS provider, the NSQF hierarchy above Skill (SSC → Sector → Occupation → QP → NOS), typed
 SkillRelation edges, embeddings, and analytics instrumentation. Do not assume every module listed

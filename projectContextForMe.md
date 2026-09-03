@@ -4,7 +4,7 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-02 · Sprints 1–4 built; Sprint 5 (matching) not yet planned
+**Last updated:** 2026-09-02 · Sprints 1–5 built; matching is now Sprint 6, unplanned
 
 ---
 
@@ -92,7 +92,12 @@ per-phone rate limiting, 5-guess cap, JWT access + rotating refresh. `Notificati
 adapter with a console implementation. `CandidateProfile` + `CandidateSkill` carrying `source`.
 `/signin` and `/profile` live; header reflects auth state. 78 tests.
 
-**Verified at last run:** 78 Python tests pass · Ruff + mypy clean · tsc + ESLint clean ·
+**Sprint 5 (rich candidate profile) — complete.** Driven by real use: the first-login profile was
+five fields. Added personal details, job preferences, and six repeating collections (experiences,
+educations, certifications, languages, preferred roles, preferred locations). Guided wizard on
+first visit, sectioned editor after, weighted completeness meter. 101 tests.
+
+**Verified at last run:** 101 Python tests pass · Ruff + mypy clean · tsc + ESLint clean ·
 routes all correct · migrations round-trip properly (verified by exit code and table counts,
 not by log-grepping) · 52 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses.
 
@@ -211,6 +216,13 @@ Three processes must run for the full stack: **api, worker, web.**
     maps to `TIMESTAMP WITHOUT TIME ZONE` and asyncpg rejects an aware value outright.
 17. **`ENVIRONMENT=test` is not `development`.** Config guards that relax "in development" must
     list both, or the whole suite fails at import with a validation error.
+18. **A route taking `body: dict` loses FastAPI's automatic 422.** The generic
+    `/me/profile/{collection}` handler must catch `ValidationError` and re-raise as 422, or bad
+    input returns 500. Same for DB CHECK violations — validate in the schema, not just the column.
+19. **Correction to gotcha 14:** Alembic *does* detect newly-**added** named CHECK constraints. It
+    only fails to diff **changed** bodies. Both were seen this project.
+20. **Adding a NOT NULL column to a populated table needs `server_default`,** or the ALTER fails
+    outright on the existing rows.
 
 ## 9. Conventions that must not be broken
 
@@ -251,7 +263,8 @@ First real occupant of `api/adapters/` — a `NotificationProvider` protocol wit
 implementation that logs the OTP in dev. `CandidateProfile` + `candidate_skills` in the marketplace
 module. `/signin` and `/profile` go live; adding skills reuses the existing `SkillBrowser`.
 
-**Sprint 5 is matching** — the payoff, and now unblocked: all three sides of the graph exist.
+**Sprint 6 is matching** — the payoff. Deferred once already: the candidate profile was too thin
+to match against, which was the right call since score quality is bounded by input quality.
 Two things must land with or before it, and neither exists:
 1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute for
    a revenue signal and nothing currently records anything.

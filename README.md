@@ -9,7 +9,12 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 33 ADRs
 that govern how.
 
-## Status — Sprints 1–4 complete
+## Status — Sprints 1–5 complete
+
+**Sprint 5 — rich candidate profile.** Work history, education, certifications, languages, target
+roles and preferred locations, plus job preferences and optional personal details. First visit is a
+guided 5-step wizard; after that it is a sectioned editor with a completeness meter that names the
+most valuable thing to add next.
 
 **Sprint 4 — identity and candidate profiles.** Passwordless sign-in with a phone number and a
 6-digit code. Build a profile and declare skills against the taxonomy — search in English, Hindi
