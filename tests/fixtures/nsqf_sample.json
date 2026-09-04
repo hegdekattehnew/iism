@@ -1,0 +1,204 @@
+{
+  "_comment": [
+    "A small NSQF corpus in the exact document shape of iism_nsqf_master_data.",
+    "Hand-built rather than sampled, so that every trap the real feed contains is",
+    "present in something small enough to read: half-levels, the '4' vs '4.0'",
+    "duplicate forms, trailing whitespace in NOS titles, credits of 'TBD', HH:MM",
+    "durations, grouped elective/optional units, superseded QP versions, a NOS",
+    "with no usable code, a curriculum entry whose unitCode is blank, and one",
+    "sectorID carrying two spellings of its name.",
+    "Keys are deliberately the source's own, including the 'compulsary' spelling."
+  ],
+
+  "nos": [
+    {
+      "unitCode": "HC/N0001",
+      "unitTitle": "Collect blood samples   ",
+      "version": "1.0",
+      "type": "Core",
+      "description": "Draw venous blood safely and label it correctly.",
+      "credits": "TBD"
+    },
+    {
+      "unitCode": "HC/N0002",
+      "unitTitle": "Maintain a sterile field",
+      "version": "2.0",
+      "type": "Core",
+      "description": "Keep the working area sterile throughout a procedure.",
+      "credits": "2.0"
+    },
+    {
+      "unitCode": "HC/N0002",
+      "unitTitle": "Maintain a sterile field (superseded wording)",
+      "version": "1.0",
+      "type": "Core",
+      "credits": "2.0"
+    },
+    {
+      "unitCode": "RT/N0001",
+      "unitTitle": "Handle customer payments",
+      "version": "1.0",
+      "type": "Core"
+    },
+    {
+      "unitCode": "RT/N0002",
+      "unitTitle": "Handle returns and exchanges",
+      "version": "1.0",
+      "type": "Non-Core"
+    },
+    {
+      "unitCode": "RT/N0003",
+      "unitTitle": "Stock shelves to plan",
+      "version": "1.0",
+      "type": "Non-Core"
+    },
+    {
+      "unitCode": "  ",
+      "unitTitle": "A unit with no usable code at all",
+      "version": "1.0"
+    }
+  ],
+
+  "qps": [
+    {
+      "qpCode": "HC/Q0001",
+      "qpName": "Phlebotomy Technician",
+      "jobRole": "Phlebotomy Technician",
+      "nsqfLevel": "4.5",
+      "version": "2.0",
+      "status": { "statusDesc": "Approved" },
+      "totalHoursQplevel": 400,
+      "sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare",
+        "subSectors": [{ "subSectorID": "SUB01", "subSectorName": "Diagnostics" }]
+      },
+      "occupation": { "occupationDesc": "Sample Collection" },
+      "compulsoryNos": [
+        { "unitCode": "HC/N0001", "unitTitle": "Collect blood samples   ", "version": "1.0" },
+        { "unitCode": "HC/N0002", "unitTitle": "Maintain a sterile field", "version": "2.0" }
+      ]
+    },
+    {
+      "qpCode": "HC/Q0001",
+      "qpName": "Phlebotomy Technician",
+      "jobRole": "Phlebotomy Technician",
+      "nsqfLevel": "4",
+      "version": "1.0",
+      "status": { "statusDesc": "Superseded" },
+      "sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare ",
+        "subSectors": [{ "subSectorID": "SUB01", "subSectorName": "Diagnostics" }]
+      },
+      "compulsoryNos": [
+        { "unitCode": "HC/N0001", "unitTitle": "Collect blood samples", "version": "1.0" }
+      ]
+    },
+    {
+      "qpCode": "HC/Q0002",
+      "qpName": "General Duty Assistant",
+      "jobRole": "General Duty Assistant",
+      "nsqfLevel": "4.0",
+      "version": "1.0",
+      "status": { "statusDesc": "Approved" },
+      "sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare",
+        "subSectors": [{ "subSectorID": "SUB02", "subSectorName": "Patient Care" }]
+      },
+      "occupation": { "occupationDesc": "Patient Care" },
+      "compulsoryNos": [
+        { "unitCode": "HC/N0002", "unitTitle": "Maintain a sterile field", "version": "2.0" }
+      ]
+    },
+    {
+      "qpCode": "RT/Q0001",
+      "qpName": "Retail Sales Associate",
+      "jobRole": "Retail Sales Associate",
+      "nsqfLevel": "3.5",
+      "version": "1.0",
+      "status": { "statusDesc": "Approved" },
+      "sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [{ "subSectorID": "SUB10", "subSectorName": "In-store" }]
+      },
+      "occupation": { "occupationDesc": "Store Operations" },
+      "compulsoryNos": [
+        { "unitCode": "RT/N0001", "unitTitle": "Handle customer payments", "version": "1.0" }
+      ],
+      "electiveNos": [
+        {
+          "name": "Customer service specialisation",
+          "optionalDesc": "Choose one",
+          "nos": [
+            { "unitCode": "RT/N0002", "unitTitle": "Handle returns and exchanges", "version": "1.0" }
+          ]
+        }
+      ],
+      "optionalNos": [
+        {
+          "name": "Merchandising",
+          "nos": [{ "unitCode": "RT/N0003", "unitTitle": "Stock shelves to plan", "version": "1.0" }]
+        }
+      ]
+    },
+    {
+      "qpCode": "XX/Q9999",
+      "qpName": "Qualification with an unreadable level",
+      "jobRole": "Unknown",
+      "nsqfLevel": "not a number",
+      "version": "1.0",
+      "status": { "statusDesc": "Draft" },
+      "sectors": { "sectorID": "SEC02", "sectorName": "Retail", "subSectors": [] },
+      "compulsoryNos": []
+    }
+  ],
+
+  "modelcurriculum": [
+    {
+      "qpCode": "HC/Q0001",
+      "jobRole": "Phlebotomy Technician",
+      "nsqfLevel": "4.5",
+      "MCStatus": "Approved",
+      "MCversion": "2.0",
+      "grandTotal": "570:00",
+      "document": "mc/HC-Q0001-v2.pdf",
+      "nos": {
+        "compulsary": [
+          {
+            "unitCode": "HC/N0001",
+            "compulsory": "30:00",
+            "practical": "60:30",
+            "ojtmanditory": "00:00",
+            "nosTotal": "90:30"
+          },
+          {
+            "unitCode": "",
+            "compulsory": "10:00",
+            "practical": "20:00",
+            "nosTotal": "30:00"
+          }
+        ],
+        "elective": [
+          { "unitCode": "HC/N0002", "compulsory": "15:00", "nosTotal": "15:00" }
+        ],
+        "optional": []
+      }
+    },
+    {
+      "qpCode": "RT/Q0001",
+      "jobRole": "Retail Sales Associate",
+      "nsqfLevel": "3.5",
+      "MCStatus": "Approved",
+      "MCversion": "1.0",
+      "grandTotal": "not a duration",
+      "nos": {
+        "compulsary": [
+          { "unitCode": "RT/N0001", "compulsory": "bad", "nosTotal": "also bad" }
+        ]
+      }
+    }
+  ]
+}

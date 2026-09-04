@@ -52,6 +52,7 @@ class ImportReport:
     mc_skills: int = 0
     levels_derived: int = 0
     mc_entries_without_code: int = 0
+    documents_without_code: int = 0
     problems: list[ImportProblem] = field(default_factory=list)
 
     def summary(self) -> str:
@@ -62,6 +63,7 @@ class ImportReport:
             f"curricula={self.model_curricula} mc_skills={self.mc_skills} "
             f"levels_derived={self.levels_derived} "
             f"mc_entries_without_code={self.mc_entries_without_code} "
+            f"documents_without_code={self.documents_without_code} "
             f"problems={len(self.problems)}"
         )
 
@@ -390,6 +392,9 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
     report.mc_skills = await _chunked_upsert(
         db, ModelCurriculumSkill.__table__, mc_skill_rows, ["curriculum_id", "skill_id"]
     )
+
+    # Read after every iterator is exhausted, not before.
+    report.documents_without_code = getattr(source, "skipped_documents", 0)
 
     await db.commit()
     return report
