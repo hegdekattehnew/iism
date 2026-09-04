@@ -97,13 +97,25 @@ five fields. Added personal details, job preferences, and six repeating collecti
 educations, certifications, languages, preferred roles, preferred locations). Guided wizard on
 first visit, sectioned editor after, weighted completeness meter. 101 tests.
 
-**Verified at last run:** 101 Python tests pass · Ruff + mypy clean · tsc + ESLint clean ·
-routes all correct · migrations round-trip properly (verified by exit code and table counts,
-not by log-grepping) · 52 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses.
+**Sprint 6 (NSQF master data) — complete.** The real national corpus now lives in Postgres,
+projected from MongoDB (ADR-034). 43 sectors, 540 sub-sectors, 1,144 occupations, 4,424
+qualification packs, 21,303 NOS-derived skills, 27,278 QP→NOS links and 1,950 model curricula,
+imported in ~16 seconds and idempotent across runs. `api/adapters/nsqf/` is the port; nothing
+outside it imports a Mongo driver. 140 tests.
 
-**Not built yet:** authentication and candidate profiles (Sprint 4), matching (Sprint 5), the NSQF
-hierarchy above Skill (SSC → Sector → Occupation → QP → NOS), typed `SkillRelation` edges,
-embeddings, analytics instrumentation, observability, encryption path.
+The 52 curated skills were **kept alongside** the national ones rather than replaced, tagged
+`source='curated'` and labelled as such in the UI. That was a deliberate departure from the
+Sprint 6 plan, which assumed wholesale replacement: keeping them preserved all five foreign keys
+into `skills.id`, kept `make seed`'s 170 slug references resolving, and kept the multi-script
+search demo working. The cost is two vocabularies coexisting — see §12.
+
+**Verified at last run:** 140 Python tests pass · Ruff + mypy clean · tsc + ESLint clean ·
+`next build` clean · migrations round-trip (verified by exit code and table counts, not by
+log-grepping) · autogenerate reports no drift · import idempotent (identical counts twice) ·
+21,355 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses.
+
+**Not built yet:** matching, typed `SkillRelation` edges, embeddings, analytics instrumentation,
+observability, the encryption path, and **Hindi for the national corpus** (§12).
 
 ## 5. Repository map
 
@@ -116,17 +128,26 @@ api/                    FastAPI modular monolith
   modules/identity/     User, Tenant, Membership, OTP sign-in, JWT
   core/security.py      tokens, OTP hashing, rate limits, get_current_user
   adapters/notifications/  NotificationProvider protocol + console impl
+  adapters/nsqf/        NsqfSource port + Mongo and JSON-file sources, document
+                        parsing, normalisation, importer (ADR-017, ADR-034)
+  modules/skills/hierarchy.py  Sector, SubSector, Occupation, QualificationPack,
+                        QpSkill, ModelCurriculum, ModelCurriculumSkill
 web/                    Next.js 16 PWA
   src/app/[locale]/     13 routes, all bilingual
   src/components/       Header, Hero, HowItWorks, Audiences, BrowsePanels, CtaBand,
                         Footer, SkillBrowser, SystemStatus, DevPanel, PlaceholderPage, ui
   src/messages/         en.json, hi.json — no user-facing string is hardcoded
   src/lib/api-schema.d.ts  GENERATED from OpenAPI, never hand-edit
-infra/docker-compose.yml   Postgres 16 + pgvector, Redis 7
+infra/docker-compose.yml   Postgres 16 + pgvector (5433), Redis 7 (6380), Mongo 7.0 (27018)
 migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0003 (tenants, jobs, courses),
-                        0004 (users, memberships, candidate profiles)
-scripts/                seed_skills.py, seed_marketplace.py — both idempotent
+                        0004 (users, memberships, candidate profiles),
+                        0005 (rich profile), 0006 (list-filter indexes),
+                        0007 (widen nsqf_level to Numeric(3,1)),
+                        0008 (NSQF hierarchy), 0009 (widen level_taught),
+                        0010 (skills.qp_count)
+scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py — all idempotent
+tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 tests/                  pytest + testcontainers
 ```
 
@@ -159,7 +180,8 @@ This is an **Apple Silicon (arm64) Mac, macOS 26.6.2**, and the setup has traps:
 ```bash
 make up          # start Postgres + Redis, wait for healthy
 make migrate     # alembic upgrade head
-make seed        # load the skill taxonomy (idempotent)
+make seed        # load the skill taxonomy + marketplace (idempotent)
+make import-nsqf # project the NSQF corpus from Mongo into Postgres (idempotent)
 make api         # uvicorn on :8000
 make worker      # ARQ worker
 make web         # Next.js on :3000
@@ -235,6 +257,36 @@ Three processes must run for the full stack: **api, worker, web.**
 24. **String-replace edits silently no-op after ruff reformats.** Three separate edits this project
     reported success while changing nothing. Always `assert old in s` before replacing.
 
+33. **Widening a database column is half the job — the response models are the other half.**
+    Migration 0007 widened every `nsqf_level` to `Numeric(3,1)`; the Pydantic schemas still said
+    `int`. 8,055 skills (38%) then failed serialisation and `/skills` returned 500 for the whole
+    page. Nothing caught it because the 52 curated skills all sit at whole levels, so every
+    transliteration and search check kept passing. Grep the schemas whenever a column type changes.
+34. **Output schemas must not re-validate stored data.** A constraint on an output model turns one
+    odd row into a 500 for the entire response. Constrain input (`NsqfLevelIn`), leave output
+    permissive (`NsqfLevel`).
+35. **NSQF levels have half-steps.** 2.5, 3.5, 4.5, 5.5 and 6.5 are real; 4.5 alone covers 6,532
+    skills and 905 qualifications. Anything typed `int` or a dropdown listing 1–10 silently hides
+    38% of the taxonomy — and a filter that returns a correct *empty* page announces nothing.
+36. **A NOS carries no NSQF level.** Zero of 27,538 do. Level belongs to the qualification and,
+    contextually, to each `qp_skills` row. `skills.nsqf_level` is a derived modal value for display
+    only — never score against it.
+37. **Elective and optional NOS are nested in named groups.** Flattening them to plain links turns
+    "choose one of these" into "all of these are required". `qp_skills.group_name` is what keeps
+    that distinction; reading only `compulsoryNos` loses 1,756 links outright.
+38. **The model-curriculum key is spelled `compulsary` in the source**, and `nos.elective` /
+    `nos.optional` carry another 749 usable links. Reading only the first list found 128
+    curriculum-to-unit links where there are 877.
+39. **`$exists: true` matches the empty string.** 2,399 curriculum entries have a `unitCode` that
+    is present but blank. They are counted in the report (`mc_entries_without_code`), not dropped
+    in silence and not raised one by one.
+40. **Ordering 21k rows alphabetically is a product decision, not a default.** It opens the
+    taxonomy on "0JT" and "10.1. Case Studies". `skills.qp_count` is denormalised precisely so the
+    browse can order by prominence — an ORDER BY over a correlated subquery cannot use an index.
+41. **Only the latest version of each code is imported.** `(code, version)` is the natural key
+    — 21,263 distinct `unitCode` across 27,538 documents. Prior versions stay in Mongo; that is
+    what making it the source of record buys (ADR-034).
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -257,33 +309,37 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 11. What comes next
 
-**Sprints 3 and 4 are planned in full** — see the plan file listed in §2. Summary:
+**Hindi for the national corpus is the largest open gap.** All 21,303 imported skills are
+English-only: the source contains no Devanagari at all, and the 149 aliases still attach only to
+the 52 curated skills. Searching `khoon nikalna`, `बिक्री` or `safai` today returns curated skills
+and *nothing* from the national taxonomy. This is a real, stated regression against ADR-033.
 
-**Sprint 3 — Marketplace: Jobs & Courses.** New `api/modules/marketplace/` built to the
-`skills` module pattern. `Tenant` (in `identity/`, models only), `Job` + `job_skills`
-(`importance`, `is_mandatory`), `Course` + `course_skills` (`level_taught`). Ops-seeded via
-`scripts/seed_marketplace.py`, ~20 jobs and ~20 courses. No auth. `/jobs` and `/courses` list and
-detail pages replace their `PlaceholderPage` stubs, and **`/skills/[slug]` gains "jobs needing this
-skill" and "courses teaching this skill"** — the point at which the taxonomy becomes a navigable
-graph rather than a glossary.
+The planned answer is an ARQ translation job over a prioritised subset — 43 sectors, then 4,424 QP
+job roles, then the NOS referenced by seeded jobs — writing back to Postgres and **mirroring into
+Mongo so a re-import cannot destroy the translations**. It is blocked on an LLM adapter
+(ADR-018/031) and on provider credentials, neither of which exists yet. Do not present the
+bilingual story as complete before this lands.
 
-**Sprint 4 — Identity and the candidate profile.** Phone + OTP for candidates only; org/email login
-deferred because orgs have nothing to publish yet. `User` with nullable independently-unique
-phone/email, `Membership`, JWT access + rotating refresh in Redis, per-phone OTP rate limiting.
-First real occupant of `api/adapters/` — a `NotificationProvider` protocol with a console
-implementation that logs the OTP in dev. `CandidateProfile` + `candidate_skills` in the marketplace
-module. `/signin` and `/profile` go live; adding skills reuses the existing `SkillBrowser`.
+**`scripts/map_legacy_skills.py` was planned and deliberately not built.** Its premise was that the
+52 curated skills would be replaced and their 149 aliases had to be carried onto real NOS codes.
+They were not replaced, so nothing needs rescuing. Searching the corpus for each of the 52 found a
+confident NOS counterpart for only about 11; forcing the rest would attach Hindi aliases to units
+that do not mean the same thing, and even the good 11 would produce duplicate search results for
+0.05% coverage. The finding worth keeping is that **the hand-written Sprint 2 vocabulary and the
+national standard do not align concept-for-concept** — translation, not mapping, is the answer.
 
-**Sprint 6 is matching** — the payoff. Deferred once already: the candidate profile was too thin
-to match against, which was the right call since score quality is bounded by input quality.
-Two things must land with or before it, and neither exists:
-1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute for
-   a revenue signal and nothing currently records anything.
+**`scripts/seed_marketplace.py` did not need re-authoring** for the same reason: all 170 slug
+references still resolve. Pointing the seeded jobs and courses at real NOS codes is still worth
+doing, because today no NSQF skill has a single job or course attached to it.
+
+**Matching is the next real sprint** — the payoff, deferred twice. Two things must land with or
+before it, and neither exists:
+1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute
+   for a revenue signal and nothing currently records anything.
 2. **A golden-set evaluation harness** — hand-labelled candidate/job pairs, precision@5 in CI.
 
-Deliberately still unscheduled: the NSQF hierarchy above Skill (SSC → Sector → Occupation → QP →
-NOS) and its importer. Acquiring real NSQF data is a project in itself — per-SSC documents, no clean
-public API — and remains the single most underestimated line item in the plan.
+Also outstanding: typed `SkillRelation` edges, embeddings, organisation/email login and self-serve
+publishing, a real SMS provider, observability, and the ADR-023 encryption path.
 
 ## 12a. Measured performance ceiling (audited 2026-09-02)
 
@@ -342,3 +398,15 @@ the logs. CORS is restricted to one origin.
   until the golden-set harness exists.
 - Self-declared skills are unreliable until assessment integration lands.
 - Employer-side supply is the weakest link in Indian vocational markets.
+- **Two vocabularies now coexist.** 52 curated skills sit alongside 21,303 NSQF units, and for
+  concepts like blood sample collection both exist as separate rows. Search returns both. This was
+  the price of not breaking five foreign keys and the working demo, and it is a deliberate,
+  reversible trade — but it is debt, not a design.
+- **The national taxonomy is English-only**, so the Hindi half of ADR-033 currently covers the UI
+  chrome and 52 skills, not the 21,303 that matter. Say this plainly.
+- **4,732 imported skills belong to no current qualification** and 4,784 have no QP link at all.
+  They are real NOS whose qualifications were superseded; they will never surface through sector
+  or QP navigation, only through search.
+- **Only 45 of 21,303 titles are section-numbered course fragments** ("10.1. Case Studies") but
+  they are indistinguishable from real units in the schema. Prominence ordering hides them; it
+  does not fix them.

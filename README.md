@@ -9,7 +9,18 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
-## Status — Sprints 1–5 complete
+## Status — Sprints 1–6 complete
+
+**Sprint 6 — the national NSQF corpus.** 4,424 qualification packs, 21,303 National Occupational
+Standards and 1,950 model curricula, projected from the MongoDB source of record into Postgres in
+about sixteen seconds, and idempotent. Open any skill and see the qualifications that require it,
+each with its own NSQF level — because a NOS has no level of its own. Browse at `/skills`, now
+ordered by how many qualifications use a unit rather than alphabetically.
+
+Two honest caveats. The imported corpus is **English-only** — the source contains no Devanagari,
+so Hindi currently covers the interface and the 52 hand-curated skills, not the 21,303 imported
+ones. And those 52 curated skills were kept alongside the national taxonomy rather than replaced,
+so a handful of concepts exist as two rows.
 
 **Sprint 5 — rich candidate profile.** Work history, education, certifications, languages, target
 roles and preferred locations, plus job preferences and optional personal details. First visit is a
@@ -28,6 +39,7 @@ courses that teach it — the taxonomy is now a navigable graph rather than a gl
 **Sprint 2 — skill taxonomy.** 52 bilingual skills, 149 aliases, and search that resolves a
 skill however a real person types it: English, Devanagari, or Hindi in Latin script. Try
 `khoon nikalna` at `/skills` — it finds "Blood sample collection" and tells you why it matched.
+These 52 remain the only skills with Hindi names and aliases; see the Sprint 6 caveat above.
 
 **Sprint 1 — walking skeleton.** Every architectural layer exists and is connected.
 
@@ -45,12 +57,12 @@ skill however a real person types it: English, Devanagari, or Hindi in Latin scr
 `/jobs` and `/courses`, sign-in at `/signin`, the candidate profile at `/profile`, and the System
 Status panel at the foot of the homepage.
 
-Not yet built: matching (Sprint 5), organisation/email login, self-serve publishing, a real SMS
-provider, the NSQF hierarchy above Skill, skill relations, embeddings.
+Not yet built: matching, Hindi for the imported corpus, organisation/email login, self-serve
+publishing, a real SMS provider, typed skill relations, embeddings, analytics instrumentation.
 
 ## Prerequisites
 
-- Docker Desktop (running)
+- Docker Desktop (running) — Postgres, Redis and MongoDB all run in containers
 - [uv](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Node 24 (`nvm install 24`)
 
@@ -66,6 +78,16 @@ make seed
 
 `make seed` loads the skill taxonomy and the marketplace inventory. It is idempotent — run it
 as often as you like.
+
+To load the national NSQF corpus, put it in MongoDB as `iism_nsqf_master_data` and run:
+
+```bash
+make import-nsqf
+```
+
+Also idempotent: it upserts on `nos_code` and `qp_code`, keeps only the current version of each,
+and prints a summary with counts and any records it could not import. Everything works without it
+— you simply get the 52 curated skills instead of 21,303.
 
 ## Run
 
@@ -100,8 +122,11 @@ containers, so they never touch your development data and behave identically in 
 
 ## Notes
 
-- Host ports are **5433** (Postgres) and **6380** (Redis) so a pre-existing local install is
-  left alone.
+- Host ports are **5433** (Postgres), **6380** (Redis) and **27018** (MongoDB) so pre-existing
+  local installs are left alone.
+- MongoDB is pinned to **7.0**. 8.0 will not start on this Docker VM's kernel (SERVER-121912).
+- NSQF levels are `Numeric(3,1)` everywhere, including in Pydantic schemas. The framework uses
+  half-levels and 4.5 alone accounts for 6,532 skills.
 - After changing any API endpoint, run `make gen-api` to regenerate the TypeScript client.
 - Configuration is always read through `get_settings()`. Never bind `settings` at module import
   time — it cannot then be overridden, and tests silently hit the wrong database.

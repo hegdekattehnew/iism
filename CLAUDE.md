@@ -46,6 +46,7 @@ is a condensed index, not a replacement.
 |---|---|---|
 | Backend | Python + FastAPI | ADR-002 |
 | Database | PostgreSQL + pgvector | ADR-003 |
+| NSQF source of record | MongoDB — raw corpus, projected into Postgres, never read at request time | ADR-034 |
 | Embeddings | sentence-transformers, stored in pgvector | ADR-013 |
 | Async / queues | Redis + ARQ (→ Kafka later) | ADR-006, ADR-027 |
 | Cache | Redis | ADR-020 |
@@ -73,11 +74,16 @@ api/                     FastAPI modular monolith
   modules/
     identity/            Users, tenants, memberships, OTP sign-in (ADR-009/010/011/032)
     marketplace/         Jobs, courses and their skill links (ADR-001)
-    skills/              NSQF-aligned taxonomy / skill graph (ADR-004)
+    skills/              NSQF taxonomy: Skill/SkillAlias plus the hierarchy above them
+                         (Sector → SubSector → Occupation → QualificationPack → QpSkill)
+                         in hierarchy.py, and ModelCurriculum (ADR-004, ADR-034)
     matching/            Hybrid scoring engine (ADR-007)
     career_paths/        Graph-based role transition engine (ADR-008)
     intelligence/        LLM extraction/explanation, embeddings (ADR-005/013/018)
   adapters/              External integrations behind interfaces (ADR-017)
+    notifications/       NotificationProvider protocol + console impl (the reference)
+    nsqf/                NsqfSource port, Mongo and JSON-file sources, shared document
+                         parsing, normalisation and the importer (ADR-034)
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -117,6 +123,20 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   has an `include_object` guard listing them — add to `MANUALLY_MANAGED_INDEXES` whenever you
   create an index with `op.execute()`. Alembic also does **not** diff CHECK constraint bodies:
   widening one is invisible to autogenerate and must be written by hand.
+- **NSQF levels are `Numeric(3, 1)`, never integers.** The national corpus uses half-steps —
+  2.5, 3.5, 4.5, 5.5, 6.5 — and 4.5 alone covers 6,532 skills. Any level that becomes an `int`
+  anywhere in the stack silently excludes 38% of the taxonomy. That includes Pydantic schemas and
+  query parameters, not only columns: widening the column and leaving the schema at `int` returned
+  500 for every affected row while every existing test kept passing.
+- **Output schemas stay permissive; input schemas carry the constraints.** `NsqfLevel` on the way
+  out, `NsqfLevelIn` on the way in. A constraint on a response model turns one odd row into a 500
+  for the entire response.
+- **A NOS carries no level of its own.** Level lives on `qualification_packs.nsqf_level` and,
+  contextually, on each `qp_skills` row. `skills.nsqf_level` is a derived modal value for display
+  only — never score against it.
+- **Anything touching the NSQF corpus goes through `api/adapters/nsqf/`.** No module imports a
+  MongoDB driver. Document parsing lives in `documents.py` and is shared by every source, so the
+  test fixture exercises the real import path rather than a second reader that can drift from it.
 - **After mutating a relationship, re-query with `populate_existing=True`.** Without it the
   instance already in the session's identity map is returned with its stale collection, so the
   query succeeds and quietly returns the wrong answer. `db.refresh()` does not cascade nested
@@ -137,6 +157,24 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   not-yet-built pages render `PlaceholderPage` rather than 404.
 
 ## Current state
+
+Sprint 6 (NSQF master data) is complete. The national corpus is projected from MongoDB into
+Postgres: 43 sectors, 540 sub-sectors, 1,144 occupations, 4,424 qualification packs, 21,303
+NOS-derived skills, 27,278 QP→NOS links and 1,950 model curricula. `make import-nsqf` is
+idempotent. `/skills` pages server-side and orders by how many qualifications use a unit; a skill
+page lists the qualifications containing it, each with its contextual level and elective group.
+
+Four things to respect:
+- **The 52 curated skills were kept, not replaced.** They are tagged `source='curated'`, labelled
+  as such in the UI, and still own every `job_skills` and `course_skills` link. Two vocabularies
+  coexist; that is deliberate debt, recorded in `projectContextForMe.md` §12.
+- **The imported corpus is English-only.** The source contains no Devanagari, and the 149 aliases
+  attach only to curated skills — so `khoon nikalna` resolves and nothing in the national taxonomy
+  does. A real regression against ADR-033, pending the translation job.
+- **`skills.qp_count` is denormalised** and maintained by the importer, because the browse orders
+  by it and an ORDER BY over a correlated subquery cannot use an index.
+- **Elective and optional NOS carry `group_name`.** Flattening them would present "choose one of
+  these" as "all of these are required".
 
 Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
 preferences, plus six repeating collections: experiences, educations, certifications, languages,
