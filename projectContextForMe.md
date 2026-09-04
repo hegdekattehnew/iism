@@ -97,22 +97,35 @@ five fields. Added personal details, job preferences, and six repeating collecti
 educations, certifications, languages, preferred roles, preferred locations). Guided wizard on
 first visit, sectioned editor after, weighted completeness meter. 101 tests.
 
-**Sprint 6 (NSQF master data) — complete.** The real national corpus now lives in Postgres,
-projected from MongoDB (ADR-034). 43 sectors, 540 sub-sectors, 1,144 occupations, 4,424
-qualification packs, 21,303 NOS-derived skills, 27,278 QP→NOS links and 1,950 model curricula,
-imported in ~16 seconds and idempotent across runs. `api/adapters/nsqf/` is the port; nothing
-outside it imports a Mongo driver. 140 tests.
+**Sprint 6 (NSQF master data) — built, then rolled back.** The corpus was imported from MongoDB
+(43 sectors, 4,424 QPs, 21,303 skills, 27,278 links, idempotent, ~16s) and the migrated data was
+then deliberately deleted on 2026-09-04.
 
-The 52 curated skills were **kept alongside** the national ones rather than replaced, tagged
-`source='curated'` and labelled as such in the UI. That was a deliberate departure from the
-Sprint 6 plan, which assumed wholesale replacement: keeping them preserved all five foreign keys
-into `skills.id`, kept `make seed`'s 170 slug references resolving, and kept the multi-script
-search demo working. The cost is two vocabularies coexisting — see §12.
+An audit against the source found the import had taken the taxonomy's **labels** and left its
+**content** behind, and had one modelling decision built on a false premise. Rather than patch it,
+the data was discarded pending a complete re-migration once the remaining master data — sectors,
+Sector Skill Councils, states, districts, awarding bodies — is loaded.
 
-**Verified at last run:** 140 Python tests pass · Ruff + mypy clean · tsc + ESLint clean ·
-`next build` clean · migrations round-trip (verified by exit code and table counts, not by
-log-grepping) · autogenerate reports no drift · import idempotent (identical counts twice) ·
-21,355 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses.
+**[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) is the record of that
+audit and must be read before the re-migration.** Headlines:
+- **A NOS does carry its own NSQF level.** All 27,538 do, in a field spelled `nsqf`; a
+  qualification spells the same concept `nsqfLevel`. Sprint 6 checked the qualification's spelling
+  against standards, got zero, and wrote "a NOS carries no level" into the schema, four commits
+  and every doc. It left 4,730 units with no level and contradicted 653 more.
+- **~893,000 content records were never imported** — 349,874 performance criteria (with marks),
+  292,762 knowledge parameters, 250,281 generic skill criteria, 55,747 element headings.
+- **NCO-2015 occupation codes** (`alignedTo`, 3,214 QPs), **entry qualifications** (`minEduQual`,
+  4,571) and the **assessment blueprint** (`assmtCrt`, sourced per-NOS weightage) were all missed.
+- 4,847 rows shared a duplicated name; "Employability Skills" was 67 separate units.
+
+What is still in place: the schema (migrations 0007–0010), `api/adapters/nsqf/`, server-side
+pagination and facets on `/skills`, and the tests. The database is back to the 52 curated skills
+and 149 aliases. **Do not run `make import-nsqf`** until the schema is redesigned against the
+complete master data.
+
+**Verified at last run (after the rollback):** 140 Python tests pass · Ruff + mypy clean ·
+all endpoints 200 · multi-script search still resolves `khoon nikalna`, `रक्त` and `phlebotomy` ·
+52 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses / 9 users.
 
 **Not built yet:** matching, typed `SkillRelation` edges, embeddings, analytics instrumentation,
 observability, the encryption path, and **Hindi for the national corpus** (§12).
@@ -268,9 +281,15 @@ Three processes must run for the full stack: **api, worker, web.**
 35. **NSQF levels have half-steps.** 2.5, 3.5, 4.5, 5.5 and 6.5 are real; 4.5 alone covers 6,532
     skills and 905 qualifications. Anything typed `int` or a dropdown listing 1–10 silently hides
     38% of the taxonomy — and a filter that returns a correct *empty* page announces nothing.
-36. **A NOS carries no NSQF level.** Zero of 27,538 do. Level belongs to the qualification and,
-    contextually, to each `qp_skills` row. `skills.nsqf_level` is a derived modal value for display
-    only — never score against it.
+36. **The two collections name the same concept differently, and this caused a real error.**
+    A standard states its level in `nsqf`; a qualification states it in `nsqfLevel`. Checking the
+    qualification's spelling against standards returns zero every time, which reads exactly like
+    "a NOS has no level" — and all 27,538 carry one. That wrong conclusion was written into the
+    schema, four commit messages and every document before it was caught. The same trap applies to
+    `type` vs `nosType` (3,952 vs 98.7% coverage) and `Sectors` vs `sectors`. **Never conclude a
+    field is absent from one collection using another collection's spelling** — enumerate the
+    actual field paths per collection first. Full record in
+    [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 37. **Elective and optional NOS are nested in named groups.** Flattening them to plain links turns
     "choose one of these" into "all of these are required". `qp_skills.group_name` is what keeps
     that distinction; reading only `compulsoryNos` loses 1,756 links outright.

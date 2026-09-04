@@ -9,18 +9,14 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
-## Status — Sprints 1–6 complete
+## Status — Sprints 1–5 complete
 
-**Sprint 6 — the national NSQF corpus.** 4,424 qualification packs, 21,303 National Occupational
-Standards and 1,950 model curricula, projected from the MongoDB source of record into Postgres in
-about sixteen seconds, and idempotent. Open any skill and see the qualifications that require it,
-each with its own NSQF level — because a NOS has no level of its own. Browse at `/skills`, now
-ordered by how many qualifications use a unit rather than alphabetically.
-
-Two honest caveats. The imported corpus is **English-only** — the source contains no Devanagari,
-so Hindi currently covers the interface and the 52 hand-curated skills, not the 21,303 imported
-ones. And those 52 curated skills were kept alongside the national taxonomy rather than replaced,
-so a handful of concepts exist as two rows.
+**Sprint 6 — the national NSQF corpus (built, then rolled back).** The corpus was imported from
+MongoDB and the migrated data has since been deleted: an audit found it carried the taxonomy's
+labels without its content, and a complete re-migration is planned once the remaining master data
+is available. The schema and importer remain in place. See
+[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) for everything the audit
+established about the source data.
 
 **Sprint 5 — rich candidate profile.** Work history, education, certifications, languages, target
 roles and preferred locations, plus job preferences and optional personal details. First visit is a

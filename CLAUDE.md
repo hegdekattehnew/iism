@@ -131,9 +131,12 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - **Output schemas stay permissive; input schemas carry the constraints.** `NsqfLevel` on the way
   out, `NsqfLevelIn` on the way in. A constraint on a response model turns one odd row into a 500
   for the entire response.
-- **A NOS carries no level of its own.** Level lives on `qualification_packs.nsqf_level` and,
-  contextually, on each `qp_skills` row. `skills.nsqf_level` is a derived modal value for display
-  only — never score against it.
+- **A NOS carries its own NSQF level — and so does the qualification, and so does the link
+  between them.** All three are real and different facts. The source names them inconsistently:
+  `nsqf` on a standard, `nsqfLevel` on a qualification. Sprint 6 checked the qualification's
+  spelling against standards, got zero, and recorded "a NOS has no level" — which was wrong and
+  shaped the schema. Never conclude a field is absent from one collection using another's
+  spelling. See [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 - **Anything touching the NSQF corpus goes through `api/adapters/nsqf/`.** No module imports a
   MongoDB driver. Document parsing lives in `documents.py` and is shared by every source, so the
   test fixture exercises the real import path rather than a second reader that can drift from it.
@@ -158,23 +161,24 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
-Sprint 6 (NSQF master data) is complete. The national corpus is projected from MongoDB into
-Postgres: 43 sectors, 540 sub-sectors, 1,144 occupations, 4,424 qualification packs, 21,303
-NOS-derived skills, 27,278 QP→NOS links and 1,950 model curricula. `make import-nsqf` is
-idempotent. `/skills` pages server-side and orders by how many qualifications use a unit; a skill
-page lists the qualifications containing it, each with its contextual level and elective group.
+**Sprint 6 (NSQF master data) was built and then rolled back.** The corpus was imported —
+43 sectors, 4,424 qualification packs, 21,303 skills, 27,278 links — and the migrated data was
+then deliberately deleted. An audit against the MongoDB source found the import had taken the
+taxonomy's labels and left its content behind (~893,000 performance criteria, knowledge
+parameters and generic skill criteria), missed the structural fields the intelligence layer needs
+(NCO-2015 codes, entry qualifications, assessment weightage), and got the level modelling wrong.
+Rather than patch it, the data was discarded pending a complete re-migration once the remaining
+master data — sectors, Sector Skill Councils, states, districts, awarding bodies — is available.
 
-Four things to respect:
-- **The 52 curated skills were kept, not replaced.** They are tagged `source='curated'`, labelled
-  as such in the UI, and still own every `job_skills` and `course_skills` link. Two vocabularies
-  coexist; that is deliberate debt, recorded in `projectContextForMe.md` §12.
-- **The imported corpus is English-only.** The source contains no Devanagari, and the 149 aliases
-  attach only to curated skills — so `khoon nikalna` resolves and nothing in the national taxonomy
-  does. A real regression against ADR-033, pending the translation job.
-- **`skills.qp_count` is denormalised** and maintained by the importer, because the browse orders
-  by it and an ORDER BY over a correlated subquery cannot use an index.
-- **Elective and optional NOS carry `group_name`.** Flattening them would present "choose one of
-  these" as "all of these are required".
+**Read [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) before attempting
+that re-migration.** It records everything measured about the source: field-naming traps, level
+distributions, the three-way QP→NOS relationship, content volumes, deduplication rates,
+translation costs, and the data-quality issues that will affect matching.
+
+What remains in place and working: the NSQF schema and `api/adapters/nsqf/` importer (unused but
+intact), migrations 0007–0010, server-side pagination and facets on `/skills`, and 140 passing
+tests. The database holds the 52 curated skills and their 149 aliases; `make import-nsqf` would
+repopulate it, but should not be run until the schema is redesigned.
 
 Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
 preferences, plus six repeating collections: experiences, educations, certifications, languages,
