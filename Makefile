@@ -60,6 +60,10 @@ seed: ## Seed the taxonomy and marketplace inventory (idempotent)
 mongosh: ## Open a mongosh shell against the NSQF source
 	docker exec -it iism-mongo-1 mongosh -u iism -p iism --authenticationDatabase admin nsqf
 
+.PHONY: import-nsqf
+import-nsqf: ## Project the NSQF corpus from MongoDB into PostgreSQL (idempotent)
+	$(PY) scripts/import_nsqf.py
+
 .PHONY: psql
 psql: ## Open a psql shell in the container
 	docker exec -it iism-postgres-1 psql -U iism -d iism

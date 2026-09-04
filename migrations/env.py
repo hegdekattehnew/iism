@@ -13,6 +13,7 @@ from api.core.database import Base
 # autogenerate sees them. New modules must be added here.
 from api.modules.identity import models as _identity_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401
+from api.modules.skills import hierarchy as _skills_hierarchy  # noqa: F401
 from api.modules.skills import models as _skills_models  # noqa: F401
 
 config = context.config

@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
@@ -9,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     UniqueConstraint,
     func,
 )
@@ -61,7 +63,7 @@ class Job(Base):
         ),
         CheckConstraint("status IN ('draft', 'published')", name="ck_jobs_status"),
         CheckConstraint(
-            "nsqf_level_min IS NULL OR (nsqf_level_min BETWEEN 1 AND 10)",
+            "nsqf_level_min IS NULL OR (nsqf_level_min >= 1 AND nsqf_level_min <= 10)",
             name="ck_jobs_nsqf_level",
         ),
         Index("ix_jobs_tenant_id", "tenant_id"),
@@ -89,7 +91,7 @@ class Job(Base):
     experience_max_years: Mapped[int | None] = mapped_column(default=None)
     salary_min_inr: Mapped[int | None] = mapped_column(default=None)
     salary_max_inr: Mapped[int | None] = mapped_column(default=None)
-    nsqf_level_min: Mapped[int | None] = mapped_column(default=None)
+    nsqf_level_min: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
 
     status: Mapped[str] = mapped_column(default="published")
     search_vector: Mapped[str | None] = mapped_column(
@@ -139,7 +141,7 @@ class Course(Base):
         CheckConstraint("language IN ('en', 'hi', 'both')", name="ck_courses_language"),
         CheckConstraint("status IN ('draft', 'published')", name="ck_courses_status"),
         CheckConstraint(
-            "nsqf_level IS NULL OR (nsqf_level BETWEEN 1 AND 10)",
+            "nsqf_level IS NULL OR (nsqf_level >= 1 AND nsqf_level <= 10)",
             name="ck_courses_nsqf_level",
         ),
         Index("ix_courses_tenant_id", "tenant_id"),
@@ -161,7 +163,7 @@ class Course(Base):
     language: Mapped[str] = mapped_column(default="both")
     duration_hours: Mapped[int | None] = mapped_column(default=None)
     fee_inr: Mapped[int | None] = mapped_column(default=None)
-    nsqf_level: Mapped[int | None] = mapped_column(default=None)
+    nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
     # Nullable by design: Qualification Pack anchoring arrives with the NSQF
     # hierarchy in a later sprint, without restructuring this table.
     qualification_pack_code: Mapped[str | None] = mapped_column(default=None)
@@ -391,7 +393,7 @@ class CandidateCertification(Base):
     credential_id: Mapped[str | None] = mapped_column(default=None)
     issued_on: Mapped[date | None] = mapped_column(Date, default=None)
     expires_on: Mapped[date | None] = mapped_column(Date, default=None)
-    nsqf_level: Mapped[int | None] = mapped_column(default=None)
+    nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
     skill_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("skills.id", ondelete="SET NULL"), default=None
     )

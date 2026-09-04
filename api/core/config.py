@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # store; this is the source it is projected from, never read at request time.
     # Host port 27018, matching the 5433/6380 convention.
     mongo_url: str = "mongodb://iism:iism@localhost:27018/?authSource=admin"
-    mongo_database: str = "nsqf"
+    mongo_database: str = "iism_nsqf_master_data"
 
     # Echo SQL only in development; noisy and leaks values into logs otherwise.
     db_echo: bool = False
