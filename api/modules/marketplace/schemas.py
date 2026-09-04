@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.modules.identity import TenantOut
-from api.modules.skills.schemas import SkillOut
+from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn, SkillOut
 
 EmploymentType = Literal["full_time", "part_time", "contract", "apprenticeship"]
 CourseMode = Literal["online", "offline", "hybrid"]
@@ -39,7 +39,7 @@ class CourseSkillOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     skill: SkillOut
-    level_taught: int | None = None
+    level_taught: NsqfLevel | None = None
 
 
 class JobOut(BaseModel):
@@ -58,7 +58,7 @@ class JobOut(BaseModel):
     experience_max_years: int | None = None
     salary_min_inr: int | None = None
     salary_max_inr: int | None = None
-    nsqf_level_min: int | None = None
+    nsqf_level_min: NsqfLevel | None = None
     tenant: TenantOut
 
 
@@ -79,7 +79,7 @@ class CourseOut(BaseModel):
     language: CourseLanguage
     duration_hours: int | None = None
     fee_inr: int | None = None
-    nsqf_level: int | None = None
+    nsqf_level: NsqfLevel | None = None
     qualification_pack_code: str | None = None
     tenant: TenantOut
 
@@ -193,7 +193,7 @@ class CertificationIn(BaseModel):
     credential_id: str | None = Field(default=None, max_length=80)
     issued_on: date | None = None
     expires_on: date | None = None
-    nsqf_level: int | None = Field(default=None, ge=1, le=10)
+    nsqf_level: NsqfLevelIn | None = None
     skill_slug: str | None = None
 
     @model_validator(mode="after")
@@ -212,7 +212,7 @@ class CertificationOut(BaseModel):
     credential_id: str | None = None
     issued_on: date | None = None
     expires_on: date | None = None
-    nsqf_level: int | None = None
+    nsqf_level: NsqfLevel | None = None
     skill: SkillOut | None = None
 
 

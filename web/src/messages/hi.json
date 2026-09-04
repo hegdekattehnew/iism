@@ -181,7 +181,29 @@
     "notFound": "यह कौशल मौजूद नहीं है।",
     "backToSkills": "सभी कौशल",
     "loadError": "API तक नहीं पहुँच सके। क्या यह चल रहा है?",
-    "showingAll": "सभी कौशल दिखाए जा रहे हैं"
+    "showingAll": "सभी कौशल दिखाए जा रहे हैं",
+    "showingRange": "{total} में से {from}–{to} दिखा रहे हैं",
+    "prevPage": "पिछला",
+    "nextPage": "अगला",
+    "levelWithCount": "स्तर {level} ({count})",
+    "typeWithCount": "{type} ({count})",
+    "searchCapped": "सबसे मिलते-जुलते {count} परिणाम दिखाए जा रहे हैं। कम लेकिन बेहतर परिणामों के लिए खोज को सीमित करें।",
+    "filtersOnSearch": "फ़िल्टर केवल इन्हीं परिणामों पर लागू होते हैं।",
+    "qualifications": "इस इकाई का उपयोग करने वाली योग्यताएँ",
+    "qualificationsIntro": "राष्ट्रीय व्यावसायिक मानक का अपना कोई स्तर नहीं होता — इसका स्तर उसे शामिल करने वाली प्रत्येक योग्यता तय करती है।",
+    "qualificationsCount": "{count, plural, =0 {कोई योग्यता नहीं} one {# योग्यता} other {# योग्यताएँ}}",
+    "qualificationsMore": "और {count} अन्य",
+    "requirement": {
+      "compulsory": "अनिवार्य",
+      "elective": "वैकल्पिक",
+      "optional": "ऐच्छिक"
+    },
+    "electiveGroup": "इनमें से चुनें: {group}",
+    "nosCode": "NOS कोड",
+    "nosVersion": "संस्करण",
+    "curatedNotice": "यह एक हस्त-निर्मित कौशल है, जो अभी किसी राष्ट्रीय व्यावसायिक मानक से नहीं जोड़ा गया है।",
+    "noQualifications": "यह इकाई किसी भी वर्तमान योग्यता का हिस्सा नहीं है।",
+    "usedInQps": "{count, plural, one {# योग्यता} other {# योग्यताएँ}}"
   },
   "jobsPage": {
     "title": "नौकरियाँ",

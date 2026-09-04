@@ -270,6 +270,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
 
     # ------------------------------------------------------------- qp -> skills
     link_rows, level_votes = [], defaultdict(list)
+    qp_counts: Counter[uuid.UUID] = Counter()
     seen_links = set()
     for qp, _ in qp_by_code.values():
         qp_id = qp_ids.get((qp.code, qp.version))
@@ -285,6 +286,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
             if (qp_id, skill_id) in seen_links:
                 continue
             seen_links.add((qp_id, skill_id))
+            qp_counts[skill_id] += 1
             link_rows.append(
                 {
                     "id": uuid.uuid4(),
@@ -303,10 +305,18 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
 
     # A NOS has no level of its own, so the displayed level is the modal level
     # of the qualifications that contain it. Authoritative level stays on the QP.
+    # qp_count is written for every skill, including the 4,732 that no current
+    # qualification uses -- a re-import that drops a QP must be able to send a
+    # count back down to zero, which a "only write what we found" pass cannot do.
     derived = [
-        {"nos_code": code, "nsqf_level": Counter(level_votes[sid]).most_common(1)[0][0]}
+        {
+            "nos_code": code,
+            "nsqf_level": (
+                Counter(level_votes[sid]).most_common(1)[0][0] if level_votes.get(sid) else None
+            ),
+            "qp_count": qp_counts.get(sid, 0),
+        }
         for code, sid in skill_ids.items()
-        if level_votes.get(sid)
     ]
     for start in range(0, len(derived), CHUNK):
         batch = derived[start : start + CHUNK]
@@ -318,10 +328,14 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
         )
         await db.execute(
             stmt.on_conflict_do_update(
-                index_elements=["nos_code"], set_={"nsqf_level": stmt.excluded.nsqf_level}
+                index_elements=["nos_code"],
+                set_={
+                    "nsqf_level": stmt.excluded.nsqf_level,
+                    "qp_count": stmt.excluded.qp_count,
+                },
             )
         )
-    report.levels_derived = len(derived)
+    report.levels_derived = sum(1 for r in derived if r["nsqf_level"] is not None)
 
     # -------------------------------------------------------- model curricula
     mc_rows = []

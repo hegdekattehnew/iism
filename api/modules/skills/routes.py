@@ -12,6 +12,17 @@ async def skill_count(db: AsyncSession = Depends(get_db_session)) -> schemas.Ski
     return schemas.SkillCount(count=await service.count_skills(db))
 
 
+@router.get("/facets", response_model=schemas.SkillFacets)
+async def skill_facets(db: AsyncSession = Depends(get_db_session)) -> schemas.SkillFacets:
+    levels, types, unlevelled, total = await service.skill_facets(db)
+    return schemas.SkillFacets(
+        total=total,
+        levels=[schemas.LevelFacet(level=lv, count=c) for lv, c in levels],
+        types=[schemas.TypeFacet(skill_type=ty, count=c) for ty, c in types],
+        unlevelled=unlevelled,
+    )
+
+
 @router.get("/search", response_model=list[schemas.SkillSearchHit])
 async def search_skills(
     q: str = Query(min_length=1, max_length=120, description="Free text, any script"),
@@ -32,7 +43,7 @@ async def search_skills(
 @router.get("", response_model=schemas.SkillPage)
 async def list_skills(
     skill_type: schemas.SkillType | None = Query(None),
-    nsqf_level: int | None = Query(None, ge=1, le=10),
+    nsqf_level: float | None = Query(None, ge=1, le=10),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
@@ -45,6 +56,22 @@ async def list_skills(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/{slug}/qualifications", response_model=schemas.SkillQualifications)
+async def skill_qualifications(
+    slug: str,
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.SkillQualifications:
+    skill = await service.get_skill_by_slug(db, slug)
+    if skill is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill not found")
+    items, total = await service.qualifications_for_skill(db, skill.id, limit=limit)
+    return schemas.SkillQualifications(
+        items=[schemas.QualificationRefOut.model_validate(q) for q in items],
+        total=total,
     )
 
 

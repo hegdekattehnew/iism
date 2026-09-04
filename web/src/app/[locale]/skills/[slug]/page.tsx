@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
+import { SkillQualifications } from "@/components/SkillQualifications";
 import { SkillRelated } from "@/components/SkillRelated";
 import { ButtonLink } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -51,7 +52,21 @@ export default async function SkillDetailPage({
             ? t("level", { level: data.nsqf_level })
             : t("noLevel")}
         </span>
+        {data.nos_code && (
+          <span className="rounded-md border border-border-token px-2.5 py-1 font-mono text-xs text-muted">
+            {data.nos_code}
+            {data.nos_version ? ` v${data.nos_version}` : ""}
+          </span>
+        )}
       </div>
+
+      {/* The 52 hand-written skills predate the national import. Saying so beats
+          letting them look like standards they are not. */}
+      {data.source === "curated" && (
+        <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          {t("curatedNotice")}
+        </p>
+      )}
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
       {secondary && <p className="mt-1 text-lg text-muted">{secondary}</p>}
@@ -89,6 +104,8 @@ export default async function SkillDetailPage({
           </dl>
         </section>
       )}
+
+      <SkillQualifications slug={data.slug} />
 
       <SkillRelated slug={data.slug} />
 

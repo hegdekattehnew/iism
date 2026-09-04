@@ -197,7 +197,7 @@ class CourseSkill(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
     skill_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
-    level_taught: Mapped[int | None] = mapped_column(default=None)
+    level_taught: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
 
     course: Mapped["Course"] = relationship(back_populates="skills")
     skill: Mapped["Skill"] = relationship(lazy="selectin")

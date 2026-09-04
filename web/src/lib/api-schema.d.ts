@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/skills/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Skill Facets */
+        get: operations["skill_facets_skills_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skills/search": {
         parameters: {
             query?: never;
@@ -47,6 +64,23 @@ export interface paths {
         };
         /** List Skills */
         get: operations["list_skills_skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skills/{slug}/qualifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Skill Qualifications */
+        get: operations["skill_qualifications_skills__slug__qualifications_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -923,6 +957,13 @@ export interface components {
              */
             id: string;
         };
+        /** LevelFacet */
+        LevelFacet: {
+            /** Level */
+            level: number;
+            /** Count */
+            count: number;
+        };
         /** MarketplaceCounts */
         MarketplaceCounts: {
             /** Jobs */
@@ -995,6 +1036,34 @@ export interface components {
             /** Missing */
             missing?: string[];
         };
+        /** QualificationRefOut */
+        QualificationRefOut: {
+            /** Qp Code */
+            qp_code: string;
+            /** Version */
+            version: string;
+            /** Slug */
+            slug: string;
+            /** Name En */
+            name_en: string;
+            /** Name Hi */
+            name_hi?: string | null;
+            /** Job Role En */
+            job_role_en?: string | null;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /**
+             * Requirement
+             * @enum {string}
+             */
+            requirement: "compulsory" | "elective" | "optional";
+            /** Group Name */
+            group_name?: string | null;
+            /** Sector Name En */
+            sector_name_en?: string | null;
+            /** Sector Slug */
+            sector_slug?: string | null;
+        };
         /** RefreshRequest */
         RefreshRequest: {
             /** Refresh Token */
@@ -1029,8 +1098,44 @@ export interface components {
             skill_type: "technical" | "core" | "generic";
             /** Nsqf Level */
             nsqf_level?: number | null;
+            /**
+             * Qp Count
+             * @default 0
+             */
+            qp_count: number;
             /** Aliases */
             aliases?: components["schemas"]["AliasOut"][];
+            /**
+             * Source
+             * @default curated
+             * @enum {string}
+             */
+            source: "nsqf" | "curated";
+            /** Nos Code */
+            nos_code?: string | null;
+            /** Nos Version */
+            nos_version?: string | null;
+            /** Nos Type */
+            nos_type?: string | null;
+        };
+        /**
+         * SkillFacets
+         * @description The filter options that actually exist in the data, with their counts.
+         *
+         *     Served rather than hardcoded in the client for one concrete reason: the
+         *     taxonomy holds 8,055 skills at half-levels, 6,532 of them at 4.5 alone. A
+         *     dropdown listing 1-10 hides 38% of the corpus behind options that silently
+         *     do not exist, and no test catches a filter that returns a correct empty page.
+         */
+        SkillFacets: {
+            /** Total */
+            total: number;
+            /** Levels */
+            levels: components["schemas"]["LevelFacet"][];
+            /** Types */
+            types: components["schemas"]["TypeFacet"][];
+            /** Unlevelled */
+            unlevelled: number;
         };
         /** SkillOut */
         SkillOut: {
@@ -1056,6 +1161,11 @@ export interface components {
             skill_type: "technical" | "core" | "generic";
             /** Nsqf Level */
             nsqf_level?: number | null;
+            /**
+             * Qp Count
+             * @default 0
+             */
+            qp_count: number;
         };
         /** SkillPage */
         SkillPage: {
@@ -1067,6 +1177,13 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** SkillQualifications */
+        SkillQualifications: {
+            /** Items */
+            items: components["schemas"]["QualificationRefOut"][];
+            /** Total */
+            total: number;
         };
         /**
          * SkillSearchHit
@@ -1096,6 +1213,11 @@ export interface components {
             skill_type: "technical" | "core" | "generic";
             /** Nsqf Level */
             nsqf_level?: number | null;
+            /**
+             * Qp Count
+             * @default 0
+             */
+            qp_count: number;
             /** Matched On */
             matched_on?: string | null;
             /**
@@ -1153,6 +1275,16 @@ export interface components {
             token_type: string;
             /** Expires In */
             expires_in: number;
+        };
+        /** TypeFacet */
+        TypeFacet: {
+            /**
+             * Skill Type
+             * @enum {string}
+             */
+            skill_type: "technical" | "core" | "generic";
+            /** Count */
+            count: number;
         };
         /** UserOut */
         UserOut: {
@@ -1216,6 +1348,26 @@ export interface operations {
             };
         };
     };
+    skill_facets_skills_facets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillFacets"];
+                };
+            };
+        };
+    };
     search_skills_skills_search_get: {
         parameters: {
             query: {
@@ -1270,6 +1422,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skill_qualifications_skills__slug__qualifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillQualifications"];
                 };
             };
             /** @description Validation Error */
