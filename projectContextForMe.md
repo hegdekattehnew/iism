@@ -24,17 +24,19 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **34 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/adr/architecture-decisions.md` | **35 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
-| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The sprint plan, 1–4.** Sprints 1–2 as built; 3–4 planned in detail with deliverables, on-screen outcome, exclusions, definition of done and verification. Lives outside the repo. |
+| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The sprint plan, 1–8.** Sprint 7 is marked superseded but still holds the translation-pipeline design. Lives outside the repo. |
+| `docs/nsqf-source-data-findings.md` | **Everything measured about the NSQF corpus** — field-naming traps, level distributions, content volumes, deduplication rates, translation costs, data-quality issues. Read before touching the importer. |
 | This file | Session-to-session continuity, environment quirks, hard-won gotchas. |
 
-ADR-001–023 came from a March 2026 spreadsheet. **ADR-024–033 were written in this project
+ADR-001–023 came from a March 2026 spreadsheet. **ADR-024–035 were written in this project
 (Sept 2026)** and cover: multi-sector scope, monetization deferral, supply acquisition, ARQ over
 Celery, AWS topology, Next.js client, in-house identity, AI provider abstraction, dual credentials,
-language scope. Three repairs were also made: ADR-014's malformed status, ADR-015 marked superseded,
+language scope, the NSQF source of record (034), and selective ingestion — why the PII-bearing
+`ssc` collection is deliberately not imported (035). Three repairs were also made: ADR-014's malformed status, ADR-015 marked superseded,
 and **ADR-023's `Final decision` field was empty** — the most compliance-sensitive decision in the
 document was formally unresolved. It is now filled in.
 
@@ -142,19 +144,30 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 api/                    FastAPI modular monolith
   main.py               app, health, demo task endpoints
   core/                 config, database, cache, tasks (ARQ), health
-  modules/skills/       models, schemas, service, routes, __init__ (public interface)
+  modules/skills/       models.py     Skill, SkillAlias (the leaf)
+                        hierarchy.py  AwardingBody, Sector, SubSector, Occupation,
+                                      QualificationPack, QpSkill, QpEntryRoute,
+                                      QpNcoCode, ModelCurriculum
+                        content.py    PerformanceElement, PerformanceCriterion,
+                                      KnowledgeParameter, GenericCriterion (~614k rows)
+                        + schemas, service, routes, __init__ (public interface)
+  modules/geography/    State, District, SubDistrict. Its own module because jobs
+                        and profiles reference it and neither is a skill. No routes
+                        yet -- nothing consumes it over HTTP.
   modules/marketplace/  Job, JobSkill, Course, CourseSkill + browse/detail endpoints
   modules/identity/     User, Tenant, Membership, OTP sign-in, JWT
   core/security.py      tokens, OTP hashing, rate limits, get_current_user
   adapters/notifications/  NotificationProvider protocol + console impl
-  adapters/nsqf/        NsqfSource port + Mongo and JSON-file sources, document
-                        parsing, normalisation, importer (ADR-017, ADR-034)
-  modules/skills/hierarchy.py  Sector, SubSector, Occupation, QualificationPack,
-                        QpSkill, ModelCurriculum, ModelCurriculumSkill
+  adapters/nsqf/        base.py       NsqfSource port (6 iterators)
+                        documents.py  ALL document parsing, shared by every source
+                        mongo.py / jsonfile.py  the two sources
+                        normalise.py  levels, HH:MM, credits, slugs, NCO codes
+                        importer.py   phased projection into Postgres
 web/                    Next.js 16 PWA
   src/app/[locale]/     13 routes, all bilingual
   src/components/       Header, Hero, HowItWorks, Audiences, BrowsePanels, CtaBand,
-                        Footer, SkillBrowser, SystemStatus, DevPanel, PlaceholderPage, ui
+                        Footer, SkillBrowser, SkillRequirements, SkillQualifications,
+                        SkillRelated, SystemStatus, DevPanel, PlaceholderPage, ui
   src/messages/         en.json, hi.json — no user-facing string is hardcoded
   src/lib/api-schema.d.ts  GENERATED from OpenAPI, never hand-edit
 infra/docker-compose.yml   Postgres 16 + pgvector (5433), Redis 7 (6380), Mongo 7.0 (27018)
@@ -164,7 +177,8 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0005 (rich profile), 0006 (list-filter indexes),
                         0007 (widen nsqf_level to Numeric(3,1)),
                         0008 (NSQF hierarchy), 0009 (widen level_taught),
-                        0010 (skills.qp_count)
+                        0010 (skills.qp_count), 0011 (geography),
+                        0012 (structure, entry routes, content, pruning)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py — all idempotent
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 tests/                  pytest + testcontainers
@@ -312,6 +326,45 @@ Three processes must run for the full stack: **api, worker, web.**
     — 21,263 distinct `unitCode` across 27,538 documents. Prior versions stay in Mongo; that is
     what making it the source of record buys (ADR-034).
 
+42. **Sector-local identifiers are not global, and this trap fires twice.** An occupation's
+    two-digit `code` is scoped to a sector -- that was caught. Its `occupationID` is *also* scoped,
+    reusing `"1"`, `"2"`, `"3"` across forty-odd sectors -- that was not, and keying on it collapsed
+    1,811 occupations into 529. Nothing failed; the count was simply wrong. **When a source id looks
+    global, count the distinct values before keying on it.**
+43. **`minEduQual` is a structured array, never a text description.** 14,877 alternative entry
+    routes across 4,564 qualifications, each pairing an education requirement with an experience
+    one. An earlier pass counted non-empty arrays and called them text values. `"NA"` experience
+    stays NULL -- "no experience required" and "not stated" would score differently.
+44. **`alignedTo` is dirty and must be parsed, not stored.** Of 3,214 values: 1,914 well-formed NCO
+    codes, 507 in variant formats (U+2010 hyphens, `NCO 2015- ` spacing, comma-separated multiples),
+    and 793 free text like `(CNC Operator)`. The free text is discarded and counted. Sampling one
+    clean value and generalising is how this was first misreported -- the same mistake shape as the
+    level error.
+45. **Content rows key on `(parent, ordinal)`, never the source's own id.** `pcID` repeats within a
+    unit in 17 of 6,000 standards, `kpID` in 1, `skillID` in 2. A natural key on the source id fails
+    partway through the import, after thousands of rows are already written.
+46. **Content is deleted and rewritten each run, not upserted.** It is wholly derived and owned by
+    the importer, and a revised standard with fewer criteria must not leave the surplus behind.
+    Anything later attached to content (translations, embeddings) must therefore live in its own
+    table, not as a column on these rows.
+47. **Free prose columns are `Text`, not `String(n)`.** Two import runs died on `varchar(512)`
+    overflow -- occupation names reach 894 characters and entry-route specialisations 735. Postgres
+    stores `Text` and `varchar(n)` identically, so a cap buys nothing except a future failure. Keep
+    a bound only on genuine codes and enums.
+48. **Autogenerate emits unnamed foreign keys.** `op.create_foreign_key(None, ...)` produces a
+    downgrade calling `op.drop_constraint(None, ...)`, which fails outright. Name every FK before
+    applying a generated migration -- twelve appeared across 0011 and 0012.
+49. **A source iterated more than once double-counts its own diagnostics.** `iter_nos` now runs
+    three times (collect, then two content passes), so `skipped_documents` tripled. Capture
+    per-source counters at the end of the collect phase, not at the end of the import.
+50. **Regenerating a migration: never delete the old file before the new one exists.** A glob that
+    did not match left the database at a revision whose file was gone, and alembic could then do
+    nothing in either direction. Autogenerate against a scratch database instead, and reconcile.
+51. **`make check` is not enough after a data-model change.** It passed while `occupations` held 529
+    rows instead of 1,811. Compare the import report against independently computed expectations --
+    for content, the ceiling is the sum over the *current version* of each code, which is how
+    38,340 elements was confirmed correct rather than short.
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -325,68 +378,83 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 10. Git state
 
-- Branch **`v2/sprint-1-skeleton`** — name is now misleading, it holds two sprints. Worth renaming.
-- **Nothing has been committed.** The whole rebuild is uncommitted working tree.
-- The original `app/` (identity module, auth, 8 actor types) was deleted in this branch's working
-  tree but **remains in history on `main`** at commit `ef59c4e`. Recoverable if the identity work
-  is worth mining when Sprint 3 builds auth.
-- `docs/` was carried forward untouched.
+- Branch **`v2/foundations`**, 16 commits ahead of `main`, working tree clean.
+- The NSQF work reads as a sequence worth understanding in order: `a62d964` projected the corpus,
+  `5cf496f` made it usable at 21k rows, `75abc17` added tests, **`c10829f` rolled the whole thing
+  back** after an audit, and `4230c9c` re-migrated against the complete master data. The rollback
+  commit is not a failure to skim past -- it carries the audit that made the second attempt right.
+- The original `app/` (identity module, auth, 8 actor types) remains in history on `main` at
+  `ef59c4e`. Recoverable if that identity work is ever worth mining.
 
 ## 11. What comes next
 
-**Hindi for the national corpus is the largest open gap.** All 21,303 imported skills are
-English-only: the source contains no Devanagari at all, and the 149 aliases still attach only to
-the 52 curated skills. Searching `khoon nikalna`, `बिक्री` or `safai` today returns curated skills
-and *nothing* from the national taxonomy. This is a real, stated regression against ADR-033.
+Nothing is half-finished. The next piece of work is a choice, not a continuation.
 
-The planned answer is an ARQ translation job over a prioritised subset — 43 sectors, then 4,424 QP
-job roles, then the NOS referenced by seeded jobs — writing back to Postgres and **mirroring into
-Mongo so a re-import cannot destroy the translations**. It is blocked on an LLM adapter
-(ADR-018/031) and on provider credentials, neither of which exists yet. Do not present the
-bilingual story as complete before this lands.
+**The taxonomy connects to nothing.** Zero `job_skills`, `course_skills`, `candidate_skills` or
+`skill_aliases` point at an imported row -- 21,303 standards sit beside the product rather than
+inside it, and the 52 curated skills still carry every link. Until that changes, none of the
+imported data affects a single user-visible outcome. This is the highest-value next step and the
+cheapest: re-anchor the seeded jobs and courses onto real NOS codes.
 
-**`scripts/map_legacy_skills.py` was planned and deliberately not built.** Its premise was that the
-52 curated skills would be replaced and their 149 aliases had to be carried onto real NOS codes.
-They were not replaced, so nothing needs rescuing. Searching the corpus for each of the 52 found a
-confident NOS counterpart for only about 11; forcing the rest would attach Hindi aliases to units
-that do not mean the same thing, and even the good 11 would produce duplicate search results for
-0.05% coverage. The finding worth keeping is that **the hand-written Sprint 2 vocabulary and the
-national standard do not align concept-for-concept** — translation, not mapping, is the answer.
+**Then matching**, which is the payoff and has been deferred three times. Two things must land with
+or before it, and neither exists:
+1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute for
+   a revenue signal and nothing records anything.
+2. **A golden-set evaluation harness** -- hand-labelled candidate/job pairs, precision@5 in CI.
 
-**`scripts/seed_marketplace.py` did not need re-authoring** for the same reason: all 170 slug
-references still resolve. Pointing the seeded jobs and courses at real NOS codes is still worth
-doing, because today no NSQF skill has a single job or course attached to it.
+The content layer now makes honest gap analysis possible for the first time: 238,370 assessable
+criteria rather than 21,303 titles.
 
-**Matching is the next real sprint** — the payoff, deferred twice. Two things must land with or
-before it, and neither exists:
-1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute
-   for a revenue signal and nothing currently records anything.
-2. **A golden-set evaluation harness** — hand-labelled candidate/job pairs, precision@5 in CI.
+**The duplicate-concept problem blocks good matching** and needs a decision, not code: 4,847 rows
+share a name and "Employability Skills" is 67 separate units. A candidate claiming it matches one
+of 67. Either a concept layer above the unit, or deduplication at import -- both are design calls.
+
+**Hindi for the corpus** is designed but unbuilt (superseded Sprint 7 in the plan file has the
+shape: glossary first, deduplicate before translating, `translations` table with a review status,
+write back to Mongo, transliteration as a first-class output). Roughly $5 for the navigable
+surface, blocked on an LLM adapter and credentials.
 
 Also outstanding: typed `SkillRelation` edges, embeddings, organisation/email login and self-serve
 publishing, a real SMS provider, observability, and the ADR-023 encryption path.
 
-## 12a. Measured performance ceiling (audited 2026-09-02)
+## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 
-Load-tested locally. **The bottleneck is Python CPU, not the database.**
+Single uvicorn worker, load generator on the same box, so **treat throughput as a floor**.
+The database is now **485 MB** across 21,355 skills and ~614,000 content rows.
 
-- `GET /jobs` — flat at **~137 rps** on one uvicorn worker regardless of
-  concurrency; p99 degrades 208ms → 2,192ms from c=10 to c=200.
-- `GET /skills/search` — peaks ~420 rps at c=100 then **collapses to 160 rps**.
-- The database answers in **1.5 ms** while uvicorn pegs **94.8% of one core**.
-- Four workers gave ~255 rps, not 4× (the load generator shares the box, so
-  treat all throughput figures as a floor).
+| Endpoint | c=10 rps | c=50 rps | p50 | p99 (c=50) |
+|---|---|---|---|---|
+| `GET /skills?limit=24` | 350 | 313 | 19 ms | 589 ms |
+| `GET /skills/{slug}/requirements` | 235 | 230 | 34 ms | 895 ms |
+| `GET /skills/search?q=` | 154 | 183 | 57 ms | 648 ms |
+| `GET /jobs` | 135 | 149 | 66 ms | 1,159 ms |
 
-**Not ready for 1000 concurrent users.** Fixed in this pass: the four missing
-filter indexes. Still outstanding, in order:
+**The 2026-09-02 conclusion still holds: the bottleneck is Python CPU, not the database.**
+Throughput is flat across concurrency while p99 climbs an order of magnitude — the signature of a
+saturated single process, not a slow query. Serving 614k content rows did not move the numbers,
+because every hot path is index-backed:
 
-1. **No caching.** Redis is present but serves only OTP, refresh tokens and the
-   ARQ broker — ADR-020 is unimplemented. The taxonomy is near-static.
-2. **Connection pool maths.** 15 connections per process against Postgres
-   `max_connections=100` caps you at ~6 processes. PgBouncer before that.
-3. **The browsers fetch `limit=200` and filter client-side.** This does not
-   degrade with catalogue growth — it stops working.
-4. Run uvicorn with multiple workers; it is single-process today.
+- `/skills` first page uses `ix_skills_qp_count` with an incremental sort.
+- Content fetch is two index scans (`ix_performance_elements_skill_id`, then
+  `ix_performance_criteria_element_id`) — 7.5 ms for a 128-criterion standard.
+- FTS still uses the GIN index at 21k rows; the trigram fallback uses `ix_skills_name_en_trgm`.
+
+**One new weakness the corpus exposed.** Deep offset paging degrades badly: `offset 21000`
+seq-scans and fully sorts all 21,355 rows (70 ms against 7 ms for the first page). Fine while
+people browse the first pages, wrong if anything ever walks the catalogue. Keyset pagination on
+`(qp_count, name_en)` is the fix when that matters.
+
+**Still not ready for 1000 concurrent users.** Outstanding, in order:
+
+1. **No caching.** Redis serves only OTP, refresh tokens and the ARQ broker — ADR-020 is
+   unimplemented. The taxonomy is near-static and 485 MB of it is now read-only reference data.
+2. **Single uvicorn process.** Multiple workers is the cheapest win available.
+3. **Connection pool maths.** 15 connections per process against `max_connections=100` caps you at
+   ~6 processes; PgBouncer before that.
+4. **Deep offset paging**, as above.
+
+Fixed since the last audit: the four missing filter indexes, and the browsers that fetched
+`limit=200` and filtered client-side — `/skills` now pages server-side.
 
 ## 12b. Security posture (audited 2026-09-02)
 
@@ -429,9 +497,14 @@ the logs. CORS is restricted to one origin.
   reversible trade — but it is debt, not a design.
 - **The national taxonomy is English-only**, so the Hindi half of ADR-033 currently covers the UI
   chrome and 52 skills, not the 21,303 that matter. Say this plainly.
-- **4,732 imported skills belong to no current qualification** and 4,784 have no QP link at all.
-  They are real NOS whose qualifications were superseded; they will never surface through sector
-  or QP navigation, only through search.
+- ~~4,784 imported skills are unreachable by sector navigation.~~ **Resolved in Sprint 8** — every
+  standard states its own sector, so the hierarchy no longer depends on the qualification side.
+  They still belong to no current qualification, which is a fact about the corpus, not a defect.
+- **7,459 of 21,263 current standards publish no performance criteria at all.** Gap analysis will
+  simply have nothing to say about a third of the taxonomy, and no amount of importing fixes it.
+- **The source's own arithmetic does not always add up.** In 422 of 23,903 comparable elements the
+  criteria marks do not sum to the element total (e.g. 8+6+6=20 against a stated 23). Reproduced
+  faithfully rather than corrected — silently "fixing" a national standard would be worse.
 - **Only 45 of 21,303 titles are section-numbered course fragments** ("10.1. Case Studies") but
   they are indistinguishable from real units in the schema. Prominence ordering hides them; it
   does not fix them.

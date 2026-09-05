@@ -57,6 +57,11 @@ These 52 remain the only skills with Hindi names and aliases; see the Sprint 6 c
 `/jobs` and `/courses`, sign-in at `/signin`, the candidate profile at `/profile`, and the System
 Status panel at the foot of the homepage.
 
+The most interesting page is a standard's detail view — try
+`/en/skills/basic-sculptor-and-stone-artist-moortikar-hcs-n1506`. It shows what the standard
+requires (assessable criteria with their marks), the qualifications that use it with each one's own
+NSQF level, and its code, sector and owning body.
+
 Not yet built: matching, Hindi for the imported corpus, a concept layer over duplicated unit names,
 organisation/email login, self-serve publishing, a real SMS provider, typed skill relations,
 embeddings, analytics instrumentation.
@@ -132,7 +137,11 @@ containers, so they never touch your development data and behave identically in 
   local installs are left alone.
 - MongoDB is pinned to **7.0**. 8.0 will not start on this Docker VM's kernel (SERVER-121912).
 - NSQF levels are `Numeric(3,1)` everywhere, including in Pydantic schemas. The framework uses
-  half-levels and 4.5 alone accounts for 6,532 skills.
+  half-levels and 4.5 alone accounts for 6,780 standards.
+- A level is stated in three places and they are three different facts: the standard's own
+  (`skills.nsqf_level`), the qualification's (`qualification_packs.nsqf_level`), and the level a
+  unit sits at inside a given qualification (`qp_skills.nsqf_level`).
+- The importer is idempotent and takes ~90 seconds. Run it twice and the counts do not move.
 - After changing any API endpoint, run `make gen-api` to regenerate the TypeScript client.
 - Configuration is always read through `get_settings()`. Never bind `settings` at module import
   time — it cannot then be overridden, and tests silently hit the wrong database.

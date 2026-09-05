@@ -14,6 +14,7 @@
 > - **ADR-015** — superseded by ADR-024. India-first is retained; the single-sector constraint is withdrawn.
 > - **ADR-023** — `Final decision` was empty in the source; now resolved.
 > - **ADR-006** — amended by ADR-027 (task runner implementation only; the principle stands).
+> - **ADR-023** — complemented by ADR-035 (what not to collect, as against what to protect).
 > - **ADR-021** — qualified by ADR-033 for Hindi-language search.
 > - **ADR-003** — qualified by ADR-034. Its rejection of a second store for *vector search* stands
 >   and pgvector is unchanged; ADR-034 adds a document store for *source data* only.
@@ -1061,5 +1062,58 @@ includes the Linux VM that Docker Desktop runs on macOS. And the container is ex
 **27018** rather than 27017, following the same convention as PostgreSQL on 5433 and Redis on
 6380, so a pre-existing local installation is never disturbed.
 
+
+---
+
+## ADR-035: Selective Ingestion of the NSQF Master Data
+
+**Status:** Accepted (September 2026)
+
+**Context:** The NSQF master data arrived in MongoDB as seven collections. Six describe the
+framework — qualifications, standards, curricula, sectors, states, districts. The seventh, `ssc`,
+does not: it is a portal account registry holding **4,027 email addresses, 4,042 mobile numbers,
+2,129 personal names, and 50 bank account numbers with IFSC codes and account-holder names**, of
+which 3,547 of 4,053 rows are incomplete registrations at `status='init'`.
+
+It was initially assumed to be the Sector Skill Council master, and the obvious reading of "import
+the master data" is to import all of it. Two facts made that wrong. First, the `sectors` collection
+supplies the same organisations with real names and no personal data, and covers far more of the
+corpus: its `sectorCode` is the code prefix of everything a body owns, resolving **99% of
+qualifications and standards** against the 40% reachable through `ssc`'s `qpPrefix`. Second, the
+personal and financial data serves no product purpose whatsoever — nothing in the marketplace,
+matching or career-path design consumes an awarding body's bank account.
+
+**Decision:** Ingestion is selective and justified per collection, not wholesale. The `ssc`
+collection is **not imported at all**, and no module under `api/` may read it.
+
+More generally: **a field is imported because something needs it, not because it is present.**
+Audit, workflow and shadow fields (`createdBy`, `updatedReason`, `Reviews`, `dockets`,
+`deactivation*`, every `_bk` / `_Old` variant) are dropped by the document parsers rather than
+carried on the chance they prove useful.
+
+**Options considered:**
+1. Import everything, encrypt the sensitive fields under ADR-023
+2. Import the ~110 rows carrying a `qpPrefix`, dropping only the PII columns
+3. **Exclude the collection entirely** *(chosen)*
+
+**Why:** Option 1 takes on a permanent DPDP obligation — lawful basis, retention limits, erasure
+and export rights, breach exposure — for data the product does not use. Encryption reduces the
+consequence of a breach; it does not create a lawful basis for holding the data in the first place.
+Option 2 still means holding contact details for real people, and buys almost nothing: the
+`sectors` collection already resolves more than twice the corpus. Option 3 loses no capability.
+
+**Consequences:**
+- Sector Skill Councils and awarding bodies come from the `sectors` collection, which holds both
+  populations under one key, and land in one `awarding_bodies` table because the source treats them
+  as one thing.
+- Ownership is derived from the code prefix rather than from any explicit field.
+- Should awarding-body contact data ever be needed, it must be collected with consent through the
+  product's own onboarding, not lifted from a portal export.
+- The exclusion is asserted by test and by convention: `CLAUDE.md` states that nothing in `api/`
+  may read `ssc`, and the schema carries no column sourced from it.
+
+This complements ADR-023 (encryption of sensitive data) rather than qualifying it. ADR-023 governs
+data the product needs and must protect; this governs data the product does not need and therefore
+must not hold. The cheapest way to protect personal data is not to collect it.
 
 ---
