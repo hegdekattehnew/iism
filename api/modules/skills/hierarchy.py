@@ -1,14 +1,21 @@
 """The NSQF hierarchy above a skill (ADR-004, ADR-034).
 
 Modelled against the real national corpus rather than the framework as
-described. Two things the source dictates and the schema has to respect:
+described. Three things the source dictates and the schema has to respect:
 
-* **A NOS carries no NSQF level of its own** — zero of 27,538 do. Level is a
-  property of the Qualification Pack, so it lives on `QualificationPack` and,
-  contextually, on each `QpSkill` row. `Skill.nsqf_level` is derived for
-  display only.
-* **There is no usable Sector Skill Council dimension.** `originSSC` is present
-  on 427 of 4,669 QPs. `Sector` (47 of them) is the real top of the tree.
+* **Level is stated in three places and they are three different facts.** A
+  standard declares its own (`Skill.nsqf_level`), a qualification declares its
+  own (`QualificationPack.nsqf_level`), and a unit sits at a particular level
+  *inside* a given qualification (`QpSkill.nsqf_level`). An earlier version of
+  this file claimed a NOS carries no level; that was wrong, and came from
+  checking the qualification's field name (`nsqfLevel`) against standards, which
+  spell it `nsqf`.
+* **The owning body is derivable from the code prefix.** `AwardingBody.code` is
+  the prefix of every qualification and standard the body owns, which resolves
+  99% of the corpus. Sector Skill Councils and awarding bodies share one table
+  because the source keeps them in one collection under one key.
+* **Occupation codes are two digits and sector-local** (`01`, `99`), so the code
+  alone is not unique. `occupation_ref` is the key. They are not NCO codes.
 """
 
 import uuid
@@ -21,6 +28,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -33,16 +41,56 @@ from api.core.database import Base
 QP_REQUIREMENTS = ("compulsory", "elective", "optional")
 
 
+BODY_TYPES = ("sector_skill_council", "awarding_body")
+
+
+class AwardingBody(Base):
+    """The organisation that owns a qualification or standard.
+
+    Sector Skill Councils and awarding bodies live in one source collection under
+    one key, and `code` is the prefix of everything they own -- `LSC` owns
+    `LSC/Q6101` and `LSC/N2131`. That single fact resolves 4,529 of 4,576
+    qualifications and 27,495 of 27,523 standards to an owner, which is why the
+    prefix is the join and not the sparse `originSSC` field.
+    """
+
+    __tablename__ = "awarding_bodies"
+    __table_args__ = (
+        CheckConstraint(
+            "body_type IN ('sector_skill_council', 'awarding_body')",
+            name="ck_awarding_body_type",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    body_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    name_en: Mapped[str] = mapped_column(Text)
+    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    slug: Mapped[str] = mapped_column(String(360), unique=True, index=True)
+    body_type: Mapped[str] = mapped_column(String(32), default="awarding_body")
+    logo_url: Mapped[str | None] = mapped_column(String(1024), default=None)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class Sector(Base):
-    """One of 47 NSQF sectors — effectively the Sector Skill Council axis."""
+    """A skilling sector. 43 of the 111 rows in the source master carry the
+    sub-sectors and occupations that make them a real sector; the rest are
+    awarding bodies, which land in `AwardingBody` instead."""
 
     __tablename__ = "sectors"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     sector_ref: Mapped[str] = mapped_column(unique=True, index=True)
+    # Also the qualification code prefix, and the key shared with AwardingBody.
+    sector_code: Mapped[str | None] = mapped_column(String(32), index=True, default=None)
     name_en: Mapped[str] = mapped_column()
     name_hi: Mapped[str | None] = mapped_column(default=None)
     slug: Mapped[str] = mapped_column(unique=True, index=True)
+    logo_url: Mapped[str | None] = mapped_column(String(1024), default=None)
+    awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("awarding_bodies.id", ondelete="SET NULL"), index=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     sub_sectors: Mapped[list["SubSector"]] = relationship(
@@ -67,14 +115,27 @@ class SubSector(Base):
 
 
 class Occupation(Base):
-    """Free-text occupation description carried on the QP. 1,162 distinct
-    values, deduplicated on import."""
+    """1,811 occupations from the sector master, every one carrying a code.
+
+    **Both the code and the ref are sector-local.** `code` is two digits, and
+    `occupation_ref` -- the source's occupationID -- reuses "1", "2", "3" across
+    forty-odd sectors. So the key is the pair, and keying on the ref alone
+    collapses 1,811 occupations into 529. The previous version of this table
+    keyed on free text and had no stable identity at all.
+    """
 
     __tablename__ = "occupations"
+    __table_args__ = (
+        UniqueConstraint("sector_id", "occupation_ref", name="uq_occupation_sector_ref"),
+        Index("ix_occupations_sector_id", "sector_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    name_en: Mapped[str] = mapped_column(unique=True, index=True)
-    name_hi: Mapped[str | None] = mapped_column(default=None)
+    occupation_ref: Mapped[str] = mapped_column(String(64), index=True)
+    code: Mapped[str | None] = mapped_column(String(16), default=None)
+    sector_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sectors.id", ondelete="CASCADE"))
+    name_en: Mapped[str] = mapped_column(Text)
+    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 class QualificationPack(Base):
@@ -115,8 +176,17 @@ class QualificationPack(Base):
         ForeignKey("sub_sectors.id", ondelete="SET NULL"), default=None
     )
     occupation_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("occupations.id", ondelete="SET NULL"), default=None
+        ForeignKey("occupations.id", ondelete="SET NULL"), index=True, default=None
     )
+    # Derived from the qualification code prefix, which resolves 99% of the corpus.
+    awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("awarding_bodies.id", ondelete="SET NULL"), index=True, default=None
+    )
+
+    # The assessment blueprint the qualification publishes.
+    total_marks: Mapped[int | None] = mapped_column(default=None)
+    min_pass_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), default=None)
+    credits: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), default=None)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -158,7 +228,76 @@ class QpSkill(Base):
     group_name: Mapped[str | None] = mapped_column(default=None)
     nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
 
+    # What this unit is worth inside this qualification, from the source's own
+    # assessment criteria. The only importance weight in the system that is
+    # sourced rather than hand-authored -- ADR-007 should score against this.
+    weightage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), default=None)
+    total_marks: Mapped[int | None] = mapped_column(default=None)
+
     qualification_pack: Mapped["QualificationPack"] = relationship(back_populates="skills")
+
+
+class QpEntryRoute(Base):
+    """One way in to a qualification: an education requirement plus an
+    experience requirement.
+
+    A qualification publishes several alternative routes -- 4,564 of them do,
+    for 14,877 routes in total -- and a candidate needs to satisfy only one.
+    Modelled as rows rather than a text column because "can this person enrol?"
+    is a query, and because the source states it as structured data: a blob
+    would be throwing away a shape we were handed.
+    """
+
+    __tablename__ = "qp_entry_routes"
+    __table_args__ = (
+        UniqueConstraint("qp_id", "ordinal", name="uq_qp_entry_route_ordinal"),
+        Index("ix_qp_entry_routes_qp_id", "qp_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    qp_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("qualification_packs.id", ondelete="CASCADE")
+    )
+    ordinal: Mapped[int] = mapped_column()
+
+    education_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    education_desc: Mapped[str | None] = mapped_column(Text, default=None)
+    education_specialisation: Mapped[str | None] = mapped_column(Text, default=None)
+
+    experience_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    experience_desc: Mapped[str | None] = mapped_column(String(64), default=None)
+    experience_specialisation: Mapped[str | None] = mapped_column(Text, default=None)
+    # Parsed from the description where it states one. Null means unstated or
+    # unreadable -- never zero, because "no experience needed" and "not stated"
+    # would score differently.
+    experience_years: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), default=None)
+
+    qualification_pack: Mapped["QualificationPack"] = relationship()
+
+
+class QpNcoCode(Base):
+    """NCO-2015 occupation codes a qualification aligns to.
+
+    A link table because a qualification can align to several codes -- the source
+    stores them comma-separated in one string. Of 3,214 values, 1,914 are
+    well-formed, 507 carry a code in a variant format, and 793 are free text such
+    as "(CNC Operator)". Only the first two kinds reach this table; the rest are
+    reported by the importer and discarded, because a job role in brackets is not
+    an occupation code.
+    """
+
+    __tablename__ = "qp_nco_codes"
+    __table_args__ = (
+        UniqueConstraint("qp_id", "nco_code", name="uq_qp_nco_code"),
+        Index("ix_qp_nco_codes_nco_code", "nco_code"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    qp_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("qualification_packs.id", ondelete="CASCADE")
+    )
+    nco_code: Mapped[str] = mapped_column(String(32))
+    ordinal: Mapped[int] = mapped_column(default=0)
 
 
 class ModelCurriculum(Base):
@@ -192,28 +331,7 @@ class ModelCurriculum(Base):
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    skills: Mapped[list["ModelCurriculumSkill"]] = relationship(
-        back_populates="curriculum", cascade="all, delete-orphan"
-    )
-
-
-class ModelCurriculumSkill(Base):
-    """Per-NOS training hours from the model curriculum. All in minutes."""
-
-    __tablename__ = "model_curriculum_skills"
-    __table_args__ = (
-        UniqueConstraint("curriculum_id", "skill_id", name="uq_mc_skill"),
-        Index("ix_mc_skills_skill_id", "skill_id"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    curriculum_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("model_curricula.id", ondelete="CASCADE")
-    )
-    skill_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
-    theory_minutes: Mapped[int | None] = mapped_column(default=None)
-    practical_minutes: Mapped[int | None] = mapped_column(default=None)
-    ojt_minutes: Mapped[int | None] = mapped_column(default=None)
-    total_minutes: Mapped[int | None] = mapped_column(default=None)
-
-    curriculum: Mapped["ModelCurriculum"] = relationship(back_populates="skills")
+    # No per-unit breakdown table. 2,399 of the source's curriculum entries carry
+    # a unitCode that is present but blank, so such a table only ever covered 424
+    # of 1,950 curricula: a twenty-unit curriculum rendered as two, which
+    # misinforms rather than under-informs. The totals below are complete.

@@ -7,9 +7,9 @@ collections, not sampled, unless it says otherwise.
 The first migration attempt (Sprint 6, since discarded) got several of these wrong. Where that
 happened it is said plainly, because the *way* it went wrong is the reusable lesson.
 
-> **Status:** the corpus is being extended with further master data — sectors, Sector Skill
-> Councils, states, districts, awarding bodies. A complete re-migration is planned once that
-> lands. Treat the counts below as describing the corpus as of 2026-09-04.
+> **Status:** migrated 2026-09-05. Four further collections (`sectors`, `ssc`, `state`,
+> `district`) arrived after the first attempt was rolled back, and §13–§16 below record what
+> they contain. Everything here was measured against complete collections, not sampled.
 
 ---
 
@@ -103,8 +103,8 @@ collapse them, and do not derive (1) from (2) — it is stated directly.
 - **Occupation:** free text. 1,144 distinct values on the qualification side, **1,650** on the
   standard side, with no stable identifier joining them. `occupationCode` is present on only
   19,867 of 27,538 NOS. A table keyed on the text is not defensible; denormalise it.
-- **Sector Skill Council:** `originSSC` appears on only **427 of 4,669** qualifications. There is
-  no usable SSC dimension in this corpus. *(Incoming master data may change this — check again.)*
+- **Sector Skill Council:** `originSSC` appears on only **427 of 4,669** qualifications and is
+  useless. **The `sectors` master supersedes it entirely — see §13.**
 
 **Standards carry their own sector on 100% of documents** and an occupation on 27,311. Taking the
 hierarchy from the qualification side alone stranded **4,784 units** that belong to no current
@@ -257,3 +257,121 @@ constraints are elsewhere:
   entirely, and is what would connect a national qualification to a real training provider.
 - How should the **duplicate-concept problem** (67 × "Employability Skills") be modelled — a
   concept layer above units, or deduplication at import?
+
+
+---
+
+## 13. The `sectors` master — two populations in one collection
+
+111 documents, and they are not all sectors:
+
+| | Count | What it is |
+|---|---|---|
+| Rows carrying sub-sectors and occupations | **43** | Real skilling sectors |
+| Rows typed `Awarding Body` | **68** | Organisations, not sectors |
+| Distinct `sectorCode` (== `sscCode`) | **106** | Every owning body |
+
+**`sectorCode` is the qualification code prefix**, and this is the single most useful fact in the
+new data. `LSC` owns `LSC/Q6101` and `LSC/N2131`. It resolves:
+
+- **4,529 of 4,576 qualifications (99.0%)**
+- **27,495 of 27,523 standards (99.9%)**
+
+Against `originSSC`'s 9%, that is the difference between having an ownership dimension and not.
+Listing the 68 awarding bodies as sectors would put "Medhavi Foundation" in a sector filter, so
+they go to `awarding_bodies` and only the 43 become sectors.
+
+**Occupations: 1,811, every one coded — but both the code and the id are sector-local.**
+`occupationCode` is two digits (`01`, `99`) and `occupationID` reuses `"1"`, `"2"`, `"3"` across
+forty-odd sectors. Keying on either alone collapses 1,811 occupations into **529**. The key is
+`(sector, ref)`. They are *not* NCO codes; the overlap with NCO is four values and coincidental.
+
+Sub-sectors: 801, all with ids.
+
+## 14. The `ssc` collection — excluded entirely
+
+4,053 documents, and it is a **portal account registry**, not a Sector Skill Council master:
+
+- 4,027 email addresses, 4,042 mobile numbers, 2,129 personal names
+- 50 bank account numbers with IFSC codes and account-holder names
+- 3,547 of 4,053 still at `status='init'` — incomplete registrations
+- only 110 carry a `qpPrefix`, reaching 1,840 qualifications
+
+The `sectors` collection supplies the same organisations with real names, no personal or financial
+data, and four times the coverage. Importing `ssc` would mean holding DPDP-regulated personal data
+and bank details that the product does not use and has no consent for. **It is not imported, and
+nothing in `api/` reads it.**
+
+## 15. Geography — clean, with one structural surprise
+
+36 states and 767 districts, all `status='active'`, all uniquely coded; 7,138 sub-districts.
+
+**The `district` collection carries no state reference at all.** A district is tied to a state only
+by the array embedded in each state document, and the policy flags live only on that embedded
+copy. So the embedded array is the authority for the hierarchy, and the standalone collection
+contributes sub-districts alone. Two district documents appear in no state's list and are reported
+rather than imported.
+
+The policy flags are worth keeping — they are the axes government skilling schemes target:
+
+| Flag | Districts |
+|---|---|
+| North-east | 128 |
+| Border | 110 |
+| Aspirational | 104 |
+| Tribal | 66 |
+| Left-wing extremism affected | 39 |
+
+Free text resolves well: all four seeded states and five of six districts match exactly.
+`Bengaluru` is `BENGALURU URBAN` in the master — handled by an alias, not by changing the seed,
+because "Bengaluru" is what an employer would actually write.
+
+## 16. `minEduQual` is structured, and `alignedTo` is dirty
+
+**`minEduQual` is an array, never a string.** An earlier pass counted non-empty arrays and called
+them text values. It holds **14,877 alternative entry routes across 4,564 qualifications**, each
+pairing an education requirement with an experience requirement — "12th grade Pass with no
+experience" *or* "10th grade pass with 3 years" — and a candidate needs to satisfy only one.
+Experience is stated as "3 Years", "1.5 years", "6 Months" or "NA"; `NA` must stay null, because
+"no experience required" and "not stated" would score differently.
+
+**`alignedTo` is a mess and must be treated as one.** Of 3,214 values:
+
+| | Count | |
+|---|---|---|
+| Well-formed `NCO-2015/dddd.dddd` | 1,914 | |
+| Variant formats | 507 | unicode hyphen `‐`, `NCO 2015- ` spacing, comma-separated multiples |
+| Free text | 793 | `(CNC Operator)` — a job role, not a code |
+
+Parsing yields 2,541 codes across 2,419 qualifications, 929 distinct. The free-text values are
+counted and discarded, because storing a job role as an occupation classification is worse than
+storing nothing.
+
+## 17. What the migration actually produced (2026-09-05)
+
+```
+states 36 | districts 766 | sub_districts 7,100
+awarding bodies 106 (43 SSC + 63 AB) | sectors 43 | sub_sectors 796 | occupations 1,808
+skills 21,303 | qualification_packs 4,424 | qp_skills 27,278 | model_curricula 1,950
+entry_routes 14,405 | nco_codes 2,541 | qp_skills with weightage 25,522
+performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151,840
+```
+
+Ownership resolves for **97.2% of qualifications** and **99.8% of standards**. `nos_type` went
+from 1,685 populated to 17,992 by reading the embedded copy as well as the standalone field.
+
+**Content is thinner than the corpus-wide totals suggest, and this is real rather than a bug.**
+Only the current version of each code contributes content, and **7,459 of 21,263 current standards
+carry no performance criteria at all** in their latest version. The import writes every content row
+that the current versions hold — verified by computing the ceiling independently and matching it
+exactly.
+
+## 18. Still open
+
+- The **duplicate-concept problem** is untouched: 4,847 rows share a name, and "Employability
+  Skills" is 67 separate units. Matching will suffer until there is a concept layer above the unit.
+- **No Hindi.** The corpus is English-only and the translation pipeline is not built.
+- **The national taxonomy connects to nothing**: zero `job_skills`, `course_skills`,
+  `candidate_skills` or aliases point at an imported row.
+- **NCO reference data is still absent** — codes but no names or hierarchy, so an occupation
+  hierarchy cannot be built from them without inventing one.

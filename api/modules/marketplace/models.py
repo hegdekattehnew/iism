@@ -85,6 +85,17 @@ class Job(Base):
 
     location_state: Mapped[str | None] = mapped_column(default=None)
     location_district: Mapped[str | None] = mapped_column(default=None)
+
+    # Resolved references to the geography master. Nullable, and sitting beside
+    # the free text rather than replacing it: not every value resolves ("Bengaluru"
+    # is "Bengaluru Urban" in the master), and losing an unresolvable location is
+    # worse than carrying both.
+    state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("states.id", ondelete="SET NULL"), index=True, default=None
+    )
+    district_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("districts.id", ondelete="SET NULL"), index=True, default=None
+    )
     employment_type: Mapped[str] = mapped_column(default="full_time")
 
     experience_min_years: Mapped[int] = mapped_column(default=0)
@@ -236,6 +247,17 @@ class CandidateProfile(Base):
     headline: Mapped[str | None] = mapped_column(default=None)
     location_state: Mapped[str | None] = mapped_column(default=None)
     location_district: Mapped[str | None] = mapped_column(default=None)
+
+    # Resolved references to the geography master. Nullable, and sitting beside
+    # the free text rather than replacing it: not every value resolves ("Bengaluru"
+    # is "Bengaluru Urban" in the master), and losing an unresolvable location is
+    # worse than carrying both.
+    state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("states.id", ondelete="SET NULL"), index=True, default=None
+    )
+    district_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("districts.id", ondelete="SET NULL"), index=True, default=None
+    )
     years_experience: Mapped[int] = mapped_column(default=0)
     education_level: Mapped[str | None] = mapped_column(default=None)
 
@@ -470,5 +492,16 @@ class CandidatePreferredLocation(Base):
     )
     state: Mapped[str] = mapped_column()
     district: Mapped[str | None] = mapped_column(default=None)
+
+    # Resolved references to the geography master. Nullable, and sitting beside
+    # the free text rather than replacing it: not every value resolves ("Bengaluru"
+    # is "Bengaluru Urban" in the master), and losing an unresolvable location is
+    # worse than carrying both.
+    state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("states.id", ondelete="SET NULL"), index=True, default=None
+    )
+    district_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("districts.id", ondelete="SET NULL"), index=True, default=None
+    )
 
     profile: Mapped["CandidateProfile"] = relationship(back_populates="preferred_locations")

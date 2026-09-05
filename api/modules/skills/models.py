@@ -63,10 +63,28 @@ class Skill(Base):
     nos_type: Mapped[str | None] = mapped_column(default=None)  # Core | Non-Core
     # 'nsqf' for imported units, 'curated' for anything hand-authored.
     source: Mapped[str] = mapped_column(default="curated")
-    # Numeric, not Integer: NSQF defines half-levels (2.5, 3.5, 4.5, 5.5) and
-    # the national data uses them. Derived here -- the authoritative level sits
-    # on the Qualification Pack, since a NOS carries none of its own.
+    # The standard's OWN declared level, taken from the source's `nsqf` field.
+    #
+    # Numeric, not Integer: NSQF uses half-levels (2.5, 3.5, 4.5, 5.5, 6.5) and
+    # 4.5 alone covers 6,887 standards.
+    #
+    # This was previously derived as the modal level of the containing
+    # qualifications, on the mistaken belief that a NOS carries no level of its
+    # own. It does. The contextual level a unit takes *inside* a particular
+    # qualification is a separate and also-real fact, on `qp_skills.nsqf_level`.
     nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
+
+    # Every standard states its own sector and almost all state an occupation, so
+    # the 4,784 units belonging to no current qualification are still placeable.
+    sector_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sectors.id", ondelete="SET NULL"), index=True, default=None
+    )
+    occupation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("occupations.id", ondelete="SET NULL"), index=True, default=None
+    )
+    awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("awarding_bodies.id", ondelete="SET NULL"), index=True, default=None
+    )
 
     # How many current qualifications use this unit. Denormalised by the importer
     # rather than counted per row: it is the default browse ordering over 21,303

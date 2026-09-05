@@ -19,8 +19,22 @@ from pathlib import Path
 from typing import Any
 
 from api.adapters.nsqf.base import NsqfSource
-from api.adapters.nsqf.documents import mc_from_doc, nos_from_doc, qp_from_doc
-from api.adapters.nsqf.records import McRecord, NosRecord, QpRecord
+from api.adapters.nsqf.documents import (
+    district_from_doc,
+    mc_from_doc,
+    nos_from_doc,
+    qp_from_doc,
+    sector_from_doc,
+    state_from_doc,
+)
+from api.adapters.nsqf.records import (
+    DistrictRecord,
+    McRecord,
+    NosRecord,
+    QpRecord,
+    SectorRecord,
+    StateRecord,
+)
 
 
 class JsonFileNsqfSource(NsqfSource):
@@ -29,7 +43,8 @@ class JsonFileNsqfSource(NsqfSource):
         if not isinstance(raw, dict):
             raise ValueError("NSQF JSON must be an object keyed by collection name")
         self._docs: dict[str, list[dict[str, Any]]] = {
-            key: list(raw.get(key) or []) for key in ("nos", "qps", "modelcurriculum")
+            key: list(raw.get(key) or [])
+            for key in ("nos", "qps", "modelcurriculum", "state", "district", "sectors")
         }
         self.skipped_documents = 0
 
@@ -55,6 +70,30 @@ class JsonFileNsqfSource(NsqfSource):
     async def iter_model_curricula(self) -> AsyncIterator[McRecord]:
         for doc in self._docs["modelcurriculum"]:
             record = mc_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_states(self) -> AsyncIterator[StateRecord]:
+        for doc in self._docs["state"]:
+            record = state_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_districts(self) -> AsyncIterator[DistrictRecord]:
+        for doc in self._docs["district"]:
+            record = district_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_sectors(self) -> AsyncIterator[SectorRecord]:
+        for doc in self._docs["sectors"]:
+            record = sector_from_doc(doc)
             if record is None:
                 self.skipped_documents += 1
                 continue

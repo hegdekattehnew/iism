@@ -97,35 +97,41 @@ five fields. Added personal details, job preferences, and six repeating collecti
 educations, certifications, languages, preferred roles, preferred locations). Guided wizard on
 first visit, sectioned editor after, weighted completeness meter. 101 tests.
 
-**Sprint 6 (NSQF master data) — built, then rolled back.** The corpus was imported from MongoDB
-(43 sectors, 4,424 QPs, 21,303 skills, 27,278 links, idempotent, ~16s) and the migrated data was
-then deliberately deleted on 2026-09-04.
+**Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
+it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
-An audit against the source found the import had taken the taxonomy's **labels** and left its
-**content** behind, and had one modelling decision built on a false premise. Rather than patch it,
-the data was discarded pending a complete re-migration once the remaining master data — sectors,
-Sector Skill Councils, states, districts, awarding bodies — is loaded.
+**Sprint 8 (complete NSQF migration) — done** on 2026-09-05, against the full master data after
+four further collections arrived (`sectors`, `ssc`, `state`, `district`).
 
-**[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) is the record of that
-audit and must be read before the re-migration.** Headlines:
-- **A NOS does carry its own NSQF level.** All 27,538 do, in a field spelled `nsqf`; a
-  qualification spells the same concept `nsqfLevel`. Sprint 6 checked the qualification's spelling
-  against standards, got zero, and wrote "a NOS carries no level" into the schema, four commits
-  and every doc. It left 4,730 units with no level and contradicted 653 more.
-- **~893,000 content records were never imported** — 349,874 performance criteria (with marks),
-  292,762 knowledge parameters, 250,281 generic skill criteria, 55,747 element headings.
-- **NCO-2015 occupation codes** (`alignedTo`, 3,214 QPs), **entry qualifications** (`minEduQual`,
-  4,571) and the **assessment blueprint** (`assmtCrt`, sourced per-NOS weightage) were all missed.
-- 4,847 rows shared a duplicated name; "Employability Skills" was 67 separate units.
+```
+states 36 | districts 766 | sub_districts 7,100
+awarding bodies 106 (43 SSC + 63 AB) | sectors 43 | sub_sectors 796 | occupations 1,808
+skills 21,303 | qualification_packs 4,424 | qp_skills 27,278 | model_curricula 1,950
+entry_routes 14,405 | nco_codes 2,541 | qp_skills with weightage 25,522
+performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151,840
+```
 
-What is still in place: the schema (migrations 0007–0010), `api/adapters/nsqf/`, server-side
-pagination and facets on `/skills`, and the tests. The database is back to the 52 curated skills
-and 149 aliases. **Do not run `make import-nsqf`** until the schema is redesigned against the
-complete master data.
+Migrations 0011 (geography) and 0012 (structure, entry routes, content, pruning). `make
+import-nsqf` runs in ~90s and is idempotent — verified by identical counts across consecutive
+runs. New module `api/modules/geography/`; new file `api/modules/skills/content.py`.
 
-**Verified at last run (after the rollback):** 140 Python tests pass · Ruff + mypy clean ·
-all endpoints 200 · multi-script search still resolves `khoon nikalna`, `रक्त` and `phlebotomy` ·
-52 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses / 9 users.
+Things a future session must not relearn the hard way:
+- **The `ssc` collection is never imported.** Portal accounts with 4,027 emails, 4,042 mobiles and
+  50 bank accounts. `sectors` supplies the same organisations, cleanly, with four times the reach.
+- **The owning body is the code prefix.** 97% of qualifications, 99.8% of standards.
+- **Sector-local ids.** Occupation `code` *and* `occupationID` are both scoped to a sector;
+  keying on the id alone collapsed 1,811 occupations into 529 before it was caught.
+- **`minEduQual` is a structured array of alternative entry routes**, not a text description.
+- **`alignedTo` is dirty**: 1,914 clean NCO codes, 507 variant, 793 free text that is discarded
+  and counted.
+- **Content keys on ordinals**, because `pcID` repeats within a unit.
+- **7,459 of 21,263 current standards have no performance criteria.** Real, not a bug.
+
+**Verified at last run:** 160 Python tests pass · Ruff + mypy clean · tsc + ESLint + `next build`
+clean · migrations round-trip and autogenerate reports no drift · import idempotent across two
+runs · all endpoints 200 · multi-script search still resolves `khoon nikalna` and `रक्त` ·
+21,355 skills / 149 aliases / 8 tenants / 20 jobs / 20 courses, all 20 job locations resolved
+to the geography master.
 
 **Not built yet:** matching, typed `SkillRelation` edges, embeddings, analytics instrumentation,
 observability, the encryption path, and **Hindi for the national corpus** (§12).

@@ -9,14 +9,18 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
-## Status — Sprints 1–5 complete
+## Status — Sprints 1–8 complete
 
-**Sprint 6 — the national NSQF corpus (built, then rolled back).** The corpus was imported from
-MongoDB and the migrated data has since been deleted: an audit found it carried the taxonomy's
-labels without its content, and a complete re-migration is planned once the remaining master data
-is available. The schema and importer remain in place. See
-[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) for everything the audit
-established about the source data.
+**Sprint 8 — the national NSQF corpus.** 4,424 qualification packs, 21,303 National Occupational
+Standards, 1,808 occupations and 106 awarding bodies, plus Indian administrative geography — 36
+states, 766 districts, 7,100 sub-districts. Open a standard and see what it actually requires:
+238,370 performance criteria with their marks, 185,559 knowledge parameters, and the
+qualifications that use it with each one's own NSQF level. Open a qualification and see the
+alternative ways in — "12th grade Pass with no experience" or "10th grade pass with three years".
+
+Two honest caveats. The corpus is **English-only**: the source contains no Devanagari, so Hindi
+covers the interface and the 52 hand-curated skills, not the imported ones. And those 52 curated
+skills were kept alongside the national taxonomy, so a handful of concepts exist as two rows.
 
 **Sprint 5 — rich candidate profile.** Work history, education, certifications, languages, target
 roles and preferred locations, plus job preferences and optional personal details. First visit is a
@@ -53,8 +57,9 @@ These 52 remain the only skills with Hindi names and aliases; see the Sprint 6 c
 `/jobs` and `/courses`, sign-in at `/signin`, the candidate profile at `/profile`, and the System
 Status panel at the foot of the homepage.
 
-Not yet built: matching, Hindi for the imported corpus, organisation/email login, self-serve
-publishing, a real SMS provider, typed skill relations, embeddings, analytics instrumentation.
+Not yet built: matching, Hindi for the imported corpus, a concept layer over duplicated unit names,
+organisation/email login, self-serve publishing, a real SMS provider, typed skill relations,
+embeddings, analytics instrumentation.
 
 ## Prerequisites
 
@@ -81,9 +86,14 @@ To load the national NSQF corpus, put it in MongoDB as `iism_nsqf_master_data` a
 make import-nsqf
 ```
 
-Also idempotent: it upserts on `nos_code` and `qp_code`, keeps only the current version of each,
-and prints a summary with counts and any records it could not import. Everything works without it
-— you simply get the 52 curated skills instead of 21,303.
+Takes about 90 seconds and is idempotent: it upserts on the national codes, keeps only the current
+version of each, and prints a summary with counts plus anything it could not import. Everything
+works without it — you simply get the 52 curated skills instead of 21,303.
+
+The importer deliberately **does not read the `ssc` collection**: it is a portal account registry
+holding personal contact details and bank accounts, and the `sectors` collection supplies the same
+organisations with better coverage and no personal data. See
+[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
 ## Run
 

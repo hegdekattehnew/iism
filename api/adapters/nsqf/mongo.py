@@ -10,8 +10,22 @@ from collections.abc import AsyncIterator
 from pymongo import AsyncMongoClient
 
 from api.adapters.nsqf.base import NsqfSource
-from api.adapters.nsqf.documents import mc_from_doc, nos_from_doc, qp_from_doc
-from api.adapters.nsqf.records import McRecord, NosRecord, QpRecord
+from api.adapters.nsqf.documents import (
+    district_from_doc,
+    mc_from_doc,
+    nos_from_doc,
+    qp_from_doc,
+    sector_from_doc,
+    state_from_doc,
+)
+from api.adapters.nsqf.records import (
+    DistrictRecord,
+    McRecord,
+    NosRecord,
+    QpRecord,
+    SectorRecord,
+    StateRecord,
+)
 from api.core.config import get_settings
 
 BATCH = 1000
@@ -46,6 +60,30 @@ class MongoNsqfSource(NsqfSource):
     async def iter_model_curricula(self) -> AsyncIterator[McRecord]:
         async for doc in self._db.modelcurriculum.find({}, batch_size=BATCH):
             record = mc_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_states(self) -> AsyncIterator[StateRecord]:
+        async for doc in self._db.state.find({}, batch_size=BATCH):
+            record = state_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_districts(self) -> AsyncIterator[DistrictRecord]:
+        async for doc in self._db.district.find({}, batch_size=BATCH):
+            record = district_from_doc(doc)
+            if record is None:
+                self.skipped_documents += 1
+                continue
+            yield record
+
+    async def iter_sectors(self) -> AsyncIterator[SectorRecord]:
+        async for doc in self._db.sectors.find({}, batch_size=BATCH):
+            record = sector_from_doc(doc)
             if record is None:
                 self.skipped_documents += 1
                 continue

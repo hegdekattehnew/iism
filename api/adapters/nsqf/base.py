@@ -9,7 +9,14 @@ importer.
 from collections.abc import AsyncIterator
 from typing import Protocol, runtime_checkable
 
-from api.adapters.nsqf.records import McRecord, NosRecord, QpRecord
+from api.adapters.nsqf.records import (
+    DistrictRecord,
+    McRecord,
+    NosRecord,
+    QpRecord,
+    SectorRecord,
+    StateRecord,
+)
 
 
 @runtime_checkable
@@ -27,4 +34,10 @@ class NsqfSource(Protocol):
     def iter_nos(self) -> AsyncIterator[NosRecord]: ...
     def iter_qps(self) -> AsyncIterator[QpRecord]: ...
     def iter_model_curricula(self) -> AsyncIterator[McRecord]: ...
+    # Master data. States carry their districts inline -- that array is the only
+    # place a district is tied to a state, so `iter_districts` supplies
+    # sub-districts and nothing else.
+    def iter_states(self) -> AsyncIterator[StateRecord]: ...
+    def iter_districts(self) -> AsyncIterator[DistrictRecord]: ...
+    def iter_sectors(self) -> AsyncIterator[SectorRecord]: ...
     async def close(self) -> None: ...

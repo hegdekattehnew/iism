@@ -133,10 +133,17 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   for the entire response.
 - **A NOS carries its own NSQF level — and so does the qualification, and so does the link
   between them.** All three are real and different facts. The source names them inconsistently:
-  `nsqf` on a standard, `nsqfLevel` on a qualification. Sprint 6 checked the qualification's
-  spelling against standards, got zero, and recorded "a NOS has no level" — which was wrong and
-  shaped the schema. Never conclude a field is absent from one collection using another's
-  spelling. See [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
+  `nsqf` on a standard, `nsqfLevel` on a qualification. Checking the qualification's spelling
+  against standards returns zero, which is how "a NOS has no level" was once wrongly written into
+  the schema. **Never conclude a field is absent from one collection using another's spelling** —
+  the same trap sits on `type`/`nosType` and `Sectors`/`sectors`.
+- **Sector-local identifiers are not global.** An occupation's `code` *and* its `occupationID` are
+  both scoped to a sector — `"1"` is a different occupation in each of forty sectors. Key on
+  `(sector, ref)`. Assuming the id was global collapsed 1,811 occupations into 529.
+- **Anything from the `ssc` collection is off limits.** It is a portal account registry holding
+  4,027 emails, 4,042 mobile numbers and 50 bank accounts. Sectors and awarding bodies come from
+  the `sectors` collection instead. Nothing in `api/` may read `ssc`.
+- Full record of the source data: [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 - **Anything touching the NSQF corpus goes through `api/adapters/nsqf/`.** No module imports a
   MongoDB driver. Document parsing lives in `documents.py` and is shared by every source, so the
   test fixture exercises the real import path rather than a second reader that can drift from it.
@@ -161,24 +168,38 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
-**Sprint 6 (NSQF master data) was built and then rolled back.** The corpus was imported —
-43 sectors, 4,424 qualification packs, 21,303 skills, 27,278 links — and the migrated data was
-then deliberately deleted. An audit against the MongoDB source found the import had taken the
-taxonomy's labels and left its content behind (~893,000 performance criteria, knowledge
-parameters and generic skill criteria), missed the structural fields the intelligence layer needs
-(NCO-2015 codes, entry qualifications, assessment weightage), and got the level modelling wrong.
-Rather than patch it, the data was discarded pending a complete re-migration once the remaining
-master data — sectors, Sector Skill Councils, states, districts, awarding bodies — is available.
+Sprint 8 (complete NSQF migration) is done. The national corpus is in Postgres, migrated against
+the full master data after the first attempt was rolled back:
 
-**Read [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md) before attempting
-that re-migration.** It records everything measured about the source: field-naming traps, level
-distributions, the three-way QP→NOS relationship, content volumes, deduplication rates,
-translation costs, and the data-quality issues that will affect matching.
+```
+states 36 | districts 766 | sub_districts 7,100
+awarding bodies 106 | sectors 43 | sub_sectors 796 | occupations 1,808
+skills 21,303 | qualification_packs 4,424 | qp_skills 27,278 | model_curricula 1,950
+entry_routes 14,405 | nco_codes 2,541
+performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151,840
+```
 
-What remains in place and working: the NSQF schema and `api/adapters/nsqf/` importer (unused but
-intact), migrations 0007–0010, server-side pagination and facets on `/skills`, and 140 passing
-tests. The database holds the 52 curated skills and their 149 aliases; `make import-nsqf` would
-repopulate it, but should not be run until the schema is redesigned.
+`make import-nsqf` takes ~90 seconds and is idempotent. Things to respect:
+
+- **The owning body comes from the code prefix.** `LSC` owns `LSC/Q6101`. That resolves 97% of
+  qualifications and 99.8% of standards; the source's own `originSSC` field reaches 9%. Sector
+  Skill Councils and awarding bodies share `awarding_bodies` because the source does.
+- **`api/modules/geography/` is its own module**, not part of `skills` — jobs and profiles
+  reference it and neither is a skill. A district is tied to a state *only* by the array embedded
+  in each state document; the standalone collection has no state field at all.
+- **Location FKs sit beside the free text, not instead of it.** Not every value resolves, and an
+  unresolvable location is still a location. `Bengaluru` → `BENGALURU URBAN` via an alias map,
+  because "Bengaluru" is what an employer would actually write.
+- **Content tables key on `(parent, ordinal)`, never the source's id.** `pcID` repeats within a
+  unit, so a natural key on it fails partway through an import.
+- **Content is deleted and rewritten each run, not upserted.** A revised standard with fewer
+  criteria must not leave the surplus behind.
+- **7,459 of 21,263 current standards have no performance criteria** in their latest version.
+  That is the data, not a bug — the import writes every row the current versions hold.
+- **The 52 curated skills remain** alongside the 21,303 imported ones, tagged `source='curated'`.
+  Two vocabularies still coexist; that debt is recorded in `projectContextForMe.md` §12.
+- **Still English-only, and still connected to nothing** — zero `job_skills`, `course_skills`,
+  `candidate_skills` or aliases point at an imported row.
 
 Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
 preferences, plus six repeating collections: experiences, educations, certifications, languages,

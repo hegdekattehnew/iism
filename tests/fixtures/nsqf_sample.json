@@ -1,15 +1,21 @@
 {
   "_comment": [
     "A small NSQF corpus in the exact document shape of iism_nsqf_master_data.",
-    "Hand-built rather than sampled, so that every trap the real feed contains is",
-    "present in something small enough to read: half-levels, the '4' vs '4.0'",
-    "duplicate forms, trailing whitespace in NOS titles, credits of 'TBD', HH:MM",
-    "durations, grouped elective/optional units, superseded QP versions, a NOS",
-    "with no usable code, a curriculum entry whose unitCode is blank, and one",
-    "sectorID carrying two spellings of its name.",
-    "Keys are deliberately the source's own, including the 'compulsary' spelling."
+    "Hand-built rather than sampled, so every trap the real feed contains is present",
+    "in something small enough to read.",
+    "",
+    "Field-naming traps, which is how the largest real error happened: a standard",
+    "states its level in 'nsqf', a qualification in 'nsqfLevel'; a standard uses",
+    "'Sectors'/'Occupation' where a qualification uses 'sectors'/'occupation'; the",
+    "model curriculum spells its key 'compulsary'.",
+    "",
+    "Also present: half-levels, '4' against '4.0', trailing whitespace in titles,",
+    "credits of 'TBD', HH:MM durations, grouped elective/optional units, a",
+    "superseded QP version, one sectorID under two spellings, an unreadable level,",
+    "a blank curriculum unitCode, occupationID reused across sectors, alignedTo in",
+    "clean, variant and junk forms, structured minEduQual entry routes, an",
+    "assessment blueprint, and a repeated pcID within one standard."
   ],
-
   "nos": [
     {
       "unitCode": "HC/N0001",
@@ -17,7 +23,103 @@
       "version": "1.0",
       "type": "Core",
       "description": "Draw venous blood safely and label it correctly.",
-      "credits": "TBD"
+      "credits": "TBD",
+      "nsqf": "4.5",
+      "Sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare",
+        "subSectors": [
+          {
+            "subSectorID": "SUB01",
+            "subSectorName": "Diagnostics"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Sample Collection"
+      },
+      "PerformanceCriteria": {
+        "theoryTotal": 50,
+        "pracTotal": 50,
+        "totMarks": 100,
+        "performanceCriteriaElements": [
+          {
+            "element": "Prepare for the procedure",
+            "elementTheoryTotal": 20,
+            "elementPracTotal": 20,
+            "elementTotalMarks": 40,
+            "performanceCriteriaValues": [
+              {
+                "pcID": "PC1",
+                "pcDescription": "confirm patient identity before drawing blood",
+                "theory": 10,
+                "practical": 10,
+                "total": 20
+              },
+              {
+                "pcID": "PC2",
+                "pcDescription": "select the correct tube for the requested test",
+                "theory": 10,
+                "practical": 10,
+                "total": 20
+              }
+            ]
+          },
+          {
+            "element": "Draw and label the sample",
+            "elementTheoryTotal": 30,
+            "elementPracTotal": 30,
+            "elementTotalMarks": 60,
+            "performanceCriteriaValues": [
+              {
+                "pcID": "PC1",
+                "pcDescription": "draw the sample using aseptic technique",
+                "theory": 15,
+                "practical": 15,
+                "total": 30
+              },
+              {
+                "pcID": "PC2",
+                "pcDescription": "label the tube at the bedside",
+                "theory": 15,
+                "practical": 15,
+                "total": 30
+              },
+              {
+                "pcID": "PC3",
+                "pcDescription": "",
+                "theory": 0,
+                "practical": 0
+              }
+            ]
+          }
+        ]
+      },
+      "KnowledgeAndUnderstanding": [
+        {
+          "kpID": "KU1",
+          "knowledgeParam": "the anatomy of superficial veins"
+        },
+        {
+          "kpID": "KU2",
+          "knowledgeParam": "the order of draw and why it matters"
+        },
+        {
+          "kpID": "KU3",
+          "knowledgeParam": "   "
+        }
+      ],
+      "Skills": [
+        {
+          "skillID": "GS1",
+          "skillCrt": "complete documentation accurately"
+        },
+        {
+          "skillID": "GS2",
+          "skillCrt": "communicate clearly with anxious patients"
+        }
+      ]
     },
     {
       "unitCode": "HC/N0002",
@@ -25,32 +127,107 @@
       "version": "2.0",
       "type": "Core",
       "description": "Keep the working area sterile throughout a procedure.",
-      "credits": "2.0"
+      "credits": "2.0",
+      "nsqf": "4",
+      "Sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare",
+        "subSectors": [
+          {
+            "subSectorID": "SUB02",
+            "subSectorName": "Patient Care"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "2",
+        "occupationDesc": "Patient Care"
+      }
     },
     {
       "unitCode": "HC/N0002",
       "unitTitle": "Maintain a sterile field (superseded wording)",
       "version": "1.0",
       "type": "Core",
-      "credits": "2.0"
+      "credits": "2.0",
+      "nsqf": "3",
+      "Sectors": {
+        "sectorID": "SEC01",
+        "sectorName": "Healthcare",
+        "subSectors": [
+          {
+            "subSectorID": "SUB02",
+            "subSectorName": "Patient Care"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "2",
+        "occupationDesc": "Patient Care"
+      }
     },
     {
       "unitCode": "RT/N0001",
       "unitTitle": "Handle customer payments",
       "version": "1.0",
-      "type": "Core"
+      "type": "Core",
+      "nsqf": "3.5",
+      "Sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Store Operations"
+      }
     },
     {
       "unitCode": "RT/N0002",
       "unitTitle": "Handle returns and exchanges",
       "version": "1.0",
-      "type": "Non-Core"
+      "type": "Non-Core",
+      "nsqf": "3",
+      "Sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Store Operations"
+      }
     },
     {
       "unitCode": "RT/N0003",
       "unitTitle": "Stock shelves to plan",
       "version": "1.0",
-      "type": "Non-Core"
+      "type": "Non-Core",
+      "nsqf": "2.5",
+      "Sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Store Operations"
+      }
     },
     {
       "unitCode": "  ",
@@ -58,7 +235,6 @@
       "version": "1.0"
     }
   ],
-
   "qps": [
     {
       "qpCode": "HC/Q0001",
@@ -66,18 +242,83 @@
       "jobRole": "Phlebotomy Technician",
       "nsqfLevel": "4.5",
       "version": "2.0",
-      "status": { "statusDesc": "Approved" },
+      "status": {
+        "statusDesc": "Approved"
+      },
       "totalHoursQplevel": 400,
       "sectors": {
         "sectorID": "SEC01",
         "sectorName": "Healthcare",
-        "subSectors": [{ "subSectorID": "SUB01", "subSectorName": "Diagnostics" }]
+        "subSectors": [
+          {
+            "subSectorID": "SUB01",
+            "subSectorName": "Diagnostics"
+          }
+        ]
       },
-      "occupation": { "occupationDesc": "Sample Collection" },
+      "occupation": {
+        "occupationDesc": "Sample Collection",
+        "occupationID": "1"
+      },
       "compulsoryNos": [
-        { "unitCode": "HC/N0001", "unitTitle": "Collect blood samples   ", "version": "1.0" },
-        { "unitCode": "HC/N0002", "unitTitle": "Maintain a sterile field", "version": "2.0" }
-      ]
+        {
+          "unitCode": "HC/N0001",
+          "unitTitle": "Collect blood samples   ",
+          "version": "1.0"
+        },
+        {
+          "unitCode": "HC/N0002",
+          "unitTitle": "Maintain a sterile field",
+          "version": "2.0"
+        }
+      ],
+      "alignedTo": "NCO-2015/3212.0100",
+      "credits": "12.0",
+      "minEduQual": [
+        {
+          "expReq": {
+            "expReqID": "10",
+            "expReqDesc": "NA"
+          },
+          "eduQual": [
+            {
+              "minEduQualID": "5",
+              "minEduQualDesc": "12th grade Pass",
+              "minSpecialization": "Science"
+            }
+          ]
+        },
+        {
+          "expReq": {
+            "expReqID": "16",
+            "expReqDesc": "3 Years"
+          },
+          "eduQual": [
+            {
+              "minEduQualID": "3",
+              "minEduQualDesc": "10th grade pass"
+            }
+          ]
+        }
+      ],
+      "assmtCrt": {
+        "totMarks": 200,
+        "minPassPrcnt": "70",
+        "compulsoryNos": {
+          "assmtOutcm": [
+            {
+              "nosCode": "HC/N0001",
+              "weightage": "60",
+              "totMarks": 120
+            },
+            {
+              "nosCode": "HC/N0002",
+              "weightage": "40",
+              "totMarks": 80
+            }
+          ]
+        }
+      }
     },
     {
       "qpCode": "HC/Q0001",
@@ -85,14 +326,25 @@
       "jobRole": "Phlebotomy Technician",
       "nsqfLevel": "4",
       "version": "1.0",
-      "status": { "statusDesc": "Superseded" },
+      "status": {
+        "statusDesc": "Superseded"
+      },
       "sectors": {
         "sectorID": "SEC01",
         "sectorName": "Healthcare ",
-        "subSectors": [{ "subSectorID": "SUB01", "subSectorName": "Diagnostics" }]
+        "subSectors": [
+          {
+            "subSectorID": "SUB01",
+            "subSectorName": "Diagnostics"
+          }
+        ]
       },
       "compulsoryNos": [
-        { "unitCode": "HC/N0001", "unitTitle": "Collect blood samples", "version": "1.0" }
+        {
+          "unitCode": "HC/N0001",
+          "unitTitle": "Collect blood samples",
+          "version": "1.0"
+        }
       ]
     },
     {
@@ -101,16 +353,30 @@
       "jobRole": "General Duty Assistant",
       "nsqfLevel": "4.0",
       "version": "1.0",
-      "status": { "statusDesc": "Approved" },
+      "status": {
+        "statusDesc": "Approved"
+      },
       "sectors": {
         "sectorID": "SEC01",
         "sectorName": "Healthcare",
-        "subSectors": [{ "subSectorID": "SUB02", "subSectorName": "Patient Care" }]
+        "subSectors": [
+          {
+            "subSectorID": "SUB02",
+            "subSectorName": "Patient Care"
+          }
+        ]
       },
-      "occupation": { "occupationDesc": "Patient Care" },
+      "occupation": {
+        "occupationDesc": "Patient Care"
+      },
       "compulsoryNos": [
-        { "unitCode": "HC/N0002", "unitTitle": "Maintain a sterile field", "version": "2.0" }
-      ]
+        {
+          "unitCode": "HC/N0002",
+          "unitTitle": "Maintain a sterile field",
+          "version": "2.0"
+        }
+      ],
+      "alignedTo": "NCO\u20102015/ 5321.0200, 5321.9900"
     },
     {
       "qpCode": "RT/Q0001",
@@ -118,29 +384,68 @@
       "jobRole": "Retail Sales Associate",
       "nsqfLevel": "3.5",
       "version": "1.0",
-      "status": { "statusDesc": "Approved" },
+      "status": {
+        "statusDesc": "Approved"
+      },
       "sectors": {
         "sectorID": "SEC02",
         "sectorName": "Retail",
-        "subSectors": [{ "subSectorID": "SUB10", "subSectorName": "In-store" }]
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
       },
-      "occupation": { "occupationDesc": "Store Operations" },
+      "occupation": {
+        "occupationDesc": "Store Operations",
+        "occupationID": "1"
+      },
       "compulsoryNos": [
-        { "unitCode": "RT/N0001", "unitTitle": "Handle customer payments", "version": "1.0" }
+        {
+          "unitCode": "RT/N0001",
+          "unitTitle": "Handle customer payments",
+          "version": "1.0"
+        }
       ],
       "electiveNos": [
         {
           "name": "Customer service specialisation",
           "optionalDesc": "Choose one",
           "nos": [
-            { "unitCode": "RT/N0002", "unitTitle": "Handle returns and exchanges", "version": "1.0" }
+            {
+              "unitCode": "RT/N0002",
+              "unitTitle": "Handle returns and exchanges",
+              "version": "1.0"
+            }
           ]
         }
       ],
       "optionalNos": [
         {
           "name": "Merchandising",
-          "nos": [{ "unitCode": "RT/N0003", "unitTitle": "Stock shelves to plan", "version": "1.0" }]
+          "nos": [
+            {
+              "unitCode": "RT/N0003",
+              "unitTitle": "Stock shelves to plan",
+              "version": "1.0"
+            }
+          ]
+        }
+      ],
+      "alignedTo": "(Retail Sales Associate)",
+      "minEduQual": [
+        {
+          "expReq": {
+            "expReqID": "24",
+            "expReqDesc": "6 Months"
+          },
+          "eduQual": [
+            {
+              "minEduQualID": "2",
+              "minEduQualDesc": "8th grade pass"
+            }
+          ]
         }
       ]
     },
@@ -150,12 +455,17 @@
       "jobRole": "Unknown",
       "nsqfLevel": "not a number",
       "version": "1.0",
-      "status": { "statusDesc": "Draft" },
-      "sectors": { "sectorID": "SEC02", "sectorName": "Retail", "subSectors": [] },
+      "status": {
+        "statusDesc": "Draft"
+      },
+      "sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": []
+      },
       "compulsoryNos": []
     }
   ],
-
   "modelcurriculum": [
     {
       "qpCode": "HC/Q0001",
@@ -182,7 +492,11 @@
           }
         ],
         "elective": [
-          { "unitCode": "HC/N0002", "compulsory": "15:00", "nosTotal": "15:00" }
+          {
+            "unitCode": "HC/N0002",
+            "compulsory": "15:00",
+            "nosTotal": "15:00"
+          }
         ],
         "optional": []
       }
@@ -196,9 +510,159 @@
       "grandTotal": "not a duration",
       "nos": {
         "compulsary": [
-          { "unitCode": "RT/N0001", "compulsory": "bad", "nosTotal": "also bad" }
+          {
+            "unitCode": "RT/N0001",
+            "compulsory": "bad",
+            "nosTotal": "also bad"
+          }
         ]
       }
+    }
+  ],
+  "state": [
+    {
+      "stateCode": 29,
+      "state": "KARNATAKA",
+      "stateCodeForNCVET": "KA",
+      "status": "active",
+      "districts": [
+        {
+          "code": 583,
+          "name": "BENGALURU URBAN",
+          "short_name": "BLR",
+          "isAsprirational": false,
+          "isBorder": false,
+          "isTribal": false,
+          "isLwe": false,
+          "northEast": false,
+          "ruralOrMunicipal": true
+        },
+        {
+          "code": 584,
+          "name": "KALABURAGI",
+          "short_name": "KLB",
+          "isAsprirational": true,
+          "isBorder": false,
+          "isTribal": false,
+          "isLwe": false,
+          "northEast": false,
+          "ruralOrMunicipal": false
+        }
+      ]
+    },
+    {
+      "stateCode": 18,
+      "state": "ASSAM",
+      "stateCodeForNCVET": "AS",
+      "status": "active",
+      "districts": [
+        {
+          "code": 301,
+          "name": "DHUBRI",
+          "short_name": "DHB",
+          "isAsprirational": true,
+          "isBorder": true,
+          "isTribal": false,
+          "isLwe": false,
+          "northEast": true,
+          "ruralOrMunicipal": false
+        }
+      ]
+    }
+  ],
+  "district": [
+    {
+      "districtCode": 583,
+      "district": "BENGALURU URBAN",
+      "short_name": "BLR",
+      "status": "active",
+      "subDistricts": [
+        {
+          "code": 5831,
+          "name": "ANEKAL"
+        },
+        {
+          "code": 5832,
+          "name": "BENGALURU NORTH"
+        }
+      ]
+    },
+    {
+      "districtCode": 301,
+      "district": "DHUBRI",
+      "status": "active",
+      "subDistricts": [
+        {
+          "code": 3011,
+          "name": "BILASIPARA"
+        }
+      ]
+    },
+    {
+      "districtCode": 999,
+      "district": "ORPHAN DISTRICT",
+      "status": "active",
+      "subDistricts": []
+    }
+  ],
+  "sectors": [
+    {
+      "sectorID": "SEC01",
+      "sectorCode": "HC",
+      "sscCode": "HC",
+      "sector": "Healthcare",
+      "nameOfSector": "Healthcare",
+      "sectorLogo": "hc.png",
+      "subSectors": [
+        {
+          "subSectorID": "SUB01",
+          "subSectorName": "Diagnostics"
+        },
+        {
+          "subSectorID": "SUB02",
+          "subSectorName": "Patient Care"
+        }
+      ],
+      "occupations": [
+        {
+          "occupationID": "1",
+          "occupationCode": "01",
+          "occupationDesc": "Sample Collection"
+        },
+        {
+          "occupationID": "2",
+          "occupationCode": "02",
+          "occupationDesc": "Patient Care"
+        }
+      ]
+    },
+    {
+      "sectorID": "SEC02",
+      "sectorCode": "RT",
+      "sscCode": "RT",
+      "sector": "Retail",
+      "nameOfSector": "Retail",
+      "subSectors": [
+        {
+          "subSectorID": "SUB10",
+          "subSectorName": "In-store"
+        }
+      ],
+      "occupations": [
+        {
+          "occupationID": "1",
+          "occupationCode": "01",
+          "occupationDesc": "Store Operations"
+        }
+      ]
+    },
+    {
+      "sectorID": "AB01",
+      "sectorCode": "XX",
+      "sscCode": "XX",
+      "sector": "Example Awarding Body",
+      "nameOfSector": "Example Awarding Body",
+      "type": "Awarding Body"
     }
   ]
 }

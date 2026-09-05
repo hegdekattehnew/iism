@@ -82,6 +82,53 @@ def parse_credits(value: object) -> Decimal | None:
         return None
 
 
+def parse_decimal(value: object) -> Decimal | None:
+    """A plain numeric field, tolerant of what the feed puts in one.
+
+    Returns None rather than zero for an absent value: a weightage of nothing
+    and a weightage of zero would score differently.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().rstrip("%").strip()
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ArithmeticError):
+        return None
+
+
+# An NCO-2015 occupation code: four digits, a dot, then three or four more.
+_NCO_CODE = re.compile(r"\b(\d{4}\.\d{3,4})\b")
+
+
+def parse_nco_codes(value: object) -> list[str]:
+    """Pull every NCO occupation code out of one `alignedTo` string.
+
+    The field is a mess and must be treated as one. Of 3,214 values, 1,914 are
+    well formed, 507 carry a code in a variant format -- unicode hyphens,
+    'NCO 2015- ' spacing, or several codes comma-separated -- and 793 are free
+    text such as '(CNC Operator)', which is a job role and not a code at all.
+
+    Returns the codes found, normalised and de-duplicated in order. An empty list
+    means there was nothing usable, which the importer counts and reports rather
+    than storing a job role as though it were a classification.
+    """
+    if value is None:
+        return []
+    text = str(value)
+    # U+2010 HYPHEN and friends appear in place of ASCII '-'.
+    for dash in ("\u2010", "\u2011", "\u2012", "\u2013", "\u2014"):
+        text = text.replace(dash, "-")
+    text = text.replace("\u00a0", " ")
+    seen: list[str] = []
+    for match in _NCO_CODE.findall(text):
+        if match not in seen:
+            seen.append(match)
+    return seen
+
+
 def slugify(text: str) -> str:
     ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     return _SLUG_STRIP.sub("-", ascii_text.lower()).strip("-")
