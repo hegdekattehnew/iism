@@ -190,7 +190,7 @@
     "searchCapped": "Showing the {count} closest matches. Narrow the search to see fewer, better ones.",
     "filtersOnSearch": "Filters apply to these matches only.",
     "qualifications": "Qualifications using this unit",
-    "qualificationsIntro": "A National Occupational Standard carries no level of its own — its level is set by each qualification that includes it.",
+    "qualificationsIntro": "This unit declares its own NSQF level. Each qualification that includes it also places it at a level, which can differ.",
     "qualificationsCount": "{count, plural, =0 {No qualifications} one {# qualification} other {# qualifications}}",
     "qualificationsMore": "and {count} more",
     "requirement": {
@@ -203,7 +203,14 @@
     "nosVersion": "Version",
     "curatedNotice": "A hand-curated skill, not yet mapped to a National Occupational Standard.",
     "noQualifications": "This unit is not part of any current qualification.",
-    "usedInQps": "{count, plural, one {# qualification} other {# qualifications}}"
+    "usedInQps": "{count, plural, one {# qualification} other {# qualifications}}",
+    "requirements": "What this standard requires",
+    "requirementsIntro": "Assessable criteria, with the marks each carries.",
+    "criteriaCount": "{count, plural, one {# criterion} other {# criteria}}",
+    "marks": "{marks} marks",
+    "knowledge": "Knowledge and understanding",
+    "genericSkills": "Generic skills",
+    "noRequirements": "The current version of this standard publishes no performance criteria."
   },
   "jobsPage": {
     "title": "Jobs",

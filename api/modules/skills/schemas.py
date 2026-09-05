@@ -121,3 +121,30 @@ class QualificationRefOut(BaseModel):
 class SkillQualifications(BaseModel):
     items: list[QualificationRefOut]
     total: int
+
+
+class CriterionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    pc_ref: str | None = None
+    description_en: str
+    description_hi: str | None = None
+    total_marks: float | None = None
+
+
+class PerformanceElementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name_en: str
+    name_hi: str | None = None
+    total_marks: float | None = None
+    criteria: list[CriterionOut] = Field(default_factory=list)
+
+
+class SkillRequirements(BaseModel):
+    """The substance of a standard, as against its title."""
+
+    elements: list[PerformanceElementOut]
+    criteria_count: int
+    knowledge: list[str]
+    generic_skills: list[str]

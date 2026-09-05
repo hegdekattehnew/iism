@@ -5,10 +5,17 @@ Routes validate and delegate here; they contain no logic themselves (CLAUDE.md).
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.modules.skills.content import (
+    GenericCriterion,
+    KnowledgeParameter,
+    PerformanceCriterion,
+    PerformanceElement,
+)
 from api.modules.skills.hierarchy import QpSkill, QualificationPack, Sector
 from api.modules.skills.models import Skill
 
@@ -129,6 +136,13 @@ async def list_skills(
 
 
 @dataclass(frozen=True)
+class RequirementsBundle:
+    elements: list[tuple[Any, list[Any]]]
+    knowledge: list[str]
+    generic_skills: list[str]
+
+
+@dataclass(frozen=True)
 class QualificationRef:
     """A qualification that requires this unit, and on what terms."""
 
@@ -187,6 +201,62 @@ async def qualifications_for_skill(
             for link, qp, sector in rows
         ],
         total,
+    )
+
+
+async def requirements_for_skill(db: AsyncSession, skill_id: uuid.UUID) -> RequirementsBundle:
+    """What a standard actually requires: criteria, knowledge, generic skills.
+
+    Ordered by the ordinals the importer assigned, which preserve the source's
+    own sequence -- the criteria of a standard read as a procedure, and shuffling
+    them would lose that.
+    """
+    elements = (
+        (
+            await db.execute(
+                select(PerformanceElement)
+                .where(PerformanceElement.skill_id == skill_id)
+                .order_by(PerformanceElement.ordinal)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    criteria: dict[uuid.UUID, list[PerformanceCriterion]] = {}
+    if elements:
+        rows = (
+            (
+                await db.execute(
+                    select(PerformanceCriterion)
+                    .where(PerformanceCriterion.element_id.in_([e.id for e in elements]))
+                    .order_by(PerformanceCriterion.ordinal)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            criteria.setdefault(row.element_id, []).append(row)
+
+    knowledge = (
+        await db.scalars(
+            select(KnowledgeParameter.text_en)
+            .where(KnowledgeParameter.skill_id == skill_id)
+            .order_by(KnowledgeParameter.ordinal)
+        )
+    ).all()
+    generic = (
+        await db.scalars(
+            select(GenericCriterion.text_en)
+            .where(GenericCriterion.skill_id == skill_id)
+            .order_by(GenericCriterion.ordinal)
+        )
+    ).all()
+    return RequirementsBundle(
+        elements=[(e, criteria.get(e.id, [])) for e in elements],
+        knowledge=list(knowledge),
+        generic_skills=list(generic),
     )
 
 

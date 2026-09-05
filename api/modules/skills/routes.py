@@ -59,6 +59,30 @@ async def list_skills(
     )
 
 
+@router.get("/{slug}/requirements", response_model=schemas.SkillRequirements)
+async def skill_requirements(
+    slug: str, db: AsyncSession = Depends(get_db_session)
+) -> schemas.SkillRequirements:
+    skill = await service.get_skill_by_slug(db, slug)
+    if skill is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill not found")
+    bundle = await service.requirements_for_skill(db, skill.id)
+    return schemas.SkillRequirements(
+        elements=[
+            schemas.PerformanceElementOut(
+                name_en=element.name_en,
+                name_hi=element.name_hi,
+                total_marks=element.total_marks,
+                criteria=[schemas.CriterionOut.model_validate(c) for c in criteria],
+            )
+            for element, criteria in bundle.elements
+        ],
+        criteria_count=sum(len(c) for _, c in bundle.elements),
+        knowledge=bundle.knowledge,
+        generic_skills=bundle.generic_skills,
+    )
+
+
 @router.get("/{slug}/qualifications", response_model=schemas.SkillQualifications)
 async def skill_qualifications(
     slug: str,

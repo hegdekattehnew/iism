@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/skills/{slug}/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Skill Requirements */
+        get: operations["skill_requirements_skills__slug__requirements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skills/{slug}/qualifications": {
         parameters: {
             query?: never;
@@ -764,6 +781,17 @@ export interface components {
             /** Level Taught */
             level_taught?: number | null;
         };
+        /** CriterionOut */
+        CriterionOut: {
+            /** Pc Ref */
+            pc_ref?: string | null;
+            /** Description En */
+            description_en: string;
+            /** Description Hi */
+            description_hi?: string | null;
+            /** Total Marks */
+            total_marks?: number | null;
+        };
         /** DeepHealth */
         DeepHealth: {
             /**
@@ -1001,6 +1029,17 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** PerformanceElementOut */
+        PerformanceElementOut: {
+            /** Name En */
+            name_en: string;
+            /** Name Hi */
+            name_hi?: string | null;
+            /** Total Marks */
+            total_marks?: number | null;
+            /** Criteria */
+            criteria?: components["schemas"]["CriterionOut"][];
+        };
         /** PreferredLocationOut */
         PreferredLocationOut: {
             /** State */
@@ -1184,6 +1223,20 @@ export interface components {
             items: components["schemas"]["QualificationRefOut"][];
             /** Total */
             total: number;
+        };
+        /**
+         * SkillRequirements
+         * @description The substance of a standard, as against its title.
+         */
+        SkillRequirements: {
+            /** Elements */
+            elements: components["schemas"]["PerformanceElementOut"][];
+            /** Criteria Count */
+            criteria_count: number;
+            /** Knowledge */
+            knowledge: string[];
+            /** Generic Skills */
+            generic_skills: string[];
         };
         /**
          * SkillSearchHit
@@ -1422,6 +1475,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skill_requirements_skills__slug__requirements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillRequirements"];
                 };
             };
             /** @description Validation Error */

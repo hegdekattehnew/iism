@@ -617,3 +617,43 @@ class TestStructuralFields:
         assert qp.total_marks == 200
         assert qp.min_pass_percent == Decimal("70.00")
         assert qp.credits == Decimal("12.00")
+
+
+class TestRequirementsApi:
+    async def test_a_standard_serves_what_it_requires(self, db, client, source) -> None:
+        await _import(db, source)
+
+        slug = await db.scalar(select(Skill.slug).where(Skill.nos_code == "HC/N0001"))
+        response = await client.get(f"/skills/{slug}/requirements")
+        assert response.status_code == 200
+
+        body = response.json()
+        assert body["criteria_count"] == 4
+        assert [e["name_en"] for e in body["elements"]] == [
+            "Prepare for the procedure",
+            "Draw and label the sample",
+        ]
+        assert body["knowledge"][0] == "the anatomy of superficial veins"
+        assert len(body["generic_skills"]) == 2
+
+    async def test_criteria_keep_the_sources_order(self, db, client, source) -> None:
+        """The criteria of a standard read as a procedure; shuffling them would
+        lose that, so rows are served by the ordinal the importer assigned."""
+        await _import(db, source)
+
+        slug = await db.scalar(select(Skill.slug).where(Skill.nos_code == "HC/N0001"))
+        body = (await client.get(f"/skills/{slug}/requirements")).json()
+        first = body["elements"][0]["criteria"]
+        assert [c["pc_ref"] for c in first] == ["PC1", "PC2"]
+        assert first[0]["description_en"].startswith("confirm patient identity")
+
+    async def test_a_standard_with_no_criteria_serves_an_empty_bundle(
+        self, db, client, source
+    ) -> None:
+        """7,459 of 21,263 current standards publish none. That is the data, and
+        the endpoint must say so rather than fail."""
+        await _import(db, source)
+
+        slug = await db.scalar(select(Skill.slug).where(Skill.nos_code == "RT/N0003"))
+        body = (await client.get(f"/skills/{slug}/requirements")).json()
+        assert body["elements"] == [] and body["criteria_count"] == 0

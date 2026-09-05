@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { SkillQualifications } from "@/components/SkillQualifications";
+import { SkillRequirements } from "@/components/SkillRequirements";
 import { SkillRelated } from "@/components/SkillRelated";
 import { ButtonLink } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -104,6 +105,8 @@ export default async function SkillDetailPage({
           </dl>
         </section>
       )}
+
+      <SkillRequirements slug={data.slug} />
 
       <SkillQualifications slug={data.slug} />
 
