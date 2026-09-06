@@ -29,6 +29,9 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   if (signedIn) {
     return (
       <>
+        <ButtonLink href="/matches" size={size}>
+          {t("myMatches")}
+        </ButtonLink>
         <ButtonLink href="/profile" variant="secondary" size={size}>
           {t("myProfile")}
         </ButtonLink>

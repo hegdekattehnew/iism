@@ -15,6 +15,8 @@
 > - **ADR-023** — `Final decision` was empty in the source; now resolved.
 > - **ADR-006** — amended by ADR-027 (task runner implementation only; the principle stands).
 > - **ADR-023** — complemented by ADR-035 (what not to collect, as against what to protect).
+> - **ADR-005, ADR-007** — extended by ADR-036 (skill-based versus behavioural, and when a
+>   model may be called).
 > - **ADR-021** — qualified by ADR-033 for Hindi-language search.
 > - **ADR-003** — qualified by ADR-034. Its rejection of a second store for *vector search* stands
 >   and pgvector is unchanged; ADR-034 adds a document store for *source data* only.
@@ -1115,5 +1117,65 @@ Option 2 still means holding contact details for real people, and buys almost no
 This complements ADR-023 (encryption of sensitive data) rather than qualifying it. ADR-023 governs
 data the product needs and must protect; this governs data the product does not need and therefore
 must not hold. The cheapest way to protect personal data is not to collect it.
+
+---
+
+## ADR-036: Recommendation Approach and Where the LLM Sits
+
+**Status:** Accepted (September 2026)
+
+**Context:** ADR-005 splits AI into extraction/explanation versus deterministic decision-making,
+and ADR-007 names the scoring components. Neither answers two questions the matching engine cannot
+avoid: whether recommendations are driven by **skills or by behaviour**, and **when in the request
+lifecycle** a model may be called. Both are cheap to decide now and expensive to reverse once a
+scoring surface exists that people have seen.
+
+The cold start is absolute — nine users, four declared skills, zero recorded events. Collaborative
+filtering needs on the order of 10⁴–10⁵ interactions before it beats random, so it is not
+available. But that is the weaker argument.
+
+**Decision:**
+
+1. **Recommendations are skill-based. Behaviour is a re-ranker, never a source of matches.**
+2. **LLM calls happen at write time, never in the request path.**
+
+**Why skill-based, beyond the cold start:**
+
+- **Behaviour cannot produce the output.** Collaborative filtering answers "people like you applied
+  here". It cannot answer "you are missing these three standards, and this course closes them" —
+  and the gap *is* the product. A behavioural engine would be a worse job board.
+- **We have an ontology, which most recommender domains never get.** 238,370 assessable criteria,
+  levels, entry routes, and an importance weight the standards themselves publish. Discarding that
+  for click data would be perverse.
+- **Cold start does not bite us the way it bites consumer recommenders.** A candidate with no
+  history still gets a good answer, because the input is their declared skills.
+
+When behaviour exists it may reorder already-qualified matches. It must never introduce a match, or
+suppress one, on its own — that would make the explanation untrue.
+
+**Why write-time only for LLM calls:**
+
+Extraction (a résumé or a job description into taxonomy concepts) runs once per document.
+Explanation, if it is ever generated rather than templated, is cached by content hash. Scoring is
+deterministic SQL and arithmetic. Five reasons, in order: a score must be **auditable** to an
+employer or a regulator; a golden set needs **determinism** to measure against; latency; cost —
+1,000 daily users at 20 matches each is 20,000 calls a day; and reproducibility of an explanation
+the candidate may act on.
+
+**Embeddings are the middle path**, and where ADR-007's "semantic similarity" comes from. A vector
+computed once at write time and compared with arithmetic at read time is not an LLM call. ADR-013
+and ADR-031 already fix the implementation and dimension.
+
+**Consequences:**
+- `api/modules/matching/` contains no model client, and must not acquire one.
+- Every score returns a **reason structure** — matched concepts, missing ones, which are mandatory,
+  the level shortfall — rather than a number and a sentence. The UI renders the structure, so the
+  explanation cannot drift from the score.
+- Matching scores at **concept** level, not skill-row level, or a candidate and a job that picked
+  different rows for the same standard would never meet.
+- `analytics_events` must exist from the first release of matching, or the behavioural signal that
+  a later re-ranker needs will not have been collected.
+- Semantic similarity is deliberately **not** in the first release: deterministic overlap ships
+  first so there is a baseline to measure any addition against.
 
 ---

@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(35 ADRs). Read it before making any structural decision — the summary below
+(36 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -83,7 +83,9 @@ api/                     FastAPI modular monolith
                          (ADR-004, ADR-034)
     geography/           State, District, SubDistrict. Its own module: jobs and
                          profiles reference it and neither is a skill.
-    matching/            Hybrid scoring engine (ADR-007)
+    matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
+                         scoring.py is pure -- no I/O, no clock, no model.
+    analytics/           analytics_events (ADR-025). record() COMMITS.
     career_paths/        Graph-based role transition engine (ADR-008)
     intelligence/        LLM extraction/explanation, embeddings (ADR-005/013/018)
   adapters/              External integrations behind interfaces (ADR-017)
@@ -187,6 +189,24 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   not-yet-built pages render `PlaceholderPage` rather than 404.
 
 ## Current state
+
+Sprint 10 (matching and the gap) is done. A signed-in candidate opens `/matches` and sees ranked
+jobs with a score they can interrogate, the gap named standard by standard, courses that close
+that specific gap, and how to become qualified.
+
+- **`api/modules/matching/scoring.py` is pure and must stay that way.** No I/O, no clock, no model
+  (ADR-036). A score has to be defensible to an employer and reproducible against the golden set,
+  and neither survives a generated number.
+- **A missing mandatory standard caps the score at 45, it does not zero it.** A candidate one
+  standard short of a strong match needs telling, not hiding.
+- **Zero matched standards scores zero**, deliberately. Letting the level and evidence components
+  through alone gave every job in the catalogue a small non-zero score for everyone.
+- **Matching compares at concept level**, which is the whole reason Sprint 9 built that table.
+- **`record()` commits.** `get_db_session` never commits, so a merely-flushed event is discarded
+  when the request ends — which is exactly what happened the first time this was wired up. Call it
+  only from handlers with no other uncommitted work.
+- **`make evaluate` runs the golden set.** Expectations are *relative* — "this candidate outranks
+  that one" — never absolute scores, or every deliberate weighting change looks like a regression.
 
 Sprint 9 (connect the graph) is done. The national taxonomy is now the operational vocabulary:
 every job, course and candidate skill points at a real National Occupational Standard, and the 52

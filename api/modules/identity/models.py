@@ -25,7 +25,13 @@ class Tenant(Base):
 
     __tablename__ = "tenants"
     __table_args__ = (
-        CheckConstraint("tenant_type IN ('employer', 'course_provider')", name="ck_tenants_type"),
+        # `personal` was added when candidate sign-in landed and the database
+        # was widened by hand; the model was not, and Alembic does not diff
+        # CHECK bodies so nothing flagged the drift.
+        CheckConstraint(
+            "tenant_type IN ('employer', 'course_provider', 'personal')",
+            name="ck_tenants_type",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

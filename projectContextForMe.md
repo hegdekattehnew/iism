@@ -102,6 +102,27 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
+**Sprint 10 (matching and the gap) — done** on 2026-09-06. The payoff, after three deferrals.
+`/matches` ranks jobs for a signed-in candidate with the score broken down, names the gap standard
+by standard, and lists the courses that close it plus how to become qualified. Migration 0014
+(`analytics_events`). ADR-036. 195 tests, plus a golden set behind `make evaluate`.
+
+Non-obvious things:
+- **`scoring.py` is pure and must stay pure** — no I/O, no clock, no model. That is what makes a
+  score defensible to an employer and measurable against the golden set.
+- **`record()` commits.** `get_db_session` never commits, so the first wiring flushed three events
+  per request into an empty table. Only call it from handlers with no other uncommitted work.
+- **Zero matched standards scores zero.** Letting level and evidence through alone gave every job
+  a small non-zero score for everyone — noise that ranking then had to see past.
+- **A missing mandatory standard caps at 45**, not zero: a candidate one short of a strong match
+  needs telling, not hiding.
+- **Golden-set expectations are relative, never absolute.** "This candidate outranks that one"
+  survives a weighting change; "scores 82" does not, and a suite failing on every improvement is
+  one people stop running.
+- **`openapi-fetch` resolves rather than throws on non-2xx.** A 401 arrived as `data: undefined`
+  and rendered as "nothing matches" — telling a signed-out visitor they had no matches. Authenticated
+  queries must check `error` explicitly.
+
 **Sprint 9 (connect the graph) — done** on 2026-09-06. The national taxonomy is now the
 operational vocabulary. 87 job links, 64 course links and 4 candidate skills all point at real
 National Occupational Standards; the 52 curated skills are `source='legacy'`, hidden from search
@@ -167,6 +188,9 @@ api/                    FastAPI modular monolith
                                       KnowledgeParameter, GenericCriterion (~614k rows)
                         concepts.py   SkillConcept -- rows that mean the same thing
                         + schemas, service, routes, __init__ (public interface)
+  modules/matching/     scoring.py (pure), service.py (retrieval + gap + courses),
+                        schemas, routes. No model client, by ADR-036.
+  modules/analytics/    analytics_events (ADR-025). record() commits.
   modules/geography/    State, District, SubDistrict. Its own module because jobs
                         and profiles reference it and neither is a skill. No routes
                         yet -- nothing consumes it over HTTP.
@@ -195,10 +219,12 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0008 (NSQF hierarchy), 0009 (widen level_taught),
                         0010 (skills.qp_count), 0011 (geography),
                         0012 (structure, entry routes, content, pruning),
-                        0013 (skill concepts + 'legacy' source)
+                        0013 (skill concepts + 'legacy' source),
+                        0014 (analytics events)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
-                        retire_legacy_skills.py — all idempotent
+                        retire_legacy_skills.py, seed_candidates.py (demo profiles +
+                        the golden pairs), evaluate_matching.py — all idempotent
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 tests/                  pytest + testcontainers
 ```
@@ -232,7 +258,8 @@ This is an **Apple Silicon (arm64) Mac, macOS 26.6.2**, and the setup has traps:
 ```bash
 make up          # start Postgres + Redis, wait for healthy
 make migrate     # alembic upgrade head
-make seed        # load the skill taxonomy + marketplace (idempotent)
+make seed        # taxonomy + marketplace + demo candidates (idempotent)
+make evaluate    # score the matcher against the golden set
 make import-nsqf # project the NSQF corpus from Mongo into Postgres (idempotent)
 make api         # uvicorn on :8000
 make worker      # ARQ worker
@@ -424,28 +451,29 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 11. What comes next
 
-**Matching is next, and nothing blocks it any more.** All three sides of the graph exist and are
-connected; the concept layer means a candidate and a job need not have picked the same row. Sprint
-10 is planned in full in the plan file: deterministic scoring per ADR-007 using the *sourced*
-`qp_skills.weightage`, `is_mandatory` as a cap rather than a penalty, `candidate_skills.source` so
-verified evidence outranks self-claims, and `qp_entry_routes` for eligibility — plus courses ranked
-by how much of the named gap they close.
+Matching works and is measured. What is missing is now mostly **evidence and reach**, not
+mechanism.
 
-Two things must land with it and neither exists:
-1. **`analytics_events`** (ADR-025). Measurement substitutes for a revenue signal and nothing
-   records anything.
-2. **A golden-set harness** — 50–100 hand-labelled pairs, precision@5 in CI, built *before* tuning.
+**Tune against the golden set, and grow it.** Five labelled pairs is enough to catch a regression
+and nowhere near enough to trust a weighting. The plan called for 50–100. Growing it is the
+cheapest way to make every later scoring change safe.
 
-Then **Hindi for the corpus** (Sprint 11, ~$5 for the navigable surface, blocked on credentials
-rather than design), and the **parked resume builder and extractor** — deferred because correct
-Devanagari in PDF needs complex-script shaping and therefore Pango/HarfBuzz system libraries.
+**Semantic similarity** is the deliberate omission from Sprint 10 (ADR-007 names it; ADR-036 says
+deterministic overlap ships first so there is a baseline). Embeddings over performance criteria
+rather than titles — titles like `OJT` and `Project` embed to noise — with sentence-transformers
+self-hosted, so no per-request cost.
 
-Two ADRs are owed: **recommendation architecture** (skill-based versus behavioural, and the
-write-time/read-time rule for LLM calls) before Sprint 10, and one on resume data handling if that
-work is revived.
+**Hindi for the corpus** (Sprint 11): ~$5 for the navigable surface, blocked on credentials rather
+than design.
 
-Also outstanding: typed `SkillRelation` edges, embeddings, organisation/email login and self-serve
-publishing, a real SMS provider, observability, and the ADR-023 encryption path.
+**The parked résumé builder and extractor**, deferred because correct Devanagari in PDF needs
+complex-script shaping and therefore Pango/HarfBuzz. Still the best answer to profile-completion
+friction, which is now the binding constraint on matching: a candidate with no declared skills
+gets no matches, correctly, and nothing yet makes declaring them easy.
+
+Also outstanding: career paths (ADR-008, and the NCO codes for it now exist), typed `SkillRelation`
+edges, organisation/email login and self-serve publishing, a real SMS provider, observability, and
+the ADR-023 encryption path.
 
 ## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 

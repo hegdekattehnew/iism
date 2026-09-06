@@ -1,0 +1,148 @@
+"""Match endpoints. Authenticated: a match is about a specific person."""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.core.database import get_db_session
+from api.core.security import get_current_user
+from api.modules.analytics import record
+from api.modules.identity.models import User
+from api.modules.marketplace.models import CandidateProfile
+from api.modules.matching import schemas, service
+
+router = APIRouter(prefix="/me/matches", tags=["matching"])
+
+
+async def _profile(db: AsyncSession, user: User) -> CandidateProfile:
+    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id))
+    if profile is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No candidate profile")
+    return profile
+
+
+def _to_match(scored: service.ScoredJob) -> schemas.MatchOut:
+    r = scored.result
+    return schemas.MatchOut(
+        job=schemas.JobSummary.model_validate(scored.job),
+        score=r.score,
+        coverage=round(r.coverage, 4),
+        matched=[schemas.MatchedSkillOut(**vars(m)) for m in r.matched],
+        missing=[
+            schemas.MissingSkillOut(
+                skill_id=m.skill_id,
+                nos_code=m.nos_code,
+                name_en=m.name_en,
+                importance=m.importance,
+                is_mandatory=m.is_mandatory,
+                nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,
+            )
+            for m in r.missing
+        ],
+        missing_mandatory=r.missing_mandatory,
+        level_shortfall=float(r.level_shortfall) if r.level_shortfall is not None else None,
+        capped_by_mandatory=r.capped_by_mandatory,
+    )
+
+
+@router.get("", response_model=schemas.MatchPage)
+async def list_matches(
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> schemas.MatchPage:
+    profile = await _profile(db, user)
+    scored = await service.match_jobs(db, profile.id, limit=limit)
+
+    await record(
+        db,
+        "matches_viewed",
+        user_id=user.id,
+        payload={"returned": len(scored)},
+    )
+    return schemas.MatchPage(
+        items=[_to_match(s) for s in scored],
+        total=len(scored),
+        has_skills=bool(await service.has_declared_skills(db, profile.id)),
+    )
+
+
+@router.get("/{slug}", response_model=schemas.MatchDetail)
+async def match_detail(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> schemas.MatchDetail:
+    """One job, scored, with the courses that close its gap."""
+    profile = await _profile(db, user)
+    scored = await service.match_job_by_slug(db, profile.id, slug)
+    if scored is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+
+    courses = await service.courses_closing_gap(db, scored.result.missing)
+    entry = await service.entry_routes_for_job(db, scored.job.id)
+
+    await record(
+        db,
+        "match_opened",
+        user_id=user.id,
+        subject_type="job",
+        subject_id=scored.job.id,
+        payload={"score": scored.result.score, "missing": len(scored.result.missing)},
+    )
+    if scored.result.missing:
+        await record(
+            db,
+            "gap_viewed",
+            user_id=user.id,
+            subject_type="job",
+            subject_id=scored.job.id,
+            payload={
+                "missing": len(scored.result.missing),
+                "mandatory": scored.result.missing_mandatory,
+            },
+        )
+    if courses:
+        await record(
+            db,
+            "course_recommended",
+            user_id=user.id,
+            subject_type="job",
+            subject_id=scored.job.id,
+            payload={"suggested": len(courses)},
+        )
+
+    base = _to_match(scored)
+    return schemas.MatchDetail(
+        **base.model_dump(),
+        courses=[
+            schemas.CourseSuggestionOut(
+                slug=c.course.slug,
+                title_en=c.course.title_en,
+                title_hi=c.course.title_hi,
+                mode=c.course.mode,
+                duration_hours=c.course.duration_hours,
+                fee_inr=c.course.fee_inr,
+                closes=c.closes,
+                closes_count=c.closes_count,
+                gap_size=c.gap_size,
+                covers_mandatory=c.covers_mandatory,
+            )
+            for c in courses
+        ],
+        entry=(
+            schemas.EntryRouteOut(
+                qp_code=entry.qp_code,
+                qp_name=entry.qp_name,
+                routes_total=entry.routes_total,
+                education_options=entry.education_options,
+                lowest_experience_years=(
+                    float(entry.lowest_experience_years)
+                    if entry.lowest_experience_years is not None
+                    else None
+                ),
+            )
+            if entry
+            else None
+        ),
+    )

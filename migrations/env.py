@@ -11,6 +11,7 @@ from api.core.database import Base
 
 # Importing every module's models registers them on Base.metadata so that
 # autogenerate sees them. New modules must be added here.
+from api.modules.analytics import models as _analytics_models  # noqa: F401
 from api.modules.geography import models as _geography_models  # noqa: F401
 from api.modules.identity import models as _identity_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401

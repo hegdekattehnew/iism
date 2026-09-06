@@ -52,9 +52,14 @@ migration: ## Autogenerate a migration: make migration m="add courses"
 	$(ALEMBIC) revision --autogenerate -m "$(m)"
 
 .PHONY: seed
-seed: ## Seed the taxonomy and marketplace inventory (idempotent)
+seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempotent)
 	$(PY) scripts/seed_skills.py
 	$(PY) scripts/seed_marketplace.py
+	$(PY) scripts/seed_candidates.py
+
+.PHONY: evaluate
+evaluate: ## Score the matcher against the hand-labelled golden set
+	$(PY) scripts/evaluate_matching.py
 
 .PHONY: mongosh
 mongosh: ## Open a mongosh shell against the NSQF source

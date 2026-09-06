@@ -306,7 +306,8 @@
     "errorGeneric": "Something went wrong. Please try again.",
     "signOut": "Sign out",
     "myProfile": "My profile",
-    "signedInAs": "Signed in as {phone}"
+    "signedInAs": "Signed in as {phone}",
+    "myMatches": "My matches"
   },
   "profilePage": {
     "title": "My profile",
@@ -451,5 +452,36 @@
       "duplicate": "That entry already exists.",
       "generic": "Could not save. Please check the fields."
     }
+  },
+  "matchesPage": {
+    "title": "Your matches",
+    "subtitle": "Jobs ranked by how much of what they need you already have.",
+    "noSkills": "Add a few skills to your profile and we can show you matches.",
+    "addSkills": "Go to my profile",
+    "noMatches": "Nothing matches your skills yet. Try adding more, or widen your preferences.",
+    "matchScore": "{score}% match",
+    "youHave": "You have",
+    "youNeed": "You need",
+    "mandatory": "Required",
+    "capped": "One required standard is missing, which limits this match.",
+    "levelShort": "{levels} NSQF levels below what this job asks for",
+    "evidence": {
+      "certified": "Certified",
+      "assessed": "Assessed",
+      "self_declared": "Self-declared",
+      "inferred": "Inferred"
+    },
+    "closesGap": "Closes {closed} of your {total} missing",
+    "coursesHeading": "Courses that close this gap",
+    "noCourses": "No course on the platform covers this gap yet.",
+    "entryHeading": "Getting qualified",
+    "entryVia": "This role maps to {name} ({code}).",
+    "entryRoutes": "{count, plural, one {# way in} other {# ways in}}",
+    "entryExperience": "From {years} years' experience",
+    "entryEducation": "Entry qualifications accepted",
+    "viewJob": "View the job",
+    "backToMatches": "All matches",
+    "loadError": "Could not load your matches.",
+    "hours": "{hours} hours"
   }
 }

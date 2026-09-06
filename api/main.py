@@ -20,6 +20,7 @@ from api.modules.marketplace import (
     marketplace_router,
     profile_router,
 )
+from api.modules.matching import router as matching_router
 from api.modules.skills import router as skills_router
 
 
@@ -54,6 +55,7 @@ app.include_router(courses_router)
 app.include_router(marketplace_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(matching_router)
 
 
 @app.get("/health", tags=["health"])

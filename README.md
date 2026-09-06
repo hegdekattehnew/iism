@@ -9,7 +9,13 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
-## Status — Sprints 1–9 complete
+## Status — Sprints 1–10 complete
+
+**Sprint 10 — matching, and what to do about the gap.** Sign in and open `/matches`: jobs ranked
+by how much of what they need you already have, with the score broken down into what you hold and
+what you are missing, which of those are mandatory, and — for each gap — the courses that close it
+and how many hours that takes. Scoring is deterministic and explainable; no model is consulted.
+`make evaluate` scores it against hand-labelled pairs.
 
 **Sprint 9 — the taxonomy connects.** Every job, course and candidate skill now points at a real
 National Occupational Standard. Open a job and it lists the standards it requires, by code and
@@ -68,9 +74,9 @@ The most interesting page is a standard's detail view — try
 requires (assessable criteria with their marks), the qualifications that use it with each one's own
 NSQF level, and its code, sector and owning body.
 
-Not yet built: matching, Hindi for the imported corpus, a concept layer over duplicated unit names,
-organisation/email login, self-serve publishing, a real SMS provider, typed skill relations,
-embeddings, analytics instrumentation.
+Not yet built: Hindi for the imported corpus, semantic similarity and embeddings, résumé builder
+and extractor, organisation/email login, self-serve publishing, a real SMS provider, typed skill
+relations, career paths.
 
 ## Prerequisites
 
@@ -125,6 +131,14 @@ make web
 Then open **http://localhost:3000** — it redirects to `/en`. All four status cards should be
 green. "Run test task" enqueues a real background job through Redis; the worker picks it up and
 the result appears in the UI.
+
+```bash
+make evaluate
+```
+
+Scores the matcher against hand-labelled candidate/job pairs. Expectations are relative — "a
+candidate holding every mandatory standard outranks one missing it" — so a deliberate change to
+the weights does not read as a regression.
 
 `make help` lists every target.
 

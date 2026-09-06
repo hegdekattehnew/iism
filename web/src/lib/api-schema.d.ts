@@ -457,6 +457,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Matches */
+        get: operations["list_matches_me_matches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/matches/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Match Detail
+         * @description One job, scored, with the courses that close its gap.
+         */
+        get: operations["match_detail_me_matches__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -781,6 +818,29 @@ export interface components {
             /** Level Taught */
             level_taught?: number | null;
         };
+        /** CourseSuggestionOut */
+        CourseSuggestionOut: {
+            /** Slug */
+            slug: string;
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Mode */
+            mode: string;
+            /** Duration Hours */
+            duration_hours?: number | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /** Closes */
+            closes: string[];
+            /** Closes Count */
+            closes_count: number;
+            /** Gap Size */
+            gap_size: number;
+            /** Covers Mandatory */
+            covers_mandatory: number;
+        };
         /** CriterionOut */
         CriterionOut: {
             /** Pc Ref */
@@ -828,6 +888,19 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /** EntryRouteOut */
+        EntryRouteOut: {
+            /** Qp Code */
+            qp_code: string;
+            /** Qp Name */
+            qp_name: string;
+            /** Routes Total */
+            routes_total: number;
+            /** Education Options */
+            education_options: string[];
+            /** Lowest Experience Years */
+            lowest_experience_years?: number | null;
         };
         /** ExperienceOut */
         ExperienceOut: {
@@ -959,6 +1032,27 @@ export interface components {
             /** Is Mandatory */
             is_mandatory: boolean;
         };
+        /** JobSummary */
+        JobSummary: {
+            /** Slug */
+            slug: string;
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Employment Type */
+            employment_type: string;
+            /** Nsqf Level Min */
+            nsqf_level_min?: number | null;
+            /** Salary Min Inr */
+            salary_min_inr?: number | null;
+            /** Salary Max Inr */
+            salary_max_inr?: number | null;
+        };
         /** LanguageOut */
         LanguageOut: {
             /** Language */
@@ -999,6 +1093,87 @@ export interface components {
             /** Courses */
             courses: number;
         };
+        /**
+         * MatchDetail
+         * @description One match, with what to do about the gap.
+         */
+        MatchDetail: {
+            job: components["schemas"]["JobSummary"];
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Matched */
+            matched?: components["schemas"]["MatchedSkillOut"][];
+            /** Missing */
+            missing?: components["schemas"]["MissingSkillOut"][];
+            /**
+             * Missing Mandatory
+             * @default 0
+             */
+            missing_mandatory: number;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
+            /**
+             * Capped By Mandatory
+             * @default false
+             */
+            capped_by_mandatory: boolean;
+            /** Courses */
+            courses?: components["schemas"]["CourseSuggestionOut"][];
+            entry?: components["schemas"]["EntryRouteOut"] | null;
+        };
+        /**
+         * MatchOut
+         * @description A ranked job with the whole of why.
+         */
+        MatchOut: {
+            job: components["schemas"]["JobSummary"];
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Matched */
+            matched?: components["schemas"]["MatchedSkillOut"][];
+            /** Missing */
+            missing?: components["schemas"]["MissingSkillOut"][];
+            /**
+             * Missing Mandatory
+             * @default 0
+             */
+            missing_mandatory: number;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
+            /**
+             * Capped By Mandatory
+             * @default false
+             */
+            capped_by_mandatory: boolean;
+        };
+        /** MatchPage */
+        MatchPage: {
+            /** Items */
+            items: components["schemas"]["MatchOut"][];
+            /** Total */
+            total: number;
+            /** Has Skills */
+            has_skills: boolean;
+        };
+        /** MatchedSkillOut */
+        MatchedSkillOut: {
+            /** Nos Code */
+            nos_code?: string | null;
+            /** Name En */
+            name_en: string;
+            /** Importance */
+            importance: number;
+            /** Is Mandatory */
+            is_mandatory: boolean;
+            /** Evidence */
+            evidence: string;
+            /** Proficiency */
+            proficiency: number;
+        };
         /** MembershipOut */
         MembershipOut: {
             /**
@@ -1007,6 +1182,24 @@ export interface components {
              */
             role: "owner" | "admin" | "member";
             tenant: components["schemas"]["TenantOut"];
+        };
+        /** MissingSkillOut */
+        MissingSkillOut: {
+            /**
+             * Skill Id
+             * Format: uuid
+             */
+            skill_id: string;
+            /** Nos Code */
+            nos_code?: string | null;
+            /** Name En */
+            name_en: string;
+            /** Importance */
+            importance: number;
+            /** Is Mandatory */
+            is_mandatory: boolean;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
         };
         /** OtpRequest */
         OtpRequest: {
@@ -2205,6 +2398,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_matches_me_matches_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    match_detail_me_matches__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchDetail"];
                 };
             };
             /** @description Validation Error */
