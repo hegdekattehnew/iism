@@ -9,7 +9,13 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
 that govern how.
 
-## Status — Sprints 1–8 complete
+## Status — Sprints 1–9 complete
+
+**Sprint 9 — the taxonomy connects.** Every job, course and candidate skill now points at a real
+National Occupational Standard. Open a job and it lists the standards it requires, by code and
+level, each linking to what that standard actually assesses. Search `khoon nikalna` and you reach
+`HSS/N0513`, not a hand-written stand-in — the 149 bilingual aliases were carried across. The 52
+curated skills are retired: hidden from search, kept because profiles reference them.
 
 **Sprint 8 — the national NSQF corpus.** 4,424 qualification packs, 21,303 National Occupational
 Standards, 1,808 occupations and 106 awarding bodies, plus Indian administrative geography — 36

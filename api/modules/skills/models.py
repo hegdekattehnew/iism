@@ -16,6 +16,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base
 
+# Imported for its side effect: `skills.concept_id` is a foreign key to
+# `skill_concepts`, and SQLAlchemy cannot resolve it unless that table is
+# registered on the same metadata. concepts.py imports only Base, so this does
+# not create a cycle.
+from api.modules.skills import concepts as _concepts  # noqa: F401
+
 # Skill classification, per NSQF's split between job-specific and shared competencies.
 SKILL_TYPES = ("technical", "core", "generic")
 
@@ -39,7 +45,7 @@ class Skill(Base):
             "nsqf_level IS NULL OR (nsqf_level >= 1 AND nsqf_level <= 10)",
             name="ck_skills_nsqf_level",
         ),
-        CheckConstraint("source IN ('nsqf', 'curated')", name="ck_skills_source"),
+        CheckConstraint("source IN ('nsqf', 'curated', 'legacy')", name="ck_skills_source"),
         Index("ix_skills_type_level", "skill_type", "nsqf_level"),
         Index("ix_skills_source", "source"),
     )
@@ -84,6 +90,13 @@ class Skill(Base):
     )
     awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("awarding_bodies.id", ondelete="SET NULL"), index=True, default=None
+    )
+
+    # The group of rows meaning the same thing. Matching scores at this level,
+    # so a candidate and a job need not have picked the same row -- see
+    # `concepts.py` for why identical names are not enough on their own.
+    concept_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("skill_concepts.id", ondelete="SET NULL"), index=True, default=None
     )
 
     # How many current qualifications use this unit. Denormalised by the importer

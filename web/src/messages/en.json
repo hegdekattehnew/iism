@@ -201,7 +201,7 @@
     "electiveGroup": "Choose from: {group}",
     "nosCode": "NOS code",
     "nosVersion": "Version",
-    "curatedNotice": "A hand-curated skill, not yet mapped to a National Occupational Standard.",
+    "curatedNotice": "This is a retired hand-written entry, superseded by the National Occupational Standards it maps to. It is kept because existing profiles reference it, and no longer appears in search.",
     "noQualifications": "This unit is not part of any current qualification.",
     "usedInQps": "{count, plural, one {# qualification} other {# qualifications}}",
     "requirements": "What this standard requires",

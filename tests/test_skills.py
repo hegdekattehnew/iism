@@ -195,3 +195,64 @@ async def test_blank_search_returns_nothing(seeded: AsyncSession) -> None:
 
 async def test_search_respects_limit(seeded: AsyncSession) -> None:
     assert len(await search_skills(seeded, "a", limit=1)) <= 1
+
+
+class TestRetiredSkills:
+    """The 52 curated skills were superseded, not deleted.
+
+    Their aliases were carried onto the standards they map to, so the
+    multi-script search still works -- but now it reaches a real National
+    Occupational Standard rather than a hand-written stand-in.
+    """
+
+    async def _retire(self, db) -> tuple[object, object]:
+        """A live skill and a retired one, sharing an alias."""
+        from api.modules.skills.models import Skill, SkillAlias
+
+        live = Skill(slug="live-standard", name_en="Live standard", source="nsqf")
+        retired = Skill(slug="retired-skill", name_en="Retired skill", source="legacy")
+        db.add_all([live, retired])
+        await db.flush()
+        db.add(SkillAlias(skill_id=live.id, surface_form="khoon nikalna", script="transliteration"))
+        db.add(SkillAlias(skill_id=retired.id, surface_form="old term", script="latin"))
+        await db.flush()
+        return live, retired
+
+    async def test_a_retired_skill_is_absent_from_browse(self, db, client) -> None:
+        await self._retire(db)
+
+        slugs = {s["slug"] for s in (await client.get("/skills?limit=200")).json()["items"]}
+        assert "live-standard" in slugs
+        assert "retired-skill" not in slugs
+
+    async def test_a_retired_skill_is_absent_from_search(self, db, client) -> None:
+        """Including through its own alias -- otherwise the exclusion would leak
+        through one of the four search branches."""
+        await self._retire(db)
+
+        by_name = (await client.get("/skills/search?q=Retired skill")).json()
+        assert all(hit["slug"] != "retired-skill" for hit in by_name)
+
+        by_alias = (await client.get("/skills/search?q=old term")).json()
+        assert all(hit["slug"] != "retired-skill" for hit in by_alias)
+
+    async def test_a_carried_alias_reaches_the_live_standard(self, db, client) -> None:
+        await self._retire(db)
+
+        hits = (await client.get("/skills/search?q=khoon nikalna")).json()
+        assert any(hit["slug"] == "live-standard" for hit in hits)
+
+    async def test_a_retired_skill_keeps_its_own_page(self, db, client) -> None:
+        """Not deleted, because profiles and certificates still reference them.
+        A 404 on a row we deliberately kept would be a broken link of our own
+        making."""
+        await self._retire(db)
+
+        assert (await client.get("/skills/retired-skill")).status_code == 200
+
+    async def test_retired_rows_are_excluded_from_the_count_and_facets(self, db, client) -> None:
+        await self._retire(db)
+
+        counted = (await client.get("/skills/count")).json()["count"]
+        facet_total = (await client.get("/skills/facets")).json()["total"]
+        assert counted == facet_total  # both exclude retired rows, so they agree

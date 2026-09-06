@@ -43,10 +43,16 @@ class SkillOut(BaseModel):
 
 class SkillDetail(SkillOut):
     aliases: list[AliasOut] = Field(default_factory=list)
-    # Provenance. `curated` marks the 52 hand-written skills that predate the
-    # national import; `nsqf` marks a real National Occupational Standard, and
-    # only those carry a code a training provider or assessor would recognise.
-    source: Literal["nsqf", "curated"] = "curated"
+    # Provenance. `nsqf` is a real National Occupational Standard and the only
+    # kind carrying a code an assessor would recognise. `legacy` is one of the
+    # 52 hand-written skills, superseded by the standard it maps to but kept
+    # because profiles still reference it.
+    #
+    # A plain string, not a Literal: adding `legacy` to the enum turned this
+    # endpoint into a 500 for every retired row before the value was listed
+    # here, which is the "output schemas stay permissive" rule in CLAUDE.md
+    # earning its keep again.
+    source: str = "curated"
     nos_code: str | None = None
     nos_version: str | None = None
     nos_type: str | None = None

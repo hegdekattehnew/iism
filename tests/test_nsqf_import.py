@@ -119,7 +119,7 @@ class TestImport:
         assert report.sub_sectors == 3
         # HC/Q0001 exists twice; only the newest version is kept.
         assert report.qualification_packs == 4
-        assert report.skills == 5
+        assert report.skills == 7
 
     async def test_only_the_latest_version_of_a_qualification_is_kept(self, db, source) -> None:
         """Prior versions stay in the source of record; Postgres holds today's."""
@@ -303,7 +303,7 @@ class TestImport:
         go unnoticed if a future re-issue introduced one."""
         report = await _import(db, source)
 
-        assert report.skills == 5  # the sixth distinct code; the seventh had none
+        assert report.skills == 7  # seven distinct codes; the eighth had none
         assert report.documents_without_code == 1
 
 

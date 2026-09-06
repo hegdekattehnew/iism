@@ -1147,9 +1147,8 @@ export interface components {
             /**
              * Source
              * @default curated
-             * @enum {string}
              */
-            source: "nsqf" | "curated";
+            source: string;
             /** Nos Code */
             nos_code?: string | null;
             /** Nos Version */

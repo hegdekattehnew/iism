@@ -12,7 +12,12 @@ invisible to matching and the failure would not surface until Sprint 5.
 
 import asyncio
 import sys
+import uuid
 
+# Sibling import: `scripts/` is not an installed package, but Python puts a
+# script's own directory on sys.path, so this resolves when run as
+# `python scripts/seed_marketplace.py` -- which is how the Makefile runs it.
+from legacy_skill_map import LEGACY_SKILL_MAP  # noqa: E402
 from sqlalchemy import delete, select
 
 from api.core.database import dispose_engine, get_sessionmaker
@@ -863,18 +868,50 @@ async def seed() -> dict[str, int]:
     }
 
     async with get_sessionmaker()() as db:
-        skills = {s.slug: s.id for s in (await db.scalars(select(Skill)))}
-        if not skills:
-            print("No skills found. Run scripts/seed_skills.py first.", file=sys.stderr)
+        # Inventory is anchored to real National Occupational Standards, not to
+        # the hand-written Sprint 2 vocabulary. The job and course definitions
+        # below still read in the curated terms because they are legible that
+        # way; LEGACY_SKILL_MAP is the single place the translation happens, so
+        # every anchor is auditable in one file instead of across 172 literals.
+        by_nos = dict(
+            (
+                await db.execute(
+                    select(Skill.nos_code, Skill.id).where(
+                        Skill.source == "nsqf", Skill.nos_code.isnot(None)
+                    )
+                )
+            ).all()  # type: ignore[arg-type]
+        )
+        if not by_nos:
+            print(
+                "No NSQF skills found. Run `make import-nsqf` before seeding the marketplace.",
+                file=sys.stderr,
+            )
             raise SystemExit(1)
 
-        # Fail loudly on a bad slug rather than creating skill-less inventory.
         referenced = {sl for j in JOBS for sl, _, _ in j[14]} | {
             sl for c in COURSES for sl, _ in c[11]
         }
-        missing = sorted(referenced - skills.keys())
-        if missing:
-            print(f"Unknown skill slugs: {', '.join(missing)}", file=sys.stderr)
+
+        # Two ways this can be wrong, and both must stop the seed: a slug with
+        # no mapping, or a mapping pointing at a standard the import did not
+        # produce. Inventory with silently missing skills is invisible until
+        # matching returns nothing for it.
+        unmapped = sorted(referenced - LEGACY_SKILL_MAP.keys())
+        if unmapped:
+            print(f"Skill slugs with no NOS mapping: {', '.join(unmapped)}", file=sys.stderr)
+            raise SystemExit(1)
+
+        skills: dict[str, uuid.UUID] = {}
+        dangling: list[str] = []
+        for slug in referenced:
+            code = LEGACY_SKILL_MAP[slug]
+            if code in by_nos:
+                skills[slug] = by_nos[code]
+            else:
+                dangling.append(f"{slug} -> {code}")
+        if dangling:
+            print(f"Mapped to unknown NOS codes: {', '.join(sorted(dangling))}", file=sys.stderr)
             raise SystemExit(1)
 
         tenants: dict[str, Tenant] = {}
@@ -922,11 +959,24 @@ async def seed() -> dict[str, int]:
             await db.flush()
 
             await db.execute(delete(JobSkill).where(JobSkill.job_id == job.id))
+            # Several curated skills can map to one standard -- a job listing
+            # both "hand hygiene" and "infection control" needs HSS/N9618 once,
+            # not twice. Merge on the strongest signal: the highest importance,
+            # and mandatory beats optional. Understating either would weaken a
+            # requirement the job actually has.
+            merged: dict[uuid.UUID, tuple[int, bool]] = {}
             for sslug, importance, mandatory in skill_rows:
+                sid = skills[sslug]
+                prev_importance, prev_mandatory = merged.get(sid, (0, False))
+                merged[sid] = (
+                    max(importance, prev_importance),
+                    mandatory or prev_mandatory,
+                )
+            for sid, (importance, mandatory) in merged.items():
                 db.add(
                     JobSkill(
                         job_id=job.id,
-                        skill_id=skills[sslug],
+                        skill_id=sid,
                         importance=importance,
                         is_mandatory=mandatory,
                     )
@@ -962,8 +1012,16 @@ async def seed() -> dict[str, int]:
             await db.flush()
 
             await db.execute(delete(CourseSkill).where(CourseSkill.course_id == course.id))
+            # Same collapse as jobs: keep the highest level taught, since a
+            # course covering a standard to level 4 in one module and level 3 in
+            # another does take the learner to 4.
+            taught: dict[uuid.UUID, int | None] = {}
             for sslug, level in skill_rows:
-                db.add(CourseSkill(course_id=course.id, skill_id=skills[sslug], level_taught=level))
+                sid = skills[sslug]
+                if sid not in taught or (level or 0) > (taught[sid] or 0):
+                    taught[sid] = level
+            for sid, level in taught.items():
+                db.add(CourseSkill(course_id=course.id, skill_id=sid, level_taught=level))
                 stats["course_skills"] += 1
 
         await db.commit()

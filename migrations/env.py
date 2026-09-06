@@ -14,6 +14,7 @@ from api.core.database import Base
 from api.modules.geography import models as _geography_models  # noqa: F401
 from api.modules.identity import models as _identity_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401
+from api.modules.skills import concepts as _skills_concepts  # noqa: F401
 from api.modules.skills import content as _skills_content  # noqa: F401
 from api.modules.skills import hierarchy as _skills_hierarchy  # noqa: F401
 from api.modules.skills import models as _skills_models  # noqa: F401

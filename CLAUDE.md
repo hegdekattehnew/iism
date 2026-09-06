@@ -163,6 +163,10 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   fails. Twelve appeared across 0011 and 0012.
 - **`make check` passing does not mean the import is right.** It passed while `occupations` held
   529 rows instead of 1,811. Compare the import report against independently computed expectations.
+- **A model with a cross-module foreign key must import the target module.** SQLAlchemy resolves
+  `ForeignKey("districts.id")` against the metadata, so a script importing `marketplace.models`
+  without `geography.models` fails at mapper configuration. This bit twice in one sprint —
+  marketplace→geography and skills→concepts. Import for the side effect, with a comment saying why.
 - **After mutating a relationship, re-query with `populate_existing=True`.** Without it the
   instance already in the session's identity map is returned with its stale collection, so the
   query succeeds and quietly returns the wrong answer. `db.refresh()` does not cascade nested
@@ -183,6 +187,28 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   not-yet-built pages render `PlaceholderPage` rather than 404.
 
 ## Current state
+
+Sprint 9 (connect the graph) is done. The national taxonomy is now the operational vocabulary:
+every job, course and candidate skill points at a real National Occupational Standard, and the 52
+hand-curated Sprint 2 skills are retired.
+
+- **`skill_concepts` groups rows that mean the same thing** — same awarding body + same normalised
+  name + same level, giving 18,958 concepts from 21,303 rows. Derived and rebuilt by the importer
+  on every run, like `qp_count`. Never edit it by hand. Level and body stay in the key: 576
+  duplicate groups span levels and 174 cross bodies, and merging those would assert something
+  untrue. Matching will score at concept level so a candidate and a job need not have picked the
+  same row.
+- **`scripts/legacy_skill_map.py` is the single place the old vocabulary maps to the new.** Job and
+  course definitions still read in curated terms because they are legible that way; the map does
+  the translation, so all 50 anchors are auditable in one file rather than across 172 literals.
+- **The map is many-to-one, and that is the finding.** The curated vocabulary was authored at
+  capability level ("hand hygiene", "bed making"); an NOS is a job task ("Follow infection control
+  policies & procedures"). 52 slugs collapse to 38 standards. Seeding therefore merges duplicate
+  links on the strongest signal — highest importance, mandatory beating optional — because a job
+  needing one standard twice is a constraint violation, not two requirements.
+- **Retired skills are `source='legacy'`: hidden from search, browse, count and facets, but their
+  own page still resolves.** They are not deleted because profiles and certificates reference them,
+  and a 404 on a row we deliberately kept would be a broken link of our own making.
 
 Sprint 8 (complete NSQF migration) is done. The national corpus is in Postgres, migrated against
 the full master data after the first attempt was rolled back:
@@ -214,8 +240,8 @@ performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151
   That is the data, not a bug — the import writes every row the current versions hold.
 - **The 52 curated skills remain** alongside the 21,303 imported ones, tagged `source='curated'`.
   Two vocabularies still coexist; that debt is recorded in `projectContextForMe.md` §12.
-- **Still English-only, and still connected to nothing** — zero `job_skills`, `course_skills`,
-  `candidate_skills` or aliases point at an imported row.
+- **Still English-only.** The corpus carries no Devanagari; the 149 carried aliases are the only
+  Hindi reaching it.
 
 Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
 preferences, plus six repeating collections: experiences, educations, certifications, languages,

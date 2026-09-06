@@ -61,9 +61,10 @@ export default async function SkillDetailPage({
         )}
       </div>
 
-      {/* The 52 hand-written skills predate the national import. Saying so beats
-          letting them look like standards they are not. */}
-      {data.source === "curated" && (
+      {/* Retired: superseded by the standards it maps to, but still reachable
+          because profiles reference it. Saying so beats letting it look like a
+          standard it is not. */}
+      {data.source === "legacy" && (
         <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           {t("curatedNotice")}
         </p>

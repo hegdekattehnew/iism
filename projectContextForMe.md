@@ -102,6 +102,21 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
+**Sprint 9 (connect the graph) — done** on 2026-09-06. The national taxonomy is now the
+operational vocabulary. 87 job links, 64 course links and 4 candidate skills all point at real
+National Occupational Standards; the 52 curated skills are `source='legacy'`, hidden from search
+and browse but still reachable by URL because profiles reference them. 149 aliases carried across,
+so `khoon nikalna` resolves to `HSS/N0513`. `skill_concepts` holds 18,958 concepts over 21,303
+rows. Migration 0013. 179 tests.
+
+Two things worth knowing:
+- **`scripts/legacy_skill_map.py` is hand-authored and is the only place the old vocabulary maps
+  to the new.** It cannot be automated: full-text search gets `Blood sample collection` →
+  `HSS/N0513` right and `Customer service` → a hair-and-beauty NOS wrong, and nothing in the data
+  distinguishes the two cases.
+- **52 curated slugs collapse to 38 standards**, because the curated vocabulary is finer-grained
+  than NSQF. Seeding merges duplicate links on the strongest signal.
+
 **Sprint 8 (complete NSQF migration) — done** on 2026-09-05, against the full master data after
 four further collections arrived (`sectors`, `ssc`, `state`, `district`).
 
@@ -150,6 +165,7 @@ api/                    FastAPI modular monolith
                                       QpNcoCode, ModelCurriculum
                         content.py    PerformanceElement, PerformanceCriterion,
                                       KnowledgeParameter, GenericCriterion (~614k rows)
+                        concepts.py   SkillConcept -- rows that mean the same thing
                         + schemas, service, routes, __init__ (public interface)
   modules/geography/    State, District, SubDistrict. Its own module because jobs
                         and profiles reference it and neither is a skill. No routes
@@ -178,8 +194,11 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0007 (widen nsqf_level to Numeric(3,1)),
                         0008 (NSQF hierarchy), 0009 (widen level_taught),
                         0010 (skills.qp_count), 0011 (geography),
-                        0012 (structure, entry routes, content, pruning)
-scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py — all idempotent
+                        0012 (structure, entry routes, content, pruning),
+                        0013 (skill concepts + 'legacy' source)
+scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
+                        legacy_skill_map.py (hand-authored, the only curated->NOS map),
+                        retire_legacy_skills.py — all idempotent
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 tests/                  pytest + testcontainers
 ```
@@ -365,6 +384,23 @@ Three processes must run for the full stack: **api, worker, web.**
     for content, the ceiling is the sum over the *current version* of each code, which is how
     38,340 elements was confirmed correct rather than short.
 
+52. **A model with a cross-module foreign key must import the target module.** SQLAlchemy resolves
+    `ForeignKey("districts.id")` against the metadata at mapper-configuration time, so a script
+    importing `marketplace.models` without `geography.models` dies with `NoReferencedTableError`.
+    This fired twice in one sprint — marketplace→geography, then skills→concepts. Import for the
+    side effect and say why in a comment; the alternative is every script needing to know the
+    whole graph.
+53. **A `Literal` on an output schema is a latent 500, and this is the second time.** Adding
+    `legacy` to `skills.source` broke `GET /skills/{slug}` for every retired row until the schema
+    listed it. Output models stay permissive; the constraint belongs on input.
+54. **A many-to-one remap creates duplicate association rows.** 52 curated skills collapse to 38
+    standards, so a job listing both "hand hygiene" and "infection control" tried to insert
+    `HSS/N9618` twice and hit `uq_job_skill`. Merge on the strongest signal — highest importance,
+    mandatory beats optional — rather than taking the first or last.
+55. **`scripts/` is not an importable package.** Sibling imports work (`from legacy_skill_map
+    import ...`) because Python puts a script's own directory on `sys.path`; `from scripts.x import`
+    does not, because only `api*` is installed.
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -388,31 +424,25 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 11. What comes next
 
-Nothing is half-finished. The next piece of work is a choice, not a continuation.
+**Matching is next, and nothing blocks it any more.** All three sides of the graph exist and are
+connected; the concept layer means a candidate and a job need not have picked the same row. Sprint
+10 is planned in full in the plan file: deterministic scoring per ADR-007 using the *sourced*
+`qp_skills.weightage`, `is_mandatory` as a cap rather than a penalty, `candidate_skills.source` so
+verified evidence outranks self-claims, and `qp_entry_routes` for eligibility — plus courses ranked
+by how much of the named gap they close.
 
-**The taxonomy connects to nothing.** Zero `job_skills`, `course_skills`, `candidate_skills` or
-`skill_aliases` point at an imported row -- 21,303 standards sit beside the product rather than
-inside it, and the 52 curated skills still carry every link. Until that changes, none of the
-imported data affects a single user-visible outcome. This is the highest-value next step and the
-cheapest: re-anchor the seeded jobs and courses onto real NOS codes.
+Two things must land with it and neither exists:
+1. **`analytics_events`** (ADR-025). Measurement substitutes for a revenue signal and nothing
+   records anything.
+2. **A golden-set harness** — 50–100 hand-labelled pairs, precision@5 in CI, built *before* tuning.
 
-**Then matching**, which is the payoff and has been deferred three times. Two things must land with
-or before it, and neither exists:
-1. **Analytics instrumentation** (`analytics_events`). ADR-025 makes measurement the substitute for
-   a revenue signal and nothing records anything.
-2. **A golden-set evaluation harness** -- hand-labelled candidate/job pairs, precision@5 in CI.
+Then **Hindi for the corpus** (Sprint 11, ~$5 for the navigable surface, blocked on credentials
+rather than design), and the **parked resume builder and extractor** — deferred because correct
+Devanagari in PDF needs complex-script shaping and therefore Pango/HarfBuzz system libraries.
 
-The content layer now makes honest gap analysis possible for the first time: 238,370 assessable
-criteria rather than 21,303 titles.
-
-**The duplicate-concept problem blocks good matching** and needs a decision, not code: 4,847 rows
-share a name and "Employability Skills" is 67 separate units. A candidate claiming it matches one
-of 67. Either a concept layer above the unit, or deduplication at import -- both are design calls.
-
-**Hindi for the corpus** is designed but unbuilt (superseded Sprint 7 in the plan file has the
-shape: glossary first, deduplicate before translating, `translations` table with a review status,
-write back to Mongo, transliteration as a first-class output). Roughly $5 for the navigable
-surface, blocked on an LLM adapter and credentials.
+Two ADRs are owed: **recommendation architecture** (skill-based versus behavioural, and the
+write-time/read-time rule for LLM calls) before Sprint 10, and one on resume data handling if that
+work is revived.
 
 Also outstanding: typed `SkillRelation` edges, embeddings, organisation/email login and self-serve
 publishing, a real SMS provider, observability, and the ADR-023 encryption path.
@@ -491,12 +521,12 @@ the logs. CORS is restricted to one origin.
   until the golden-set harness exists.
 - Self-declared skills are unreliable until assessment integration lands.
 - Employer-side supply is the weakest link in Indian vocational markets.
-- **Two vocabularies now coexist.** 52 curated skills sit alongside 21,303 NSQF units, and for
-  concepts like blood sample collection both exist as separate rows. Search returns both. This was
-  the price of not breaking five foreign keys and the working demo, and it is a deliberate,
-  reversible trade — but it is debt, not a design.
-- **The national taxonomy is English-only**, so the Hindi half of ADR-033 currently covers the UI
-  chrome and 52 skills, not the 21,303 that matter. Say this plainly.
+- ~~Two vocabularies coexist.~~ **Closed in Sprint 9.** The 52 curated skills are retired and
+  every link points at a National Occupational Standard. What replaced it is a smaller, honest
+  debt: the curated→NOS map is hand-authored, so some anchors are judgement calls. The uncertain
+  ones are marked in `scripts/legacy_skill_map.py`.
+- **The national taxonomy is English-only.** The 149 carried aliases are the only Hindi reaching
+  it, covering 38 standards out of 21,303. Say this plainly.
 - ~~4,784 imported skills are unreachable by sector navigation.~~ **Resolved in Sprint 8** — every
   standard states its own sector, so the hierarchy no longer depends on the qualification side.
   They still belong to no current qualification, which is a fact about the corpus, not a defect.

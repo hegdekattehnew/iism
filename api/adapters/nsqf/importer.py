@@ -32,6 +32,7 @@ from api.modules.marketplace.models import (
     CandidateProfile,
     Job,
 )
+from api.modules.skills.concepts import SkillConcept
 from api.modules.skills.content import (
     GenericCriterion,
     KnowledgeParameter,
@@ -71,6 +72,7 @@ class ImportReport:
     awarding_bodies: int = 0
     nco_codes: int = 0
     entry_routes: int = 0
+    concepts: int = 0
     locations_resolved: int = 0
     nco_unparsed: int = 0
     performance_elements: int = 0
@@ -90,7 +92,7 @@ class ImportReport:
             f"states={self.states} districts={self.districts} "
             f"sub_districts={self.sub_districts} bodies={self.awarding_bodies} "
             f"nco={self.nco_codes} nco_unparsed={self.nco_unparsed} "
-            f"entry_routes={self.entry_routes} "
+            f"entry_routes={self.entry_routes} concepts={self.concepts} "
             f"locations_resolved={self.locations_resolved} "
             f"elements={self.performance_elements} criteria={self.performance_criteria} "
             f"knowledge={self.knowledge_params} generic={self.generic_criteria} "
@@ -282,6 +284,95 @@ _DISTRICT_ALIASES = {
     "bengaluru": "bengaluru urban",
     "bangalore": "bengaluru urban",
 }
+
+
+def _normalise_concept_name(name: str) -> str:
+    """Lower-cased and whitespace-collapsed. Nothing cleverer.
+
+    Deliberately not stemming, stripping punctuation or matching on similarity:
+    those are judgements, and this grouping has to be reproducible from the
+    source rather than from a heuristic that shifts when it is tuned.
+    """
+    return " ".join(name.lower().split())
+
+
+async def _build_concepts(db: AsyncSession) -> int:
+    """Group skill rows that mean the same thing (see `concepts.py`).
+
+    Same awarding body + same normalised name + same NSQF level. Rebuilt whole
+    on every run, like qp_count, because it is derived: a revised corpus must be
+    able to split a concept as well as merge one.
+    """
+    rows = (
+        await db.execute(
+            select(
+                Skill.id,
+                Skill.name_en,
+                Skill.awarding_body_id,
+                Skill.nsqf_level,
+                Skill.qp_count,
+                Skill.nos_code,
+            ).where(Skill.source == "nsqf")
+        )
+    ).all()
+
+    groups: dict[tuple[Any, str, Any], list[Any]] = defaultdict(list)
+    for row in rows:
+        groups[(row.awarding_body_id, _normalise_concept_name(row.name_en), row.nsqf_level)].append(
+            row
+        )
+
+    concept_rows: list[dict[str, Any]] = []
+    slugs: set[str] = set()
+    for (body_id, normalised, level), members in groups.items():
+        # The row an employer is most likely to mean: required by the most
+        # current qualifications. nos_code breaks ties so a rebuild is stable
+        # rather than depending on row order.
+        canonical = max(members, key=lambda m: (m.qp_count, m.nos_code or ""))
+        slug = slugify(canonical.name_en)[:200] or "concept"
+        if level is not None:
+            slug = f"{slug}-l{str(level).replace('.', '-')}"
+        if canonical.nos_code and slug in slugs:
+            slug = f"{slug}-{slugify(canonical.nos_code)}"
+        while slug in slugs:  # pragma: no cover - only on a pathological corpus
+            slug = f"{slug}-x"
+        slugs.add(slug)
+        concept_rows.append(
+            {
+                "id": uuid.uuid4(),
+                "slug": slug,
+                "normalised_name": normalised,
+                "name_en": canonical.name_en,
+                "awarding_body_id": body_id,
+                "nsqf_level": level,
+                "canonical_skill_id": canonical.id,
+                "member_count": len(members),
+                "_members": [m.id for m in members],
+            }
+        )
+
+    # Rebuilt whole: a concept that no longer exists must disappear, which an
+    # upsert cannot express. Skills.concept_id is ON DELETE SET NULL, so the
+    # members are re-pointed immediately below.
+    await db.execute(delete(SkillConcept))
+    await db.flush()
+    await _chunked_upsert(
+        db,
+        SkillConcept.__table__,
+        [{k: v for k, v in r.items() if k != "_members"} for r in concept_rows],
+        ["awarding_body_id", "normalised_name", "nsqf_level"],
+    )
+    await db.flush()
+
+    assignments = [
+        {"id": member_id, "concept_id": concept["id"]}
+        for concept in concept_rows
+        for member_id in concept["_members"]
+    ]
+    for start in range(0, len(assignments), CONTENT_CHUNK):
+        batch = assignments[start : start + CONTENT_CHUNK]
+        await db.execute(update(Skill), batch)
+    return len(concept_rows)
 
 
 async def _backfill_geography(db: AsyncSession) -> int:
@@ -773,6 +864,8 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
     report.knowledge_params, report.generic_criteria = await _import_text_content(
         db, source, skill_ids, current_versions
     )
+
+    report.concepts = await _build_concepts(db)
 
     report.locations_resolved = await _backfill_geography(db)
 

@@ -14,7 +14,8 @@
     "superseded QP version, one sectorID under two spellings, an unreadable level,",
     "a blank curriculum unitCode, occupationID reused across sectors, alignedTo in",
     "clean, variant and junk forms, structured minEduQual entry routes, an",
-    "assessment blueprint, and a repeated pcID within one standard."
+    "assessment blueprint, and a repeated pcID within one standard.",
+    "RT/N0001 and RT/N0004 share a body, name and level and must become one concept; RT/N0005 has the same name (differently spaced) at another level and must not."
   ],
   "nos": [
     {
@@ -233,6 +234,48 @@
       "unitCode": "  ",
       "unitTitle": "A unit with no usable code at all",
       "version": "1.0"
+    },
+    {
+      "unitCode": "RT/N0004",
+      "unitTitle": "Handle customer payments",
+      "version": "1.0",
+      "type": "Core",
+      "nsqf": "3.5",
+      "Sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Store Operations"
+      }
+    },
+    {
+      "unitCode": "RT/N0005",
+      "unitTitle": "handle   customer payments",
+      "version": "1.0",
+      "type": "Core",
+      "nsqf": "5.0",
+      "Sectors": {
+        "sectorID": "SEC02",
+        "sectorName": "Retail",
+        "subSectors": [
+          {
+            "subSectorID": "SUB10",
+            "subSectorName": "In-store"
+          }
+        ]
+      },
+      "Occupation": {
+        "occupationID": "1",
+        "occupationDesc": "Store Operations"
+      }
     }
   ],
   "qps": [

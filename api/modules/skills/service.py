@@ -85,6 +85,11 @@ best AS (
 SELECT b.skill_id, b.score, b.matched_on, b.match_kind
 FROM best b
 JOIN skills s ON s.id = b.skill_id
+-- Retired vocabulary. The 52 curated skills were superseded by the national
+-- standards they map to; their aliases were carried across, so a search for
+-- `khoon nikalna` still resolves -- to a real NOS. One filter here covers all
+-- four branches above, which is why the join is worth keeping.
+WHERE s.source <> 'legacy'
 ORDER BY b.score DESC, s.name_en ASC
 LIMIT :limit
 """
@@ -100,10 +105,19 @@ class SearchHit:
 
 
 async def count_skills(db: AsyncSession) -> int:
-    return await db.scalar(select(func.count()).select_from(Skill)) or 0
+    return (
+        await db.scalar(select(func.count()).select_from(Skill).where(Skill.source != "legacy"))
+        or 0
+    )
 
 
 async def get_skill_by_slug(db: AsyncSession, slug: str) -> Skill | None:
+    """Retired skills are *not* excluded here.
+
+    They are hidden from search and browse, but a profile or certificate may
+    still reference one, and a 404 on a row we deliberately kept rather than
+    deleted would be a broken link of our own making.
+    """
     return await db.scalar(select(Skill).where(Skill.slug == slug))
 
 
@@ -116,7 +130,9 @@ async def list_skills(
     offset: int = 0,
 ) -> tuple[list[Skill], int]:
     """Returns a page of skills plus the total matching the same filters."""
-    filters = []
+    # Retired rows never appear in browse or facets either -- a filter option
+    # that returns only legacy rows would be a control that does nothing.
+    filters: list[Any] = [Skill.source != "legacy"]
     if skill_type is not None:
         filters.append(Skill.skill_type == skill_type)
     if nsqf_level is not None:
@@ -272,7 +288,7 @@ async def skill_facets(
     level_rows = (
         await db.execute(
             select(Skill.nsqf_level, func.count())
-            .where(Skill.nsqf_level.is_not(None))
+            .where(Skill.nsqf_level.is_not(None), Skill.source != "legacy")
             .group_by(Skill.nsqf_level)
             .order_by(Skill.nsqf_level)
         )
@@ -280,12 +296,17 @@ async def skill_facets(
     type_rows = (
         await db.execute(
             select(Skill.skill_type, func.count())
+            .where(Skill.source != "legacy")
             .group_by(Skill.skill_type)
             .order_by(func.count().desc())
         )
     ).all()
     unlevelled = (
-        await db.scalar(select(func.count()).select_from(Skill).where(Skill.nsqf_level.is_(None)))
+        await db.scalar(
+            select(func.count())
+            .select_from(Skill)
+            .where(Skill.nsqf_level.is_(None), Skill.source != "legacy")
+        )
     ) or 0
     total = sum(int(r[1]) for r in type_rows)
     return (

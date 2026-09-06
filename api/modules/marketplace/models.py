@@ -18,6 +18,12 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base
+
+# Imported for its side effect as well as its use: jobs and profiles carry
+# foreign keys to `states` and `districts`, and SQLAlchemy cannot resolve those
+# unless the geography models are registered on the same metadata. Without this,
+# any script importing marketplace models alone fails at mapper configuration.
+from api.modules.geography.models import District, State  # noqa: F401
 from api.modules.skills.models import Skill
 
 EMPLOYMENT_TYPES = ("full_time", "part_time", "contract", "apprenticeship")
