@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict V9k3zMRLoTsrC9AyIGvUYew2K0JmYbKJiessOaw8CFDvx4TAciL7FDZ2ImVE02X
+\restrict DoVRoHJzDILhvI2x0JB8dHF4yoW639oX8AoRfRtljTVMBG0Xcbx79g8jLvOe1Yx
 
 -- Dumped from database version 16.15 (Debian 16.15-1.pgdg12+2)
 -- Dumped by pg_dump version 16.15 (Debian 16.15-1.pgdg12+2)
@@ -659,6 +659,12 @@ CREATE TABLE public.tenants (
     tenant_type character varying NOT NULL,
     city character varying,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
+    description text,
+    website text,
+    logo_url text,
+    contact_email text,
+    is_verified boolean DEFAULT false NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_tenants_type CHECK (((tenant_type)::text = ANY ((ARRAY['employer'::character varying, 'course_provider'::character varying, 'personal'::character varying])::text[])))
 );
 
@@ -2123,5 +2129,5 @@ ALTER TABLE ONLY public.sub_sectors
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V9k3zMRLoTsrC9AyIGvUYew2K0JmYbKJiessOaw8CFDvx4TAciL7FDZ2ImVE02X
+\unrestrict DoVRoHJzDILhvI2x0JB8dHF4yoW639oX8AoRfRtljTVMBG0Xcbx79g8jLvOe1Yx
 

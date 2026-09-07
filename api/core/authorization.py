@@ -21,19 +21,23 @@ the organisation exists, which is a disclosure in its own right — an employer
 can discover a competitor's account simply by guessing slugs.
 """
 
-import uuid
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Depends, HTTPException, Path, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
 from api.core.security import get_current_user
-from api.modules.identity.models import Membership, Tenant, User
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # Imported for annotations only. At runtime the models are pulled in inside
+    # `_context_for`, because `api.modules.identity` now imports this module for
+    # its own organisation routes -- the same cycle `get_current_user` avoids
+    # the same way.
+    from api.modules.identity.models import Tenant, User
 
 
 class Permission(StrEnum):
@@ -42,6 +46,7 @@ class Permission(StrEnum):
     survives that."""
 
     ORG_READ = "org:read"
+    ORG_UPDATE = "org:update"
     JOB_CREATE = "job:create"
     JOB_UPDATE = "job:update"
     JOB_PUBLISH = "job:publish"
@@ -56,9 +61,9 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.JOB_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
 }
-# Deletion is the owner's alone. An admin can unpublish, which reverses; nothing
-# else on this surface does.
-_OWNER: frozenset[Permission] = _ADMIN | {Permission.JOB_DELETE}
+# Deletion is the owner's alone, and so is editing the organisation itself. An
+# admin can unpublish, which reverses; neither of these does.
+_OWNER: frozenset[Permission] = _ADMIN | {Permission.JOB_DELETE, Permission.ORG_UPDATE}
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "member": _MEMBER,
@@ -75,8 +80,8 @@ class TenantContext:
     make this layer decorative.
     """
 
-    user: User
-    tenant: Tenant
+    user: "User"
+    tenant: "Tenant"
     role: str
     permissions: frozenset[Permission]
 
@@ -84,16 +89,39 @@ class TenantContext:
         return permission in self.permissions
 
 
-async def _context_for(db: AsyncSession, user: User, slug: str) -> TenantContext:
+# A personal workspace is not an organisation. Every candidate is provisioned as
+# `owner` of one (ADR-010 wants everybody to have a membership from day one), so
+# without this filter a candidate's own personal slug resolved as a tenant
+# context and their `owner` role carried JOB_CREATE, JOB_PUBLISH and
+# CANDIDATE_SHORTLIST -- letting anyone read the employer console's aggregate
+# pool and publish a vacancy attributed to "Personal workspace".
+ORGANISATION_TYPES = ("employer", "course_provider")
+
+# What each kind of organisation may publish. Nothing enforced this before, so a
+# course provider could post vacancies and an employer could publish training.
+PUBLISHES: dict[str, str] = {"job": "employer", "course": "course_provider"}
+
+
+async def _context_for(db: AsyncSession, user: "User", slug: str) -> TenantContext:
+    from sqlalchemy import select
+
+    from api.modules.identity.models import Membership, Tenant  # local: avoids a cycle
+
     row = (
         await db.execute(
             select(Membership, Tenant)
             .join(Tenant, Tenant.id == Membership.tenant_id)
-            .where(Membership.user_id == user.id, Tenant.slug == slug)
+            .where(
+                Membership.user_id == user.id,
+                Tenant.slug == slug,
+                Tenant.tenant_type.in_(ORGANISATION_TYPES),
+            )
         )
     ).first()
     if row is None:
-        # Deliberately indistinguishable from "no such organisation".
+        # One answer for "no such organisation", "not a member" and "that is a
+        # personal workspace". Distinguishing them tells a prober which slugs
+        # exist.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Organisation not found")
     membership, tenant = row
     return TenantContext(
@@ -116,7 +144,7 @@ def require(
     async def dependency(
         org_slug: str = Path(...),
         db: AsyncSession = Depends(get_db_session),
-        user: User = Depends(get_current_user),
+        user: "User" = Depends(get_current_user),
     ) -> TenantContext:
         context = await _context_for(db, user, org_slug)
         if not context.allows(permission):
@@ -132,8 +160,16 @@ def require(
     return dependency
 
 
-async def tenant_ids_for(db: AsyncSession, user_id: uuid.UUID) -> list[uuid.UUID]:
-    """Every tenant this user belongs to. One identity, many roles (ADR-038)."""
-    return list(
-        (await db.scalars(select(Membership.tenant_id).where(Membership.user_id == user_id))).all()
-    )
+def require_publisher_of(context: TenantContext, what: str) -> None:
+    """Refuse a listing the organisation has no business publishing.
+
+    Membership answers *may this person act here*; it does not answer *is this
+    the right kind of organisation*. A course provider holding JOB_CREATE in
+    their own tenant is exactly the case the permission set alone lets through.
+    """
+    expected = PUBLISHES[what]
+    if context.tenant.tenant_type != expected:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Only a {expected.replace('_', ' ')} can publish a {what}",
+        )

@@ -3,9 +3,13 @@
 import { useTranslations } from "next-intl";
 
 import { AboutSection } from "@/components/profile/AboutSection";
+import { CredentialsSection } from "@/components/profile/CredentialsSection";
 import { CompletenessMeter } from "@/components/profile/CompletenessMeter";
 import { OnboardingWizard } from "@/components/profile/OnboardingWizard";
-import { SectionEditor, useSectionDefs } from "@/components/profile/SectionEditor";
+import {
+  SectionEditor,
+  useSectionDefs,
+} from "@/components/profile/SectionEditor";
 import { SkillsSection } from "@/components/profile/SkillsSection";
 import { TagSection } from "@/components/profile/TagSection";
 import { ButtonLink } from "@/components/ui";
@@ -72,6 +76,8 @@ export function ProfileEditor() {
       {defs.map((d) => (
         <SectionEditor key={d.collection} {...d} />
       ))}
+
+      <CredentialsSection />
     </div>
   );
 }

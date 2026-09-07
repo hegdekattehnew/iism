@@ -14,7 +14,9 @@
     "signIn": "Sign in",
     "getStarted": "Get started",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "vacancies": "Vacancies",
+    "settings": "Settings"
   },
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
@@ -551,7 +553,7 @@
       "title": "Know what the market cannot supply",
       "body": "Every standard your roles ask for, counted against how many candidates hold it. A standard nobody holds is a hiring plan that will not work, and it is better to learn that before the vacancy is open."
     },
-    "status": "The console is a working demonstration: scores are real and computed by the same engine that ranks jobs for candidates, but employer sign-in and self-serve publishing are not built yet. Roles are seeded by us for now."
+    "status": "Employers now sign in and publish their own vacancies. Still to come: inviting colleagues, and verification so a candidate can tell a vetted employer from an unvetted one."
   },
   "providersPage": {
     "title": "For training providers",
@@ -669,5 +671,66 @@
       "contract": "Contract",
       "apprenticeship": "Apprenticeship"
     }
+  },
+  "context": {
+    "jobSeeker": "Job seeker",
+    "jobSeekerHint": "Your matches and profile",
+    "createOrg": "Create an organisation",
+    "createOrgHint": "Added to the account you are signed in as — you keep one login and one profile.",
+    "orgName": "Organisation name",
+    "orgNamePlaceholder": "Sunrise Multispeciality Hospital",
+    "orgType": "What does it do?",
+    "typeEmployer": "Hires people",
+    "typeProvider": "Provides training",
+    "create": "Create",
+    "creating": "Creating…",
+    "cancel": "Cancel",
+    "createError": "Could not create the organisation. Try again.",
+    "whatIsThis": "What can an organisation do?",
+    "role": {
+      "owner": "Owner",
+      "admin": "Administrator",
+      "member": "Member"
+    }
+  },
+  "orgSettings": {
+    "title": "Organisation profile",
+    "subtitle": "What a candidate sees when they open one of your vacancies.",
+    "name": "Organisation name",
+    "description": "About the organisation",
+    "descriptionHint": "A few sentences. What you do, and what it is like to work there.",
+    "city": "City",
+    "website": "Website",
+    "logoUrl": "Logo URL",
+    "contactEmail": "Contact email",
+    "contactEmailHint": "Kept private — shown to you, never on a public listing.",
+    "verified": "Verified",
+    "unverified": "Not yet verified",
+    "slugNote": "Your address is /employer/{slug}. It does not change when you rename the organisation, because links to your vacancies depend on it.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveError": "Could not save. Only an owner can edit the organisation.",
+    "noAccess": "You do not have access to this organisation."
+  },
+  "credentials": {
+    "title": "How you sign in",
+    "subtitle": "One account, either way in. Adding the second means you never have to remember which you used.",
+    "phone": "Phone",
+    "email": "Email",
+    "notSet": "Not added",
+    "verified": "Verified",
+    "unverified": "Not verified",
+    "add": "Add",
+    "phoneLabel": "Phone number",
+    "emailLabel": "Email address",
+    "codeLabel": "Six-digit code",
+    "devCode": "Development only — your code is {code}",
+    "sendCode": "Send the code",
+    "verify": "Verify and add",
+    "cancel": "Cancel",
+    "requestError": "Could not send a code. Check the value and try again.",
+    "codeError": "That code is incorrect or has expired.",
+    "takenError": "That already belongs to another account. Sign in with it instead."
   }
 }

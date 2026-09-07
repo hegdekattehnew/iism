@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base
@@ -39,7 +39,23 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column()
     tenant_type: Mapped[str] = mapped_column()
     city: Mapped[str | None] = mapped_column(default=None)
+
+    # What a candidate sees when deciding whether to apply. Until now a job
+    # listing showed a bare name with nothing behind it.
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    website: Mapped[str | None] = mapped_column(Text, default=None)
+    logo_url: Mapped[str | None] = mapped_column(Text, default=None)
+    # Deliberately NOT on the public `TenantOut`: an organisation's own inbox is
+    # not something a job listing should broadcast to scrapers.
+    contact_email: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # Set by an operator, never by the organisation. A self-asserted badge is
+    # worse than none, because a candidate reads it as ours. No endpoint writes
+    # it yet; the column exists so the seam is there before anyone needs it.
+    is_verified: Mapped[bool] = mapped_column(default=False, server_default="false")
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
 class User(Base):

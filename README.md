@@ -9,7 +9,13 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 39 ADRs
 that govern how.
 
-## Status — Sprints 1–12 complete
+## Status — Sprints 1–13 complete
+
+**Sprint 13 — one person, many hats, visibly.** The header carries a context switcher: "Job seeker"
+alongside every organisation you belong to, and picking one changes the navigation, not just the
+page. A candidate can create an organisation without leaving the account they already have, link a
+second way to sign in, and give the organisation a profile a candidate can actually read before
+applying.
 
 **Sprint 12 — the employer becomes a real user.** Register an organisation at
 `/employers/signin` with an email and a six-digit code — no password to set, forget or reset, and

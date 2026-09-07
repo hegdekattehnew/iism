@@ -25,48 +25,16 @@ import {
  * The signed-in employer's own workspace.
  *
  * Distinct from `/employers/demo`, which acts as a seeded employer with no
- * authentication and mounts in local environments only. This one is the
- * product: the organisation is named in the URL and granted by the caller's
- * membership, so it can ship.
+ * authentication. Its *API* refuses to mount outside local environments; the
+ * page itself is unconditional, so the demo is only as absent as the data
+ * behind it. This one is the product: the organisation is named in the URL and
+ * granted by the caller's membership, so it can ship.
+ *
+ * Switching organisations lives in the header (`ContextSwitcher`), not here.
+ * A switcher inside the page could not be reached from the one screen that
+ * most needs it -- the "no access" state below returns before rendering
+ * anything else.
  */
-
-function WorkspaceSwitcher({
-  active,
-  onSwitch,
-}: {
-  active: string | null;
-  onSwitch: (slug: string) => void;
-}) {
-  const t = useTranslations("employerWorkspace");
-  const { organisations } = useMemberships();
-
-  // With one organisation there is nothing to switch between, and a control
-  // offering a single choice is noise.
-  if (organisations.length < 2) return null;
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-        {t("actingAs")}
-      </span>
-      {organisations.map((m) => (
-        <button
-          key={m.tenant.slug}
-          type="button"
-          onClick={() => onSwitch(m.tenant.slug)}
-          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-            m.tenant.slug === active
-              ? "border-brand bg-accent-soft font-medium text-brand"
-              : "border-border-token text-muted hover:text-foreground"
-          }`}
-        >
-          {m.tenant.name}
-          <span className="ml-2 text-[11px] opacity-70">{m.role}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("employerWorkspace");
@@ -132,18 +100,6 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="space-y-6">
-      <WorkspaceSwitcher
-        active={orgSlug}
-        onSwitch={(slug) => {
-          // The workspace lives in the URL so it is shareable and survives a
-          // reload, rather than in React state that a refresh would forget.
-          window.location.href = window.location.pathname.replace(
-            /\/employer\/[^/]+/,
-            `/employer/${slug}`,
-          );
-        }}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t("yourVacancies")}</h2>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 
 import { ButtonLink, buttonVariants } from "@/components/ui";
@@ -14,14 +15,22 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("auth");
   const tn = useTranslations("nav");
   const router = useRouter();
+  const qc = useQueryClient();
   const signedIn = useIsSignedIn();
 
   const signOut = async () => {
     const refresh_token = getRefreshToken();
     // Revoke server-side first; clearing locally alone would leave a valid
     // refresh token in play for 30 days.
-    if (refresh_token) await api.POST("/auth/logout", { body: { refresh_token } });
+    if (refresh_token)
+      await api.POST("/auth/logout", { body: { refresh_token } });
     clearTokens();
+    // The QueryClient is created once per browser session, so without this the
+    // previous person's profile, matches, memberships and vacancies stay in
+    // memory and render to whoever signs in next until fresh queries resolve.
+    // Same concern that put /me/, /profile and /matches on the service worker's
+    // DENY list -- and the target device is a shared phone.
+    qc.clear();
     router.push("/");
   };
 
@@ -39,7 +48,10 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
         <button
           type="button"
           onClick={() => void signOut()}
-          className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
+          className={cn(
+            buttonVariants({ variant: "ghost", size }),
+            "text-foreground",
+          )}
         >
           {t("signOut")}
         </button>
@@ -49,7 +61,13 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
 
   return (
     <>
-      <Link href="/signin" className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}>
+      <Link
+        href="/signin"
+        className={cn(
+          buttonVariants({ variant: "ghost", size }),
+          "text-foreground",
+        )}
+      >
         {tn("signIn")}
       </Link>
       <ButtonLink href="/signin" size={size}>

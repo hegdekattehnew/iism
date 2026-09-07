@@ -8,7 +8,12 @@ that is the difference between an organisation you belong to and one you named.
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.authorization import Permission, TenantContext, require
+from api.core.authorization import (
+    Permission,
+    TenantContext,
+    require,
+    require_publisher_of,
+)
 from api.core.database import get_db_session
 from api.modules.marketplace import publishing, schemas
 
@@ -41,6 +46,7 @@ async def create_job(
     context: TenantContext = CanCreate,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgJobOut:
+    require_publisher_of(context, "job")
     job = await publishing.create_job(db, context.tenant.id, payload)
     return schemas.OrgJobOut.model_validate(job)
 
@@ -73,6 +79,7 @@ async def publish_job(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgJobOut:
     """Explicit, and refused for a job requiring no standards."""
+    require_publisher_of(context, "job")
     job = await publishing.set_published(db, context.tenant.id, slug, True)
     return schemas.OrgJobOut.model_validate(job)
 

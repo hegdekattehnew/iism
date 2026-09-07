@@ -4,20 +4,37 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { AuthNav } from "@/components/AuthNav";
+import { ContextSwitcher, useActiveOrg } from "@/components/ContextSwitcher";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { Logo } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 
-const NAV = [
+/** What a job seeker is here to do. Also what an anonymous visitor sees. */
+const SEEKER_NAV = [
   { key: "jobs", href: "/jobs" },
   { key: "courses", href: "/courses" },
   { key: "skills", href: "/skills" },
   { key: "howItWorks", href: "/#how-it-works" },
 ] as const;
 
+/** What an employer is here to do. The navigation changes with the context, not
+ *  just the page -- otherwise "switching" would mean nothing more than going
+ *  somewhere that happens to be an organisation. */
+const ORG_NAV = [
+  { key: "vacancies", href: "" },
+  { key: "settings", href: "/settings" },
+] as const;
+
 export function Header() {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
+  const activeOrg = useActiveOrg();
+  const nav: { key: string; href: string }[] = activeOrg
+    ? ORG_NAV.map(({ key, href }) => ({
+        key,
+        href: `/employer/${activeOrg}${href}`,
+      }))
+    : SEEKER_NAV.map(({ key, href }) => ({ key, href }));
   // Closed on click rather than in an effect keyed to the path: the effect form
   // sets state during render-commit, which React 19 flags.
   const close = () => setOpen(false);
@@ -30,7 +47,7 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
-          {NAV.map(({ key, href }) => (
+          {nav.map(({ key, href }) => (
             <Link
               key={key}
               href={href}
@@ -42,6 +59,7 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
+          <ContextSwitcher />
           <LocaleToggle />
           <AuthNav />
         </div>
@@ -54,16 +72,33 @@ export function Header() {
           aria-label={open ? t("closeMenu") : t("openMenu")}
           className="rounded-lg border border-border-token p-2 lg:hidden"
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            {open ? (
+              <path d="M6 6l12 12M18 6L6 18" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            )}
           </svg>
         </button>
       </div>
 
       {open && (
-        <div id="mobile-nav" className="border-t border-border-token bg-background lg:hidden">
-          <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4" aria-label="Main">
-            {NAV.map(({ key, href }) => (
+        <div
+          id="mobile-nav"
+          className="border-t border-border-token bg-background lg:hidden"
+        >
+          <nav
+            className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4"
+            aria-label="Main"
+          >
+            {nav.map(({ key, href }) => (
               <Link
                 key={key}
                 href={href}
@@ -73,7 +108,13 @@ export function Header() {
                 {t(key)}
               </Link>
             ))}
-            <div onClick={close} className="mt-3 flex flex-col gap-2 border-t border-border-token pt-4">
+            <div className="mt-3 border-t border-border-token pt-4">
+              <ContextSwitcher stacked />
+            </div>
+            <div
+              onClick={close}
+              className="mt-3 flex flex-col gap-2 border-t border-border-token pt-4"
+            >
               <AuthNav stacked />
               <div className="pt-2">
                 <LocaleToggle />

@@ -102,6 +102,39 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
+**Sprint 13 (multi-tenancy you can see) — done** on 2026-09-07. Prompted by a single observation:
+*"I was expecting an option on the frontend to change tenancy after login."* There wasn't one, and
+auditing why turned up more than a missing control.
+
+- **The Sprint 12 plan said "the header gains a switcher" and I built it inside `EmployerWorkspace`
+  instead, without flagging the deviation.** That is the root of everything below. A switcher inside
+  the page is invisible to anyone who has not already reached the page, and `/employer/{org}` had no
+  inbound link from anywhere a signed-in person could be — its only entry was a one-shot
+  `router.push` at the moment of email verification.
+- **A candidate's personal tenant resolved as an organisation context — a real hole, mine.** Every
+  candidate is `owner` of a personal tenant, `_context_for` filtered on membership and slug alone,
+  and `owner` carries `JOB_CREATE`, `JOB_PUBLISH`, `CANDIDATE_SHORTLIST`. Confirmed against the
+  running API: `GET /org/personal-…/candidates` returned **200**. It returns 404 now. The lesson is
+  narrow and worth keeping: *a permission set answers "may this person act here", never "is this the
+  right kind of place".*
+- **The only visible "create an organisation" path created a second account.** It posts
+  `/auth/org/register`, which mints a new `User` for an unknown address. So the one affordance a
+  candidate could find produced exactly the outcome ADR-038 exists to prevent, while
+  `POST /me/organisations` — which does the right thing — was called from nowhere in `web/src`.
+  Endpoints without an interface are not features; they are tests that happen to pass.
+- **Sign-out did not clear the TanStack cache.** The `QueryClient` outlives the session, so the
+  previous person's profile, matches and memberships stayed in memory for whoever signed in next.
+  On a shared phone that is the same problem the service worker's DENY list exists to stop.
+- **Circular import when identity started importing `core.authorization`.** `authorization` imports
+  identity's models, and importing a submodule runs the package `__init__`. Solved the way
+  `get_current_user` already solves it: `TYPE_CHECKING` for annotations, a local import inside the
+  function for runtime.
+- **`TenantOut` is embedded in every public job and course payload.** Any column added to it is
+  published. `contact_email` therefore lives on `OrganisationOut` only.
+- Still true and still deliberate: `CandidateProfile` is 1:1 with `User`, not with a tenant. A
+  person's skills are theirs; forking them per employer would fragment the history the matching
+  engine scores against.
+
 **Sprint 12 (one identity, many roles) — done** on 2026-09-07. Organisation identity, the
 authorization primitive both ADR-012 and ADR-022 had described for eleven sprints without anyone
 building it, and self-serve job publishing. ADR-038 and ADR-039. 233 tests. 557 message keys per

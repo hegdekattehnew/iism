@@ -26,7 +26,13 @@ export type Membership = NonNullable<
 export type JobPayload =
   paths["/org/{org_slug}/jobs"]["post"]["requestBody"]["content"]["application/json"];
 
-/** Organisations the signed-in person can act in — one identity, many roles. */
+/** Every context the signed-in person can act in — one identity, many roles.
+ *
+ * Two derived lists, because the two callers want different things. The
+ * switcher needs every membership so it can offer the job-seeker context
+ * alongside the organisations; the workspace needs only the tenants a vacancy
+ * can actually be posted from.
+ */
 export function useMemberships() {
   const me = useQuery({
     queryKey: ["me"],
@@ -37,11 +43,15 @@ export function useMemberships() {
     },
     retry: false,
   });
-  // Personal workspaces are not places you post vacancies from.
-  const organisations = (me.data?.memberships ?? []).filter(
-    (m) => m.tenant.tenant_type !== "personal",
+
+  const memberships = me.data?.memberships ?? [];
+  // Employers only. A course provider is an organisation but not a place a
+  // vacancy comes from, and the API refuses one now -- so offering it here
+  // would be an invitation to a 403.
+  const organisations = memberships.filter(
+    (m) => m.tenant.tenant_type === "employer",
   );
-  return { ...me, organisations };
+  return { ...me, memberships, organisations };
 }
 
 export function useOrgJobs(orgSlug: string | null) {

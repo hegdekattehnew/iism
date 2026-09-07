@@ -264,6 +264,87 @@ class TestOrganisationRegistration:
 
 
 class TestAuthorization:
+    async def test_a_personal_workspace_is_not_an_organisation(self, client: AsyncClient) -> None:
+        """The Sprint 12 regression this suite most needs, because it passed as
+        200 before.
+
+        Every candidate is provisioned `owner` of a personal tenant so that
+        ADR-010's "a membership from day one" holds. `_context_for` matched on
+        membership and slug alone, so that slug resolved as an organisation
+        context and `owner` carried JOB_CREATE, JOB_PUBLISH and
+        CANDIDATE_SHORTLIST -- letting any candidate read the employer console's
+        aggregate pool and publish a vacancy as "Personal workspace".
+        """
+        headers = await _headers_for_phone(client)
+        me = (await client.get("/auth/me", headers=headers)).json()
+        personal = next(
+            m["tenant"]["slug"]
+            for m in me["memberships"]
+            if m["tenant"]["tenant_type"] == "personal"
+        )
+
+        # 404, not 403: distinguishing "personal workspace" from "no such
+        # organisation" would tell a prober which slugs exist.
+        assert (await client.get(f"/org/{personal}/jobs", headers=headers)).status_code == 404
+        assert (await client.get(f"/org/{personal}/candidates", headers=headers)).status_code == 404
+        assert (
+            await client.post(
+                f"/org/{personal}/jobs",
+                headers=headers,
+                json={"title_en": "Not from a personal workspace", "skills": []},
+            )
+        ).status_code == 404
+
+    async def test_a_course_provider_cannot_post_a_vacancy(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Membership answers *may this person act here*, not *is this the right
+        kind of organisation*. Both are needed."""
+        headers, slug = await _register_org(client, "Skills Academy")
+        tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
+        assert tenant is not None
+        tenant.tenant_type = "course_provider"
+        await db.commit()
+
+        refused = await client.post(
+            f"/org/{slug}/jobs",
+            headers=headers,
+            json={"title_en": "Vacancy from a training provider", "skills": []},
+        )
+        assert refused.status_code == 403
+
+    async def test_one_person_holds_a_different_role_in_each_organisation(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The case that makes per-request tenant resolution matter, and which
+        had no coverage at all: the same token must carry different permissions
+        depending only on which organisation the request names."""
+        headers = await _headers_for_phone(client)
+        slugs = []
+        for name in ("Northside Clinic", "Southside Clinic"):
+            created = await client.post(
+                "/me/organisations",
+                headers=headers,
+                json={"organisation_name": name, "tenant_type": "employer"},
+            )
+            slugs.append(created.json()["slug"])
+        owned, demoted = slugs
+
+        tenant = await db.scalar(select(Tenant).where(Tenant.slug == demoted))
+        assert tenant is not None
+        membership = await db.scalar(select(Membership).where(Membership.tenant_id == tenant.id))
+        assert membership is not None
+        membership.role = "member"
+        await db.commit()
+
+        body = {"title_en": "Same token, two answers", "skills": []}
+        assert (
+            await client.post(f"/org/{owned}/jobs", headers=headers, json=body)
+        ).status_code == 201
+        assert (
+            await client.post(f"/org/{demoted}/jobs", headers=headers, json=body)
+        ).status_code == 403
+
     def test_permissions_widen_with_role_and_deletion_is_the_owners_alone(self) -> None:
         member, admin, owner = (ROLE_PERMISSIONS[r] for r in ("member", "admin", "owner"))
         assert member < admin < owner
@@ -465,3 +546,87 @@ class TestPublishing:
             json={"title_en": "Completely Different Title", "skills": []},
         )
         assert updated.json()["slug"] == job["slug"]
+
+
+# ------------------------------------------------------- the organisation itself
+
+
+class TestOrganisationProfile:
+    async def test_an_owner_can_correct_the_name(self, client: AsyncClient) -> None:
+        """There was no tenant update surface at all until now: a name typed
+        during registration was permanent."""
+        headers, slug = await _register_org(client, "Typo Hosptial")
+
+        updated = await client.put(
+            f"/org/{slug}",
+            headers=headers,
+            json={"name": "Typo Hospital", "description": "We fixed the spelling."},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["name"] == "Typo Hospital"
+
+    async def test_the_slug_does_not_follow_the_name(self, client: AsyncClient) -> None:
+        """It is a published URL. Renaming must not break links to the vacancies
+        already under it."""
+        headers, slug = await _register_org(client, "Original Name")
+        await client.put(f"/org/{slug}", headers=headers, json={"name": "Completely Different"})
+
+        assert (await client.get(f"/org/{slug}", headers=headers)).status_code == 200
+
+    async def test_verification_cannot_be_self_asserted(self, client: AsyncClient) -> None:
+        """A badge the organisation can set itself is worse than no badge, because
+        a candidate reads it as ours."""
+        headers, slug = await _register_org(client, "Unverified Clinic")
+
+        await client.put(
+            f"/org/{slug}",
+            headers=headers,
+            json={"name": "Unverified Clinic", "is_verified": True},
+        )
+        assert (await client.get(f"/org/{slug}", headers=headers)).json()["is_verified"] is False
+
+    async def test_the_contact_address_stays_off_the_public_listing(
+        self, client: AsyncClient, seeded_skill_slug: str
+    ) -> None:
+        """`TenantOut` is embedded in every job and course payload, so a field
+        added there is published to whatever scrapes /jobs."""
+        headers, slug = await _register_org(client, "Private Inbox Clinic")
+        await client.put(
+            f"/org/{slug}",
+            headers=headers,
+            json={"name": "Private Inbox Clinic", "contact_email": "hr@private.example.com"},
+        )
+        job = (
+            await client.post(
+                f"/org/{slug}/jobs",
+                headers=headers,
+                json={
+                    "title_en": "Publicly Listed Role",
+                    "skills": [{"skill_slug": seeded_skill_slug, "importance": 4}],
+                },
+            )
+        ).json()
+        await client.post(f"/org/{slug}/jobs/{job['slug']}/publish", headers=headers)
+
+        public = (await client.get(f"/jobs/{job['slug']}")).json()
+        assert "contact_email" not in public["tenant"]
+        # The members' view does carry it.
+        assert (await client.get(f"/org/{slug}", headers=headers)).json()[
+            "contact_email"
+        ] == "hr@private.example.com"
+
+    async def test_a_member_cannot_edit_the_organisation(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, slug = await _register_org(client, "Members Only Clinic")
+        tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
+        assert tenant is not None
+        membership = await db.scalar(select(Membership).where(Membership.tenant_id == tenant.id))
+        assert membership is not None
+        membership.role = "member"
+        await db.commit()
+
+        refused = await client.put(f"/org/{slug}", headers=headers, json={"name": "Renamed"})
+        assert refused.status_code == 403
+        # Reading is still allowed.
+        assert (await client.get(f"/org/{slug}", headers=headers)).status_code == 200

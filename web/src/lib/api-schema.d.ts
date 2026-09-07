@@ -565,6 +565,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Organisation
+         * @description The members' view, which carries the contact address the public one omits.
+         */
+        get: operations["get_organisation_org__org_slug__get"];
+        /**
+         * Update Organisation
+         * @description Owner only.
+         *
+         *     `slug`, `tenant_type` and `is_verified` are absent from `OrganisationIn`, so
+         *     they cannot be set here however the request is shaped: the slug is a
+         *     published URL, changing the type would strand listings already published
+         *     under it, and verification is ours to assert rather than theirs to claim.
+         */
+        put: operations["update_organisation_org__org_slug__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/profile": {
         parameters: {
             query?: never;
@@ -1934,6 +1963,63 @@ export interface components {
              */
             tenant_type: "employer" | "course_provider";
         };
+        /**
+         * OrganisationIn
+         * @description What a member may change. Everything absent from here is not theirs to set.
+         *
+         *     Note what is missing: `slug` (a published URL), `tenant_type` (changing it
+         *     would strand the listings already published under it) and `is_verified`
+         *     (ours to assert, not theirs).
+         */
+        OrganisationIn: {
+            /** Name */
+            name: string;
+            /** City */
+            city?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+        };
+        /**
+         * OrganisationOut
+         * @description What the organisation's own members see. Adds what the public may not.
+         */
+        OrganisationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Tenant Type
+             * @enum {string}
+             */
+            tenant_type: "employer" | "course_provider" | "personal";
+            /** City */
+            city?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+            /** Contact Email */
+            contact_email?: string | null;
+        };
         /** OtpRequest */
         OtpRequest: {
             /** Phone */
@@ -2248,7 +2334,15 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** TenantOut */
+        /**
+         * TenantOut
+         * @description An organisation as the **public** sees it.
+         *
+         *     Embedded in `JobOut` and `CourseOut`, so every field here appears on
+         *     `/jobs` and `/courses`. `contact_email` is therefore deliberately absent —
+         *     an organisation's inbox is not something a listing should broadcast to
+         *     whatever scrapes it.
+         */
         TenantOut: {
             /**
              * Id
@@ -2266,6 +2360,17 @@ export interface components {
             tenant_type: "employer" | "course_provider" | "personal";
             /** City */
             city?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
         };
         /** TokenPairOut */
         TokenPairOut: {
@@ -3251,6 +3356,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organisation_org__org_slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_organisation_org__org_slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganisationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationOut"];
                 };
             };
             /** @description Validation Error */

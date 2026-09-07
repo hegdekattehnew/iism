@@ -153,6 +153,14 @@ class TokenPairOut(BaseModel):
 
 
 class TenantOut(BaseModel):
+    """An organisation as the **public** sees it.
+
+    Embedded in `JobOut` and `CourseOut`, so every field here appears on
+    `/jobs` and `/courses`. `contact_email` is therefore deliberately absent —
+    an organisation's inbox is not something a listing should broadcast to
+    whatever scrapes it.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -160,6 +168,33 @@ class TenantOut(BaseModel):
     name: str
     tenant_type: TenantType
     city: str | None = None
+    description: str | None = None
+    website: str | None = None
+    logo_url: str | None = None
+    # Set by an operator, never by the organisation itself.
+    is_verified: bool = False
+
+
+class OrganisationOut(TenantOut):
+    """What the organisation's own members see. Adds what the public may not."""
+
+    contact_email: str | None = None
+
+
+class OrganisationIn(BaseModel):
+    """What a member may change. Everything absent from here is not theirs to set.
+
+    Note what is missing: `slug` (a published URL), `tenant_type` (changing it
+    would strand the listings already published under it) and `is_verified`
+    (ours to assert, not theirs).
+    """
+
+    name: Annotated[str, Field(min_length=2, max_length=120)]
+    city: Annotated[str | None, Field(max_length=120)] = None
+    description: str | None = None
+    website: Annotated[str | None, Field(max_length=500)] = None
+    logo_url: Annotated[str | None, Field(max_length=500)] = None
+    contact_email: EmailStr | None = None
 
 
 class MembershipOut(BaseModel):

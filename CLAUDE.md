@@ -77,7 +77,8 @@ api/                     FastAPI modular monolith
     text.py              slugify, shared by identity and the NSQF importer
   modules/
     identity/            Users, tenants, memberships, OTP sign-in by phone *or* email,
-                         credential linking, organisation creation (ADR-009/010/011/032/038)
+                         credential linking, organisation creation and the organisation
+                         profile (ADR-009/010/011/032/038)
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path; everything else there is read-only.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
@@ -202,6 +203,41 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   theme.
 
 ## Current state
+
+Sprint 13 (multi-tenancy you can see) is done. A signed-in person switches between "Job seeker" and
+each of their organisations from the header, creates an organisation without leaving their account,
+links a second credential, and edits the organisation's public profile.
+
+- **A personal workspace is not an organisation** (`ORGANISATION_TYPES` in
+  `api/core/authorization.py`). Every candidate is `owner` of a personal tenant, so before this
+  filter `_context_for` resolved their own personal slug as an org context and `owner` carried
+  `JOB_CREATE`, `JOB_PUBLISH` and `CANDIDATE_SHORTLIST` — any candidate could read the employer
+  console's aggregate pool and publish a vacancy as "Personal workspace". Verified 200 before, 404
+  after; `tests/test_organisations.py` guards it.
+- **Membership answers *may this person act here*, not *is this the right kind of organisation*.**
+  `require_publisher_of` is the second check: a job needs an `employer`, a course a
+  `course_provider`. Nothing enforced this before.
+- **The switcher lives in the header, not in a page.** A switcher inside `EmployerWorkspace` could
+  not be reached from the one screen that most needs it — its "no access" branch returns first — and
+  `/employer/{org}` had no inbound link from anywhere a signed-in person could already be.
+- **Context is derived from the URL, never stored.** `useActiveOrg()` reads
+  `/employer/{slug}` from the path. Same rule as ADR-038 applies server-side, so the interface can
+  never believe a context the API would refuse, and two tabs can be two organisations.
+- **Creating an organisation must go through `POST /me/organisations`**, which adds a *membership*.
+  The cold `/auth/org/register` path creates a **new `User`** for an unknown address — correct for a
+  stranger, and a duplicate account for someone already signed in.
+- **`qc.clear()` on sign-out.** The `QueryClient` is created once per browser session, so without it
+  the previous person's profile, matches and memberships render to whoever signs in next. Same
+  concern as the service worker's DENY list, one layer up.
+- **`contact_email` is deliberately absent from `TenantOut`**, which is embedded in every public
+  `JobOut` and `CourseOut`. Anything added to that model is published to whatever scrapes `/jobs`;
+  `OrganisationOut` is the members-only view.
+- **`is_verified` is set by an operator, never the organisation.** It is absent from
+  `OrganisationIn`, so no request shape can set it — as are `slug` (a published URL) and
+  `tenant_type` (changing it would strand listings already published under it).
+- **`api/core/authorization.py` imports identity's models lazily**, inside `_context_for`, because
+  `api/modules/identity/` now imports it back for the organisation routes. Same cycle
+  `get_current_user` avoids the same way.
 
 Sprint 12 (one identity, many roles) is done. An employer registers by email, posts a vacancy
 against real National Occupational Standards, publishes it, and sees ranked candidates — and the
