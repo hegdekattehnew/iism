@@ -1,13 +1,13 @@
 """Match endpoints. Authenticated: a match is about a specific person."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
 from api.core.security import get_current_user
 from api.modules.analytics import record
 from api.modules.identity.models import User
+from api.modules.marketplace import ensure_profile
 from api.modules.marketplace.models import CandidateProfile
 from api.modules.matching import schemas, service
 
@@ -15,10 +15,20 @@ router = APIRouter(prefix="/me/matches", tags=["matching"])
 
 
 async def _profile(db: AsyncSession, user: User) -> CandidateProfile:
-    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id))
-    if profile is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No candidate profile")
-    return profile
+    """The signed-in candidate's profile, created if they have never had one.
+
+    Not a 404. Profiles are created lazily on first access, so a brand-new user
+    who signs in and comes straight here has none -- and 404 sent them to the
+    interface's error state instead of the "add your skills" prompt this module
+    already returns via `has_skills`. That is the difference between a dead end
+    and a next step, and it was reaching every new candidate who did not visit
+    their profile page first.
+
+    `ensure_profile` commits when it creates and writes nothing when it does
+    not, so `record()` further down these handlers still has no uncommitted work
+    to sweep up.
+    """
+    return await ensure_profile(db, user.id)
 
 
 def _to_match(scored: service.ScoredJob) -> schemas.MatchOut:

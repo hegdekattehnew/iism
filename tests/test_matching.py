@@ -205,11 +205,55 @@ class TestMatchEndpoints:
         """Not "no matches found": zero declared skills is a different state,
         and the difference is a dead end versus a next step."""
         headers = await _auth(client)
-        await client.get("/me/profile", headers=headers)  # creates the profile
+        await client.get("/me/profile", headers=headers)
         body = (await client.get("/me/matches", headers=headers)).json()
 
         assert body["has_skills"] is False
         assert body["items"] == []
+
+    async def test_a_brand_new_user_reaches_matches_without_visiting_profile(
+        self, db, client
+    ) -> None:
+        """Profiles are created lazily, so someone who signs in and comes
+        straight here has none. This used to 404, which the interface renders as
+        its error state -- telling every new candidate something had gone wrong
+        rather than showing them the "add your skills" prompt built for exactly
+        this moment."""
+        headers = await _auth(client)
+        response = await client.get("/me/matches", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json()["has_skills"] is False
+
+    async def test_reaching_matches_first_still_records_the_event(self, db, client) -> None:
+        """The subtle half of creating the profile here: `record()` commits, so
+        a half-finished write left in the session would be swept in with it.
+        `ensure_profile` commits its own creation, and this is what proves the
+        two do not interfere."""
+        headers = await _auth(client)
+        await client.get("/me/matches", headers=headers)
+
+        recorded = await db.scalar(
+            select(func.count())
+            .select_from(AnalyticsEvent)
+            .where(AnalyticsEvent.name == "matches_viewed")
+        )
+        assert recorded == 1
+
+    async def test_the_profile_is_actually_created(self, db, client) -> None:
+        """Lazily, but really: the next request must find a row rather than
+        create a second one."""
+        headers = await _auth(client)
+        me = (await client.get("/auth/me", headers=headers)).json()
+        await client.get("/me/matches", headers=headers)
+        await client.get("/me/matches", headers=headers)
+
+        profiles = await db.scalar(
+            select(func.count())
+            .select_from(CandidateProfile)
+            .where(CandidateProfile.user_id == uuid.UUID(me["id"]))
+        )
+        assert profiles == 1
 
     async def test_viewing_matches_records_an_event(self, db, client) -> None:
         """ADR-025: measurement substitutes for a revenue signal, and the first

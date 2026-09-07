@@ -302,6 +302,11 @@ that specific gap, and how to become qualified.
 - **Zero matched standards scores zero**, deliberately. Letting the level and evidence components
   through alone gave every job in the catalogue a small non-zero score for everyone.
 - **Matching compares at concept level**, which is the whole reason Sprint 9 built that table.
+- **The candidate profile is created lazily, and `/me/matches` creates it too.** It used to 404 for
+  anyone who had not opened `/me/profile` first, which the interface renders as its error state —
+  so every new candidate arriving at matches first was told something had gone wrong instead of
+  being shown the "add your skills" prompt `has_skills` exists for. `ensure_profile` is the single
+  creation path and commits its own write, which is what keeps `record()`'s contract intact.
 - **`record()` commits.** `get_db_session` never commits, so a merely-flushed event is discarded
   when the request ends — which is exactly what happened the first time this was wired up. Call it
   only from handlers with no other uncommitted work.

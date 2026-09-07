@@ -69,14 +69,31 @@ async def _load(db: AsyncSession, profile_id: uuid.UUID) -> CandidateProfile:
     return profile
 
 
-async def get_or_create_profile(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfile:
-    """Profiles are created lazily on first access, so signing in never has to
-    decide whether someone is a candidate."""
+async def ensure_profile(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfile:
+    """The profile row, created if this is the first time anyone asked for it.
+
+    Profiles are lazy so that signing in never has to decide whether someone is
+    a candidate. The single place that creation happens.
+
+    **Leaves no uncommitted work.** It either finds a row and writes nothing, or
+    creates one and commits — which is what lets a handler call `record()`
+    afterwards, since `record()` commits and would otherwise sweep a
+    half-finished write in with it (see `api/modules/analytics/service.py`).
+
+    Returns the bare row. Callers wanting the profile *and* its skills want
+    `get_or_create_profile` instead.
+    """
     profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
     if profile is None:
         profile = CandidateProfile(user_id=user_id)
         db.add(profile)
         await db.commit()
+    return profile
+
+
+async def get_or_create_profile(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfile:
+    """The profile with its skills eagerly loaded, ready to serialise."""
+    profile = await ensure_profile(db, user_id)
     return await _load(db, profile.id)
 
 

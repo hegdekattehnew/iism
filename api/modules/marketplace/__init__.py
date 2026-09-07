@@ -21,6 +21,7 @@ from api.modules.marketplace.models import (
 from api.modules.marketplace.profile_routes import router as profile_router
 from api.modules.marketplace.profile_service import (
     add_skill,
+    ensure_profile,
     get_or_create_profile,
     remove_skill,
     update_profile,
@@ -64,6 +65,7 @@ __all__ = [
     "jobs_requiring_skill",
     "jobs_router",
     "add_skill",
+    "ensure_profile",
     "get_or_create_profile",
     "list_courses",
     "list_jobs",
