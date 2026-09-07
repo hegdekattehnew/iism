@@ -318,3 +318,20 @@ class CandidateProfileUpdateFull(BaseModel):
         if lo is not None and hi is not None and hi < lo:
             raise ValueError("expected_salary_max_inr cannot be below expected_salary_min_inr")
         return self
+
+
+class CorpusStatsOut(BaseModel):
+    """What the platform holds, counted live. Backs the landing page."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    standards: int
+    qualifications: int
+    criteria: int
+    awarding_bodies: int
+    sectors: int
+    states: int
+    districts: int
+    entry_routes: int
+    jobs: int
+    courses: int

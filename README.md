@@ -6,10 +6,18 @@ what a person is missing for the work they want, and which training closes that 
 
 India-first, Hindi and English at launch. See
 [docs/IISM-Product-Definition.docx](docs/IISM-Product-Definition.docx) for what we are building
-and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 34 ADRs
+and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 37 ADRs
 that govern how.
 
-## Status — Sprints 1–10 complete
+## Status — Sprints 1–11 complete
+
+**Sprint 11 — the employer side, and a product you can look at.** The landing page now counts the
+corpus live rather than describing it. `/employers/demo` ranks candidates for a vacancy using the
+*same* scorer that ranks jobs for candidates — run with its arguments swapped — showing who holds
+every mandatory standard, who is exactly one short and which one, and which standards the market
+cannot supply. It is a labelled demonstration: there is no employer sign-in yet, and no candidate
+is ever identified on it. The app is installable, matches render as a coverage bar and a position
+on the NSQF scale, and no route says "coming soon".
 
 **Sprint 10 — matching, and what to do about the gap.** Sign in and open `/matches`: jobs ranked
 by how much of what they need you already have, with the score broken down into what you hold and

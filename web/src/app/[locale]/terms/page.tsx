@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <PlaceholderPage titleKey="terms" noteKey="generic" />;
+  return <PlaceholderPage titleKey="terms" noteKey="legal" />;
 }

@@ -93,3 +93,64 @@ class MatchDetail(MatchOut):
 
     courses: list[CourseSuggestionOut] = Field(default_factory=list)
     entry: EntryRouteOut | None = None
+
+
+# ---------------------------------------------------------------------------
+# Employer console (ADR-036). Same scorer, other direction.
+# ---------------------------------------------------------------------------
+
+
+class EmployerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    slug: str
+    name: str
+
+
+class CandidateCardOut(BaseModel):
+    """A ranked candidate, described without identifying them.
+
+    No name, no phone, no email. The employer surface is unauthenticated for
+    now, so it may only show what an employer needs to decide whether to open a
+    conversation -- and a reference is enough for that.
+    """
+
+    reference: str
+    headline: str | None = None
+    location_state: str | None = None
+    location_district: str | None = None
+    years_experience: int
+    score: int
+    coverage: float
+    matched: list[MatchedSkillOut] = Field(default_factory=list)
+    missing: list[MissingSkillOut] = Field(default_factory=list)
+    missing_mandatory: int = 0
+    level_shortfall: NsqfLevel | None = None
+    capped_by_mandatory: bool = False
+
+
+class JobPoolOut(BaseModel):
+    job: JobSummary
+    pool: int
+    ready: int
+    nearly: int
+
+
+class ScarceSkillOut(BaseModel):
+    nos_code: str | None = None
+    name_en: str
+    required_by: int
+    held_by: int
+
+
+class EmployerOverview(BaseModel):
+    employer: EmployerOut
+    jobs: list[JobPoolOut] = Field(default_factory=list)
+    scarce: list[ScarceSkillOut] = Field(default_factory=list)
+    candidates_total: int
+
+
+class CandidateRanking(BaseModel):
+    job: JobSummary
+    items: list[CandidateCardOut] = Field(default_factory=list)
+    total: int

@@ -24,7 +24,7 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **35 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/adr/architecture-decisions.md` | **37 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
@@ -101,6 +101,51 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
+
+**Sprint 11 (make it sellable) — done** on 2026-09-07. Six parts, in the plan's must-land order:
+a component library, the landing page proving scale from live counts, the employer console, an
+installable PWA, match visualisation, and real content on the three audience routes. Migration 0015
+(the analytics event CHECK). ADR-037. 208 tests. 487 message keys in each locale.
+
+What a future session should not have to rediscover:
+- **The shadcn CLI was tried and reverted.** It adds a second dark-mode mechanism (a `.dark` class)
+  beside the `prefers-color-scheme` one already in `globals.css`, 62 duplicate oklch tokens
+  including `--background` / `--foreground` / `--border`, a Geist font override in `layout.tsx`, and
+  installs `cn` and `shadcn` as runtime dependencies. Its components would have rendered light
+  inside this app's dark theme. Radix primitives plus `cva` over the existing tokens, directly,
+  cost about a day and owe nothing.
+- **`buttonVariants` must not live in a `"use client"` module.** Exporting the cva from
+  `button.tsx` broke prerendering of every server component styling a button:
+  `Error: Attempted to call buttonVariants() from the server`. It lives in `button-variants.ts`.
+- **`ui.tsx` and `ui/` both resolve for `@/components/ui`.** Having both is a silent collision; the
+  file was deleted and its contents folded into `ui/layout.tsx` and `ui/button-link.tsx`, so no
+  import in the codebase changed.
+- **The employer console is the same `score_match`, arguments swapped** (ADR-037), and it refuses
+  to mount in production. It is unauthenticated and reads the candidate pool, so the guard is code,
+  not a comment: `mount_employer_console` returns `False`, and a test boots the app in both
+  environments to prove the route is present in one and absent in the other.
+- **No employer-facing payload identifies a candidate** — reference, headline, district, years and
+  the gap only. A test asserts the absence of `full_name`, `phone`, `email` and `user_id`.
+- **Adding an analytics event needs a hand-written migration.** Alembic does not diff CHECK bodies,
+  so a new `EVENT_NAMES` entry is accepted by the model and rejected by the database — and
+  `record()` swallows its own failures by design, so the only symptom is events that silently never
+  appear. This is the third time a CHECK constraint has cost time in this project.
+- **A label overstated the data and had to be corrected.** "Fully qualified" appeared beside "holds
+  3 of 6 required standards", because the flag means *all mandatory held*. It now says exactly
+  that. Worth naming: the failure was in the words, not the arithmetic, and only a screenshot
+  caught it.
+- **`qlmanage -t -s 512` honours an SVG's `width`/`height`, not its viewBox.** The 64px source
+  rendered 64px in the corner of a 512 canvas. The icon sources are 512-sized SVGs; the maskable
+  one has no rounded corners, because the launcher applies its own mask and a rounded source is
+  cropped twice.
+- **The service worker registers in production builds only.** In development it caches hashed
+  chunks that hot reload then replaces. Demonstrate installability with `npm run build && npm start`.
+- **The in-app browser pane refuses `serviceWorker.register`** — "an unknown error occurred when
+  fetching the script", although the same page fetches `/sw.js` fine at 200 with
+  `application/javascript`. Registration therefore has **not** been confirmed in a real browser;
+  that check is still outstanding and needs Chrome or a phone.
+- **Twenty seeded candidates now, not five.** The original five are unchanged and still first in
+  the list, because the golden set is asserted against them.
 
 **Sprint 10 (matching and the gap) — done** on 2026-09-06. The payoff, after three deferrals.
 `/matches` ranks jobs for a signed-in candidate with the score broken down, names the gap standard
@@ -487,8 +532,13 @@ on one laptop; that risk is closed.
 
 ## 11. What comes next
 
-Matching works and is measured. What is missing is now mostly **evidence and reach**, not
-mechanism.
+Matching works, is measured, and is now visible from both sides. What is missing is mostly
+**evidence and reach**, not mechanism.
+
+**Confirm the PWA installs on a real device.** The manifest, icons and service worker are in place
+and tested for existence and correctness, but the in-app browser pane will not register a worker,
+so nothing has yet proved Chrome offers "Install". One phone, five minutes — and until it is done,
+say "installable" with that caveat rather than as a fact.
 
 **Tune against the golden set, and grow it.** Five labelled pairs is enough to catch a regression
 and nowhere near enough to trust a weighting. The plan called for 50–100. Growing it is the
@@ -499,8 +549,14 @@ deterministic overlap ships first so there is a baseline). Embeddings over perfo
 rather than titles — titles like `OJT` and `Project` embed to noise — with sentence-transformers
 self-hosted, so no per-request cost.
 
-**Hindi for the corpus** (Sprint 11): ~$5 for the navigable surface, blocked on credentials rather
-than design.
+**Hindi for the corpus** (Sprint 12): ~$5 for the navigable surface, blocked on credentials rather
+than design. Worth stating plainly in any demo: the interface is fully bilingual today, the *corpus*
+is not — standard names and descriptions are still English.
+
+**Real employer authentication**, which ADR-037 defers again on the same grounds ADR-032 first did:
+organisations cannot publish anything yet. When self-serve publishing lands, the console's mount
+guard comes off and its routes move behind `get_current_user`; the ranking logic is unchanged,
+because it never depended on being anonymous.
 
 **The parked résumé builder and extractor**, deferred because correct Devanagari in PDF needs
 complex-script shaping and therefore Pango/HarfBuzz. Still the best answer to profile-completion

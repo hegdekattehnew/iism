@@ -87,16 +87,13 @@
     "language": "Language"
   },
   "placeholder": {
-    "badge": "Coming soon",
-    "body": "This section is not built yet. The navigation and layout are in place so content can be added without rework.",
+    "badge": "Drafting",
+    "body": "This page is being written. Nothing here is a placeholder for a feature — the surrounding product works; this is text that has to be right before it is published.",
     "back": "Back to home",
-    "jobs": "Job listings arrive once employers can publish roles.",
-    "courses": "Course listings arrive once providers can publish training.",
-    "skills": "The skill browser arrives in Sprint 2.",
-    "employers": "The employer workspace arrives after authentication is built.",
-    "providers": "The provider workspace arrives after authentication is built.",
-    "signIn": "Sign-in arrives in Sprint 3, when there is something worth protecting.",
-    "generic": "This page is part of the launch checklist and will be written before any public release."
+    "generic": "Being drafted ahead of public release. Until it is published we would rather show nothing than show text nobody has checked.",
+    "legal": "Being drafted with legal review. A privacy or terms page written carelessly is worse than one that is honestly still in progress.",
+    "contact": "Being drafted. In the meantime, the fastest route in is whoever sent you this link.",
+    "careers": "Being drafted. There is no open role posted yet."
   },
   "dev": {
     "title": "Development panel",
@@ -483,5 +480,115 @@
     "backToMatches": "All matches",
     "loadError": "Could not load your matches.",
     "hours": "{hours} hours"
+  },
+  "stats": {
+    "heading": "Built on the national framework, not a guess",
+    "sub": "Every skill, job and course on this platform speaks the same NSQF vocabulary.",
+    "standards": "National Occupational Standards",
+    "qualifications": "Qualification Packs",
+    "criteria": "Assessable criteria",
+    "awardingBodies": "Awarding bodies",
+    "sectors": "Sectors",
+    "coverage": "States and districts covered",
+    "entryRoutes": "Documented ways in",
+    "footnote": "Counted live from the platform database, not illustrative."
+  },
+  "employerConsole": {
+    "title": "Employer console",
+    "subtitle": "Rank your applicants against the national standards your vacancy actually requires — and see exactly what each of them is missing.",
+    "demoTitle": "This is a demonstration",
+    "demoBody": "There is no employer sign-in yet, so this screen acts as a seeded employer. Every score is computed by the same engine that ranks jobs for candidates, over real National Occupational Standards. Candidates are shown by reference only — no names, numbers or contact details.",
+    "actingAs": "Acting as",
+    "openRoles": "Open roles",
+    "readyTotal": "Meet every mandatory standard",
+    "nearlyTotal": "One mandatory standard short",
+    "candidatesTotal": "Candidates on the platform",
+    "rolesHeading": "Your open roles",
+    "rolesNote": "Ordered by how many candidates already hold every standard the role makes mandatory.",
+    "readyCount": "{count} eligible",
+    "nearlyCount": "{count} nearly",
+    "poolCount": "{count} in pool",
+    "levelMin": "NSQF {level} and above",
+    "viewShortlist": "See the shortlist",
+    "hideShortlist": "Hide the shortlist",
+    "viewJob": "View the posting",
+    "ready": "All mandatory held",
+    "nearly": "One mandatory short",
+    "years": "{years, plural, =0 {No experience} one {# year} other {# years}}",
+    "coverage": "Holds {held} of {total} required standards",
+    "missingMandatory": "Missing",
+    "emptyPool": "No candidate on the platform holds any standard this role requires.",
+    "loadError": "Could not load the console. Is the API running?",
+    "scarcityHeading": "What your roles need and the market cannot supply",
+    "scarcityNote": "Counted across every candidate on the platform, not only those who already matched.",
+    "standard": "National Occupational Standard",
+    "requiredBy": "Roles requiring it",
+    "heldBy": "Candidates holding it"
+  },
+  "matchViz": {
+    "coverageLabel": "{percent}% of the weighted requirements",
+    "coverageWeighted": "{percent}% of what this role requires, weighted by importance",
+    "cappedBy": "{count, plural, one {# mandatory standard missing} other {# mandatory standards missing}}",
+    "levelHeading": "NSQF level",
+    "levelLabel": "NSQF level {attained} against a required {required}",
+    "levelMet": "Meets the NSQF {required} floor this role sets",
+    "levelShort": "NSQF {attained} against the {required} this role asks for"
+  },
+  "employersPage": {
+    "title": "For employers",
+    "lede": "Post a role against the National Occupational Standards it actually requires, and see who can do the work — not who wrote the right words on a CV.",
+    "primaryCta": "Open the employer console",
+    "secondaryCta": "Browse open roles",
+    "one": {
+      "title": "Hire against a standard, not a keyword",
+      "body": "A role is described by the standards it needs, each with an importance and a mandatory flag. Two employers using the same standard mean the same thing, because the standard is national."
+    },
+    "two": {
+      "title": "See who is nearly there",
+      "body": "Ranking shows the candidates missing exactly one mandatory standard, and names it. That is a training decision rather than a rejection — and often the difference between filling a vacancy and reposting it."
+    },
+    "three": {
+      "title": "Know what the market cannot supply",
+      "body": "Every standard your roles ask for, counted against how many candidates hold it. A standard nobody holds is a hiring plan that will not work, and it is better to learn that before the vacancy is open."
+    },
+    "status": "The console is a working demonstration: scores are real and computed by the same engine that ranks jobs for candidates, but employer sign-in and self-serve publishing are not built yet. Roles are seeded by us for now."
+  },
+  "providersPage": {
+    "title": "For training providers",
+    "lede": "Publish a course against the standards it teaches, and be recommended to the people whose specific gap it closes.",
+    "primaryCta": "Browse courses",
+    "secondaryCta": "Explore the taxonomy",
+    "one": {
+      "title": "Recommended by gap, not by advertising",
+      "body": "When a candidate is short of a role, courses are ranked by how much of that particular gap they close. A course teaching one thing they need beats a course teaching nine they already have."
+    },
+    "two": {
+      "title": "Anchored to the national framework",
+      "body": "Courses link to the same standards employers hire against, with the level each one teaches. That is what lets a course be matched to a vacancy rather than to a job title."
+    },
+    "three": {
+      "title": "Entry routes come from the source",
+      "body": "The qualification behind a role publishes its own ways in — education and experience alternatives, imported from the national corpus, not invented here."
+    },
+    "status": "Course listings are seeded for now. Provider sign-in and self-serve publishing are not built yet; the matching and recommendation behaviour described above is."
+  },
+  "aboutPage": {
+    "title": "About IISM",
+    "lede": "A skills marketplace built on India's national qualification framework, so that what a person can do, what a job needs, and what a course teaches are all said in the same words.",
+    "primaryCta": "Explore the taxonomy",
+    "secondaryCta": "Browse jobs",
+    "one": {
+      "title": "One vocabulary",
+      "body": "The National Occupational Standards are the shared language. A job's requirement, a candidate's claim and a course's syllabus all point at the same standard, which is what makes a gap computable at all."
+    },
+    "two": {
+      "title": "Scores you can interrogate",
+      "body": "Every match returns what was held, what is missing, which of those are mandatory, and the level shortfall. A model never decides a score here — it is deterministic, so it can be explained and measured."
+    },
+    "three": {
+      "title": "Built for a low-end phone",
+      "body": "Mobile-first, installable, in English and Hindi. The target device is an entry-level Android on mobile data, and that constraint shapes what gets built rather than being retrofitted."
+    },
+    "status": "Built in the open, sprint by sprint. Matching, the national taxonomy and the candidate profile are live; employer sign-in, Hindi for the corpus itself, and self-serve publishing are not yet."
   }
 }

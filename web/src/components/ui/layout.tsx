@@ -1,60 +1,11 @@
-import type { ComponentProps, ReactNode } from "react";
+/** Page-structure and brand components.
+ *
+ * Carried over unchanged from the original `ui.tsx`. These are composition, not
+ * interaction — there is no accessibility gap for a Radix primitive to close,
+ * so rewriting them would be churn.
+ */
 
-import { Link } from "@/i18n/navigation";
-
-type Variant = "primary" | "secondary" | "ghost";
-type Size = "sm" | "md" | "lg";
-
-const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors " +
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand " +
-  "disabled:cursor-not-allowed disabled:opacity-40";
-
-const VARIANTS: Record<Variant, string> = {
-  primary: "bg-brand text-brand-contrast hover:bg-brand-strong",
-  secondary:
-    "border border-border-token bg-surface text-foreground hover:bg-surface-muted",
-  ghost: "text-muted hover:bg-surface-muted hover:text-foreground",
-};
-
-const SIZES: Record<Size, string> = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2.5 text-sm",
-  lg: "px-5 py-3 text-base",
-};
-
-export function buttonClass(variant: Variant = "primary", size: Size = "md") {
-  return [BASE, VARIANTS[variant], SIZES[size]].join(" ");
-}
-
-export function Button({
-  variant = "primary",
-  size = "md",
-  className = "",
-  ...props
-}: ComponentProps<"button"> & { variant?: Variant; size?: Size }) {
-  return <button className={`${buttonClass(variant, size)} ${className}`} {...props} />;
-}
-
-export function ButtonLink({
-  href,
-  variant = "primary",
-  size = "md",
-  className = "",
-  children,
-}: {
-  href: string;
-  variant?: Variant;
-  size?: Size;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link href={href} className={`${buttonClass(variant, size)} ${className}`}>
-      {children}
-    </Link>
-  );
-}
+import type { ReactNode } from "react";
 
 export function Section({
   children,

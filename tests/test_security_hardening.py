@@ -64,6 +64,18 @@ def test_demo_task_endpoints_exist_in_development() -> None:
     assert "/tasks/ping" in _paths("development")
 
 
+def test_employer_console_is_absent_in_production() -> None:
+    """It is unauthenticated and it reads the candidate pool. Acceptable as a
+    labelled demonstration; not acceptable anywhere a real candidate's profile
+    exists. The guard is in the app assembly, so this boots the app to check it
+    rather than calling the mount function directly."""
+    assert "/employer/employers" not in _paths("production")
+
+
+def test_employer_console_exists_in_development() -> None:
+    assert "/employer/employers" in _paths("development")
+
+
 # ------------------------------------------------ OTP never reaches a log sink
 
 

@@ -96,7 +96,7 @@ async def _held_skills(db: AsyncSession, profile_id: uuid.UUID) -> list[HeldSkil
     ]
 
 
-async def _requirements(
+async def requirements_for(
     db: AsyncSession, job_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, list[RequiredSkill]]:
     if not job_ids:
@@ -167,7 +167,7 @@ async def match_jobs(
     if not job_ids:
         return []
 
-    requirements = await _requirements(db, job_ids)
+    requirements = await requirements_for(db, job_ids)
     jobs = {j.id: j for j in (await db.scalars(select(Job).where(Job.id.in_(job_ids)))).all()}
 
     scored = [
@@ -177,7 +177,7 @@ async def match_jobs(
                 requirements.get(job_id, []),
                 held,
                 job_level_min=jobs[job_id].nsqf_level_min,
-                candidate_level=_attained_level(held, requirements.get(job_id, [])),
+                candidate_level=attained_level(held, requirements.get(job_id, [])),
             ),
         )
         for job_id in job_ids
@@ -189,7 +189,7 @@ async def match_jobs(
     return scored[:limit]
 
 
-def _attained_level(held: list[HeldSkill], required: list[RequiredSkill]) -> Decimal | None:
+def attained_level(held: list[HeldSkill], required: list[RequiredSkill]) -> Decimal | None:
     """The level of the standards the candidate actually holds for this job.
 
     Not the candidate's highest level anywhere: holding one level-6 standard
@@ -343,14 +343,14 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
     if job is None:
         return None
     held = await _held_skills(db, profile_id)
-    requirements = (await _requirements(db, [job.id])).get(job.id, [])
+    requirements = (await requirements_for(db, [job.id])).get(job.id, [])
     return ScoredJob(
         job=job,
         result=score_match(
             requirements,
             held,
             job_level_min=job.nsqf_level_min,
-            candidate_level=_attained_level(held, requirements),
+            candidate_level=attained_level(held, requirements),
         ),
     )
 

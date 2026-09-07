@@ -32,6 +32,10 @@ EVENT_NAMES = (
     "gap_viewed",
     "course_recommended",
     "course_opened",
+    # Employer console. Nameless by construction: the surface never sees a
+    # candidate's identity, so neither can the event.
+    "employer_overview_viewed",
+    "employer_shortlist_viewed",
 )
 
 
@@ -40,7 +44,8 @@ class AnalyticsEvent(Base):
     __table_args__ = (
         CheckConstraint(
             "name IN ('matches_viewed', 'match_opened', 'gap_viewed', "
-            "'course_recommended', 'course_opened')",
+            "'course_recommended', 'course_opened', 'employer_overview_viewed', "
+            "'employer_shortlist_viewed')",
             name="ck_analytics_event_name",
         ),
         Index("ix_analytics_events_name_time", "name", "occurred_at"),

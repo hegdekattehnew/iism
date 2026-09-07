@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
-import { ButtonLink, buttonClass } from "@/components/ui";
+import { ButtonLink, buttonVariants } from "@/components/ui";
 
 export async function Hero() {
   const t = await getTranslations("hero");
@@ -37,7 +37,7 @@ export async function Hero() {
               placeholder={t("searchPlaceholder")}
               className="w-full flex-1 rounded-lg border border-border-token bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             />
-            <button type="submit" className={buttonClass("primary", "lg")}>
+            <button type="submit" className={buttonVariants({ variant: "primary", size: "lg" })}>
               {t("searchButton")}
             </button>
           </form>

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
 from api.modules.marketplace import schemas, service
+from api.modules.marketplace.stats import corpus_stats
 from api.modules.skills import get_skill_by_slug
 
 jobs_router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -18,6 +19,14 @@ async def marketplace_counts(
     return schemas.MarketplaceCounts(
         jobs=await service.count_jobs(db), courses=await service.count_courses(db)
     )
+
+
+@marketplace_router.get("/marketplace/stats", response_model=schemas.CorpusStatsOut)
+async def marketplace_stats(
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.CorpusStatsOut:
+    """Everything the landing page claims, in one round trip."""
+    return schemas.CorpusStatsOut.model_validate(await corpus_stats(db))
 
 
 # ----------------------------------------------------------------------- jobs

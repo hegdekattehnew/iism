@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(36 ADRs). Read it before making any structural decision — the summary below
+(37 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -84,7 +84,8 @@ api/                     FastAPI modular monolith
     geography/           State, District, SubDistrict. Its own module: jobs and
                          profiles reference it and neither is a skill.
     matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
-                         scoring.py is pure -- no I/O, no clock, no model.
+                         scoring.py is pure -- no I/O, no clock, no model. employer.py is
+                         the same scorer run in reverse for the console (ADR-037).
     analytics/           analytics_events (ADR-025). record() COMMITS.
     career_paths/        Graph-based role transition engine (ADR-008)
     intelligence/        LLM extraction/explanation, embeddings (ADR-005/013/018)
@@ -95,7 +96,9 @@ api/                     FastAPI modular monolith
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
+  src/components/ui/     The component library — Radix primitives over this project's tokens
   src/lib/api-schema.d.ts  GENERATED from OpenAPI; never edit by hand
+  public/sw.js           Service worker. Its DENY list is a security boundary, not a cache tweak
 infra/                   docker-compose (Terraform later — ADR-028)
 migrations/              Alembic migrations
 tests/                   pytest + testcontainers
@@ -186,9 +189,56 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   For anything that must keep polling while the tab is hidden (status boards), set
   `refetchIntervalInBackground: true` — TanStack pauses intervals on hidden tabs by default.
 - Routes live under `web/src/app/[locale]/`. Every link in the header or footer must resolve;
-  not-yet-built pages render `PlaceholderPage` rather than 404.
+  not-yet-built pages render `PlaceholderPage` rather than 404 — and it says *drafting*, never
+  "coming soon", because a visitor reading "coming soon" discounts everything they just saw.
+- Use the primitives in `web/src/components/ui/`. Nothing outside `globals.css` may hardcode a
+  colour; every tone must define both its light and its dark value, or it renders invisible in one
+  theme.
 
 ## Current state
+
+Sprint 11 (make it sellable) is done. There is a component library, the landing page proves the
+scale of the corpus from live counts, the employer console ranks candidates for a vacancy, the app
+is installable, matches render as a picture rather than a list, and no route says "coming soon".
+
+- **`api/modules/matching/employer.py` is the same scorer with its arguments swapped** (ADR-037).
+  `score_match` does not care which side of the pair the query started from. **Do not add a second
+  scoring implementation** — two scorers drift, and once they disagree about one pair neither
+  number can be defended.
+- **The employer console refuses to mount in production.** `mount_employer_console` returns `False`
+  outside development, mirroring `ConsoleNotificationProvider`. It is unauthenticated and it reads
+  the candidate pool; a test boots the app in both environments and asserts the route is present in
+  one and absent in the other.
+- **No employer-facing payload identifies a candidate.** Reference, headline, district, years and
+  the gap — never a name, phone, email or user id. Nor may an analytics payload carry one.
+- **Adding an analytics event needs a hand-written migration.** Alembic does not diff CHECK
+  constraint bodies, so a name added to `EVENT_NAMES` alone is accepted by the model and rejected
+  by the database — and `record()` swallows its own failures, so the only symptom is events that
+  silently never appear. Migration `0015` is the pattern.
+- **`web/src/components/ui/` is the component library**, built on Radix primitives and this
+  project's own tokens. The shadcn CLI was tried and reverted: it installs a second dark-mode
+  mechanism (`.dark` class) beside the `prefers-color-scheme` one already in use, 62 duplicate
+  oklch colour tokens, and a font override. Its own docstring records this.
+- **`buttonVariants` lives in `button-variants.ts`, which has no `"use client"`.** Exporting a cva
+  from a client module breaks prerendering of every server component that styles a button —
+  `Attempted to call buttonVariants() from the server`.
+- **Charts render `MatchOut` fields and compute nothing.** The moment a picture derives its own
+  number it can disagree with the score it claims to explain. The one exception is
+  `required − shortfall` in `LevelScale`, which is the scorer's own identity run backwards.
+- **The service worker's DENY list is a security boundary, not an optimisation.** `/me/`, `/auth/`,
+  `/employer/`, `/matches`, `/profile`, `/signin` and anything carrying an `Authorization` header
+  are never cached: a stale match would show a gap already closed, and cached profile data on a
+  shared phone is an ADR-023 problem. `tests/test_pwa_assets.py` asserts it.
+- **The worker registers in production builds only.** In development it would cache hashed chunks
+  that hot reload then replaces. Installability is demonstrated from `npm run build && npm start`.
+- **Icons were generated with `qlmanage -t -s 512`**, which honours the SVG's `width`/`height`
+  attributes rather than the viewBox — a 64px source renders 64px in the corner of a 512 canvas.
+  The sources are square-background SVGs sized 512; the maskable one has no rounded corners,
+  because the launcher applies its own mask and a rounded source is cropped twice.
+- **Twenty seeded candidates, not five.** Most vacancies now have someone fully eligible beside
+  someone missing exactly one mandatory standard, because "who is nearly qualified?" is the first
+  question an employer asks and a pool with no near-misses cannot answer it. The original five
+  remain first in the list and unchanged — the golden set is asserted against them.
 
 Sprint 10 (matching and the gap) is done. A signed-in candidate opens `/matches` and sees ranked
 jobs with a score they can interrogate, the gap named standard by standard, courses that close

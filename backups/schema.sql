@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5YrOrb9A2x9n5H9SJujNBYsLOZy1sIP9WBrryEz1t0pBRdiN0dznItixKvnkjeC
+\restrict Nz3UNQI1nQkTp2eju8NPKkhvMOkvZyblSqjANdNNRqANhEnkCngFGnQnNmPyU3t
 
 -- Dumped from database version 16.15 (Debian 16.15-1.pgdg12+2)
 -- Dumped by pg_dump version 16.15 (Debian 16.15-1.pgdg12+2)
@@ -71,7 +71,7 @@ CREATE TABLE public.analytics_events (
     subject_id uuid,
     payload jsonb,
     occurred_at timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_analytics_event_name CHECK (((name)::text = ANY ((ARRAY['matches_viewed'::character varying, 'match_opened'::character varying, 'gap_viewed'::character varying, 'course_recommended'::character varying, 'course_opened'::character varying])::text[])))
+    CONSTRAINT ck_analytics_event_name CHECK (((name)::text = ANY ((ARRAY['matches_viewed'::character varying, 'match_opened'::character varying, 'gap_viewed'::character varying, 'course_recommended'::character varying, 'course_opened'::character varying, 'employer_overview_viewed'::character varying, 'employer_shortlist_viewed'::character varying])::text[])))
 );
 
 
@@ -2123,5 +2123,5 @@ ALTER TABLE ONLY public.sub_sectors
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5YrOrb9A2x9n5H9SJujNBYsLOZy1sIP9WBrryEz1t0pBRdiN0dznItixKvnkjeC
+\unrestrict Nz3UNQI1nQkTp2eju8NPKkhvMOkvZyblSqjANdNNRqANhEnkCngFGnQnNmPyU3t
 

@@ -2,7 +2,8 @@
 
 import { useTranslations } from "next-intl";
 
-import { ButtonLink, buttonClass } from "@/components/ui";
+import { ButtonLink, buttonVariants } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, getRefreshToken, useIsSignedIn } from "@/lib/auth";
@@ -38,7 +39,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
         <button
           type="button"
           onClick={() => void signOut()}
-          className={`${buttonClass("ghost", size)} text-foreground`}
+          className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
         >
           {t("signOut")}
         </button>
@@ -48,7 +49,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
 
   return (
     <>
-      <Link href="/signin" className={`${buttonClass("ghost", size)} text-foreground`}>
+      <Link href="/signin" className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}>
         {tn("signIn")}
       </Link>
       <ButtonLink href="/signin" size={size}>

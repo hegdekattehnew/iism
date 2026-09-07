@@ -1,6 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { AudiencePage } from "@/components/AudiencePage";
 
 export default async function Page({
   params,
@@ -9,5 +9,13 @@ export default async function Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <PlaceholderPage titleKey="forProviders" noteKey="providers" />;
+  return (
+    <AudiencePage
+      namespace="providersPage"
+      points={["one", "two", "three"]}
+      showStats={true}
+      primaryHref="/courses"
+      secondaryHref="/skills"
+    />
+  );
 }

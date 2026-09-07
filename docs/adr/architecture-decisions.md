@@ -1179,3 +1179,47 @@ and ADR-031 already fix the implementation and dimension.
   first so there is a baseline to measure any addition against.
 
 ---
+
+---
+
+## ADR-037: The Employer Console as a Labelled Demonstration
+
+**Status:** Accepted (September 2026)
+
+**Context:** Everything the matching engine does is real, and none of it is visible to the side of
+the market ADR-025 expects to eventually carry revenue. There is no employer surface at all, so the
+B2B case cannot be shown — and it needs to be, to an audience deciding whether to fund the next
+phase.
+
+Building it properly would mean organisation authentication, which ADR-032 deliberately deferred:
+organisations have nothing to publish, so a login for them would protect nothing and would be
+authentication built to satisfy a demo rather than a user. But an employer surface with **no**
+authentication reads the candidate pool, and that is a real exposure however the roadmap is worded.
+
+**Decision:** ship the employer console as an unauthenticated demonstration, bounded by three
+constraints that are enforced in code rather than promised in a document.
+
+1. **It is the same scorer, run the other way round.** `score_match` takes what a job requires and
+   what a person holds; it does not care which side the query started from. Ranking candidates is
+   that function with its arguments swapped. **No second scoring implementation may exist** — two
+   scorers drift, and once they disagree about the same pair neither number is defensible.
+2. **No candidate is identified.** A card carries a reference derived from the profile id, a
+   headline, a district, years of experience and the gap. Never a name, a phone number, an email or
+   a user id. A demonstration that leaks the pool is not a demonstration worth having.
+3. **It refuses to mount in production.** `mount_employer_console` checks the environment and
+   returns `False`, mirroring `ConsoleNotificationProvider`, which refuses to run there for the same
+   reason: a stand-in that survives into a live environment is indistinguishable from the real thing
+   right up until it matters. A test boots the app in both environments and asserts the route is
+   present in one and absent in the other.
+
+The identity assumed — *which* employer you are acting as — is stated on the screen, above the data
+rather than beneath it.
+
+**Consequences:**
+- `api/modules/matching/employer.py` holds retrieval and aggregation only; scoring stays in
+  `scoring.py`.
+- Real employer authentication remains deferred until self-serve publishing exists. When it lands,
+  the mount guard is removed and the routes move behind `get_current_user` — the ranking logic is
+  unchanged, because it never depended on being anonymous.
+- Two analytics events (`employer_overview_viewed`, `employer_shortlist_viewed`) carry a tenant or
+  job id and counts, never a candidate reference. ADR-025's payload rule applies here as everywhere.

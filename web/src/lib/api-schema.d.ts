@@ -211,6 +211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/marketplace/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Marketplace Stats
+         * @description Everything the landing page claims, in one round trip.
+         */
+        get: operations["marketplace_stats_marketplace_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skills/{slug}/jobs": {
         parameters: {
             query?: never;
@@ -494,6 +514,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/employer/employers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Employers
+         * @description Employers with something published, for the demonstration's picker.
+         */
+        get: operations["list_employers_employer_employers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/employer/{slug}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description Every open vacancy, the pool against each, and what the pool cannot supply.
+         */
+        get: operations["overview_employer__slug__overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/employer/{slug}/jobs/{job_slug}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidates
+         * @description Ranked candidates for one vacancy, each with the gap that placed them.
+         */
+        get: operations["candidates_employer__slug__jobs__job_slug__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -582,6 +662,46 @@ export interface components {
              */
             script: "latin" | "devanagari" | "transliteration";
         };
+        /**
+         * CandidateCardOut
+         * @description A ranked candidate, described without identifying them.
+         *
+         *     No name, no phone, no email. The employer surface is unauthenticated for
+         *     now, so it may only show what an employer needs to decide whether to open a
+         *     conversation -- and a reference is enough for that.
+         */
+        CandidateCardOut: {
+            /** Reference */
+            reference: string;
+            /** Headline */
+            headline?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Years Experience */
+            years_experience: number;
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Matched */
+            matched?: components["schemas"]["MatchedSkillOut"][];
+            /** Missing */
+            missing?: components["schemas"]["MissingSkillOut"][];
+            /**
+             * Missing Mandatory
+             * @default 0
+             */
+            missing_mandatory: number;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
+            /**
+             * Capped By Mandatory
+             * @default false
+             */
+            capped_by_mandatory: boolean;
+        };
         /** CandidateProfileFull */
         CandidateProfileFull: {
             /**
@@ -669,6 +789,14 @@ export interface components {
             /** Notice Period */
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
         };
+        /** CandidateRanking */
+        CandidateRanking: {
+            job: components["schemas"]["JobSummary"];
+            /** Items */
+            items?: components["schemas"]["CandidateCardOut"][];
+            /** Total */
+            total: number;
+        };
         /** CandidateSkillAdd */
         CandidateSkillAdd: {
             /** Skill Slug */
@@ -724,6 +852,32 @@ export interface components {
             latency_ms?: number | null;
             /** Detail */
             detail?: string | null;
+        };
+        /**
+         * CorpusStatsOut
+         * @description What the platform holds, counted live. Backs the landing page.
+         */
+        CorpusStatsOut: {
+            /** Standards */
+            standards: number;
+            /** Qualifications */
+            qualifications: number;
+            /** Criteria */
+            criteria: number;
+            /** Awarding Bodies */
+            awarding_bodies: number;
+            /** Sectors */
+            sectors: number;
+            /** States */
+            states: number;
+            /** Districts */
+            districts: number;
+            /** Entry Routes */
+            entry_routes: number;
+            /** Jobs */
+            jobs: number;
+            /** Courses */
+            courses: number;
         };
         /** CourseDetail */
         CourseDetail: {
@@ -889,6 +1043,23 @@ export interface components {
              */
             id: string;
         };
+        /** EmployerOut */
+        EmployerOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+        };
+        /** EmployerOverview */
+        EmployerOverview: {
+            employer: components["schemas"]["EmployerOut"];
+            /** Jobs */
+            jobs?: components["schemas"]["JobPoolOut"][];
+            /** Scarce */
+            scarce?: components["schemas"]["ScarceSkillOut"][];
+            /** Candidates Total */
+            candidates_total: number;
+        };
         /** EntryRouteOut */
         EntryRouteOut: {
             /** Qp Code */
@@ -1023,6 +1194,16 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** JobPoolOut */
+        JobPoolOut: {
+            job: components["schemas"]["JobSummary"];
+            /** Pool */
+            pool: number;
+            /** Ready */
+            ready: number;
+            /** Nearly */
+            nearly: number;
         };
         /** JobSkillOut */
         JobSkillOut: {
@@ -1300,6 +1481,17 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /** ScarceSkillOut */
+        ScarceSkillOut: {
+            /** Nos Code */
+            nos_code?: string | null;
+            /** Name En */
+            name_en: string;
+            /** Required By */
+            required_by: number;
+            /** Held By */
+            held_by: number;
         };
         /** SkillCount */
         SkillCount: {
@@ -1933,6 +2125,26 @@ export interface operations {
             };
         };
     };
+    marketplace_stats_marketplace_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorpusStatsOut"];
+                };
+            };
+        };
+    };
     jobs_for_skill_skills__slug__jobs_get: {
         parameters: {
             query?: {
@@ -2460,6 +2672,91 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_employers_employer_employers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOut"][];
+                };
+            };
+        };
+    };
+    overview_employer__slug__overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    candidates_employer__slug__jobs__job_slug__candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+                job_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateRanking"];
                 };
             };
             /** @description Validation Error */

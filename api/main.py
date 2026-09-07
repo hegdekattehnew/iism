@@ -20,6 +20,7 @@ from api.modules.marketplace import (
     marketplace_router,
     profile_router,
 )
+from api.modules.matching import mount_employer_console
 from api.modules.matching import router as matching_router
 from api.modules.skills import router as skills_router
 
@@ -56,6 +57,11 @@ app.include_router(marketplace_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(matching_router)
+
+# The employer console is a demonstration surface with no authentication, so it
+# mounts outside production only -- and says so in the health payload rather
+# than leaving the fact to a reader of this file.
+employer_console_enabled = mount_employer_console(app)
 
 
 @app.get("/health", tags=["health"])

@@ -8,16 +8,21 @@ plausibly weaken later without noticing.
 import uuid
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics.models import AnalyticsEvent
+from api.modules.identity.models import Tenant, User
+from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
 from api.modules.matching.scoring import (
     MANDATORY_GAP_CAP,
     HeldSkill,
     RequiredSkill,
     score_match,
 )
+from api.modules.skills.models import Skill
 
 
 def _req(name: str, *, importance: int = 3, mandatory: bool = False, concept=None, level=None):
@@ -219,3 +224,141 @@ class TestMatchEndpoints:
             .where(AnalyticsEvent.name == "matches_viewed")
         )
         assert recorded == 1
+
+
+class TestEmployerConsole:
+    """The scorer, run the other way round.
+
+    The rule these guard is that there is exactly one scorer. If ranking
+    candidates ever grows its own scoring logic, the two sides can disagree
+    about the same pair, and neither number is defensible after that.
+    """
+
+    @pytest.fixture
+    async def pool(self, db: AsyncSession) -> dict:
+        """One vacancy, and three candidates who differ in exactly one way each."""
+        mandatory = Skill(
+            slug="infection-control-x",
+            name_en="Infection control",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="TST/N0001",
+            source="nsqf",
+        )
+        optional = Skill(
+            slug="bed-making-x",
+            name_en="Replace linen",
+            skill_type="technical",
+            nsqf_level=Decimal("3"),
+            nos_code="TST/N0002",
+            source="nsqf",
+        )
+        db.add_all([mandatory, optional])
+
+        employer_tenant = Tenant(slug="demo-employer", name="Demo Employer", tenant_type="employer")
+        db.add(employer_tenant)
+        await db.flush()
+
+        job = Job(
+            slug="demo-vacancy",
+            tenant_id=employer_tenant.id,
+            title_en="Ward Attendant",
+            employment_type="full_time",
+            nsqf_level_min=Decimal("3"),
+            status="published",
+        )
+        db.add(job)
+        await db.flush()
+        db.add_all(
+            [
+                JobSkill(job_id=job.id, skill_id=mandatory.id, importance=5, is_mandatory=True),
+                JobSkill(job_id=job.id, skill_id=optional.id, importance=3, is_mandatory=False),
+            ]
+        )
+
+        profiles = {}
+        for name, rows in {
+            "ready": [(mandatory, "certified"), (optional, "certified")],
+            "nearly": [(optional, "certified")],
+            "unrelated": [],
+        }.items():
+            user = User(phone=f"+9199000{abs(hash(name)) % 100000:05d}")
+            db.add(user)
+            await db.flush()
+            profile = CandidateProfile(user_id=user.id, headline=name, years_experience=2)
+            db.add(profile)
+            await db.flush()
+            for skill, source in rows:
+                db.add(
+                    CandidateSkill(
+                        profile_id=profile.id,
+                        skill_id=skill.id,
+                        proficiency=4,
+                        source=source,
+                    )
+                )
+            profiles[name] = profile
+        await db.commit()
+        return {"job": job, "profiles": profiles}
+
+    async def test_ranking_orders_by_score_and_names_the_mandatory_gap(self, pool, client) -> None:
+        body = (await client.get("/employer/demo-employer/jobs/demo-vacancy/candidates")).json()
+
+        # The candidate holding nothing the job asks for never appears: a page
+        # of zeroes is not a shortlist.
+        assert body["total"] == 2
+        first, second = body["items"]
+        assert first["score"] > second["score"]
+        assert first["missing_mandatory"] == 0
+        assert second["missing_mandatory"] == 1
+        assert second["capped_by_mandatory"] is True
+        assert [m["name_en"] for m in second["missing"] if m["is_mandatory"]] == [
+            "Infection control"
+        ]
+
+    async def test_a_candidate_is_never_identified(self, pool, client) -> None:
+        """The surface is unauthenticated, so it may not carry a name, a phone
+        or an email -- and a reference is enough to open a conversation."""
+        body = (await client.get("/employer/demo-employer/jobs/demo-vacancy/candidates")).json()
+
+        for card in body["items"]:
+            assert card["reference"].startswith("C-")
+            assert "full_name" not in card
+            assert "phone" not in card
+            assert "email" not in card
+            assert "user_id" not in card
+
+    async def test_both_directions_agree_on_the_same_pair(self, pool, db, client) -> None:
+        """One scorer, or the explanation stops explaining anything."""
+        from api.modules.matching.employer import rank_candidates
+        from api.modules.matching.service import match_job_by_slug
+
+        job = pool["job"]
+        ready = pool["profiles"]["ready"]
+
+        found = await rank_candidates(db, job.tenant_id, job.slug)
+        assert found is not None
+        employer_side = next(s for _, items in [found] for s in items if s.profile.id == ready.id)
+        candidate_side = await match_job_by_slug(db, ready.id, job.slug)
+
+        assert candidate_side is not None
+        assert employer_side.result.score == candidate_side.result.score
+
+    async def test_overview_counts_pool_ready_and_nearly(self, pool, client) -> None:
+        body = (await client.get("/employer/demo-employer/overview")).json()
+
+        vacancy = next(j for j in body["jobs"] if j["job"]["slug"] == "demo-vacancy")
+        assert vacancy["pool"] == 2
+        assert vacancy["ready"] == 1
+        assert vacancy["nearly"] == 1
+
+    async def test_scarcity_counts_supply_against_demand(self, pool, client) -> None:
+        body = (await client.get("/employer/demo-employer/overview")).json()
+
+        scarce = {s["nos_code"]: s for s in body["scarce"]}
+        assert scarce["TST/N0001"]["required_by"] == 1
+        assert scarce["TST/N0001"]["held_by"] == 1
+        assert scarce["TST/N0002"]["held_by"] == 2
+
+    async def test_an_unknown_employer_is_a_404(self, pool, client) -> None:
+        assert (await client.get("/employer/nobody/overview")).status_code == 404

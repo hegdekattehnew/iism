@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { ButtonLink } from "@/components/ui";
+import { CoverageBar, LevelScale } from "@/components/CoverageBar";
+import { ButtonLink, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
@@ -27,7 +28,9 @@ function ScoreDial({ score }: { score: number }) {
         ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
         : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
   return (
-    <span className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${tone}`}>
+    <span
+      className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${tone}`}
+    >
       {t("matchScore", { score })}
     </span>
   );
@@ -50,11 +53,15 @@ function SkillChip({
       }`}
     >
       {skill.is_mandatory && (
-        <span className="font-semibold uppercase tracking-wide">{t("mandatory")}</span>
+        <span className="font-semibold uppercase tracking-wide">
+          {t("mandatory")}
+        </span>
       )}
       <span>{skill.name_en}</span>
       {skill.nos_code && (
-        <span className="font-mono text-[10px] opacity-70">{skill.nos_code}</span>
+        <span className="font-mono text-[10px] opacity-70">
+          {skill.nos_code}
+        </span>
       )}
     </span>
   );
@@ -104,7 +111,19 @@ export function MatchBrowser() {
       </p>
     );
   }
-  if (matches.isPending) return <p className="text-sm text-muted">…</p>;
+  // A shape rather than an ellipsis: the page stops reflowing when the data
+  // lands, which on a slow connection is most of the perceived jank.
+  if (matches.isPending) {
+    return (
+      <ul className="space-y-4">
+        {[0, 1, 2].map((i) => (
+          <li key={i}>
+            <Skeleton className="h-44 w-full rounded-xl" />
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   // No declared skills is a different state from no matches, and saying so is
   // the difference between a dead end and a next step.
@@ -151,10 +170,27 @@ export function MatchBrowser() {
               <ScoreDial score={m.score} />
             </div>
 
+            <div className="mt-4">
+              <CoverageBar
+                coverage={m.coverage}
+                missingMandatory={m.missing_mandatory}
+                capped={m.capped_by_mandatory}
+              />
+            </div>
+
             {m.capped_by_mandatory && (
               <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
                 {t("capped")}
               </p>
+            )}
+
+            {m.job.nsqf_level_min != null && (
+              <div className="mt-4">
+                <LevelScale
+                  required={m.job.nsqf_level_min}
+                  shortfall={m.level_shortfall}
+                />
+              </div>
             )}
 
             {matched.length > 0 && (
@@ -187,7 +223,7 @@ export function MatchBrowser() {
               <button
                 type="button"
                 onClick={() => setOpenSlug(open ? null : m.job.slug)}
-                className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+                className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline"
               >
                 {open ? t("backToMatches") : t("coursesHeading")}
               </button>
@@ -201,7 +237,9 @@ export function MatchBrowser() {
 
             {open && (
               <div className="mt-4 border-t border-border-token pt-4">
-                {detail.isPending && <p className="text-sm text-muted">…</p>}
+                {detail.isPending && (
+                  <Skeleton className="h-24 w-full rounded-lg" />
+                )}
 
                 {d && courses.length === 0 && (
                   <p className="text-sm text-muted">{t("noCourses")}</p>
