@@ -39,6 +39,11 @@ class SkillOut(BaseModel):
     skill_type: SkillType
     nsqf_level: NsqfLevel | None = None
     qp_count: int = 0
+    # Promoted from SkillDetail. An employer picking a required standard needs
+    # the code -- `HSS/N5134` is what an assessor, a certificate and a
+    # qualification pack all say -- and a picker showing only a name asks them
+    # to trust a string match they cannot check.
+    nos_code: str | None = None
 
 
 class SkillDetail(SkillOut):
@@ -53,7 +58,6 @@ class SkillDetail(SkillOut):
     # here, which is the "output schemas stay permissive" rule in CLAUDE.md
     # earning its keep again.
     source: str = "curated"
-    nos_code: str | None = None
     nos_version: str | None = None
     nos_type: str | None = None
 

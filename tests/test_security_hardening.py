@@ -34,7 +34,11 @@ def _paths(environment: str) -> set[str]:
     OpenAPI schema is the only reliable source.
     """
     env = {**os.environ, "ENVIRONMENT": environment}
-    if environment == "production":
+    # `get_settings()` refuses to start outside the local environments with a
+    # default secret or OTP exposure on -- deliberately -- so any non-local
+    # environment under test has to satisfy the same guard a real deployment
+    # would.
+    if environment not in ("development", "test", "ci"):
         env["JWT_SECRET_KEY"] = "x" * 40
         env["OTP_EXPOSE_IN_RESPONSE"] = "false"
 
@@ -64,7 +68,7 @@ def test_demo_task_endpoints_exist_in_development() -> None:
     assert "/tasks/ping" in _paths("development")
 
 
-def test_employer_console_is_absent_in_production() -> None:
+def test_employer_demo_is_absent_in_production() -> None:
     """It is unauthenticated and it reads the candidate pool. Acceptable as a
     labelled demonstration; not acceptable anywhere a real candidate's profile
     exists. The guard is in the app assembly, so this boots the app to check it
@@ -72,8 +76,28 @@ def test_employer_console_is_absent_in_production() -> None:
     assert "/employer/employers" not in _paths("production")
 
 
-def test_employer_console_exists_in_development() -> None:
+def test_employer_demo_is_absent_in_staging_too() -> None:
+    """The original guard compared to "production" alone, which mounted an
+    unauthenticated reader of the candidate pool on staging, on CI, and on any
+    host where ENVIRONMENT was unset or misspelled. It is an allowlist of local
+    environments now, and this is the test that would have caught it."""
+    assert "/employer/employers" not in _paths("staging")
+
+
+def test_employer_demo_exists_in_development() -> None:
     assert "/employer/employers" in _paths("development")
+
+
+def test_the_authenticated_console_ships_everywhere() -> None:
+    """It needs no guard, because it has authentication. If this ever goes
+    missing in production the B2B side silently stops existing."""
+    for environment in ("development", "staging", "production"):
+        assert "/org/{org_slug}/candidates" in _paths(environment), environment
+
+
+def test_publishing_ships_everywhere() -> None:
+    for environment in ("development", "staging", "production"):
+        assert "/org/{org_slug}/jobs" in _paths(environment), environment
 
 
 # ------------------------------------------------ OTP never reaches a log sink

@@ -199,7 +199,7 @@ async def test_otp_is_not_stored_in_plaintext(client: AsyncClient) -> None:
     """Redis is a plausible read target; a plaintext code there is a credential."""
     phone = _phone()
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
-    stored = await get_redis().get(f"auth:otp:{normalise_phone(phone)}")
+    stored = await get_redis().get(f"auth:otp:sms:{normalise_phone(phone)}")
     assert stored is not None and stored != code
 
 

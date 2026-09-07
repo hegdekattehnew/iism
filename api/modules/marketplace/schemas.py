@@ -66,6 +66,72 @@ class JobDetail(JobOut):
     skills: list[JobSkillOut] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# What an employer sends (ADR-039). Constraints live on the way in; the *Out
+# models above stay permissive, because a constraint on a response model turns
+# one odd row into a 500 for the whole page.
+# ---------------------------------------------------------------------------
+
+
+class JobSkillIn(BaseModel):
+    """One required standard, with the two facts that make a match scoreable."""
+
+    skill_slug: str
+    importance: int = Field(3, ge=1, le=5)
+    is_mandatory: bool = False
+
+
+class JobIn(BaseModel):
+    """A vacancy as its employer describes it.
+
+    No `status` field: publishing is an explicit action on its own endpoint, not
+    something a form can do by setting a string. `Job.status` defaults to
+    `published` at the model level, so the service must set `draft` by hand --
+    a footgun this schema deliberately keeps out of reach.
+    """
+
+    title_en: str = Field(min_length=3, max_length=200)
+    title_hi: str | None = Field(None, max_length=200)
+    description_en: str | None = None
+    description_hi: str | None = None
+    location_state: str | None = Field(None, max_length=120)
+    location_district: str | None = Field(None, max_length=120)
+    employment_type: EmploymentType = "full_time"
+    experience_min_years: int = Field(0, ge=0, le=60)
+    experience_max_years: int | None = Field(None, ge=0, le=60)
+    salary_min_inr: int | None = Field(None, ge=0)
+    salary_max_inr: int | None = Field(None, ge=0)
+    nsqf_level_min: NsqfLevelIn | None = None
+    skills: list[JobSkillIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _ranges_are_the_right_way_round(self) -> "JobIn":
+        if (
+            self.experience_max_years is not None
+            and self.experience_max_years < self.experience_min_years
+        ):
+            raise ValueError("experience_max_years must not be below experience_min_years")
+        if (
+            self.salary_min_inr is not None
+            and self.salary_max_inr is not None
+            and self.salary_max_inr < self.salary_min_inr
+        ):
+            raise ValueError("salary_max_inr must not be below salary_min_inr")
+        return self
+
+
+class OrgJobOut(JobDetail):
+    """An employer's view of their own listing, drafts included.
+
+    Every public listing query hard-filters `status == 'published'`, so a draft
+    is unreachable anywhere else in the API. `status` is exposed here because
+    this is the one place someone needs to know it.
+    """
+
+    status: Status
+    updated_at: datetime
+
+
 class CourseOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

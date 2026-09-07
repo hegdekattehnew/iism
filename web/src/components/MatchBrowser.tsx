@@ -67,6 +67,19 @@ function SkillChip({
   );
 }
 
+/** ADR-025 names candidate-to-course click-through as one of three metrics that
+ *  stand in for a revenue signal while v1 is free. It is the one event the
+ *  server cannot observe for itself: following a link out of a recommendation
+ *  is a client-side act, and inferring it from a later course page view would
+ *  credit organic browsing to a recommendation it had nothing to do with.
+ *
+ *  Fire-and-forget. A failed measurement must never cost the person the click. */
+function reportCourseOpened(courseSlug: string, fromJobSlug: string) {
+  void api.POST("/me/events/course-opened", {
+    body: { course_slug: courseSlug, from_job_slug: fromJobSlug },
+  });
+}
+
 export function MatchBrowser() {
   const t = useTranslations("matchesPage");
   const locale = useLocale();
@@ -254,6 +267,9 @@ export function MatchBrowser() {
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <Link
                             href={`/courses/${c.slug}`}
+                            onClick={() =>
+                              reportCourseOpened(c.slug, m.job.slug)
+                            }
                             className="text-sm font-semibold underline-offset-4 hover:underline"
                           >
                             {isHi && c.title_hi ? c.title_hi : c.title_en}

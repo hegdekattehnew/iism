@@ -25,7 +25,8 @@ import sys
 from sqlalchemy import delete, select
 
 from api.core.database import dispose_engine, get_sessionmaker
-from api.modules.identity.models import Tenant, User
+from api.modules.identity.models import User
+from api.modules.identity.service import provision_candidate
 from api.modules.marketplace.models import CandidateProfile, CandidateSkill
 from api.modules.skills.models import Skill
 
@@ -375,17 +376,13 @@ async def main() -> None:
         for phone, name, headline, state, district, years, rows in CANDIDATES:
             user = await db.scalar(select(User).where(User.phone == phone))
             if user is None:
-                user = User(phone=phone, full_name=name)
-                db.add(user)
-                await db.flush()
+                # Provisioned through the real sign-in path, not by hand. An
+                # earlier version added a personal tenant without a membership,
+                # so seeded candidates were the one kind of account with no
+                # role anywhere -- invisible until something finally read
+                # `Membership`, which Sprint 12 does.
+                user = await provision_candidate(db, phone)
                 created += 1
-                db.add(
-                    Tenant(
-                        slug=f"personal-{phone[-4:]}",
-                        name=name,
-                        tenant_type="personal",
-                    )
-                )
             user.full_name = name
 
             profile = await db.scalar(

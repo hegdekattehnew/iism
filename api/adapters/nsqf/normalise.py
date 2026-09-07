@@ -7,12 +7,16 @@ returns the wrong answer.
 """
 
 import re
-import unicodedata
 from decimal import Decimal, InvalidOperation
+
+# Re-exported: `slugify` moved to `api/core/text.py` when identity needed it to
+# name an organisation's tenant, and a module importing from an adapter for a
+# pure string function is the wrong direction. Every existing caller and import
+# of `normalise.slugify` keeps working.
+from api.core.text import slugify
 
 # "0126:00" -> 126 hours 0 minutes. Leading zeros are meaningful padding only.
 _HHMM = re.compile(r"^\s*(\d{1,5}):([0-5]?\d)\s*$")
-_SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
 MAX_SLUG_TITLE = 80
 
@@ -127,11 +131,6 @@ def parse_nco_codes(value: object) -> list[str]:
         if match not in seen:
             seen.append(match)
     return seen
-
-
-def slugify(text: str) -> str:
-    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    return _SLUG_STRIP.sub("-", ascii_text.lower()).strip("-")
 
 
 def make_skill_slug(title: str, code: str) -> str:

@@ -25,6 +25,7 @@ from api.modules.marketplace.profile_service import (
     remove_skill,
     update_profile,
 )
+from api.modules.marketplace.publishing_routes import router as publishing_router
 from api.modules.marketplace.routes import (
     courses_router,
     jobs_router,
@@ -68,6 +69,7 @@ __all__ = [
     "list_jobs",
     "marketplace_router",
     "profile_router",
+    "publishing_router",
     "remove_skill",
     "update_profile",
 ]

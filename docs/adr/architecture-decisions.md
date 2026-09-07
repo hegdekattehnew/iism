@@ -1223,3 +1223,94 @@ rather than beneath it.
   unchanged, because it never depended on being anonymous.
 - Two analytics events (`employer_overview_viewed`, `employer_shortlist_viewed`) carry a tenant or
   job id and counts, never a candidate reference. ADR-025's payload rule applies here as everywhere.
+
+---
+
+## ADR-038: One Identity, Many Roles
+
+**Status:** Accepted (September 2026). Supersedes the organisational half of ADR-032.
+
+**Context:** ADR-032 decided **phone with one-time passcode for candidates, email and password for
+organizational actors**, and said both should be linkable on one account. The schema half shipped in
+Sprint 4 — `User.phone` and `User.email` are nullable, independently unique and independently
+verified, and `issue_token_pair` takes only a UUID — but nothing behavioural was ever built.
+
+Two things are now known that were not then.
+
+**A person is not an actor type.** The same human is a candidate looking for work *and* the hiring
+manager at the clinic that employs them, and may later run a training centre. ADR-032 framed the
+decision as *which credential each cohort uses*, which quietly implies a cohort per account. Two
+accounts would fork a person's history, split their memberships, and make "signed in with the wrong
+one" a permanent support burden.
+
+**The password half has not survived contact with the build.** The OTP store, verify-and-consume,
+per-identifier request limiting and attempt capping all exist, are tested, and are credential-blind
+in logic. Reusing them costs a rename. A password path costs a hashing dependency — ADR-030 forbids
+hand-rolling, and `hash_secret` is HMAC-SHA256 with no work factor, so it must not be repurposed —
+plus a reset flow, strength rules and an ADR-023 obligation, before any employer posts a vacancy.
+
+**Decision:**
+
+1. **Organisations sign in with email and a one-time passcode.** No passwords anywhere in the
+   product. ADR-032's *principle* is kept intact and is what the code implements: which credential a
+   flow requires is decided by actor type **in the service layer**, not scattered across handlers.
+2. **One `User`, many `Membership` rows.** A signed-in person can create an organisation from their
+   existing identity (`POST /me/organisations`) and link a second credential
+   (`POST /me/credentials/{email,phone}`). Both organisation paths — cold registration and creation
+   from an existing account — land in the same state.
+3. **The active tenant is named by the request and granted by the membership.** It is never carried
+   in the token. Switching workspaces must not require re-issuing tokens; one person may hold two
+   tabs open as two organisations, which a token-borne context makes impossible; and a claim baked
+   into a 15-minute access token outlives a membership revoked in the meantime.
+
+**Consequences:**
+- Registering an address that already has an account **sends a sign-in code and creates no second
+  organisation**. An earlier implementation sent a "you already have an account" note instead, which
+  made the two responses differ by one field the moment `expose_otp` was on — a prober could read
+  the difference straight off the response. A test asserts the two responses are indistinguishable.
+- `EmailProvider` is a **separate port** from `NotificationProvider`, not a second method on it. SMS
+  and email are different vendors with different failure modes and compliance regimes; in India DLT
+  registration applies to one and not the other. `ConsoleEmailProvider` refuses to run in production,
+  exactly as its SMS sibling does.
+- SSO, when it arrives, attaches to the email identity rather than replacing a password flow.
+- ADR-032 stands for candidates and for the dual-credential schema. Only its organisational
+  credential choice is superseded.
+
+---
+
+## ADR-039: Authorization — Permissions Resolved From Membership Role
+
+**Status:** Accepted (September 2026). Implements ADR-012 and ADR-022.
+
+**Context:** ADR-012 decided "RBAC now, design for ABAC" and ADR-022 decided "permission-based
+authorization". Both were Accepted, and for eleven sprints **neither existed in code**.
+`Membership.role` carried three legal values, was written exactly once at account provisioning, and
+was read nowhere. `get_current_user` answering *is this person signed in* was the entire enforcement
+surface in `api/`. That was defensible while every authenticated route acted on the caller's own
+data; self-serve publishing ends it, because a job belongs to an organisation rather than a person.
+
+**Decision:** a permission layer whose permissions are resolved from the membership role.
+
+- Callers ask for a **permission**, never for a role — ADR-022 — so ADR-012's eventual move to ABAC
+  changes how the set is computed without touching a single route.
+- The set is a closed `StrEnum`, for the same reason `EVENT_NAMES` is closed: an open string becomes
+  forty spellings of the same idea within a month, and no audit survives that.
+- `require(permission)` returns a frozen `TenantContext(user, tenant, role, permissions)`. Every
+  org-scoped query filters on `context.tenant.id`; **no route reads a tenant id from a request
+  body.**
+- Deletion is the owner's alone. An admin can unpublish, which reverses; nothing else does.
+
+**A tenant the caller is not a member of returns 404, never 403.** A 403 confirms the organisation
+exists, so an employer could enumerate competitors by guessing slugs. Within an organisation the
+caller has already proved membership, so an insufficient *role* is a 403 — the existence of the
+organisation is not news to them, and telling them their role is too narrow is the useful answer.
+
+**Consequences:**
+- The employer console gains authenticated routes and ships to production. The unauthenticated
+  demonstration console stays, mounted in **local environments only** — an allowlist, replacing the
+  earlier comparison against `"production"` alone, which mounted an unauthenticated reader of the
+  candidate pool on `staging`, on CI, and anywhere `ENVIRONMENT` was unset or misspelled. ADR-037
+  anticipated removing the guard entirely; keeping the demonstration behind it is a deliberate
+  deviation, and `/health` now reports whether it is mounted.
+- Teammate invitations need no restructuring: the model is many memberships from the start, and the
+  only thing missing is a way to create the second one.

@@ -15,6 +15,20 @@ class NotificationProvider(Protocol):
     async def send_sms(self, phone: str, message: str) -> None: ...
 
 
+@runtime_checkable
+class EmailProvider(Protocol):
+    """Sends a transactional email.
+
+    A separate port rather than a second method on `NotificationProvider`.
+    SMS and email are different vendors with different credentials, failure
+    modes and compliance regimes -- in India, DLT registration applies to one
+    and not the other -- so one protocol serving both would force every
+    implementation to stub the half it does not do (ADR-017).
+    """
+
+    async def send_email(self, address: str, subject: str, body: str) -> None: ...
+
+
 class NotificationError(RuntimeError):
     """Delivery failed. Callers decide whether that is fatal.
 

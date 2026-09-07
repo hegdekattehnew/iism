@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Nz3UNQI1nQkTp2eju8NPKkhvMOkvZyblSqjANdNNRqANhEnkCngFGnQnNmPyU3t
+\restrict V9k3zMRLoTsrC9AyIGvUYew2K0JmYbKJiessOaw8CFDvx4TAciL7FDZ2ImVE02X
 
 -- Dumped from database version 16.15 (Debian 16.15-1.pgdg12+2)
 -- Dumped by pg_dump version 16.15 (Debian 16.15-1.pgdg12+2)
@@ -2123,5 +2123,5 @@ ALTER TABLE ONLY public.sub_sectors
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Nz3UNQI1nQkTp2eju8NPKkhvMOkvZyblSqjANdNNRqANhEnkCngFGnQnNmPyU3t
+\unrestrict V9k3zMRLoTsrC9AyIGvUYew2K0JmYbKJiessOaw8CFDvx4TAciL7FDZ2ImVE02X
 

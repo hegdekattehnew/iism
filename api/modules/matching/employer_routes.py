@@ -12,13 +12,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.authorization import Permission, TenantContext, require
 from api.core.config import get_settings
 from api.core.database import get_db_session
 from api.modules.analytics import record
+from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import CandidateSkill
 from api.modules.matching import employer, schemas
 
+# The demonstration console: no authentication, local environments only.
 router = APIRouter(prefix="/employer", tags=["employer"])
+
+# The real one: same service layer, same de-identified payload, but the
+# organisation is named by the path and granted by the caller's membership
+# (ADR-039). This ships to production; the router above does not.
+org_router = APIRouter(prefix="/org/{org_slug}/candidates", tags=["employer"])
+CanShortlist = Depends(require(Permission.CANDIDATE_SHORTLIST))
 
 
 def _card(scored: employer.ScoredCandidate) -> schemas.CandidateCardOut:
@@ -59,16 +68,13 @@ async def list_employers(
     return [schemas.EmployerOut.model_validate(t) for t in await employer.list_employers(db)]
 
 
-@router.get("/{slug}/overview", response_model=schemas.EmployerOverview)
-async def overview(
-    slug: str,
-    db: AsyncSession = Depends(get_db_session),
-) -> schemas.EmployerOverview:
-    """Every open vacancy, the pool against each, and what the pool cannot supply."""
-    tenant = await employer.get_employer(db, slug)
-    if tenant is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employer not found")
+async def _overview(db: AsyncSession, tenant: Tenant) -> schemas.EmployerOverview:
+    """Shared by the demonstration and the authenticated console.
 
+    Both surfaces answer the same question and must answer it identically; two
+    implementations would drift, and the demo would stop being a demonstration
+    of the real thing.
+    """
     pools = await employer.job_pools(db, tenant.id)
     scarce = await employer.scarce_skills(db, tenant.id)
     # Candidates who have declared something, not registered accounts. An empty
@@ -98,18 +104,9 @@ async def overview(
     )
 
 
-@router.get("/{slug}/jobs/{job_slug}/candidates", response_model=schemas.CandidateRanking)
-async def candidates(
-    slug: str,
-    job_slug: str,
-    limit: int = Query(20, ge=1, le=50),
-    db: AsyncSession = Depends(get_db_session),
+async def _ranking(
+    db: AsyncSession, tenant: Tenant, job_slug: str, limit: int
 ) -> schemas.CandidateRanking:
-    """Ranked candidates for one vacancy, each with the gap that placed them."""
-    tenant = await employer.get_employer(db, slug)
-    if tenant is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employer not found")
-
     found = await employer.rank_candidates(db, tenant.id, job_slug, limit=limit)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
@@ -129,14 +126,67 @@ async def candidates(
     )
 
 
-def mount_employer_console(app: object) -> bool:
-    """Mount the console outside production only. Returns whether it mounted.
+@router.get("/{slug}/overview", response_model=schemas.EmployerOverview)
+async def overview(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.EmployerOverview:
+    """Every open vacancy, the pool against each, and what the pool cannot supply."""
+    tenant = await employer.get_employer(db, slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employer not found")
+    return await _overview(db, tenant)
 
-    Mirrors `ConsoleNotificationProvider`, which refuses to run in production
-    for the same reason: a stand-in that survives into a live environment is
-    indistinguishable from the real thing right up until it matters.
+
+@router.get("/{slug}/jobs/{job_slug}/candidates", response_model=schemas.CandidateRanking)
+async def candidates(
+    slug: str,
+    job_slug: str,
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.CandidateRanking:
+    """Ranked candidates for one vacancy, each with the gap that placed them."""
+    tenant = await employer.get_employer(db, slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employer not found")
+    return await _ranking(db, tenant, job_slug, limit)
+
+
+# --------------------------------------------------- the authenticated console
+
+
+@org_router.get("", response_model=schemas.EmployerOverview)
+async def org_overview(
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.EmployerOverview:
+    """The signed-in employer's own vacancies and the pool against each."""
+    return await _overview(db, context.tenant)
+
+
+@org_router.get("/{job_slug}", response_model=schemas.CandidateRanking)
+async def org_candidates(
+    job_slug: str,
+    limit: int = Query(20, ge=1, le=50),
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.CandidateRanking:
+    return await _ranking(db, context.tenant, job_slug, limit)
+
+
+def mount_employer_console(app: object) -> bool:
+    """Mount the *demonstration* console in local environments only.
+
+    An allowlist, not a production denylist. The earlier version compared to
+    `"production"` alone, which mounted an unauthenticated reader of the
+    candidate pool on `staging`, on `ci`, and on any host where `ENVIRONMENT`
+    was unset or misspelled. `settings.is_local` is the same guard the demo
+    task router already uses.
+
+    The authenticated console (`org_router`) is mounted unconditionally by
+    `api/main.py`; it needs no guard, because it has authentication.
     """
-    if get_settings().environment == "production":
+    if not get_settings().is_local:
         return False
     app.include_router(router)  # type: ignore[attr-defined]
     return True

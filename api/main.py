@@ -13,14 +13,18 @@ from api.core.config import get_settings
 from api.core.database import dispose_engine
 from api.core.health import DeepHealth, check_database, check_redis, check_worker
 from api.core.tasks import close_task_pool, get_task_pool
+from api.modules.analytics import router as analytics_router
+from api.modules.geography import router as geography_router
+from api.modules.identity import account_router
 from api.modules.identity import router as auth_router
 from api.modules.marketplace import (
     courses_router,
     jobs_router,
     marketplace_router,
     profile_router,
+    publishing_router,
 )
-from api.modules.matching import mount_employer_console
+from api.modules.matching import employer_org_router, mount_employer_console
 from api.modules.matching import router as matching_router
 from api.modules.skills import router as skills_router
 
@@ -51,27 +55,38 @@ app.add_middleware(
 )
 
 app.include_router(skills_router)
+app.include_router(geography_router)
 app.include_router(jobs_router)
 app.include_router(courses_router)
 app.include_router(marketplace_router)
 app.include_router(auth_router)
+app.include_router(account_router)
 app.include_router(profile_router)
+app.include_router(publishing_router)
 app.include_router(matching_router)
+app.include_router(analytics_router)
 
-# The employer console is a demonstration surface with no authentication, so it
-# mounts outside production only -- and says so in the health payload rather
-# than leaving the fact to a reader of this file.
-employer_console_enabled = mount_employer_console(app)
+app.include_router(employer_org_router)
+
+# The *demonstration* console is unauthenticated, so it mounts in local
+# environments only. The authenticated one above needs no guard. The flag is
+# reported by /health, so which surfaces are live is answerable without reading
+# this file.
+employer_demo_enabled = mount_employer_console(app)
 
 
 @app.get("/health", tags=["health"])
-async def health() -> dict[str, str]:
+async def health() -> dict[str, str | bool]:
     """Liveness only. Never touches a dependency, so it cannot cascade."""
     settings = get_settings()
     return {
         "status": "ok",
         "environment": settings.environment,
         "version": settings.app_version,
+        # Whether the unauthenticated demonstration console is mounted. Worth
+        # answering over HTTP rather than by reading source: it is the one
+        # surface whose presence is a security question.
+        "employer_demo": employer_demo_enabled,
     }
 
 

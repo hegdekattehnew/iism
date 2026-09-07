@@ -72,16 +72,22 @@ api/                     FastAPI modular monolith
     cache.py             Async Redis client
     tasks.py             ARQ worker settings + task registry (ADR-027)
     health.py            Per-dependency health probes
+    authorization.py     Permissions resolved from membership role (ADR-039).
+                         Ask for a Permission, never a role.
+    text.py              slugify, shared by identity and the NSQF importer
   modules/
-    identity/            Users, tenants, memberships, OTP sign-in (ADR-009/010/011/032)
-    marketplace/         Jobs, courses and their skill links (ADR-001)
+    identity/            Users, tenants, memberships, OTP sign-in by phone *or* email,
+                         credential linking, organisation creation (ADR-009/010/011/032/038)
+    marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
+                         the employer's write path; everything else there is read-only.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
                          QpEntryRoute, QpNcoCode, ModelCurriculum;
                          content.py = what a standard actually says, ~614k rows
                          (ADR-004, ADR-034)
-    geography/           State, District, SubDistrict. Its own module: jobs and
+    geography/           State, District, SubDistrict, plus the service that resolves a
+                         written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
     matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
                          scoring.py is pure -- no I/O, no clock, no model. employer.py is
@@ -196,6 +202,50 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   theme.
 
 ## Current state
+
+Sprint 12 (one identity, many roles) is done. An employer registers by email, posts a vacancy
+against real National Occupational Standards, publishes it, and sees ranked candidates — and the
+console finally ships to production, because it is behind something.
+
+- **One `User`, many `Membership` rows** (ADR-038). A candidate can create an organisation from
+  their existing identity and link a second credential; both organisation paths land in the same
+  state. **Never fork an account by actor type** — a person is a candidate *and* a hiring manager,
+  and two accounts would split their history permanently.
+- **The active tenant is named by the request and granted by the membership**, never carried in the
+  token. Switching workspaces must not re-issue tokens, one person may hold two tabs as two
+  organisations, and a claim in a 15-minute token outlives a revoked membership.
+- **A tenant you are not a member of is a 404, never a 403.** A 403 confirms the organisation
+  exists, so an employer could enumerate competitors by guessing slugs. An insufficient *role*
+  inside an organisation you do belong to is a 403 — existence is not news to you there.
+- **`api/core/authorization.py` is the only authorization primitive** (ADR-039). Ask for a
+  `Permission`, never a role. `Membership.role` had been written once and read nowhere for eleven
+  sprints; do not add ad-hoc role checks beside this.
+- **Organisations sign in by email OTP, not password** (ADR-038, superseding ADR-032's org half).
+  There is no password anywhere in the product and no hashing dependency; `hash_secret` is
+  HMAC-SHA256 with no work factor and **must not** be repurposed for one.
+- **OTP keys carry their channel**: `auth:otp:{channel}:{identifier}`. Without it a phone and an
+  email could share a code, an attempt counter and a request budget.
+- **Registering a known address sends a sign-in code and creates no second organisation.** The
+  earlier "you already have an account" note made the two responses differ by one field whenever
+  `expose_otp` was on — a readable enumeration oracle. A test asserts they are indistinguishable.
+- **`EmailProvider` is its own port**, not a second method on `NotificationProvider`. Different
+  vendors, different compliance (DLT applies to SMS alone). `ConsoleEmailProvider` refuses
+  production, like its sibling.
+- **`Job.status` defaults to `"published"` in the model**, so `create_job` sets `draft` by hand. A
+  create path that forgets puts an unfinished listing in front of candidates; a test guards it.
+- **A job with no required standards cannot be published.** Matching scores concept overlap, so it
+  would be published and permanently unmatchable.
+- **Geography resolves on write**, in `api/modules/geography/service.py`. It used to happen only in
+  the NSQF importer's backfill, so an API-created job had a NULL `state_id` and was invisible to
+  `match_jobs(state_id=…)` while still appearing at `/jobs`.
+- **`Button` defaults to `type="button"`**, inverting the HTML default. The standards picker's Add
+  button sat inside the job form and silently saved a half-written vacancy instead of adding a
+  standard. Submitting is the special case and every form says so explicitly.
+- **next-intl reads a dot as a namespace separator.** `"employment.full_time"` as a flat key renders
+  as the literal key; it has to be a nested object.
+- **The demonstration console mounts in local environments only** — an allowlist. The previous guard
+  compared against `"production"` alone, which mounted an unauthenticated reader of the candidate
+  pool on `staging`, on CI, and anywhere `ENVIRONMENT` was unset. `/health` reports whether it is on.
 
 Sprint 11 (make it sellable) is done. There is a component library, the landing page proves the
 scale of the corpus from live counts, the employer console ranks candidates for a vacancy, the app

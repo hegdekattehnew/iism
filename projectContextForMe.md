@@ -24,7 +24,7 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **37 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/adr/architecture-decisions.md` | **39 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
@@ -101,6 +101,46 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
+
+**Sprint 12 (one identity, many roles) — done** on 2026-09-07. Organisation identity, the
+authorization primitive both ADR-012 and ADR-022 had described for eleven sprints without anyone
+building it, and self-serve job publishing. ADR-038 and ADR-039. 233 tests. 557 message keys per
+locale.
+
+What a future session should not have to rediscover:
+- **A person is not an actor type.** The multi-role case is the load-bearing design decision, and it
+  is cheap now and expensive later: every org-scoped query depends on how the active tenant is
+  resolved. It comes from the request path and is granted by the membership — never from the token,
+  never from a request body.
+- **404, not 403, for an organisation you are not a member of.** A 403 confirms it exists, and an
+  employer could enumerate competitors by guessing slugs. Inside an organisation you *do* belong to,
+  an insufficient role is a 403.
+- **Registration had a readable enumeration oracle and it was caught by running the flow, not by
+  reading it.** The first version sent a "you already have an account" note instead of a code, so
+  the two responses differed by one field whenever `expose_otp` was on. It now sends a real sign-in
+  code and creates no second organisation — indistinguishable, and friendlier.
+- **`scripts/seed_candidates.py` was creating a personal tenant with no membership.** Invisible for
+  four sprints because nothing read `Membership`. It now provisions through the real sign-in path,
+  so seeded candidates are shaped like real ones.
+- **`Job.status` defaults to `"published"` in the model.** Every create path must set `draft`
+  explicitly. This is a footgun aimed squarely at the code this sprint added.
+- **Geography resolved only inside the NSQF importer's backfill.** A job created through the API had
+  a NULL `state_id` and was invisible to location-filtered matching while appearing normally at
+  `/jobs` — the worst kind of bug, because nothing looks wrong. Resolution moved into
+  `api/modules/geography/service.py` and happens on write.
+- **`SkillOut` carried no `nos_code`**, so a picker could show three standards with identical names
+  and no way to tell them apart. Verified in the browser: searching "infection control" returns
+  three rows named the same, distinguishable only by `MSU/HSS/CRS0093-004` and friends.
+- **A design-system `Button` defaulting to `type="submit"` is a footgun.** The picker's Add button
+  saved a half-written vacancy instead of adding a standard. `Button` now defaults to
+  `type="button"`; every form already declared its submit explicitly.
+- **next-intl reads a dot as a namespace separator**, so `"employment.full_time"` as a flat key
+  renders as the literal key string on screen. It must be a nested object.
+- **The Sprint 11 mount guard was wrong** and I wrote it: `environment == "production"` mounted the
+  unauthenticated console on staging, on CI, and anywhere `ENVIRONMENT` was unset. It is an
+  allowlist now, and `/health` reports it — which the old comment falsely claimed it already did.
+- **`email-validator` rejects the reserved `.test` TLD**, which is exactly the sort of thing a
+  hand-written address regex waves through. Test fixtures use an ordinary domain.
 
 **Sprint 11 (make it sellable) — done** on 2026-09-07. Six parts, in the plan's must-land order:
 a component library, the landing page proving scale from live counts, the employer console, an
@@ -549,14 +589,16 @@ deterministic overlap ships first so there is a baseline). Embeddings over perfo
 rather than titles — titles like `OJT` and `Project` embed to noise — with sentence-transformers
 self-hosted, so no per-request cost.
 
-**Hindi for the corpus** (Sprint 12): ~$5 for the navigable surface, blocked on credentials rather
+**Hindi for the corpus** (Sprint 13): ~$5 for the navigable surface, blocked on credentials rather
 than design. Worth stating plainly in any demo: the interface is fully bilingual today, the *corpus*
 is not — standard names and descriptions are still English.
 
-**Real employer authentication**, which ADR-037 defers again on the same grounds ADR-032 first did:
-organisations cannot publish anything yet. When self-serve publishing lands, the console's mount
-guard comes off and its routes move behind `get_current_user`; the ranking logic is unchanged,
-because it never depended on being anonymous.
+**Teammate invitations.** One owner per organisation today. The model already allows many
+memberships per tenant, so this is an invitation token, an email and an acceptance path — no
+restructuring, which is exactly why the context model was built for many memberships from the start.
+
+**Course-provider self-serve publishing**, on the same rails as jobs. `publishing.py` and the
+authorization dependency generalise; `Course` has no geography, which is the only real difference.
 
 **The parked résumé builder and extractor**, deferred because correct Devanagari in PDF needs
 complex-script shaping and therefore Pango/HarfBuzz. Still the best answer to profile-completion

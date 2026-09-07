@@ -6,10 +6,17 @@ what a person is missing for the work they want, and which training closes that 
 
 India-first, Hindi and English at launch. See
 [docs/IISM-Product-Definition.docx](docs/IISM-Product-Definition.docx) for what we are building
-and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 37 ADRs
+and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 39 ADRs
 that govern how.
 
-## Status — Sprints 1–11 complete
+## Status — Sprints 1–12 complete
+
+**Sprint 12 — the employer becomes a real user.** Register an organisation at
+`/employers/signin` with an email and a six-digit code — no password to set, forget or reset, and
+none for us to store. Post a vacancy by searching the national taxonomy and picking the standards it
+requires, each with an importance and a mandatory flag, then publish it and see ranked candidates
+immediately. One account holds many roles: a candidate can create an organisation from the identity
+they already have, and sign in afterwards by either credential.
 
 **Sprint 11 — the employer side, and a product you can look at.** The landing page now counts the
 corpus live rather than describing it. `/employers/demo` ranks candidates for a vacancy using the

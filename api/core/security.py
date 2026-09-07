@@ -45,9 +45,18 @@ def _aw(value: "Awaitable[_T] | _T") -> "Awaitable[_T]":
 
 _REFRESH_KEY = "auth:refresh:{jti}"
 _USER_REFRESH_SET = "auth:refresh:user:{user_id}"
-_OTP_KEY = "auth:otp:{phone}"
-_OTP_ATTEMPTS_KEY = "auth:otp:attempts:{phone}"
-_OTP_RATE_KEY = "auth:otp:rate:{phone}"
+# The channel is part of every OTP key. Without it a phone and an email that
+# happen to normalise to the same string would share one code, one attempt
+# counter and one request budget -- and a code issued for one could be spent on
+# the other.
+_OTP_KEY = "auth:otp:{channel}:{identifier}"
+_OTP_ATTEMPTS_KEY = "auth:otp:attempts:{channel}:{identifier}"
+_OTP_RATE_KEY = "auth:otp:rate:{channel}:{identifier}"
+
+# How a one-time code reaches its owner. The OTP machinery itself is
+# credential-blind (ADR-032: both login paths converge on one token path); only
+# delivery differs, and that lives behind an adapter.
+Channel = Literal["sms", "email"]
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -189,41 +198,45 @@ async def revoke_all_for_user(user_id: uuid.UUID) -> int:
 # ----------------------------------------------------------------------- OTP
 
 
-async def store_otp(phone: str, code: str) -> None:
+async def store_otp(channel: Channel, identifier: str, code: str) -> None:
     settings = get_settings()
     redis = get_redis()
-    await redis.set(_OTP_KEY.format(phone=phone), hash_secret(code), ex=settings.otp_ttl_seconds)
-    await redis.delete(_OTP_ATTEMPTS_KEY.format(phone=phone))
+    key = _OTP_KEY.format(channel=channel, identifier=identifier)
+    await redis.set(key, hash_secret(code), ex=settings.otp_ttl_seconds)
+    await redis.delete(_OTP_ATTEMPTS_KEY.format(channel=channel, identifier=identifier))
 
 
-async def check_otp(phone: str, code: str) -> bool:
+async def check_otp(channel: Channel, identifier: str, code: str) -> bool:
     """Verify and consume. Counts attempts so a 6-digit code cannot be brute
     forced within its 5-minute window."""
     settings = get_settings()
     redis = get_redis()
 
-    attempts = await redis.incr(_OTP_ATTEMPTS_KEY.format(phone=phone))
+    code_key = _OTP_KEY.format(channel=channel, identifier=identifier)
+    attempts_key = _OTP_ATTEMPTS_KEY.format(channel=channel, identifier=identifier)
+
+    attempts = await redis.incr(attempts_key)
     if attempts == 1:
-        await redis.expire(_OTP_ATTEMPTS_KEY.format(phone=phone), settings.otp_ttl_seconds)
+        await redis.expire(attempts_key, settings.otp_ttl_seconds)
     if attempts > settings.otp_max_attempts:
-        await redis.delete(_OTP_KEY.format(phone=phone))
+        await redis.delete(code_key)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts. Request a new code."
         )
 
-    stored = await redis.get(_OTP_KEY.format(phone=phone))
+    stored = await redis.get(code_key)
     if stored is None or not verify_secret(code, stored):
         return False
 
-    await redis.delete(_OTP_KEY.format(phone=phone))
-    await redis.delete(_OTP_ATTEMPTS_KEY.format(phone=phone))
+    await redis.delete(code_key)
+    await redis.delete(attempts_key)
     return True
 
 
-async def enforce_otp_rate_limit(phone: str) -> None:
+async def enforce_otp_rate_limit(channel: Channel, identifier: str) -> None:
     settings = get_settings()
     redis = get_redis()
-    key = _OTP_RATE_KEY.format(phone=phone)
+    key = _OTP_RATE_KEY.format(channel=channel, identifier=identifier)
     count = await redis.incr(key)
     if count == 1:
         await redis.expire(key, settings.otp_request_window_seconds)

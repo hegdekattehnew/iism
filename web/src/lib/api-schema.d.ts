@@ -123,6 +123,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/geography/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List States */
+        get: operations["list_states_geography_states_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/geography/districts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Districts */
+        get: operations["list_districts_geography_districts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -305,6 +339,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/email/otp/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Email Otp
+         * @description Send a sign-in code to an email address.
+         *
+         *     Same enumeration rule as the phone path: a well-formed address always gets
+         *     the same answer, whether or not it has an account.
+         */
+        post: operations["request_email_otp_auth_email_otp_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/email/otp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Email Otp */
+        post: operations["verify_email_otp_auth_email_otp_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/org/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Organisation
+         * @description Create an organisation and its first account, for someone with neither.
+         *
+         *     The response is identical whether or not the address already has an
+         *     account; only the email differs. Verifying the code that follows is what
+         *     signs the user in, via the ordinary email path.
+         */
+        post: operations["register_organisation_auth_org_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -367,6 +465,100 @@ export interface paths {
         get: operations["me_auth_me_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Email Request
+         * @description Start adding an email to the signed-in account. Writes nothing yet.
+         */
+        post: operations["link_email_request_me_credentials_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Email Verify */
+        post: operations["link_email_verify_me_credentials_email_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Phone Request */
+        post: operations["link_phone_request_me_credentials_phone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/phone/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Phone Verify */
+        post: operations["link_phone_verify_me_credentials_phone_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/organisations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Organisation
+         * @description Add an organisation to the signed-in identity.
+         *
+         *     This is the multi-role path: a candidate asked to start hiring gets a
+         *     second membership, not a second account (ADR-038).
+         */
+        post: operations["create_organisation_me_organisations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -477,6 +669,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description Drafts included. Every public listing query filters on published, so this
+         *     is the only place an unfinished vacancy is visible at all.
+         */
+        get: operations["list_jobs_org__org_slug__jobs_get"];
+        put?: never;
+        /** Create Job */
+        post: operations["create_job_org__org_slug__jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_org__org_slug__jobs__slug__get"];
+        /** Update Job */
+        put: operations["update_job_org__org_slug__jobs__slug__put"];
+        post?: never;
+        /**
+         * Delete Job
+         * @description Owner only. An admin can unpublish, which reverses; this does not.
+         */
+        delete: operations["delete_job_org__org_slug__jobs__slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{slug}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Job
+         * @description Explicit, and refused for a job requiring no standards.
+         */
+        post: operations["publish_job_org__org_slug__jobs__slug__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{slug}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpublish Job */
+        post: operations["unpublish_job_org__org_slug__jobs__slug__unpublish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/matches": {
         parameters: {
             query?: never;
@@ -506,6 +779,60 @@ export interface paths {
          * @description One job, scored, with the courses that close its gap.
          */
         get: operations["match_detail_me_matches__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/events/course-opened": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Course Opened */
+        post: operations["course_opened_me_events_course_opened_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org Overview
+         * @description The signed-in employer's own vacancies and the pool against each.
+         */
+        get: operations["org_overview_org__org_slug__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/candidates/{job_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Org Candidates */
+        get: operations["org_candidates_org__org_slug__candidates__job_slug__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -918,6 +1245,13 @@ export interface components {
             /** Skills */
             skills?: components["schemas"]["CourseSkillOut"][];
         };
+        /** CourseOpenedIn */
+        CourseOpenedIn: {
+            /** Course Slug */
+            course_slug: string;
+            /** From Job Slug */
+            from_job_slug?: string | null;
+        };
         /** CourseOut */
         CourseOut: {
             /**
@@ -1020,6 +1354,20 @@ export interface components {
             /** Components */
             components: components["schemas"]["ComponentHealth"][];
         };
+        /** DistrictOut */
+        DistrictOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** District Code */
+            district_code?: number | null;
+            /** Name */
+            name?: string | null;
+            /** State Id */
+            state_id?: string | null;
+        };
         /** EducationOut */
         EducationOut: {
             /** Qualification */
@@ -1042,6 +1390,24 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /** EmailOtpRequest */
+        EmailOtpRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /** EmailOtpVerify */
+        EmailOtpVerify: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Code */
+            code: string;
         };
         /** EmployerOut */
         EmployerOut: {
@@ -1146,6 +1512,50 @@ export interface components {
             /** Skills */
             skills?: components["schemas"]["JobSkillOut"][];
         };
+        /**
+         * JobIn
+         * @description A vacancy as its employer describes it.
+         *
+         *     No `status` field: publishing is an explicit action on its own endpoint, not
+         *     something a form can do by setting a string. `Job.status` defaults to
+         *     `published` at the model level, so the service must set `draft` by hand --
+         *     a footgun this schema deliberately keeps out of reach.
+         */
+        JobIn: {
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Hi */
+            description_hi?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Employment Type
+             * @default full_time
+             * @enum {string}
+             */
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            /**
+             * Experience Min Years
+             * @default 0
+             */
+            experience_min_years: number;
+            /** Experience Max Years */
+            experience_max_years?: number | null;
+            /** Salary Min Inr */
+            salary_min_inr?: number | null;
+            /** Salary Max Inr */
+            salary_max_inr?: number | null;
+            /** Nsqf Level Min */
+            nsqf_level_min?: number | null;
+            /** Skills */
+            skills?: components["schemas"]["JobSkillIn"][];
+        };
         /** JobOut */
         JobOut: {
             /**
@@ -1204,6 +1614,24 @@ export interface components {
             ready: number;
             /** Nearly */
             nearly: number;
+        };
+        /**
+         * JobSkillIn
+         * @description One required standard, with the two facts that make a match scoreable.
+         */
+        JobSkillIn: {
+            /** Skill Slug */
+            skill_slug: string;
+            /**
+             * Importance
+             * @default 3
+             */
+            importance: number;
+            /**
+             * Is Mandatory
+             * @default false
+             */
+            is_mandatory: boolean;
         };
         /** JobSkillOut */
         JobSkillOut: {
@@ -1266,6 +1694,36 @@ export interface components {
             level: number;
             /** Count */
             count: number;
+        };
+        /** LinkEmailRequest */
+        LinkEmailRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /** LinkEmailVerify */
+        LinkEmailVerify: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Code */
+            code: string;
+        };
+        /** LinkPhoneRequest */
+        LinkPhoneRequest: {
+            /** Phone */
+            phone: string;
+        };
+        /** LinkPhoneVerify */
+        LinkPhoneVerify: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
         };
         /** MarketplaceCounts */
         MarketplaceCounts: {
@@ -1381,6 +1839,100 @@ export interface components {
             is_mandatory: boolean;
             /** Nsqf Level */
             nsqf_level?: number | null;
+        };
+        /**
+         * OrgCreateRequest
+         * @description Creating an organisation from an account that already exists.
+         *
+         *     No credential here: the caller is already signed in, and this is the path
+         *     that lets one identity hold a candidate profile and an employer role
+         *     without forking into two accounts (ADR-038).
+         */
+        OrgCreateRequest: {
+            /** Organisation Name */
+            organisation_name: string;
+            /**
+             * Tenant Type
+             * @default employer
+             * @enum {string}
+             */
+            tenant_type: "employer" | "course_provider";
+        };
+        /**
+         * OrgJobOut
+         * @description An employer's view of their own listing, drafts included.
+         *
+         *     Every public listing query hard-filters `status == 'published'`, so a draft
+         *     is unreachable anywhere else in the API. `status` is exposed here because
+         *     this is the one place someone needs to know it.
+         */
+        OrgJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Hi */
+            description_hi?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Employment Type
+             * @enum {string}
+             */
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            /** Experience Min Years */
+            experience_min_years: number;
+            /** Experience Max Years */
+            experience_max_years?: number | null;
+            /** Salary Min Inr */
+            salary_min_inr?: number | null;
+            /** Salary Max Inr */
+            salary_max_inr?: number | null;
+            /** Nsqf Level Min */
+            nsqf_level_min?: number | null;
+            tenant: components["schemas"]["TenantOut"];
+            /** Skills */
+            skills?: components["schemas"]["JobSkillOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * OrgRegisterRequest
+         * @description Cold registration: an address and the organisation it belongs to.
+         */
+        OrgRegisterRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Organisation Name */
+            organisation_name: string;
+            /**
+             * Tenant Type
+             * @default employer
+             * @enum {string}
+             */
+            tenant_type: "employer" | "course_provider";
         };
         /** OtpRequest */
         OtpRequest: {
@@ -1527,6 +2079,8 @@ export interface components {
              * @default 0
              */
             qp_count: number;
+            /** Nos Code */
+            nos_code?: string | null;
             /** Aliases */
             aliases?: components["schemas"]["AliasOut"][];
             /**
@@ -1534,8 +2088,6 @@ export interface components {
              * @default curated
              */
             source: string;
-            /** Nos Code */
-            nos_code?: string | null;
             /** Nos Version */
             nos_version?: string | null;
             /** Nos Type */
@@ -1589,6 +2141,8 @@ export interface components {
              * @default 0
              */
             qp_count: number;
+            /** Nos Code */
+            nos_code?: string | null;
         };
         /** SkillPage */
         SkillPage: {
@@ -1655,6 +2209,8 @@ export interface components {
              * @default 0
              */
             qp_count: number;
+            /** Nos Code */
+            nos_code?: string | null;
             /** Matched On */
             matched_on?: string | null;
             /**
@@ -1663,6 +2219,18 @@ export interface components {
              * @enum {string}
              */
             match_kind: "exact" | "prefix" | "alias" | "text";
+        };
+        /** StateOut */
+        StateOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** State Code */
+            state_code?: number | null;
+            /** Name */
+            name: string;
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -1738,6 +2306,8 @@ export interface components {
             full_name?: string | null;
             /** Phone Verified At */
             phone_verified_at?: string | null;
+            /** Email Verified At */
+            email_verified_at?: string | null;
             /** Preferred Locale */
             preferred_locale: string;
             /** Memberships */
@@ -1954,6 +2524,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_states_geography_states_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateOut"][];
+                };
+            };
+        };
+    };
+    list_districts_geography_districts_get: {
+        parameters: {
+            query?: {
+                state_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistrictOut"][];
                 };
             };
             /** @description Validation Error */
@@ -2277,6 +2898,105 @@ export interface operations {
             };
         };
     };
+    request_email_otp_auth_email_otp_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_email_otp_auth_email_otp_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailOtpVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_organisation_auth_org_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_auth_refresh_post: {
         parameters: {
             query?: never;
@@ -2375,6 +3095,171 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    link_email_request_me_credentials_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_email_verify_me_credentials_email_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkEmailVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_phone_request_me_credentials_phone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPhoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_phone_verify_me_credentials_phone_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPhoneVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_organisation_me_organisations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2623,6 +3508,234 @@ export interface operations {
             };
         };
     };
+    list_jobs_org__org_slug__jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_job_org__org_slug__jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_org__org_slug__jobs__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_job_org__org_slug__jobs__slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_job_org__org_slug__jobs__slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_job_org__org_slug__jobs__slug__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpublish_job_org__org_slug__jobs__slug__unpublish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_matches_me_matches_get: {
         parameters: {
             query?: {
@@ -2672,6 +3785,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    course_opened_me_events_course_opened_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseOpenedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    org_overview_org__org_slug__candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    org_candidates_org__org_slug__candidates__job_slug__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                job_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateRanking"];
                 };
             };
             /** @description Validation Error */
@@ -2786,7 +3995,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: string;
+                        [key: string]: string | boolean;
                     };
                 };
             };
