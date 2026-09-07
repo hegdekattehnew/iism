@@ -446,12 +446,19 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 10. Git state
 
-> **The branch has never been pushed.** `origin` holds only `main` at `ef59c4e` — the pre-rebuild
-> code. All 19 commits of `v2/foundations`, which is the entire current product, exist on this
-> laptop and nowhere else. Verified with `git ls-remote --heads origin` on 2026-09-07. That is the
-> single largest risk to the project and it is not a technical one.
+**Pushed 2026-09-07.** `origin/v2/foundations` is at `8099b5f` with identical trees to local —
+verified by comparing tree hashes, not just the commit id. The branch had previously existed only
+on one laptop; that risk is closed.
 
-- Branch **`v2/foundations`**, 19 commits ahead of `main`, working tree clean, no stashes.
+- Branch **`v2/foundations`**, 20 commits ahead of `origin/main`, tracking
+  `origin/v2/foundations`, working tree clean, no stashes.
+- **No pull request is open yet.** `gh` is not installed on this machine, so the PR has to be
+  opened in the browser:
+  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`
+- Two things a reviewer needs telling: it is a 211-file, +35,107-line change spanning eight
+  sprints and is not reviewable as a single unit, and it **contains a deliberate rollback**
+  (`c10829f` discards `a62d964`), so reading commit-by-commit means passing through work that was
+  undone on purpose.
 - The NSQF work reads as a sequence worth understanding in order: `a62d964` projected the corpus,
   `5cf496f` made it usable at 21k rows, `75abc17` added tests, **`c10829f` rolled the whole thing
   back** after an audit, and `4230c9c` re-migrated against the complete master data. The rollback
@@ -571,9 +578,10 @@ the logs. CORS is restricted to one origin.
 
 ## 12. Open risks — state these honestly, do not soften
 
-- **The work exists in one place.** `v2/foundations` has never been pushed; `origin` still holds
-  only the pre-rebuild `main`. A lost laptop is a lost product. Nothing else on this list is as
-  cheap to fix or as expensive to get wrong.
+- ~~The work exists in one place.~~ **Closed 2026-09-07** — `v2/foundations` is on `origin`. What
+  remains is that **MongoDB is backed up by nothing**: it is the source of record for the corpus
+  (ADR-034), it lives only in a local Docker volume, and if it is lost the taxonomy cannot be
+  rebuilt from anything in this repository or on GitHub.
 
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.
