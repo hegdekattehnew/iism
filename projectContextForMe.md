@@ -226,6 +226,8 @@ scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         retire_legacy_skills.py, seed_candidates.py (demo profiles +
                         the golden pairs), evaluate_matching.py — all idempotent
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
+backups/                schema.sql (committed DDL) + README.md (the three restore paths).
+                        *.sql.gz dumps are git-ignored: 40 MB and regenerable.
 tests/                  pytest + testcontainers
 ```
 
@@ -260,6 +262,9 @@ make up          # start Postgres + Redis, wait for healthy
 make migrate     # alembic upgrade head
 make seed        # taxonomy + marketplace + demo candidates (idempotent)
 make evaluate    # score the matcher against the golden set
+make db-dump     # full backup, ~40 MB gzipped, ~8s
+make db-restore DUMP=backups/iism-....sql.gz   # ~5s, DROPS and recreates the db
+make db-schema   # refresh backups/schema.sql (DDL only, committed)
 make import-nsqf # project the NSQF corpus from Mongo into Postgres (idempotent)
 make api         # uvicorn on :8000
 make worker      # ARQ worker
@@ -441,13 +446,37 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 10. Git state
 
-- Branch **`v2/foundations`**, 16 commits ahead of `main`, working tree clean.
+> **The branch has never been pushed.** `origin` holds only `main` at `ef59c4e` — the pre-rebuild
+> code. All 19 commits of `v2/foundations`, which is the entire current product, exist on this
+> laptop and nowhere else. Verified with `git ls-remote --heads origin` on 2026-09-07. That is the
+> single largest risk to the project and it is not a technical one.
+
+- Branch **`v2/foundations`**, 19 commits ahead of `main`, working tree clean, no stashes.
 - The NSQF work reads as a sequence worth understanding in order: `a62d964` projected the corpus,
   `5cf496f` made it usable at 21k rows, `75abc17` added tests, **`c10829f` rolled the whole thing
   back** after an audit, and `4230c9c` re-migrated against the complete master data. The rollback
-  commit is not a failure to skim past -- it carries the audit that made the second attempt right.
+  commit is not a failure to skim past — it carries the audit that made the second attempt right.
+- `1fd92af` connected the taxonomy to the marketplace; `3b69a42` added matching.
 - The original `app/` (identity module, auth, 8 actor types) remains in history on `main` at
-  `ef59c4e`. Recoverable if that identity work is ever worth mining.
+  `ef59c4e`. Recoverable if that work is ever worth mining.
+
+## 10a. Backup and restore
+
+`backups/README.md` is the full account. In short:
+
+- **A crashed container loses nothing** — the data is in the `pgdata` volume. Deleting the volume
+  is what loses it.
+- `make db-dump` writes ~40 MB gzipped in about eight seconds; `make db-restore DUMP=...` brings
+  it back in about five. **Verified** by restoring into a scratch database and comparing row
+  counts, extensions, indexes and the `GENERATED` tsvector table by table.
+- Dumps are **git-ignored**. `backups/schema.sql` (61 KB DDL) is committed and refreshed with
+  `make db-schema`.
+- **716,187 of 716,257 rows are derived** and rebuild from MongoDB with `make import-nsqf && make
+  seed`. Only **70 rows are irreplaceable** — users, profiles, analytics events. That ratio is why
+  rebuilding from source is the honest default today, and why it stops being sufficient the moment
+  real users arrive.
+- **MongoDB is covered by none of this.** It is the source of record for the corpus (ADR-034), and
+  if it is lost the taxonomy cannot be rebuilt from anything in this repository.
 
 ## 11. What comes next
 
@@ -541,6 +570,10 @@ the table intact. Cross-user isolation is correct and tested. No tokens reach
 the logs. CORS is restricted to one origin.
 
 ## 12. Open risks — state these honestly, do not soften
+
+- **The work exists in one place.** `v2/foundations` has never been pushed; `origin` still holds
+  only the pre-rebuild `main`. A lost laptop is a lost product. Nothing else on this list is as
+  cheap to fix or as expensive to get wrong.
 
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.

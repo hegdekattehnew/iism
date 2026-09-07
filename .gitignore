@@ -31,3 +31,7 @@ web/openapi.json
 
 # office lock files
 ~$*
+
+# Full database dumps: ~40 MB gzipped and entirely regenerable with `make db-dump`.
+# backups/schema.sql is committed; the data dumps are not.
+backups/*.sql.gz

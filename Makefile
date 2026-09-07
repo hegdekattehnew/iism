@@ -61,6 +61,33 @@ seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempoten
 evaluate: ## Score the matcher against the hand-labelled golden set
 	$(PY) scripts/evaluate_matching.py
 
+# ---------------------------------------------------------------- backup
+PG := iism-postgres-1
+DUMP ?= backups/iism-$(shell date +%Y%m%d-%H%M).sql.gz
+
+.PHONY: db-schema
+db-schema: ## Refresh backups/schema.sql (DDL only, committed to git)
+	@docker exec $(PG) pg_dump -U iism -d iism --schema-only --no-owner --no-privileges \
+	  > backups/schema.sql
+	@echo "backups/schema.sql  $$(wc -c < backups/schema.sql | tr -d ' ') bytes"
+
+.PHONY: db-dump
+db-dump: ## Full dump, schema + data, gzipped (NOT committed -- ~40 MB)
+	@mkdir -p backups
+	@docker exec $(PG) pg_dump -U iism -d iism --no-owner --no-privileges \
+	  | gzip -c > $(DUMP)
+	@echo "$(DUMP)  $$(du -h $(DUMP) | cut -f1)"
+
+.PHONY: db-restore
+db-restore: ## Restore from a dump: make db-restore DUMP=backups/iism-....sql.gz
+	@test -f "$(DUMP)" || { echo "No such dump: $(DUMP)"; exit 1; }
+	@echo "This DROPS and recreates the iism database. Ctrl-C within 5s to abort."
+	@sleep 5
+	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS iism WITH (FORCE);"
+	@docker exec $(PG) psql -U iism -d postgres -c "CREATE DATABASE iism;"
+	@gunzip -c $(DUMP) | docker exec -i $(PG) psql -U iism -d iism -v ON_ERROR_STOP=1 -q
+	@echo "restored from $(DUMP)"
+
 .PHONY: mongosh
 mongosh: ## Open a mongosh shell against the NSQF source
 	docker exec -it iism-mongo-1 mongosh -u iism -p iism --authenticationDatabase admin nsqf
