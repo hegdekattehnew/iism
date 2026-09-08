@@ -149,10 +149,26 @@ async def _context_for(db: AsyncSession, user: "User", slug: str) -> TenantConte
 
 def require(
     permission: Permission,
+    publishes: str | None = None,
 ) -> Callable[..., Coroutine[Any, Any, TenantContext]]:
     """A dependency granting one permission in the organisation named by the path.
 
-    Use as `context: TenantContext = Depends(require(Permission.JOB_PUBLISH))`
+    `publishes` names the kind of listing the route writes -- `"job"` or
+    `"course"` -- and asks the second question the permission set cannot:
+    membership answers *may this person act here*, never *is this the right kind
+    of organisation*. A course provider holds `JOB_CREATE` in their own tenant,
+    so without this a provider could post vacancies.
+
+    **The two checks are one declaration on purpose.** They were separate at
+    first -- `require(...)` in the signature and a `require_publisher_of(...)`
+    call in the body -- and three of the eight publishing writes were shipped
+    without the second: `update_job`, `unpublish_job` and `unpublish_course`.
+    A guard a handler has to remember to call is a guard that eventually is not
+    called, and `CLAUDE.md` meanwhile asserted it was called everywhere. Now the
+    route cannot express the permission without also answering the type
+    question.
+
+    Use as `context: TenantContext = Depends(require(Permission.JOB_PUBLISH, "job"))`
     on any route carrying an `{org_slug}` path parameter.
     """
 
@@ -170,21 +186,13 @@ def require(
                 status.HTTP_403_FORBIDDEN,
                 f"Your role ({context.role}) does not permit {permission.value}",
             )
+        if publishes is not None:
+            expected = PUBLISHES[publishes]
+            if context.tenant.tenant_type != expected:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    f"Only a {expected.replace('_', ' ')} can publish a {publishes}",
+                )
         return context
 
     return dependency
-
-
-def require_publisher_of(context: TenantContext, what: str) -> None:
-    """Refuse a listing the organisation has no business publishing.
-
-    Membership answers *may this person act here*; it does not answer *is this
-    the right kind of organisation*. A course provider holding JOB_CREATE in
-    their own tenant is exactly the case the permission set alone lets through.
-    """
-    expected = PUBLISHES[what]
-    if context.tenant.tenant_type != expected:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            f"Only a {expected.replace('_', ' ')} can publish a {what}",
-        )

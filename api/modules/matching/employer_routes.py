@@ -12,12 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.authorization import (
-    Permission,
-    TenantContext,
-    require,
-    require_publisher_of,
-)
+from api.core.authorization import Permission, TenantContext, require
 from api.core.config import get_settings
 from api.core.database import get_db_session
 from api.modules.analytics import record
@@ -32,7 +27,10 @@ router = APIRouter(prefix="/employer", tags=["employer"])
 # organisation is named by the path and granted by the caller's membership
 # (ADR-039). This ships to production; the router above does not.
 org_router = APIRouter(prefix="/org/{org_slug}/candidates", tags=["employer"])
-CanShortlist = Depends(require(Permission.CANDIDATE_SHORTLIST))
+# `"job"` because a shortlist is candidates for *their vacancies*: a training
+# provider has none, and used to get a 200 here carrying a global candidate
+# count. The dependency asks both questions so a handler cannot forget one.
+CanShortlist = Depends(require(Permission.CANDIDATE_SHORTLIST, "job"))
 
 
 def _card(scored: employer.ScoredCandidate) -> schemas.CandidateCardOut:
@@ -172,7 +170,6 @@ async def org_overview(
     one number on the screen was a global count of every candidate on the
     platform, presented as though it were a pool they had access to.
     """
-    require_publisher_of(context, "job")
     return await _overview(db, context.tenant)
 
 
@@ -183,7 +180,6 @@ async def org_candidates(
     context: TenantContext = CanShortlist,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateRanking:
-    require_publisher_of(context, "job")
     return await _ranking(db, context.tenant, job_slug, limit)
 
 

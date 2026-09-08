@@ -596,7 +596,7 @@
       "title": "Built for a low-end phone",
       "body": "Mobile-first, installable, in English and Hindi. The target device is an entry-level Android on mobile data, and that constraint shapes what gets built rather than being retrofitted."
     },
-    "status": "Built in the open, sprint by sprint. Matching, the national taxonomy and the candidate profile are live; employer sign-in, Hindi for the corpus itself, and self-serve publishing are not yet."
+    "status": "Built in the open, sprint by sprint. The national taxonomy, matching, candidate profiles, employer sign-in and self-serve publishing for both vacancies and courses are live. Still to come: Hindi for the corpus itself — the interface is bilingual, the 21,303 standard names are not — along with verified organisations and semantic matching."
   },
   "orgAuth": {
     "title": "Employer sign-in",

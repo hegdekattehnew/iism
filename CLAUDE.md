@@ -217,9 +217,13 @@ takes either credential.
   generalisation.** A `JobSkill` carries importance and mandatory because a match is scored against
   them; a `CourseSkill` carries only `level_taught`. Duplicates therefore collapse on the **highest
   level**, not the strongest signal — the seed's own rule. Do not merge the two modules.
-- **`require_publisher_of` is called on every publishing write, in both directions.** Membership
-  answers *may this person act here*, never *is this the right kind of organisation*. A provider
-  posting a vacancy and an employer publishing training are both 403.
+- **A write route declares what it publishes, and the dependency asks both questions.**
+  `require(Permission.JOB_UPDATE, "job")` checks the permission *and* the tenant type, because
+  membership answers *may this person act here*, never *is this the right kind of organisation*.
+  The two were separate until Sprint 15 — a `require(...)` in the signature and a
+  `require_publisher_of(...)` call in the body — and three of the eight publishing writes shipped
+  without the second while this file asserted all eight had it. **A guard a handler must remember
+  to call is one that eventually is not called.** Never reintroduce the separate form.
 - **`/org/{slug}/candidates` requires an employer.** It used to answer 200 to a provider with two
   empty arrays and `candidates_total`, which has no tenant filter — so the only number on screen was
   a global count of every candidate on the platform, presented as a pool they could reach.

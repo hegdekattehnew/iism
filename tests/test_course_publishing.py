@@ -83,6 +83,22 @@ async def _provider(client: AsyncClient, db: AsyncSession, name: str) -> tuple[d
     return headers, slug
 
 
+async def _employer(client: AsyncClient, name: str) -> tuple[dict[str, str], str]:
+    """Register an ordinary employer. The mirror of `_provider`."""
+    address = _email()
+    requested = await client.post(
+        "/auth/org/register",
+        json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+    )
+    code = requested.json()["debug_code"]
+    tokens = (
+        await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
+    ).json()
+    headers = {"authorization": f"Bearer {tokens['access_token']}"}
+    me = (await client.get("/auth/me", headers=headers)).json()
+    return headers, me["memberships"][0]["tenant"]["slug"]
+
+
 class TestCoursePublishing:
     async def test_a_provider_can_publish_a_course(
         self, client: AsyncClient, db: AsyncSession, taught_skill: str
@@ -229,30 +245,58 @@ class TestTheTwoSurfacesStayApart:
         )
         assert refused.status_code == 403
 
-    async def test_an_employer_cannot_publish_a_course(self, client: AsyncClient) -> None:
-        address = _email()
-        requested = await client.post(
-            "/auth/org/register",
-            json={
-                "email": address,
-                "organisation_name": "Not A Provider Clinic",
-                "tenant_type": "employer",
-            },
-        )
-        code = requested.json()["debug_code"]
-        tokens = (
-            await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
-        ).json()
-        headers = {"authorization": f"Bearer {tokens['access_token']}"}
-        me = (await client.get("/auth/me", headers=headers)).json()
-        slug = me["memberships"][0]["tenant"]["slug"]
+    async def test_every_write_is_guarded_in_both_directions(
+        self, client: AsyncClient, db: AsyncSession, taught_skill: str
+    ) -> None:
+        """The gap this test exists for: create and publish were guarded and
+        **update and unpublish were not**, in either module, while `CLAUDE.md`
+        asserted the check ran on every publishing write. Nothing exercised the
+        update path with the wrong tenant type, so nothing noticed.
 
-        refused = await client.post(
-            f"/org/{slug}/courses",
-            headers=headers,
-            json={"title_en": "Training from an employer", "skills": []},
-        )
-        assert refused.status_code == 403
+        The guard now travels with the permission in the route's dependency
+        rather than being a call each handler must remember, and this walks the
+        whole surface rather than sampling it.
+        """
+        headers, slug = await _provider(client, db, "Every Write Academy")
+
+        # A provider against the vacancy surface: every write, refused.
+        job_body = {"title_en": "Not a provider's business", "skills": []}
+        assert (
+            await client.post(f"/org/{slug}/jobs", headers=headers, json=job_body)
+        ).status_code == 403
+        assert (
+            await client.put(f"/org/{slug}/jobs/anything", headers=headers, json=job_body)
+        ).status_code == 403
+        assert (
+            await client.post(f"/org/{slug}/jobs/anything/publish", headers=headers)
+        ).status_code == 403
+        assert (
+            await client.post(f"/org/{slug}/jobs/anything/unpublish", headers=headers)
+        ).status_code == 403
+        assert (
+            await client.delete(f"/org/{slug}/jobs/anything", headers=headers)
+        ).status_code == 403
+
+    async def test_an_employer_is_refused_every_course_write(self, client: AsyncClient) -> None:
+        """The mirror. A guard that holds in one direction only is not a guard."""
+        headers, slug = await _employer(client, "Every Write Clinic")
+
+        body = {"title_en": "Not an employer's business", "skills": []}
+        assert (
+            await client.post(f"/org/{slug}/courses", headers=headers, json=body)
+        ).status_code == 403
+        assert (
+            await client.put(f"/org/{slug}/courses/anything", headers=headers, json=body)
+        ).status_code == 403
+        assert (
+            await client.post(f"/org/{slug}/courses/anything/publish", headers=headers)
+        ).status_code == 403
+        assert (
+            await client.post(f"/org/{slug}/courses/anything/unpublish", headers=headers)
+        ).status_code == 403
+        assert (
+            await client.delete(f"/org/{slug}/courses/anything", headers=headers)
+        ).status_code == 403
 
     async def test_a_provider_cannot_read_the_candidate_shortlist(
         self, client: AsyncClient, db: AsyncSession
