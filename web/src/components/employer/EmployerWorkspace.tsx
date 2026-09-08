@@ -45,6 +45,7 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   if (me.isError) {
     return (
@@ -76,10 +77,17 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
     editing && editing !== "new" ? items.find((j) => j.slug === editing) : null;
 
   const save = (payload: JobPayload) => {
+    setSaveFailed(false);
     const done = () => setEditing(null);
-    if (editing === "new") create.mutate(payload, { onSuccess: done });
+    // Without an `onError` a 403 -- which is exactly what a non-employer used to
+    // get here -- left the form sitting there having silently done nothing.
+    const onError = () => setSaveFailed(true);
+    if (editing === "new") create.mutate(payload, { onSuccess: done, onError });
     else if (current)
-      update.mutate({ slug: current.slug, body: payload }, { onSuccess: done });
+      update.mutate(
+        { slug: current.slug, body: payload },
+        { onSuccess: done, onError },
+      );
   };
 
   if (editing) {
@@ -88,6 +96,11 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
         <h2 className="text-lg font-semibold">
           {editing === "new" ? t("newJob") : t("editJob")}
         </h2>
+        {saveFailed && (
+          <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+            {t("saveFailed")}
+          </p>
+        )}
         <JobEditor
           job={current ?? null}
           saving={create.isPending || update.isPending}

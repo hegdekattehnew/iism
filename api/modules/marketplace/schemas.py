@@ -154,6 +154,45 @@ class CourseDetail(CourseOut):
     skills: list[CourseSkillOut] = Field(default_factory=list)
 
 
+class CourseSkillIn(BaseModel):
+    """One standard a course teaches, and how far it takes the learner.
+
+    Deliberately unlike `JobSkillIn`. A job link carries importance and a
+    mandatory flag because a match is scored against them; a course link carries
+    only the level it teaches to, because what matters is whether it closes a
+    gap and how far.
+    """
+
+    skill_slug: str
+    level_taught: NsqfLevelIn | None = None
+
+
+class CourseIn(BaseModel):
+    """A course as its provider describes it.
+
+    No `status`, for the same reason `JobIn` has none: publishing is an explicit
+    action on its own endpoint, not something a form can do by setting a string.
+    """
+
+    title_en: str = Field(min_length=3, max_length=200)
+    title_hi: str | None = Field(None, max_length=200)
+    description_en: str | None = None
+    description_hi: str | None = None
+    mode: CourseMode = "offline"
+    language: CourseLanguage = "both"
+    duration_hours: int | None = Field(None, ge=1, le=10_000)
+    fee_inr: int | None = Field(None, ge=0)
+    nsqf_level: NsqfLevelIn | None = None
+    skills: list[CourseSkillIn] = Field(default_factory=list)
+
+
+class OrgCourseOut(CourseDetail):
+    """A provider's view of their own listing, drafts included."""
+
+    status: Status
+    updated_at: datetime
+
+
 class JobPage(BaseModel):
     items: list[JobOut]
     total: int

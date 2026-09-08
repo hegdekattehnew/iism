@@ -1,27 +1,18 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { redirect } from "next/navigation";
 
-import { OrgSignInForm } from "@/components/employer/OrgSignInForm";
-
+/**
+ * Kept as a redirect, not deleted.
+ *
+ * Sign-in is one door now, taking either a phone or an email: after Sprint 13
+ * one identity can hold both credentials, so the credential no longer says who
+ * you are. This path is still linked from the employers page, from the
+ * workspace's signed-out card, and from whatever anyone has bookmarked.
+ */
 export default async function Page({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale);
-  const t = await getTranslations("orgAuth");
-
-  return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-16 sm:py-24">
-      <h1 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
-        {t("title")}
-      </h1>
-      <p className="mx-auto mt-3 max-w-lg text-center text-base text-muted">
-        {t("subtitle")}
-      </p>
-      <div className="mt-10">
-        <OrgSignInForm />
-      </div>
-    </div>
-  );
+  redirect(`/${locale}/signin`);
 }

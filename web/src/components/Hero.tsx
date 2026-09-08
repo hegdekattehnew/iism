@@ -43,7 +43,7 @@ export async function Hero() {
           </form>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <ButtonLink href="/signin" size="lg">
+            <ButtonLink href="/signup/seeker" size="lg">
               {t("primaryCta")}
             </ButtonLink>
             <ButtonLink href="/courses" variant="secondary" size="lg">

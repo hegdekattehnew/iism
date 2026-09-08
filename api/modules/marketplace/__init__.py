@@ -4,6 +4,9 @@ Other modules import from `api.modules.marketplace` only — never from
 `.service` or `.models` directly (ADR-014).
 """
 
+from api.modules.marketplace.course_publishing_routes import (
+    router as course_publishing_router,
+)
 from api.modules.marketplace.models import (
     COURSE_LANGUAGES,
     COURSE_MODES,
@@ -71,6 +74,7 @@ __all__ = [
     "list_jobs",
     "marketplace_router",
     "profile_router",
+    "course_publishing_router",
     "publishing_router",
     "remove_skill",
     "update_profile",

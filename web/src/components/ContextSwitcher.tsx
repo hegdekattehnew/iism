@@ -34,7 +34,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("context");
   const router = useRouter();
   const signedIn = useIsSignedIn();
-  const { organisations } = useMemberships();
+  const { organisations, isJobSeeker } = useMemberships();
   const active = useActiveOrg();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -45,7 +45,11 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   if (!signedIn) return null;
 
   const current = organisations.find((m) => m.tenant.slug === active);
-  const label = current ? current.tenant.name : t("jobSeeker");
+  const label = current
+    ? current.tenant.name
+    : isJobSeeker
+      ? t("jobSeeker")
+      : t("chooseContext");
 
   const go = (slug: string | null) => {
     setOpen(false);
@@ -88,19 +92,25 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
               : "absolute right-0 z-50 mt-2 w-64 rounded-lg border border-border-token bg-surface p-1 shadow-lg"
           }
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go(null)}
-            className={`block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted ${
-              active === null ? "font-semibold text-brand" : ""
-            }`}
-          >
-            {t("jobSeeker")}
-            <span className="block text-xs text-muted">
-              {t("jobSeekerHint")}
-            </span>
-          </button>
+          {/* Only for someone who actually asked to look for work. An account
+              created as an employer or a provider has no personal workspace,
+              and offering it a job-seeker context it never chose is exactly the
+              assumption this sprint exists to remove. */}
+          {isJobSeeker && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => go(null)}
+              className={`block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted ${
+                active === null ? "font-semibold text-brand" : ""
+              }`}
+            >
+              {t("jobSeeker")}
+              <span className="block text-xs text-muted">
+                {t("jobSeekerHint")}
+              </span>
+            </button>
+          )}
 
           {organisations.map((m) => (
             <button

@@ -5,11 +5,25 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Button } from "@/components/ui";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens } from "@/lib/auth";
 
 type Step = "phone" | "code";
+
+/**
+ * One door, either key.
+ *
+ * ADR-032 decided the *credential* follows the actor type, and it still does at
+ * registration. But since Sprint 13 one identity can hold a candidate profile
+ * and organisations and can link both credentials, so at sign-in the credential
+ * no longer says who you are. Two doors would ask a question the account can
+ * already answer, and would punish exactly the people who linked both.
+ *
+ * An `@` is the whole detection. It is unambiguous here because a phone
+ * normalises to digits and an address cannot avoid the character.
+ */
+const looksLikeEmail = (value: string) => value.includes("@");
 
 export function SignInForm() {
   const t = useTranslations("auth");
@@ -22,14 +36,22 @@ export function SignInForm() {
   const [error, setError] = useState<string | null>(null);
 
   const errorFor = (status: number | undefined, fallback: string) =>
-    status === 429 ? t("errorRateLimited") : status === 422 ? t("errorInvalidPhone") : fallback;
+    status === 429
+      ? t("errorRateLimited")
+      : status === 422
+        ? t("errorInvalidId")
+        : fallback;
 
   const request = useMutation({
     mutationFn: async () => {
       setError(null);
-      const { data, error: err, response } = await api.POST("/auth/otp/request", {
-        body: { phone },
-      });
+      const {
+        data,
+        error: err,
+        response,
+      } = looksLikeEmail(phone)
+        ? await api.POST("/auth/email/otp/request", { body: { email: phone } })
+        : await api.POST("/auth/otp/request", { body: { phone } });
       if (err || !data) throw new Error(String(response.status));
       return data;
     },
@@ -37,23 +59,44 @@ export function SignInForm() {
       setDevCode(data.debug_code ?? null);
       setStep("code");
     },
-    onError: (e: Error) => setError(errorFor(Number(e.message), t("errorGeneric"))),
+    onError: (e: Error) =>
+      setError(errorFor(Number(e.message), t("errorGeneric"))),
   });
 
   const verify = useMutation({
     mutationFn: async () => {
       setError(null);
-      const { data, error: err, response } = await api.POST("/auth/otp/verify", {
-        body: { phone, code },
-      });
+      const {
+        data,
+        error: err,
+        response,
+      } = looksLikeEmail(phone)
+        ? await api.POST("/auth/email/otp/verify", {
+            body: { email: phone, code },
+          })
+        : await api.POST("/auth/otp/verify", { body: { phone, code } });
       if (err || !data) throw new Error(String(response.status));
       return data;
     },
-    onSuccess: (data) => {
-      setTokens({ access_token: data.access_token, refresh_token: data.refresh_token });
-      router.push("/profile");
+    onSuccess: async (data) => {
+      setTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      // Route on what the account holds, not on which key opened the door. An
+      // organisation with no personal workspace never asked to be a job seeker.
+      const me = await api.GET("/auth/me");
+      const memberships = me.data?.memberships ?? [];
+      const org = memberships.find((m) => m.tenant.tenant_type !== "personal");
+      const personal = memberships.some(
+        (m) => m.tenant.tenant_type === "personal",
+      );
+      router.push(
+        org && !personal ? `/employer/${org.tenant.slug}` : "/matches",
+      );
     },
-    onError: (e: Error) => setError(errorFor(Number(e.message), t("errorBadCode"))),
+    onError: (e: Error) =>
+      setError(errorFor(Number(e.message), t("errorBadCode"))),
   });
 
   return (
@@ -75,23 +118,36 @@ export function SignInForm() {
         >
           <div>
             <label htmlFor="phone" className="text-sm font-medium">
-              {t("phoneLabel")}
+              {t("identifierLabel")}
             </label>
             <input
               id="phone"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
+              type="text"
+              autoComplete="username"
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder={t("phonePlaceholder")}
+              placeholder={t("identifierPlaceholder")}
               className="mt-1.5 w-full rounded-lg border border-border-token bg-surface px-4 py-3 text-base tracking-wide placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             />
           </div>
-          <Button type="submit" size="lg" className="w-full" disabled={request.isPending}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={request.isPending}
+          >
             {request.isPending ? t("sending") : t("sendCode")}
           </Button>
+          <p className="text-center text-sm text-muted">
+            {t("noAccount")}{" "}
+            <Link
+              href="/signup/seeker"
+              className="text-brand underline-offset-4 hover:underline"
+            >
+              {t("signUpInstead")}
+            </Link>
+          </p>
         </form>
       ) : (
         <form
@@ -126,7 +182,12 @@ export function SignInForm() {
             </p>
           )}
 
-          <Button type="submit" size="lg" className="w-full" disabled={verify.isPending}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={verify.isPending}
+          >
             {verify.isPending ? t("verifying") : t("verify")}
           </Button>
 

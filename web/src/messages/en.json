@@ -16,7 +16,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "vacancies": "Vacancies",
-    "settings": "Settings"
+    "settings": "Settings",
+    "courses_org": "Courses"
   },
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
@@ -46,13 +47,13 @@
     "title": "Built for every side of the market",
     "candidateTitle": "For candidates",
     "candidateBody": "Understand what you are missing, and what to do about it. Free, in your language.",
-    "candidateCta": "Create your profile",
+    "candidateCta": "Sign up as a job seeker",
     "employerTitle": "For employers",
     "employerBody": "Post roles as skills, not keywords. Find candidates who genuinely match.",
-    "employerCta": "Post a job",
+    "employerCta": "Sign up to hire",
     "providerTitle": "For course providers",
     "providerBody": "Publish courses anchored to Qualification Packs, and see which skills the market is short of.",
-    "providerCta": "List your courses"
+    "providerCta": "Sign up to publish courses"
   },
   "browse": {
     "title": "Explore the marketplace",
@@ -286,7 +287,7 @@
   },
   "auth": {
     "signInTitle": "Sign in",
-    "signInSubtitle": "Enter your mobile number. We'll send you a 6-digit code — no password needed.",
+    "signInSubtitle": "Enter the mobile number or email you signed up with. We send a six-digit code — there is no password.",
     "phoneLabel": "Mobile number",
     "phonePlaceholder": "98765 43210",
     "sendCode": "Send code",
@@ -296,17 +297,21 @@
     "codeLabel": "6-digit code",
     "verify": "Verify and continue",
     "verifying": "Verifying…",
-    "changeNumber": "Use a different number",
+    "changeNumber": "Use a different one",
     "resend": "Send a new code",
     "devCodeNotice": "Development mode: your code is {code}",
-    "errorInvalidPhone": "That does not look like a valid mobile number.",
     "errorBadCode": "That code is incorrect or has expired.",
     "errorRateLimited": "Too many attempts. Please wait a few minutes and try again.",
     "errorGeneric": "Something went wrong. Please try again.",
     "signOut": "Sign out",
     "myProfile": "My profile",
     "signedInAs": "Signed in as {phone}",
-    "myMatches": "My matches"
+    "myMatches": "My matches",
+    "identifierLabel": "Mobile number or email",
+    "identifierPlaceholder": "98765 43210 or you@example.com",
+    "errorInvalidId": "That does not look like a mobile number or an email address.",
+    "noAccount": "No account yet?",
+    "signUpInstead": "Sign up"
   },
   "profilePage": {
     "title": "My profile",
@@ -539,7 +544,7 @@
   "employersPage": {
     "title": "For employers",
     "lede": "Post a role against the National Occupational Standards it actually requires, and see who can do the work — not who wrote the right words on a CV.",
-    "primaryCta": "Create your organisation",
+    "primaryCta": "Sign up to hire",
     "secondaryCta": "See the demonstration",
     "one": {
       "title": "Hire against a standard, not a keyword",
@@ -558,8 +563,8 @@
   "providersPage": {
     "title": "For training providers",
     "lede": "Publish a course against the standards it teaches, and be recommended to the people whose specific gap it closes.",
-    "primaryCta": "Browse courses",
-    "secondaryCta": "Explore the taxonomy",
+    "primaryCta": "Sign up to publish courses",
+    "secondaryCta": "Browse courses",
     "one": {
       "title": "Recommended by gap, not by advertising",
       "body": "When a candidate is short of a role, courses are ranked by how much of that particular gap they close. A course teaching one thing they need beats a course teaching nine they already have."
@@ -572,7 +577,7 @@
       "title": "Entry routes come from the source",
       "body": "The qualification behind a role publishes its own ways in — education and experience alternatives, imported from the national corpus, not invented here."
     },
-    "status": "Course listings are seeded for now. Provider sign-in and self-serve publishing are not built yet; the matching and recommendation behaviour described above is."
+    "status": "Providers now sign in and publish their own courses against the national framework. Still to come: inviting colleagues, and enrolment reporting."
   },
   "aboutPage": {
     "title": "About IISM",
@@ -670,7 +675,8 @@
       "part_time": "Part time",
       "contract": "Contract",
       "apprenticeship": "Apprenticeship"
-    }
+    },
+    "saveFailed": "Could not save. Check the details and try again."
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -691,7 +697,8 @@
       "owner": "Owner",
       "admin": "Administrator",
       "member": "Member"
-    }
+    },
+    "chooseContext": "Switch"
   },
   "orgSettings": {
     "title": "Organisation profile",
@@ -732,5 +739,79 @@
     "requestError": "Could not send a code. Check the value and try again.",
     "codeError": "That code is incorrect or has expired.",
     "takenError": "That already belongs to another account. Sign in with it instead."
+  },
+  "signup": {
+    "seekerTitle": "Find the work you want",
+    "seekerSubtitle": "Sign up with your phone number. No password, no CV to upload — we send a six-digit code.",
+    "employerTitle": "Hire against real standards",
+    "employerSubtitle": "Sign up with your work email. We send a six-digit code — there is no password to set or reset.",
+    "providerTitle": "Publish your courses",
+    "providerSubtitle": "Sign up with your work email and start listing training anchored to the national framework.",
+    "phoneLabel": "Mobile number",
+    "phoneHint": "We send a six-digit code by SMS. It expires in five minutes.",
+    "emailLabel": "Work email",
+    "emailHint": "We send a six-digit code. It expires in five minutes.",
+    "orgNameLabel": "Organisation name",
+    "employerPlaceholder": "Sunrise Multispeciality Hospital",
+    "providerPlaceholder": "NSDC Healthcare Academy",
+    "sendCode": "Send the code",
+    "sending": "Sending…",
+    "codeSent": "We sent a code to {to}.",
+    "codeLabel": "Six-digit code",
+    "devCode": "Development only — your code is {code}",
+    "verify": "Verify and continue",
+    "verifying": "Verifying…",
+    "changeDetails": "Change these details",
+    "haveAccount": "Already have an account?",
+    "signInInstead": "Sign in",
+    "errorInvalid": "Check the details and try again.",
+    "errorBadCode": "That code is incorrect or has expired.",
+    "errorGeneric": "Something went wrong. Try again."
+  },
+  "providerWorkspace": {
+    "yourCourses": "Your courses",
+    "yourCoursesNote": "Drafts are visible only here. A course reaches candidates when you publish it.",
+    "noCourses": "No courses yet. Create one and describe the standards it teaches.",
+    "newCourse": "New course",
+    "editCourse": "Edit course",
+    "publishRefused": "A course needs at least one standard it teaches before it can be published — without one, it can never be recommended to anyone.",
+    "saveFailed": "Could not save. Check the details, or confirm this organisation is a training provider.",
+    "teachesCount": "{count, plural, =0 {No standards yet} one {Teaches # standard} other {Teaches # standards}}",
+    "hours": "{hours} hours",
+    "nsqfLevelIs": "NSQF {level}",
+    "titleEn": "Course title (English)",
+    "titleHi": "Course title (Hindi)",
+    "titleHiHint": "Optional, and worth writing — most candidates read Hindi first.",
+    "descriptionEn": "Description",
+    "mode": "Mode",
+    "modes": {
+      "online": "Online",
+      "offline": "In person",
+      "hybrid": "Hybrid"
+    },
+    "language": "Language of instruction",
+    "languages": {
+      "en": "English",
+      "hi": "Hindi",
+      "both": "English and Hindi"
+    },
+    "durationHours": "Duration (hours)",
+    "fee": "Fee (₹)",
+    "feeHint": "Leave blank if the course is free.",
+    "nsqfLevel": "NSQF level",
+    "nsqfLevelHint": "Half-levels are real — 4.5 is a level, not a rounding error.",
+    "teachesTitle": "Standards this course teaches",
+    "teachesSubtitle": "Search the national taxonomy. The level taught is what tells a candidate how far this course takes them.",
+    "standardsSearch": "Search standards in English, Hindi or transliteration",
+    "addStandard": "Add",
+    "noStandardsWarning": "This course teaches no standards yet, so it cannot be published and can never be recommended.",
+    "levelTaught": "Level taught",
+    "levelUnset": "Not stated",
+    "remove": "Remove",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "title": "Your workspace",
+    "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close."
   }
 }

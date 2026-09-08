@@ -12,7 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.authorization import Permission, TenantContext, require
+from api.core.authorization import (
+    Permission,
+    TenantContext,
+    require,
+    require_publisher_of,
+)
 from api.core.config import get_settings
 from api.core.database import get_db_session
 from api.modules.analytics import record
@@ -160,7 +165,14 @@ async def org_overview(
     context: TenantContext = CanShortlist,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.EmployerOverview:
-    """The signed-in employer's own vacancies and the pool against each."""
+    """The signed-in employer's own vacancies and the pool against each.
+
+    Employers only. A training provider used to get a 200 here carrying two
+    empty arrays and `candidates_total`, which has no tenant filter -- so the
+    one number on the screen was a global count of every candidate on the
+    platform, presented as though it were a pool they had access to.
+    """
+    require_publisher_of(context, "job")
     return await _overview(db, context.tenant)
 
 
@@ -171,6 +183,7 @@ async def org_candidates(
     context: TenantContext = CanShortlist,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateRanking:
+    require_publisher_of(context, "job")
     return await _ranking(db, context.tenant, job_slug, limit)
 
 

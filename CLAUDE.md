@@ -80,7 +80,8 @@ api/                     FastAPI modular monolith
                          credential linking, organisation creation and the organisation
                          profile (ADR-009/010/011/032/038)
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
-                         the employer's write path; everything else there is read-only.
+                         the employer's write path and course_publishing.py the provider's;
+                         they are siblings, not one generalisation (ADR-026).
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
@@ -203,6 +204,40 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   theme.
 
 ## Current state
+
+Sprint 14 (three ways in, one way back) is done. The homepage offers three
+registration paths, a training provider can finally publish courses, and sign-in is one door that
+takes either credential.
+
+- **Registration is type-aware; sign-in is not.** ADR-032's rule that the *credential* follows the
+  actor type still governs signup. But one identity can hold both credentials and several roles, so
+  at sign-in the credential no longer says who you are — `/signin` detects an `@` and routes on what
+  the account holds. Two doors would ask a question the account can already answer.
+- **`api/modules/marketplace/course_publishing.py` is a sibling of `publishing.py`, not a
+  generalisation.** A `JobSkill` carries importance and mandatory because a match is scored against
+  them; a `CourseSkill` carries only `level_taught`. Duplicates therefore collapse on the **highest
+  level**, not the strongest signal — the seed's own rule. Do not merge the two modules.
+- **`require_publisher_of` is called on every publishing write, in both directions.** Membership
+  answers *may this person act here*, never *is this the right kind of organisation*. A provider
+  posting a vacancy and an employer publishing training are both 403.
+- **`/org/{slug}/candidates` requires an employer.** It used to answer 200 to a provider with two
+  empty arrays and `candidates_total`, which has no tenant filter — so the only number on screen was
+  a global count of every candidate on the platform, presented as a pool they could reach.
+- **Every mutation that can 403 needs an `onError`.** `EmployerWorkspace.save` had only `onSuccess`,
+  so a provider filled in a whole vacancy, pressed save, and the form sat there having silently done
+  nothing. That is worse than the 403.
+- **The header nav and the workspace heading both follow `tenant_type`.** Nothing in `web/src` read
+  it before, which is why a training provider was shown "Vacancies" and "Post a vacancy against the
+  National Occupational Standards".
+- **"Job seeker" appears only for an account with a personal membership.** An organisation-first
+  signup creates no personal tenant, and offering it a job-seeker context it never chose is the
+  assumption this sprint removed. That is also the personal tenant's first real job — it had been
+  written once and read nowhere since Sprint 4.
+- **`useMemberships` returns every organisation, not just employers.** Filtering to employers
+  dropped providers out of the switcher, so one created through `CreateOrgForm` was navigated into a
+  workspace it could never return to.
+- **No migration.** `tenant_type` already permitted `course_provider`, `Course.status` already had
+  the draft/published CHECK, and `CourseSkill.level_taught` already existed.
 
 Sprint 13 (multi-tenancy you can see) is done. A signed-in person switches between "Job seeker" and
 each of their organisations from the header, creates an organisation without leaving their account,

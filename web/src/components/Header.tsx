@@ -8,6 +8,7 @@ import { ContextSwitcher, useActiveOrg } from "@/components/ContextSwitcher";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { Logo } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
+import { useOrgType } from "@/lib/org";
 
 /** What a job seeker is here to do. Also what an anonymous visitor sees. */
 const SEEKER_NAV = [
@@ -17,20 +18,30 @@ const SEEKER_NAV = [
   { key: "howItWorks", href: "/#how-it-works" },
 ] as const;
 
-/** What an employer is here to do. The navigation changes with the context, not
- *  just the page -- otherwise "switching" would mean nothing more than going
- *  somewhere that happens to be an organisation. */
-const ORG_NAV = [
-  { key: "vacancies", href: "" },
-  { key: "settings", href: "/settings" },
-] as const;
+/** What each kind of organisation is here to do. The navigation changes with the
+ *  context, not just the page -- otherwise "switching" would mean nothing more
+ *  than going somewhere that happens to be an organisation.
+ *
+ *  A training provider used to be shown "Vacancies", which is not a thing they
+ *  can have. */
+const ORG_NAV = {
+  employer: [
+    { key: "vacancies", href: "" },
+    { key: "settings", href: "/settings" },
+  ],
+  course_provider: [
+    { key: "courses_org", href: "" },
+    { key: "settings", href: "/settings" },
+  ],
+} as const;
 
 export function Header() {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
   const activeOrg = useActiveOrg();
+  const orgType = useOrgType(activeOrg);
   const nav: { key: string; href: string }[] = activeOrg
-    ? ORG_NAV.map(({ key, href }) => ({
+    ? ORG_NAV[orgType ?? "employer"].map(({ key, href }) => ({
         key,
         href: `/employer/${activeOrg}${href}`,
       }))

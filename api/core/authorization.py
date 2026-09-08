@@ -51,19 +51,34 @@ class Permission(StrEnum):
     JOB_UPDATE = "job:update"
     JOB_PUBLISH = "job:publish"
     JOB_DELETE = "job:delete"
+    COURSE_CREATE = "course:create"
+    COURSE_UPDATE = "course:update"
+    COURSE_PUBLISH = "course:publish"
+    COURSE_DELETE = "course:delete"
     CANDIDATE_SHORTLIST = "candidate:shortlist"
 
 
 _MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ})
+# Roles stay type-agnostic: an admin of any organisation holds both publishing
+# sets, and `require_publisher_of` decides which one their tenant may actually
+# use. Splitting the role map by tenant type instead would mean two ladders to
+# keep in step, and a role that means different things in different rooms.
 _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.JOB_CREATE,
     Permission.JOB_UPDATE,
     Permission.JOB_PUBLISH,
+    Permission.COURSE_CREATE,
+    Permission.COURSE_UPDATE,
+    Permission.COURSE_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
 }
 # Deletion is the owner's alone, and so is editing the organisation itself. An
 # admin can unpublish, which reverses; neither of these does.
-_OWNER: frozenset[Permission] = _ADMIN | {Permission.JOB_DELETE, Permission.ORG_UPDATE}
+_OWNER: frozenset[Permission] = _ADMIN | {
+    Permission.JOB_DELETE,
+    Permission.COURSE_DELETE,
+    Permission.ORG_UPDATE,
+}
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "member": _MEMBER,

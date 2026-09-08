@@ -2,10 +2,14 @@ import { getTranslations } from "next-intl/server";
 
 import { ButtonLink, Card, Section, SectionHeading } from "@/components/ui";
 
+// These cards already described the three entities; now they are the way in.
+// Every route to an account used to land on the candidate phone form, so an
+// employer was two clicks behind a marketing page and a training provider had
+// no registration path anywhere in the product.
 const AUDIENCES = [
-  { key: "candidate", href: "/signin" },
-  { key: "employer", href: "/employers" },
-  { key: "provider", href: "/providers" },
+  { key: "candidate", href: "/signup/seeker" },
+  { key: "employer", href: "/signup/employer" },
+  { key: "provider", href: "/signup/provider" },
 ] as const;
 
 export async function Audiences() {

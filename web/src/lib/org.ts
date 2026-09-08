@@ -45,13 +45,30 @@ export function useMemberships() {
   });
 
   const memberships = me.data?.memberships ?? [];
-  // Employers only. A course provider is an organisation but not a place a
-  // vacancy comes from, and the API refuses one now -- so offering it here
-  // would be an invitation to a 403.
+  // Every organisation, of either kind. Filtering to employers dropped course
+  // providers out of the switcher entirely, so one created through
+  // `CreateOrgForm` was navigated into a workspace it could never return to --
+  // and the header read "Job seeker" while standing inside it.
   const organisations = memberships.filter(
-    (m) => m.tenant.tenant_type === "employer",
+    (m) => m.tenant.tenant_type !== "personal",
   );
-  return { ...me, memberships, organisations };
+  // Whether this person ever asked to look for work. An organisation-first
+  // account has no personal workspace and should not be told it is a job
+  // seeker: ADR-038 is about holding many roles, not assuming them.
+  const isJobSeeker = memberships.some(
+    (m) => m.tenant.tenant_type === "personal",
+  );
+  return { ...me, memberships, organisations, isJobSeeker };
+}
+
+/** The kind of organisation a slug refers to, from data already on the wire. */
+export function useOrgType(
+  orgSlug: string | null,
+): "employer" | "course_provider" | null {
+  const { organisations } = useMemberships();
+  if (!orgSlug) return null;
+  const found = organisations.find((m) => m.tenant.slug === orgSlug);
+  return (found?.tenant.tenant_type as "employer" | "course_provider") ?? null;
 }
 
 export function useOrgJobs(orgSlug: string | null) {
@@ -160,4 +177,85 @@ export function useOrgCandidates(
     },
     retry: false,
   });
+}
+
+export type OrgCourse =
+  paths["/org/{org_slug}/courses"]["get"]["responses"][200]["content"]["application/json"][number];
+
+export type CoursePayload =
+  paths["/org/{org_slug}/courses"]["post"]["requestBody"]["content"]["application/json"];
+
+export function useOrgCourses(orgSlug: string | null) {
+  return useQuery({
+    queryKey: ["org-courses", orgSlug],
+    enabled: orgSlug !== null,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/org/{org_slug}/courses", {
+        params: { path: { org_slug: orgSlug as string } },
+      });
+      if (error || !data) throw new Error("could not load courses");
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useOrgCourseMutations(orgSlug: string) {
+  const qc = useQueryClient();
+  const refresh = () =>
+    qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+
+  const create = useMutation({
+    mutationFn: async (body: CoursePayload) => {
+      const { data, error } = await api.POST("/org/{org_slug}/courses", {
+        params: { path: { org_slug: orgSlug } },
+        body,
+      });
+      if (error || !data) throw new Error("create failed");
+      return data;
+    },
+    onSuccess: refresh,
+  });
+
+  const update = useMutation({
+    mutationFn: async ({
+      slug,
+      body,
+    }: {
+      slug: string;
+      body: CoursePayload;
+    }) => {
+      const { data, error } = await api.PUT("/org/{org_slug}/courses/{slug}", {
+        params: { path: { org_slug: orgSlug, slug } },
+        body,
+      });
+      if (error || !data) throw new Error("update failed");
+      return data;
+    },
+    onSuccess: refresh,
+  });
+
+  const setPublished = useMutation({
+    mutationFn: async ({
+      slug,
+      published,
+    }: {
+      slug: string;
+      published: boolean;
+    }) => {
+      const path = published
+        ? "/org/{org_slug}/courses/{slug}/publish"
+        : "/org/{org_slug}/courses/{slug}/unpublish";
+      const { data, error } = await api.POST(path, {
+        params: { path: { org_slug: orgSlug, slug } },
+      });
+      // The API refuses to publish a course teaching nothing, and that refusal
+      // is the message the provider needs to see.
+      if (error || !data) throw new Error("publish-refused");
+      return data;
+    },
+    onSuccess: refresh,
+  });
+
+  return { create, update, setPublished };
 }

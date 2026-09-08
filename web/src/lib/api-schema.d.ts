@@ -779,6 +779,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Courses
+         * @description Drafts included. Every public listing query filters on published, so this
+         *     is the only place an unfinished course is visible at all.
+         */
+        get: operations["list_courses_org__org_slug__courses_get"];
+        put?: never;
+        /** Create Course */
+        post: operations["create_course_org__org_slug__courses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Course */
+        get: operations["get_course_org__org_slug__courses__slug__get"];
+        /** Update Course */
+        put: operations["update_course_org__org_slug__courses__slug__put"];
+        post?: never;
+        /**
+         * Delete Course
+         * @description Owner only. An admin can unpublish, which reverses; this does not.
+         */
+        delete: operations["delete_course_org__org_slug__courses__slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{slug}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Course
+         * @description Explicit, and refused for a course teaching no standards.
+         */
+        post: operations["publish_course_org__org_slug__courses__slug__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{slug}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpublish Course */
+        post: operations["unpublish_course_org__org_slug__courses__slug__unpublish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/matches": {
         parameters: {
             query?: never;
@@ -843,6 +924,11 @@ export interface paths {
         /**
          * Org Overview
          * @description The signed-in employer's own vacancies and the pool against each.
+         *
+         *     Employers only. A training provider used to get a 200 here carrying two
+         *     empty arrays and `candidates_total`, which has no tenant filter -- so the
+         *     one number on the screen was a global count of every candidate on the
+         *     platform, presented as though it were a pool they had access to.
          */
         get: operations["org_overview_org__org_slug__candidates_get"];
         put?: never;
@@ -1274,6 +1360,43 @@ export interface components {
             /** Skills */
             skills?: components["schemas"]["CourseSkillOut"][];
         };
+        /**
+         * CourseIn
+         * @description A course as its provider describes it.
+         *
+         *     No `status`, for the same reason `JobIn` has none: publishing is an explicit
+         *     action on its own endpoint, not something a form can do by setting a string.
+         */
+        CourseIn: {
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Hi */
+            description_hi?: string | null;
+            /**
+             * Mode
+             * @default offline
+             * @enum {string}
+             */
+            mode: "online" | "offline" | "hybrid";
+            /**
+             * Language
+             * @default both
+             * @enum {string}
+             */
+            language: "en" | "hi" | "both";
+            /** Duration Hours */
+            duration_hours?: number | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /** Skills */
+            skills?: components["schemas"]["CourseSkillIn"][];
+        };
         /** CourseOpenedIn */
         CourseOpenedIn: {
             /** Course Slug */
@@ -1328,6 +1451,21 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /**
+         * CourseSkillIn
+         * @description One standard a course teaches, and how far it takes the learner.
+         *
+         *     Deliberately unlike `JobSkillIn`. A job link carries importance and a
+         *     mandatory flag because a match is scored against them; a course link carries
+         *     only the level it teaches to, because what matters is whether it closes a
+         *     gap and how far.
+         */
+        CourseSkillIn: {
+            /** Skill Slug */
+            skill_slug: string;
+            /** Level Taught */
+            level_taught?: number | null;
         };
         /** CourseSkillOut */
         CourseSkillOut: {
@@ -1868,6 +2006,58 @@ export interface components {
             is_mandatory: boolean;
             /** Nsqf Level */
             nsqf_level?: number | null;
+        };
+        /**
+         * OrgCourseOut
+         * @description A provider's view of their own listing, drafts included.
+         */
+        OrgCourseOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Hi */
+            description_hi?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "online" | "offline" | "hybrid";
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "hi" | "both";
+            /** Duration Hours */
+            duration_hours?: number | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /** Qualification Pack Code */
+            qualification_pack_code?: string | null;
+            tenant: components["schemas"]["TenantOut"];
+            /** Skills */
+            skills?: components["schemas"]["CourseSkillOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * OrgCreateRequest
@@ -3894,6 +4084,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_courses_org__org_slug__courses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_course_org__org_slug__courses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_course_org__org_slug__courses__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_course_org__org_slug__courses__slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_course_org__org_slug__courses__slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_course_org__org_slug__courses__slug__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpublish_course_org__org_slug__courses__slug__unpublish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgCourseOut"];
                 };
             };
             /** @description Validation Error */

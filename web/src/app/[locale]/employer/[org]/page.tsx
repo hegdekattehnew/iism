@@ -1,6 +1,6 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 
-import { EmployerWorkspace } from "@/components/employer/EmployerWorkspace";
+import { OrgWorkspace } from "@/components/employer/OrgWorkspace";
 
 export default async function Page({
   params,
@@ -9,17 +9,13 @@ export default async function Page({
 }) {
   const { locale, org } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("employerWorkspace");
 
+  // The heading lives inside OrgWorkspace, not here: it depends on the kind of
+  // organisation, and only the client knows that. A server-rendered title said
+  // "Post a vacancy" to training providers.
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-12 sm:py-16">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-        {t("title")}
-      </h1>
-      <p className="mt-2 max-w-2xl text-base text-muted">{t("subtitle")}</p>
-      <div className="mt-8">
-        <EmployerWorkspace orgSlug={org} />
-      </div>
+      <OrgWorkspace orgSlug={org} />
     </div>
   );
 }

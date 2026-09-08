@@ -14,7 +14,7 @@ export default async function Page({
       namespace="employersPage"
       points={["one", "two", "three"]}
       showStats={true}
-      primaryHref="/employers/signin"
+      primaryHref="/signup/employer"
       secondaryHref="/employers/demo"
     />
   );

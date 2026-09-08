@@ -18,7 +18,7 @@ export async function CtaBand() {
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
           <ButtonLink
-            href="/signin"
+            href="/signup/seeker"
             variant="secondary"
             size="lg"
             className="border-transparent"

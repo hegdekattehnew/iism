@@ -18,6 +18,7 @@ from api.modules.geography import router as geography_router
 from api.modules.identity import account_router, organisation_router
 from api.modules.identity import router as auth_router
 from api.modules.marketplace import (
+    course_publishing_router,
     courses_router,
     jobs_router,
     marketplace_router,
@@ -64,6 +65,7 @@ app.include_router(account_router)
 app.include_router(organisation_router)
 app.include_router(profile_router)
 app.include_router(publishing_router)
+app.include_router(course_publishing_router)
 app.include_router(matching_router)
 app.include_router(analytics_router)
 

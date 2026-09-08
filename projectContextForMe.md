@@ -102,6 +102,39 @@ first visit, sectioned editor after, weighted completeness meter. 101 tests.
 **Sprint 6 (NSQF master data) — built, then rolled back** on 2026-09-04. The audit that prompted
 it is in [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
 
+**Sprint 14 (three ways in, one way back) — done** on 2026-09-08. Prompted by the observation that
+the product looked job-seeker-first and would "restrict an identity who wants only to come to either
+hiring people or provide training". Partly true, and the audit found worse.
+
+- **An employer-only identity was already possible** — `/auth/org/register` creates a user with an
+  employer tenant and no personal workspace. The problem was discoverability: every homepage route
+  to an account went to the candidate phone form, and `/employers/signin` sat two clicks behind a
+  marketing page.
+- **A training provider could not register at all.** `OrgSignInForm` hardcoded
+  `tenant_type: "employer" as const`. The API had accepted `course_provider` since Sprint 12; no UI
+  could produce it.
+- **And a provider account led nowhere.** No write path for `Course` existed anywhere in `api/`. A
+  provider got an employer's heading, a nav reading "Vacancies", and a "New vacancy" button whose
+  save returned 403 into a mutation with **no `onError`** — so the form sat there having silently
+  done nothing. A `course_provider` tenant with a member and zero courses already existed in the
+  database when this started.
+- **`/org/{slug}/candidates` answered 200 to providers** with two empty arrays and
+  `candidates_total`, which has no tenant filter. The only number on the screen was a global count
+  of every candidate on the platform, presented as a pool they could reach.
+- **Pushed back on one half of the request, and the reasoning held up.** The proposal was to fork
+  *login* by user type as well as registration. ADR-032's rule is about the credential at
+  registration; after Sprint 13 one identity holds both credentials, so at sign-in the credential no
+  longer identifies anyone. Two doors would punish exactly the people who linked both. Registration
+  is type-aware; sign-in detects an `@` and routes on what the account holds.
+- **Course publishing is a sibling of job publishing, not a generalisation.** `CourseSkill` carries
+  only `level_taught`, so duplicates collapse on the **highest level** where a job's collapse on the
+  strongest signal. Resisting the urge to unify them is the point.
+- **No migration.** Everything needed already existed in the schema — the first sprint in six that
+  did not touch it.
+- **A stale Turbopack cache cost ten minutes.** Every page 500'd with a `JSON.parse` error at a fixed
+  byte offset while `npm run build` passed cleanly. `rm -rf web/.next` fixed it. Suspect the cache
+  first when the build disagrees with the dev server.
+
 **Sprint 13 (multi-tenancy you can see) — done** on 2026-09-07. Prompted by a single observation:
 *"I was expecting an option on the frontend to change tenancy after login."* There wasn't one, and
 auditing why turned up more than a missing control.

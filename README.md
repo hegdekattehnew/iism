@@ -9,7 +9,14 @@ India-first, Hindi and English at launch. See
 and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 39 ADRs
 that govern how.
 
-## Status — Sprints 1–13 complete
+## Status — Sprints 1–14 complete
+
+**Sprint 14 — three ways in, one way back.** The homepage asks which of the three you are before it
+asks for a credential: a job seeker signs up with a phone, an employer or a training provider with a
+work email and an organisation name. A provider can now publish courses against the standards they
+teach — the other half of ADR-026, and the reason a provider account previously led to an employer's
+screen with a button wired to nothing. Signing back in is one door that takes either credential and
+routes on what the account holds.
 
 **Sprint 13 — one person, many hats, visibly.** The header carries a context switcher: "Job seeker"
 alongside every organisation you belong to, and picking one changes the navigation, not just the

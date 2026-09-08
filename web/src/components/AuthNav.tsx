@@ -70,7 +70,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
       >
         {tn("signIn")}
       </Link>
-      <ButtonLink href="/signin" size={size}>
+      <ButtonLink href="/signup/seeker" size={size}>
         {tn("getStarted")}
       </ButtonLink>
     </>

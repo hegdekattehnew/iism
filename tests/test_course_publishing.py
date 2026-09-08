@@ -1,0 +1,266 @@
+"""Sprint 14: a training provider can finally do something.
+
+Before this, a `course_provider` tenant could be created and could edit its own
+profile, and that was the whole of it — there was no write path for `Course` or
+`CourseSkill` anywhere in `api/`. It was handed an employer's workspace, whose
+primary button returned 403 into a UI that swallowed the error.
+
+These tests exist mostly to keep the two publishing surfaces from drifting into
+each other. They share a shape and not a schema, and the differences are the
+part worth guarding.
+"""
+
+import uuid
+from decimal import Decimal
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.modules.identity import Tenant
+from api.modules.skills.models import Skill
+
+
+def _email() -> str:
+    return f"provider-{uuid.uuid4().hex[:12]}@iism-fixtures.co.in"
+
+
+@pytest.fixture
+async def taught_skill(db: AsyncSession) -> str:
+    skill = Skill(
+        slug="sterile-technique-tst-n0101",
+        name_en="Apply sterile technique",
+        skill_type="technical",
+        nsqf_level=Decimal("4"),
+        nos_code="TST/N0101",
+        source="nsqf",
+    )
+    db.add(skill)
+    await db.commit()
+    return skill.slug
+
+
+@pytest.fixture
+async def second_taught_skill(db: AsyncSession) -> str:
+    skill = Skill(
+        slug="waste-segregation-tst-n0102",
+        name_en="Segregate biomedical waste",
+        skill_type="technical",
+        nsqf_level=Decimal("3"),
+        nos_code="TST/N0102",
+        source="nsqf",
+    )
+    db.add(skill)
+    await db.commit()
+    return skill.slug
+
+
+async def _provider(client: AsyncClient, db: AsyncSession, name: str) -> tuple[dict[str, str], str]:
+    """Register an organisation and make it a training provider.
+
+    Registration still mints `employer`; the type-aware signup path is Part 3 of
+    this sprint. Flipping the row here keeps this suite testing publishing
+    rather than registration.
+    """
+    address = _email()
+    requested = await client.post(
+        "/auth/org/register",
+        json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+    )
+    code = requested.json()["debug_code"]
+    tokens = (
+        await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
+    ).json()
+    headers = {"authorization": f"Bearer {tokens['access_token']}"}
+
+    me = (await client.get("/auth/me", headers=headers)).json()
+    slug = next(m["tenant"]["slug"] for m in me["memberships"])
+    tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
+    assert tenant is not None
+    tenant.tenant_type = "course_provider"
+    await db.commit()
+    return headers, slug
+
+
+class TestCoursePublishing:
+    async def test_a_provider_can_publish_a_course(
+        self, client: AsyncClient, db: AsyncSession, taught_skill: str
+    ) -> None:
+        headers, slug = await _provider(client, db, "Sterile Skills Academy")
+
+        created = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={
+                "title_en": "Sterile Technique for Ward Staff",
+                "mode": "hybrid",
+                "language": "both",
+                "duration_hours": 60,
+                "fee_inr": 4500,
+                "nsqf_level": 4,
+                "skills": [{"skill_slug": taught_skill, "level_taught": 4}],
+            },
+        )
+        assert created.status_code == 201
+        assert created.json()["status"] == "draft"
+
+        course_slug = created.json()["slug"]
+        published = await client.post(f"/org/{slug}/courses/{course_slug}/publish", headers=headers)
+        assert published.json()["status"] == "published"
+
+        listed = (await client.get("/courses", params={"limit": 100})).json()
+        assert course_slug in [c["slug"] for c in listed["items"]]
+
+    async def test_a_new_course_is_a_draft_and_invisible_to_candidates(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`Course.status` defaults to "published" at the model level, and the
+        seed sets it deliberately. A form must not."""
+        headers, slug = await _provider(client, db, "Draft Academy")
+        created = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={"title_en": "Quietly Drafted Course", "skills": []},
+        )
+
+        public = (await client.get("/courses", params={"limit": 100})).json()
+        assert created.json()["slug"] not in [c["slug"] for c in public["items"]]
+
+    async def test_publishing_a_course_teaching_nothing_is_refused(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`courses_closing_gap` inner-joins `CourseSkill`, so a course teaching
+        nothing can never be recommended — it would be published and
+        permanently unreachable."""
+        headers, slug = await _provider(client, db, "Empty Syllabus Academy")
+        course = (
+            await client.post(
+                f"/org/{slug}/courses",
+                headers=headers,
+                json={"title_en": "Teaches Nothing", "skills": []},
+            )
+        ).json()
+
+        refused = await client.post(
+            f"/org/{slug}/courses/{course['slug']}/publish", headers=headers
+        )
+        assert refused.status_code == 422
+
+    async def test_duplicate_standards_collapse_on_the_highest_level(
+        self, client: AsyncClient, db: AsyncSession, taught_skill: str
+    ) -> None:
+        """The seed's own rule, and the opposite of a job's: a course covering a
+        standard to level 4 in one module and level 3 in another does take the
+        learner to 4."""
+        headers, slug = await _provider(client, db, "Collapsing Academy")
+        created = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={
+                "title_en": "Two Modules, One Standard",
+                "skills": [
+                    {"skill_slug": taught_skill, "level_taught": 3},
+                    {"skill_slug": taught_skill, "level_taught": 4},
+                ],
+            },
+        )
+        skills = created.json()["skills"]
+        assert len(skills) == 1
+        assert skills[0]["level_taught"] == 4
+
+    async def test_editing_replaces_the_syllabus(
+        self, client: AsyncClient, db: AsyncSession, taught_skill: str, second_taught_skill: str
+    ) -> None:
+        headers, slug = await _provider(client, db, "Rewriting Academy")
+        course = (
+            await client.post(
+                f"/org/{slug}/courses",
+                headers=headers,
+                json={
+                    "title_en": "Rewritten Syllabus",
+                    "skills": [{"skill_slug": taught_skill, "level_taught": 3}],
+                },
+            )
+        ).json()
+
+        updated = await client.put(
+            f"/org/{slug}/courses/{course['slug']}",
+            headers=headers,
+            json={
+                "title_en": "Rewritten Syllabus",
+                "skills": [{"skill_slug": second_taught_skill, "level_taught": 4}],
+            },
+        )
+        assert [s["skill"]["slug"] for s in updated.json()["skills"]] == [second_taught_skill]
+
+    async def test_the_slug_survives_a_title_change(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, slug = await _provider(client, db, "Stable Academy")
+        course = (
+            await client.post(
+                f"/org/{slug}/courses",
+                headers=headers,
+                json={"title_en": "Original Course Title", "skills": []},
+            )
+        ).json()
+
+        updated = await client.put(
+            f"/org/{slug}/courses/{course['slug']}",
+            headers=headers,
+            json={"title_en": "Completely Different Title", "skills": []},
+        )
+        assert updated.json()["slug"] == course["slug"]
+
+
+class TestTheTwoSurfacesStayApart:
+    """Membership answers *may this person act here*, never *is this the right
+    kind of organisation*. Both directions need the second question asked."""
+
+    async def test_a_provider_cannot_post_a_vacancy(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, slug = await _provider(client, db, "Not An Employer Academy")
+        refused = await client.post(
+            f"/org/{slug}/jobs",
+            headers=headers,
+            json={"title_en": "Vacancy from a training provider", "skills": []},
+        )
+        assert refused.status_code == 403
+
+    async def test_an_employer_cannot_publish_a_course(self, client: AsyncClient) -> None:
+        address = _email()
+        requested = await client.post(
+            "/auth/org/register",
+            json={
+                "email": address,
+                "organisation_name": "Not A Provider Clinic",
+                "tenant_type": "employer",
+            },
+        )
+        code = requested.json()["debug_code"]
+        tokens = (
+            await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
+        ).json()
+        headers = {"authorization": f"Bearer {tokens['access_token']}"}
+        me = (await client.get("/auth/me", headers=headers)).json()
+        slug = me["memberships"][0]["tenant"]["slug"]
+
+        refused = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={"title_en": "Training from an employer", "skills": []},
+        )
+        assert refused.status_code == 403
+
+    async def test_a_provider_cannot_read_the_candidate_shortlist(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """It used to answer 200 with two empty arrays and `candidates_total`,
+        which has no tenant filter — so the one number on the screen was a
+        global count of every candidate on the platform, presented as a pool the
+        provider had access to."""
+        headers, slug = await _provider(client, db, "Curious Academy")
+
+        assert (await client.get(f"/org/{slug}/candidates", headers=headers)).status_code == 403

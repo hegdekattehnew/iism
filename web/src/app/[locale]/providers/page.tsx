@@ -14,8 +14,8 @@ export default async function Page({
       namespace="providersPage"
       points={["one", "two", "three"]}
       showStats={true}
-      primaryHref="/courses"
-      secondaryHref="/skills"
+      primaryHref="/signup/provider"
+      secondaryHref="/courses"
     />
   );
 }
