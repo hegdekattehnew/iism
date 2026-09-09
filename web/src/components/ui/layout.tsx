@@ -1,8 +1,11 @@
 /** Page-structure and brand components.
  *
- * Carried over unchanged from the original `ui.tsx`. These are composition, not
+ * Carried over from the original `ui.tsx`. These are composition, not
  * interaction — there is no accessibility gap for a Radix primitive to close,
  * so rewriting them would be churn.
+ *
+ * The `Card` that used to live here went with the `Panel` alias that was its
+ * only route out of this module; `ui/card.tsx` is the one everything uses.
  */
 
 import type { ReactNode } from "react";
@@ -44,22 +47,6 @@ export function SectionHeading({
           {subtitle}
         </p>
       )}
-    </div>
-  );
-}
-
-export function Card({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-xl border border-border-token bg-surface p-6 ${className}`}
-    >
-      {children}
     </div>
   );
 }

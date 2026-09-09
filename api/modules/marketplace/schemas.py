@@ -223,26 +223,6 @@ class CandidateSkillOut(BaseModel):
     source: SkillSource
 
 
-class CandidateProfileOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    headline: str | None = None
-    location_state: str | None = None
-    location_district: str | None = None
-    years_experience: int
-    education_level: EducationLevel | None = None
-    skills: list[CandidateSkillOut] = Field(default_factory=list)
-
-
-class CandidateProfileUpdate(BaseModel):
-    headline: str | None = Field(default=None, max_length=160)
-    location_state: str | None = Field(default=None, max_length=80)
-    location_district: str | None = Field(default=None, max_length=80)
-    years_experience: int = Field(default=0, ge=0, le=60)
-    education_level: EducationLevel | None = None
-
-
 class CandidateSkillAdd(BaseModel):
     skill_slug: str
     proficiency: int = Field(default=3, ge=1, le=5)

@@ -23,17 +23,20 @@ nothing attached.
 """
 
 import uuid
-from datetime import UTC, datetime
+from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from api.core.text import slugify
+from api.modules.marketplace.listings import (
+    load_with_skills,
+    resolve_standards,
+    unique_slug,
+)
 from api.modules.marketplace.models import Course, CourseSkill
 from api.modules.marketplace.schemas import CourseIn, CourseSkillIn
-from api.modules.skills.models import Skill
 
 # Copied field by field rather than `model_dump()`ed, so `search_vector` --
 # GENERATED ALWAYS, and rejected by Postgres on any write -- can never reach an
@@ -51,58 +54,24 @@ _PLAIN_FIELDS = (
 )
 
 
-async def _unique_slug(db: AsyncSession, title: str) -> str:
-    """Title alone, unlike a job's title-and-district: a course has no location.
-
-    A Hindi-only title transliterates to nothing, so there is a fallback.
-    """
-    base = slugify(title)[:80].strip("-") or "course"
-    taken = set((await db.scalars(select(Course.slug).where(Course.slug.like(f"{base}%")))).all())
-    if base not in taken:
-        return base
-    for n in range(2, 200):
-        candidate = f"{base}-{n}"
-        if candidate not in taken:
-            return candidate
-    return f"{base}-{datetime.now(UTC).timestamp():.0f}"
-
-
 async def _resolve_skills(
     db: AsyncSession, rows: list[CourseSkillIn]
 ) -> list[tuple[uuid.UUID, float | None]]:
-    """Slugs to skill ids, collapsed on the highest level taught."""
+    """Collapsed on the **highest level taught** — the opposite of a job's merge,
+    and the seed's own rule: a course covering a standard to level 4 in one
+    module and level 3 in another does take the learner to 4.
+
+    The existence and retired-row checks are shared with the vacancy surface
+    (`listings.resolve_standards`), because that is validation policy and
+    ADR-026 requires both paths to apply the same rules.
+    """
     if not rows:
         return []
-
-    slugs = [r.skill_slug for r in rows]
-    found = {
-        slug: (skill_id, source)
-        for slug, skill_id, source in (
-            await db.execute(
-                select(Skill.slug, Skill.id, Skill.source).where(Skill.slug.in_(slugs))
-            )
-        ).all()
-    }
-
-    unknown = sorted(set(slugs) - found.keys())
-    if unknown:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Unknown standards: {', '.join(unknown)}",
-        )
-    # A retired row would make the course unmatchable: matching compares at
-    # concept level over the national taxonomy, and `legacy` rows are excluded
-    # from it.
-    retired = sorted(s for s in slugs if found[s][1] == "legacy")
-    if retired:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Retired standards cannot be taught: {', '.join(retired)}",
-        )
+    ids = await resolve_standards(db, [r.skill_slug for r in rows], verb="taught")
 
     taught: dict[uuid.UUID, float | None] = {}
     for row in rows:
-        skill_id = found[row.skill_slug][0]
+        skill_id = ids[row.skill_slug]
         current = taught.get(skill_id)
         if skill_id not in taught or (row.level_taught or 0) > (current or 0):
             taught[skill_id] = row.level_taught
@@ -118,24 +87,7 @@ async def _write_skills(db: AsyncSession, course: Course, rows: list[CourseSkill
 
 
 async def _load(db: AsyncSession, course_id: uuid.UUID) -> Course:
-    """Re-read with relationships populated.
-
-    `populate_existing` because the instance is already in the identity map with
-    a stale `skills` collection after the delete-and-rewrite above — without it
-    the query succeeds and quietly returns the previous syllabus.
-    """
-    course = await db.scalar(
-        select(Course)
-        .where(Course.id == course_id)
-        .options(
-            selectinload(Course.skills).selectinload(CourseSkill.skill),
-            selectinload(Course.tenant),
-        )
-        .execution_options(populate_existing=True)
-    )
-    if course is None:  # pragma: no cover - just written
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
-    return course
+    return cast(Course, await load_with_skills(db, Course, CourseSkill, course_id, label="Course"))
 
 
 async def list_courses(db: AsyncSession, tenant_id: uuid.UUID) -> list[Course]:
@@ -167,7 +119,7 @@ async def get_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Cours
 
 async def create_course(db: AsyncSession, tenant_id: uuid.UUID, payload: CourseIn) -> Course:
     course = Course(
-        slug=await _unique_slug(db, payload.title_en),
+        slug=await unique_slug(db, Course.slug, payload.title_en),
         tenant_id=tenant_id,
         # Explicit. `Course.status` defaults to "published" at the model level,
         # so omitting this would put an unfinished syllabus in front of

@@ -24,18 +24,21 @@ importer: **geography resolves on write.** `state_id` is what
 """
 
 import uuid
-from datetime import UTC, datetime
+from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from api.core.text import slugify
 from api.modules.geography import resolve_location
+from api.modules.marketplace.listings import (
+    load_with_skills,
+    resolve_standards,
+    unique_slug,
+)
 from api.modules.marketplace.models import Job, JobSkill
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
-from api.modules.skills.models import Skill
 
 # Fields copied straight from the payload. Listed rather than `model_dump()`ed
 # wholesale so `search_vector` -- GENERATED ALWAYS, and rejected by Postgres on
@@ -56,68 +59,27 @@ _PLAIN_FIELDS = (
 )
 
 
-async def _unique_slug(db: AsyncSession, title: str, district: str | None) -> str:
-    """`general-duty-assistant-chennai`, disambiguated only when it must be.
-
-    Title and district, because that is what a person searching recognises, and
-    what the seeded slugs already look like. A Hindi-only title slugifies to
-    nothing, so there is a fallback.
-    """
-    parts = [slugify(title)[:70].strip("-"), slugify(district or "").strip("-")]
-    base = "-".join(p for p in parts if p) or "vacancy"
-    taken = set((await db.scalars(select(Job.slug).where(Job.slug.like(f"{base}%")))).all())
-    if base not in taken:
-        return base
-    for n in range(2, 200):
-        candidate = f"{base}-{n}"
-        if candidate not in taken:
-            return candidate
-    return f"{base}-{datetime.now(UTC).timestamp():.0f}"
-
-
 async def _resolve_skills(
     db: AsyncSession, rows: list[JobSkillIn]
 ) -> list[tuple[uuid.UUID, int, bool]]:
-    """Slugs to skill ids, merged on the strongest signal.
+    """Merged on the strongest signal: highest importance, mandatory beating
+    optional. `uq_job_skill` makes a duplicate a constraint violation rather
+    than two requirements, and understating either would weaken a requirement
+    the employer actually stated.
 
-    A retired `legacy` skill is refused rather than silently accepted: the whole
-    point of Sprint 9 was that the national taxonomy is the operational
-    vocabulary, and a job anchored to a retired row would score against nothing.
+    Which standards exist, and the refusal of retired ones, is shared with the
+    course surface (`listings.resolve_standards`) — that is validation policy,
+    and ADR-026 requires both paths to apply the same rules.
     """
     if not rows:
         return []
-
-    slugs = [r.skill_slug for r in rows]
-    found = {
-        slug: (skill_id, source)
-        for slug, skill_id, source in (
-            await db.execute(
-                select(Skill.slug, Skill.id, Skill.source).where(Skill.slug.in_(slugs))
-            )
-        ).all()
-    }
-
-    unknown = sorted(set(slugs) - found.keys())
-    if unknown:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Unknown standards: {', '.join(unknown)}",
-        )
-    retired = sorted(s for s in slugs if found[s][1] == "legacy")
-    if retired:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Retired standards cannot be required: {', '.join(retired)}",
-        )
+    ids = await resolve_standards(db, [r.skill_slug for r in rows], verb="required")
 
     merged: dict[uuid.UUID, tuple[int, bool]] = {}
     for row in rows:
-        skill_id = found[row.skill_slug][0]
+        skill_id = ids[row.skill_slug]
         importance, mandatory = merged.get(skill_id, (0, False))
-        merged[skill_id] = (
-            max(importance, row.importance),
-            mandatory or row.is_mandatory,
-        )
+        merged[skill_id] = (max(importance, row.importance), mandatory or row.is_mandatory)
     return [(sid, imp, mand) for sid, (imp, mand) in merged.items()]
 
 
@@ -137,21 +99,7 @@ async def _write_skills(db: AsyncSession, job: Job, rows: list[JobSkillIn]) -> N
 
 
 async def _load(db: AsyncSession, job_id: uuid.UUID) -> Job:
-    """Re-read with relationships populated.
-
-    `populate_existing` because the instance is already in the identity map with
-    a stale `skills` collection after the delete-and-rewrite above -- without it
-    the query succeeds and quietly returns the previous requirements.
-    """
-    job = await db.scalar(
-        select(Job)
-        .where(Job.id == job_id)
-        .options(selectinload(Job.skills).selectinload(JobSkill.skill), selectinload(Job.tenant))
-        .execution_options(populate_existing=True)
-    )
-    if job is None:  # pragma: no cover - just written
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
-    return job
+    return cast(Job, await load_with_skills(db, Job, JobSkill, job_id, label="Job"))
 
 
 async def list_jobs(db: AsyncSession, tenant_id: uuid.UUID) -> list[Job]:
@@ -182,7 +130,7 @@ async def get_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
 async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
     location = await resolve_location(db, payload.location_state, payload.location_district)
     job = Job(
-        slug=await _unique_slug(db, payload.title_en, payload.location_district),
+        slug=await unique_slug(db, Job.slug, payload.title_en, payload.location_district),
         tenant_id=tenant_id,
         # Explicit. `Job.status` defaults to "published" at the model level, so
         # omitting this would put an unfinished listing straight in front of

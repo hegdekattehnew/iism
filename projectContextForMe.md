@@ -4,7 +4,13 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-02 · Sprints 1–5 built + a security/perf pass; matching is Sprint 6
+**Last updated:** 2026-09-09 · Sprints 1–15 built. Sprint 15 was consolidation: no new product
+surface, four unpushed sprints pushed, the documents made to agree with the code.
+
+> Every count in this file is dated. An undated number in a document that survives fifteen
+> sprints is a number nobody can trust and nobody can check — the header above claimed
+> "Sprints 1–5" through nine further sprints, which is how §10 came to assert the branch was
+> pushed while four sprints sat on one laptop.
 
 ---
 
@@ -72,6 +78,62 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
   models only, `User` and `Membership` layered on in Sprint 4.
 
 ## 4. Current state
+
+**Sprint 15 (consolidation) — complete, 2026-09-09.** No new product surface. The push, the
+deletions, the shared-policy extraction, three new test files, and this document made true.
+
+*Counted live on 2026-09-09.* Database **557 MB** (not the 485 MB written here for three sprints).
+`skills` 21,355 · `skill_aliases` **298** (not 149 — the importer carried more than the seed) ·
+`skill_concepts` 18,958 · `qp_entry_routes` 14,405 (the table is `qp_entry_routes`; this file
+called it `entry_routes`) · `tenants` 49 · `users` 38 · `memberships` 40 · `jobs` 23 · `courses` 21
+· `job_skills` 91 · `course_skills` 66 · `candidate_profiles` 34 · `candidate_skills` 90 ·
+`analytics_events` 41. **39 ADRs**, 17 migrations.
+
+The tenant count is lower than it was mid-sprint because verifying the journeys end to end left
+throwaway organisations behind, and clearing them also removed **11 orphaned personal tenants**
+from earlier sessions — rows with no membership at all, which no account could reach. Worth
+knowing if a number here looks smaller than a memory of it: the seed is the floor, and everything
+above it is journey debris.
+
+**Scale, with the generated code separated out** — because quoting a gross figure to anyone
+technical invites exactly one question, and it should be answered here first:
+
+| | files | lines | |
+|---|---|---|---|
+| `api/` | 68 | 9,861 | authored |
+| `scripts/` | 7 | 2,484 | authored |
+| `tests/` | 18 | 4,170 | authored |
+| `migrations/` | 18 | 1,714 | authored |
+| `web/src/` excl. generated | 92 | 8,197 | authored |
+| `web/src/lib/api-schema.d.ts` | 1 | 4,675 | **generated** — `make gen-api` |
+| `web/src/messages/*.json` | 2 | 1,556 | authored (650 keys × 2 locales) |
+| `backups/schema.sql` | 1 | ~2,127 | **generated** — `make db-schema` |
+| `web/package-lock.json` | 1 | ~8,100 | **generated** — npm |
+
+So roughly **26,400 lines of authored code**, of which 4,170 are tests. Anything that quotes a
+number near 40,000 is counting a file a tool wrote.
+
+**Five of the six rich-profile collections are empty.** Sprint 5 built experiences, educations,
+certifications, languages, preferred roles and preferred locations; across all six the database
+holds **one row** (an experience). The schema is real, the generic route and editor are real, and
+`tests/test_profile_sections.py` exercises them — but nothing has ever put data through them at
+volume, and no seeded candidate has a work history. That is a fact about the seed, not the code,
+and it is the reason a demo of the profile wizard looks thinner than the schema behind it.
+
+**What Sprint 15 found, which is more useful than what it deleted:**
+- `record()` raised `TypeError` on an unknown event name, from above the `try/except` that exists
+  to absorb exactly that, and its docstring says "Never raises". `log.warning(..., event=name)`
+  collides with structlog's own first positional argument. `analytics/` had no test file; writing
+  one found it in the first run. The same collision sat in the `except` branch.
+- Three of eight publishing writes had no tenant-type guard while `CLAUDE.md` asserted all eight
+  did. Fixed structurally, not by adding three call sites.
+- Two profile columns were closed `Literal` unions on a response model with no CHECK behind them
+  (migration 0017). Found by writing the test that asserts unions and constraints agree.
+- The seed never resolved geography and relied on a backfill that runs **before** the rows it
+  fixes exist. A clean `make import-nsqf && make seed` left every seeded job invisible to
+  location-filtered matching.
+- 37 dead message keys per locale, `orgAuth` entire. The audit produced two rounds of false
+  positives first; **do not delete an i18n key on a grep alone** (§8).
 
 **Sprint 1 (walking skeleton) — complete.** Every architectural layer exists and is connected,
 with near-zero business logic.
@@ -296,7 +358,7 @@ four further collections arrived (`sectors`, `ssc`, `state`, `district`).
 states 36 | districts 766 | sub_districts 7,100
 awarding bodies 106 (43 SSC + 63 AB) | sectors 43 | sub_sectors 796 | occupations 1,808
 skills 21,303 | qualification_packs 4,424 | qp_skills 27,278 | model_curricula 1,950
-entry_routes 14,405 | nco_codes 2,541 | qp_skills with weightage 25,522
+qp_entry_routes 14,405 | nco_codes 2,541 | qp_skills with weightage 25,522
 performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151,840
 ```
 
@@ -597,12 +659,18 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 10. Git state
 
-**Pushed 2026-09-07.** `origin/v2/foundations` is at `8099b5f` with identical trees to local —
-verified by comparing tree hashes, not just the commit id. The branch had previously existed only
-on one laptop; that risk is closed.
+**Pushed 2026-09-09**, at the start of Sprint 15 and before anything else in it.
 
-- Branch **`v2/foundations`**, 20 commits ahead of `origin/main`, tracking
-  `origin/v2/foundations`, working tree clean, no stashes.
+This section was wrong in the most expensive possible way, and the shape of the mistake is worth
+keeping. It said "Pushed 2026-09-07 … that risk is closed", because the last commit to actually
+reach the remote was one called *"Correct the git section: the branch is pushed"*. Sprints 11, 12,
+13 and 14 — five commits and several thousand lines — then accumulated locally while the document
+went on asserting they were safe. **A claim about the remote is only true at the moment it is
+checked**; re-check it, do not read it here.
+
+- Branch **`v2/foundations`**, tracking `origin/v2/foundations`.
+- Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
+  branch tip against the document is what failed for four sprints.
 - **No pull request is open yet.** `gh` is not installed on this machine, so the PR has to be
   opened in the browser:
   `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`
@@ -678,7 +746,8 @@ the ADR-023 encryption path.
 ## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 
 Single uvicorn worker, load generator on the same box, so **treat throughput as a floor**.
-The database is now **485 MB** across 21,355 skills and ~614,000 content rows.
+The database was **485 MB** when this was measured; it is **557 MB** as of 2026-09-09, across
+21,355 skills and ~614,000 content rows. The timings below were not re-run.
 
 | Endpoint | c=10 rps | c=50 rps | p50 | p99 (c=50) |
 |---|---|---|---|---|
@@ -705,7 +774,8 @@ people browse the first pages, wrong if anything ever walks the catalogue. Keyse
 **Still not ready for 1000 concurrent users.** Outstanding, in order:
 
 1. **No caching.** Redis serves only OTP, refresh tokens and the ARQ broker — ADR-020 is
-   unimplemented. The taxonomy is near-static and 485 MB of it is now read-only reference data.
+   unimplemented. The taxonomy is near-static and the bulk of the database is read-only
+   reference data.
 2. **Single uvicorn process.** Multiple workers is the cheapest win available.
 3. **Connection pool maths.** 15 connections per process against `max_connections=100` caps you at
    ~6 processes; PgBouncer before that.
@@ -742,7 +812,8 @@ the logs. CORS is restricted to one origin.
 
 ## 12. Open risks — state these honestly, do not soften
 
-- ~~The work exists in one place.~~ **Closed 2026-09-07** — `v2/foundations` is on `origin`. What
+- ~~The work exists in one place.~~ **Re-closed 2026-09-09** — and it had quietly re-opened:
+  this line said "Closed 2026-09-07" while Sprints 11–14 sat unpushed. See §10. What
   remains is that **MongoDB is backed up by nothing**: it is the source of record for the corpus
   (ADR-034), it lives only in a local Docker volume, and if it is lost the taxonomy cannot be
   rebuilt from anything in this repository or on GitHub.
@@ -758,8 +829,9 @@ the logs. CORS is restricted to one origin.
   every link points at a National Occupational Standard. What replaced it is a smaller, honest
   debt: the curated→NOS map is hand-authored, so some anchors are judgement calls. The uncertain
   ones are marked in `scripts/legacy_skill_map.py`.
-- **The national taxonomy is English-only.** The 149 carried aliases are the only Hindi reaching
-  it, covering 38 standards out of 21,303. Say this plainly.
+- **The national taxonomy is English-only.** The carried aliases (298 rows as of 2026-09-09)
+  are the only Hindi reaching it, covering a few dozen standards out of 21,355. Say this
+  plainly.
 - ~~4,784 imported skills are unreachable by sector navigation.~~ **Resolved in Sprint 8** — every
   standard states its own sector, so the hierarchy no longer depends on the qualification side.
   They still belong to no current qualification, which is a fact about the corpus, not a defect.
@@ -771,3 +843,47 @@ the logs. CORS is restricted to one origin.
 - **Only 45 of 21,303 titles are section-numbered course fragments** ("10.1. Case Studies") but
   they are indistinguishable from real units in the schema. Prominence ordering hides them; it
   does not fix them.
+
+## 13. What it would take to run this for a real customer
+
+Written down on 2026-09-09 so the answer exists before it is asked in a meeting. **Nothing here
+is a defect** — every item is a deliberate stage-appropriate choice, and each one is load-bearing
+for a demo precisely because it is absent. But a live pilot needs all of it, and the first three
+are hard blockers rather than gaps.
+
+**Blockers — a deployed instance today would let nobody in.**
+
+1. **No SMS provider and no email provider.** `ConsoleNotificationProvider` and
+   `ConsoleEmailProvider` both *raise* when `ENVIRONMENT == "production"`, by design (ADR-017):
+   a no-op provider would look exactly like working authentication that nobody can complete.
+   There is no password anywhere in the product (ADR-038), so an OTP that cannot be delivered is
+   an account that cannot be entered. Needs a DLT-registered SMS vendor — DLT applies to SMS and
+   not to email, which is why `EmailProvider` is its own port — behind the existing adapters.
+2. **No Dockerfile and no deploy target.** `infra/` holds a single `docker-compose.yml` for local
+   Postgres, Redis and Mongo. There is no application image, no Terraform (ADR-028 defers it), and
+   CI runs lint, typecheck, tests and the web build with nothing to ship them to.
+3. **MongoDB is backed up by nothing** (§12). Postgres has `make db-dump`/`db-restore`, verified.
+   Mongo is the source of record for the corpus and lives only in a local Docker volume.
+
+**Required before real candidate data, not before a pilot instance.**
+
+4. **The ADR-023 encryption path does not exist.** No `encrypt` anywhere in `api/`. Aadhaar,
+   resumes and assessment results are all named by that ADR and none are collected yet, which is
+   the only reason this is not already a breach waiting to happen. It must land *before* the first
+   feature that collects any of them, not alongside it.
+5. **ADR-019 observability is unbuilt.** No OpenTelemetry, no Prometheus, no Grafana; structlog
+   and `/health/deep` are the whole story. Adequate for one laptop, not for diagnosing a customer's
+   report.
+6. **`is_verified` has no writer.** Deliberate — it is an operator decision and absent from
+   `OrganisationIn` so no request shape can set it — but "deliberate seam" and "shipped feature"
+   are different things, and a marketplace whose verified badge nobody can grant has no verified
+   organisations.
+7. **No teammate invitations.** `Membership.role` supports owner/admin/member and the permission
+   model reads it (ADR-039), but the only way to gain a membership is to create the organisation.
+   One person per organisation, in a product about organisations.
+
+**Would embarrass in a pilot, cheap to fix.**
+
+8. Five of six rich-profile collections are empty (§4) — no seeded candidate has a work history.
+9. The golden set is five pairs. Every claim about match quality rests on them (§12).
+10. The corpus is English-only (§12), in a product whose thesis is Hindi-first.

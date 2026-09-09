@@ -4,11 +4,19 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
-import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardBody,
+  Skeleton,
+} from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import {
   type CoursePayload,
   type OrgCourse,
+  useMemberships,
   useOrgCourseMutations,
   useOrgCourses,
 } from "@/lib/org";
@@ -20,17 +28,50 @@ import {
  * posting vacancies, a nav reading "Vacancies", and a primary button whose save
  * returned 403 into a mutation with no `onError` — so it did nothing at all and
  * said nothing about why.
+ *
+ * Kept deliberately parallel to `EmployerWorkspace`, and the two ways it had
+ * drifted from that sibling were both invisible until read side by side: a
+ * single `failed` flag served the save-failure banner *and* the publish-refused
+ * one, so cancelling out of the editor after a failed save showed "publish
+ * refused" for something that had never been attempted; and there was no
+ * signed-out branch at all, so a provider whose token had expired was told they
+ * had no access to their own organisation rather than being asked to sign in.
  */
 export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("providerWorkspace");
   const te = useTranslations("employerWorkspace");
+  const me = useMemberships();
   const courses = useOrgCourses(orgSlug);
   const { create, update, setPublished } = useOrgCourseMutations(orgSlug);
 
+  // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Two states, not one: they are shown on different screens and mean
+  // different things.
+  const [refused, setRefused] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  if (me.isError) {
+    return (
+      <Card>
+        <CardBody>
+          {/* The provider's own wording: `employerWorkspace` says "manage
+              your vacancies", which is the exact confusion Sprint 14 removed.
+              And `/signin` directly -- sign-in is one door now, and routing a
+              training provider through an employer-named path is the old
+              assumption wearing a redirect. */}
+          <p className="text-sm text-muted">{t("signInPrompt")}</p>
+          <ButtonLink href="/signin" className="mt-4">
+            {t("signIn")}
+          </ButtonLink>
+        </CardBody>
+      </Card>
+    );
+  }
 
   if (courses.isError) {
+    // A 404 here means "not a member of this organisation", which is
+    // deliberately indistinguishable from "no such organisation".
     return (
       <Card>
         <CardBody>
@@ -45,9 +86,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
     editing && editing !== "new" ? items.find((c) => c.slug === editing) : null;
 
   const save = (payload: CoursePayload) => {
-    setFailed(false);
+    setSaveFailed(false);
     const done = () => setEditing(null);
-    const onError = () => setFailed(true);
+    const onError = () => setSaveFailed(true);
     if (editing === "new") create.mutate(payload, { onSuccess: done, onError });
     else if (current)
       update.mutate(
@@ -62,7 +103,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
         <h2 className="text-lg font-semibold">
           {editing === "new" ? t("newCourse") : t("editCourse")}
         </h2>
-        {failed && (
+        {saveFailed && (
           <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
             {t("saveFailed")}
           </p>
@@ -87,7 +128,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
         <Button onClick={() => setEditing("new")}>{t("newCourse")}</Button>
       </div>
 
-      {failed && (
+      {refused && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           {t("publishRefused")}
         </p>
@@ -152,13 +193,13 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                     type="button"
                     disabled={setPublished.isPending}
                     onClick={() => {
-                      setFailed(false);
+                      setRefused(null);
                       setPublished.mutate(
                         {
                           slug: course.slug,
                           published: course.status !== "published",
                         },
-                        { onError: () => setFailed(true) },
+                        { onError: () => setRefused(course.slug) },
                       );
                     }}
                     className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"

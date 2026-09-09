@@ -59,3 +59,21 @@ async def dispose_engine() -> None:
         await _engine.dispose()
     _engine = None
     _sessionmaker = None
+
+
+def one_of(column: str, values: tuple[str, ...], *, nullable: bool = False) -> str:
+    """The SQL body of a CHECK, generated from the tuple that defines the values.
+
+    These lists were spelled twice — once as a module constant and once as a
+    string literal inside the `CheckConstraint` beside it — and the constants
+    were then read by nothing at all. That is not merely redundant: `personal`
+    was once added to `tenant_type` in the database by hand while the model's
+    copy lagged, and **Alembic does not diff CHECK bodies**, so nothing flagged
+    it. One list, used by both, removes the class of drift.
+
+    The generated text matches the existing constraint bodies exactly, so no
+    migration is required.
+    """
+    listed = ", ".join(f"'{v}'" for v in values)
+    clause = f"{column} IN ({listed})"
+    return f"{column} IS NULL OR {clause}" if nullable else clause

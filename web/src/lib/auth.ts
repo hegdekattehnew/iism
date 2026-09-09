@@ -58,11 +58,6 @@ export function onAuthChange(handler: () => void): () => void {
   };
 }
 
-export const authHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  return token ? { authorization: `Bearer ${token}` } : {};
-};
-
 // --- React binding -----------------------------------------------------------
 // useSyncExternalStore is the correct primitive for subscribing to state that
 // lives outside React (localStorage plus our change event). It also gives a

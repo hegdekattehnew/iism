@@ -38,6 +38,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await dispose_engine()
 
 
+# The one place a module-level `get_settings()` is correct, and it needs saying
+# because the convention forbids it outright.
+#
+# The rule exists because a frozen `settings` is unoverridable, which silently
+# points the engine at the wrong database in tests. Neither half applies here.
+# The app *object* is assembled once per process and cannot be built without a
+# title, an allowed origin and an environment; and the two decisions taken from
+# this value -- whether the demo task router and the unauthenticated employer
+# console mount -- are exercised by `tests/test_security_hardening.py`, which
+# boots a fresh subprocess per ENVIRONMENT and reads the resulting route table.
+# A guard on the app's own assembly is tested by assembling the app, not by
+# overriding a dependency.
+#
+# Everything downstream of assembly -- handlers, services, the engine -- calls
+# `get_settings()` at call time. The two handlers below are the pattern.
 _settings = get_settings()
 
 app = FastAPI(

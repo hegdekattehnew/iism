@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(37 ADRs). Read it before making any structural decision — the summary below
+(39 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -82,6 +82,8 @@ api/                     FastAPI modular monolith
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
+                         listings.py is what they *do* share: which standards exist,
+                         the refusal of retired ones, slug uniqueness, eager loading.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
@@ -95,8 +97,12 @@ api/                     FastAPI modular monolith
                          scoring.py is pure -- no I/O, no clock, no model. employer.py is
                          the same scorer run in reverse for the console (ADR-037).
     analytics/           analytics_events (ADR-025). record() COMMITS.
-    career_paths/        Graph-based role transition engine (ADR-008)
-    intelligence/        LLM extraction/explanation, embeddings (ADR-005/013/018)
+
+    Not built. ADR-008's career_paths/ (graph-based role transition) and
+    ADR-005/013/018's intelligence/ (LLM extraction, embeddings) have an ADR
+    each and no code. They were listed here as though they existed until
+    Sprint 15. Everything else in this tree is real; check before assuming.
+
   adapters/              External integrations behind interfaces (ADR-017)
     notifications/       NotificationProvider protocol + console impl (the reference)
     nsqf/                NsqfSource port, Mongo and JSON-file sources, shared document
@@ -124,7 +130,12 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - Python 3.12, fully type-hinted, async FastAPI routes and async SQLAlchemy sessions.
 - **Never bind config at import time.** Use `get_settings()` inside functions; a module-level
   `settings = get_settings()` is unoverridable and silently points the engine at the wrong
-  database in tests.
+  database in tests. **`api/main.py` is the single exception, and the only one admissible**: the
+  app object is assembled once per process and cannot be built without a title, an allowed origin
+  and an environment. What makes it safe is not that it is unavoidable but that it is *tested* —
+  `tests/test_security_hardening.py` boots a fresh subprocess per `ENVIRONMENT` and reads the
+  resulting route table, which is how a guard on the app's own assembly has to be tested. A second
+  module-level binding without that is the thing this rule forbids.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -150,6 +161,13 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - **Output schemas stay permissive; input schemas carry the constraints.** `NsqfLevel` on the way
   out, `NsqfLevelIn` on the way in. A constraint on a response model turns one odd row into a 500
   for the entire response.
+- **The exception is a closed set the database itself enforces**, and only while a test says the
+  two agree. Fifteen `Literal` unions sit on output models because a permissive `str` would leave
+  the generated TypeScript client typing every status as `string`. Alembic does not diff CHECK
+  bodies, so a widened constraint is invisible both to autogenerate and to the schema beside it;
+  `tests/test_enumerations.py` compares each union against the constraint on its column and fails
+  on a union with no CHECK at all. Writing it found two — `education_level` and
+  `preferred_employment_type` — closed set in the schema, open column in the database (0017).
 - **A NOS carries its own NSQF level — and so does the qualification, and so does the link
   between them.** All three are real and different facts. The source names them inconsistently:
   `nsqf` on a standard, `nsqfLevel` on a qualification. Checking the qualification's spelling
@@ -205,6 +223,47 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 15 (consolidation) is done. No new product surface: four unpushed sprints reached the
+remote, the tree lost what earned nothing, and the documents were made to agree with the code. What
+it found is more useful than what it deleted.
+
+- **`record()` raised.** Its docstring says "Never raises" and its unknown-name guard called
+  `log.warning("analytics.unknown_event", event=name)` — structlog's bound logger takes the first
+  positional argument as `event`, so the keyword collided and raised `TypeError`, from *above* the
+  `try/except` that exists to absorb exactly this. The same collision sat in the `except` branch,
+  where it would have raised out of the handler whose whole job is to swallow. `analytics/` had no
+  test file; writing one found it in the first run. **Measurement must never be the reason a page
+  fails, and for two sprints it could have been.**
+- **A guard a handler must remember to call is one that eventually is not called.** Three of the
+  eight publishing writes shipped without the tenant-type check while this file asserted all eight
+  had it. The fix was structural: `require(Permission.JOB_UPDATE, "job")` now asks both questions in
+  one declaration and `require_publisher_of` no longer exists as a separate function. Never
+  reintroduce the separate form.
+- **A closed union on an output model is safe only while a test says the CHECK agrees.**
+  `tests/test_enumerations.py` compares all fifteen against their constraints and found two columns
+  with no constraint at all. See the convention above; migration `0017` closes them.
+- **`api/modules/marketplace/listings.py` is the shared *policy*, not a shared entity.** ~22
+  byte-identical lines of standard-existence and retired-row validation lived in both publishing
+  modules with **no test in either copy** — the most drift-prone construct in the pair, and the one
+  thing ADR-026 explicitly requires both paths to agree on. The merge rules stay apart, because
+  those genuinely differ.
+- **The seed now resolves geography itself.** It wrote jobs with a NULL `state_id` and relied on
+  `_backfill_geography` inside `make import-nsqf` — but the seed *requires* the import to have run
+  first, so the documented order is import → seed and the backfill fired **before the rows it
+  needed to fix existed**. A clean `make import-nsqf && make seed` left every seeded job findable
+  at `/jobs` and invisible to `match_jobs(state_id=…)`. Proved by clearing the FKs on 11 seeded
+  jobs and re-running the seed alone: 11 unresolved before, 1 after.
+- **`DISTRICT_ALIASES` exists twice and now has a test saying so.** The geography service's copy
+  and the importer's, with a comment admitting the duplication and nothing enforcing it.
+- **The dev panel moved to `/status`**, which `notFound()`s in production and is linked from
+  nowhere. It was rendering unconditionally below the fold on the landing page, captioned "Not part
+  of the product surface", over a live Postgres/Redis/worker grid.
+- **37 message keys were dead**, `orgAuth` entire — orphaned when Sprint 14 deleted
+  `OrgSignInForm.tsx`. Three rounds of the audit produced false positives before the real number:
+  template-literal prefixes split on `.`, and two `useTranslations` bindings in one file were stored
+  in a dict keyed by variable name, so the second silently overwrote the first. **Do not delete an
+  i18n key on a grep alone.**
+
 Sprint 14 (three ways in, one way back) is done. The homepage offers three
 registration paths, a training provider can finally publish courses, and sign-in is one door that
 takes either credential.
@@ -254,8 +313,9 @@ links a second credential, and edits the organisation's public profile.
   console's aggregate pool and publish a vacancy as "Personal workspace". Verified 200 before, 404
   after; `tests/test_organisations.py` guards it.
 - **Membership answers *may this person act here*, not *is this the right kind of organisation*.**
-  `require_publisher_of` is the second check: a job needs an `employer`, a course a
-  `course_provider`. Nothing enforced this before.
+  A job needs an `employer`, a course a `course_provider`; nothing enforced this before. The check
+  arrived here as a separate `require_publisher_of` call and was folded into `require()` itself in
+  Sprint 15, after three of eight writes turned out never to make it — see that sprint's entry.
 - **The switcher lives in the header, not in a page.** A switcher inside `EmployerWorkspace` could
   not be reached from the one screen that most needs it — its "no access" branch returns first — and
   `/employer/{org}` had no inbound link from anywhere a signed-in person could already be.

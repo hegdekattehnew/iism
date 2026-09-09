@@ -296,10 +296,3 @@ async def confirm_link(
     await db.commit()
     await db.refresh(user)
     return user
-
-
-async def update_preferred_locale(db: AsyncSession, user: User, locale: str) -> User:
-    user.preferred_locale = locale if locale in ("en", "hi") else "en"
-    await db.commit()
-    await db.refresh(user)
-    return user

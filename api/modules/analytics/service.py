@@ -33,8 +33,13 @@ async def record(
     payload: dict[str, Any] | None = None,
 ) -> None:
     """Record one event. Never raises."""
-    if name not in EVENT_NAMES:  # pragma: no cover - guarded by the caller and a CHECK
-        log.warning("analytics.unknown_event", event=name)
+    if name not in EVENT_NAMES:
+        # `event_name`, not `event`: structlog's bound logger takes the first
+        # positional argument as `event`, so an `event=` keyword collides with
+        # it and raises TypeError -- out of a function documented never to
+        # raise, and from above the try/except that would otherwise absorb it.
+        # A test asserts an unknown name is dropped rather than raised.
+        log.warning("analytics.unknown_event", event_name=name)
         return
     try:
         db.add(
@@ -52,6 +57,6 @@ async def record(
     except Exception:  # pragma: no cover - defensive by design
         # Swallowed on purpose: measurement must never be the reason a page
         # fails. The exception is logged, not raised.
-        log.exception("analytics.record_failed", event=name)
+        log.exception("analytics.record_failed", event_name=name)
         # Leave the session usable for whatever the handler does next.
         await db.rollback()

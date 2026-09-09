@@ -353,9 +353,3 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
             candidate_level=attained_level(held, requirements),
         ),
     )
-
-
-async def count_matchable_jobs(db: AsyncSession) -> int:
-    return (
-        await db.scalar(select(func.count()).select_from(Job).where(Job.status == "published")) or 0
-    )

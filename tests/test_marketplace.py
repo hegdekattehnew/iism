@@ -1,5 +1,7 @@
 """Sprint 3: jobs, courses, and the edges that connect them to the taxonomy."""
 
+from dataclasses import fields
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,7 @@ from api.modules.marketplace import (
     courses_teaching_skill,
     jobs_requiring_skill,
 )
+from api.modules.marketplace.stats import CorpusStats
 from api.modules.skills import Skill
 
 
@@ -234,3 +237,44 @@ async def test_skills_routes_still_work(seeded: dict, client: AsyncClient) -> No
     """The new /skills/{slug}/jobs route must not shadow /skills/{slug}."""
     assert (await client.get("/skills/hand-hygiene")).status_code == 200
     assert (await client.get("/skills/search", params={"q": "hand"})).status_code == 200
+
+
+# ------------------------------------------------------- the landing figures
+
+
+class TestCorpusStats:
+    """`stats.py` backs the only numbers on the landing page, and had no test.
+
+    Its docstring states the rule the tests below hold it to: a marketing figure
+    that drifts from reality is worse than no figure. Both exclusions exist so
+    that every number a visitor reads is a number they can then go and find.
+    """
+
+    async def test_the_figures_need_no_account(self, seeded: dict, client: AsyncClient) -> None:
+        """It is the first request a first-time visitor makes."""
+        assert (await client.get("/marketplace/stats")).status_code == 200
+
+    async def test_drafts_are_not_counted(self, seeded: dict, client: AsyncClient) -> None:
+        """The fixture holds three jobs, one of them a draft. Counting it would
+        put a number on the homepage that `/jobs` then contradicts."""
+        body = (await client.get("/marketplace/stats")).json()
+        assert body["jobs"] == 2
+        assert body["courses"] == 2
+
+    async def test_only_nsqf_rows_count_as_standards(
+        self, seeded: dict, client: AsyncClient
+    ) -> None:
+        """`standards` counts `source='nsqf'` alone, exactly as search and browse
+        do. The fixture's two skills are `curated` — the Sprint 2 vocabulary
+        retired in Sprint 9 — so the headline figure is 0 here, not 2."""
+        assert (await client.get("/marketplace/stats")).json()["standards"] == 0
+
+    async def test_every_declared_figure_is_returned(
+        self, seeded: dict, client: AsyncClient
+    ) -> None:
+        """`CorpusStatsOut` and `CorpusStats` are two hand-maintained lists of
+        the same ten names; a field added to one and not the other is a
+        `ValidationError` at request time, on the landing page."""
+        body = (await client.get("/marketplace/stats")).json()
+        assert set(body) == {f.name for f in fields(CorpusStats)}
+        assert all(isinstance(v, int) for v in body.values())

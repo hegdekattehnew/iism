@@ -17,11 +17,11 @@
  */
 
 export { Badge } from "@/components/ui/badge";
-export { Button, type ButtonProps } from "@/components/ui/button";
+export { Button } from "@/components/ui/button";
 // From the non-client module, so server components can style a button too.
 export { buttonVariants } from "@/components/ui/button-variants";
 export { ButtonLink } from "@/components/ui/button-link";
 export { Card, CardBody, CardTitle } from "@/components/ui/card";
-export { Card as Panel, Section, SectionHeading, Logo } from "@/components/ui/layout";
+export { Section, SectionHeading, Logo } from "@/components/ui/layout";
 export { Progress } from "@/components/ui/progress";
 export { Skeleton } from "@/components/ui/skeleton";

@@ -403,13 +403,6 @@ def mc_from_doc(doc: dict[str, Any]) -> McRecord | None:
 # ---------------------------------------------------------------- geography
 
 
-def _as_marks(value: object) -> int | None:
-    """A whole-number mark total. `bool` is an `int` in Python and is not a mark."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return int(value)
-
-
 def _as_int(value: object) -> int | None:
     if isinstance(value, bool) or value is None:
         return None

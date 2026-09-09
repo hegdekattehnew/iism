@@ -1,6 +1,5 @@
 {
   "app": {
-    "name": "Intelligent Integrated Skill Marketplace",
     "short": "IISM",
     "tagline": "Connecting candidates, courses and jobs through a shared skill graph"
   },
@@ -106,7 +105,6 @@
   },
   "status": {
     "title": "System Status",
-    "subtitle": "Sprint 1 — walking skeleton. Every architectural layer, connected end to end.",
     "refresh": "Refresh",
     "checking": "Checking…",
     "allUp": "All systems operational",
@@ -114,7 +112,6 @@
     "unreachable": "API unreachable",
     "environment": "Environment",
     "version": "Version",
-    "latency": "latency",
     "lastChecked": "Last checked"
   },
   "components": {
@@ -239,7 +236,6 @@
     "optional": "Useful",
     "importance": "Importance {n} of 5",
     "backToJobs": "All jobs",
-    "aboutEmployer": "Employer",
     "minLevel": "NSQF level {level} and above",
     "experienceLabel": "Experience",
     "salaryLabel": "Salary"
@@ -272,7 +268,6 @@
     "skillsTaught": "Skills taught",
     "teachesToLevel": "to level {level}",
     "backToCourses": "All courses",
-    "aboutProvider": "Provider",
     "level": "NSQF level {level}",
     "feeLabel": "Fee",
     "durationLabel": "Duration"
@@ -288,8 +283,6 @@
   "auth": {
     "signInTitle": "Sign in",
     "signInSubtitle": "Enter the mobile number or email you signed up with. We send a six-digit code — there is no password.",
-    "phoneLabel": "Mobile number",
-    "phonePlaceholder": "98765 43210",
     "sendCode": "Send code",
     "sending": "Sending…",
     "codeTitle": "Enter the code",
@@ -305,7 +298,6 @@
     "errorGeneric": "Something went wrong. Please try again.",
     "signOut": "Sign out",
     "myProfile": "My profile",
-    "signedInAs": "Signed in as {phone}",
     "myMatches": "My matches",
     "identifierLabel": "Mobile number or email",
     "identifierPlaceholder": "98765 43210 or you@example.com",
@@ -316,7 +308,6 @@
   "profilePage": {
     "title": "My profile",
     "subtitle": "The more accurate this is, the better your recommendations will be.",
-    "detailsTitle": "About you",
     "headline": "Headline",
     "headlinePlaceholder": "e.g. Aspiring phlebotomist",
     "state": "State",
@@ -384,7 +375,6 @@
     "sections": {
       "about": "About you",
       "preferences": "What you're looking for",
-      "skills": "Skills",
       "experience": "Work history",
       "education": "Education",
       "certifications": "Certifications",
@@ -418,7 +408,6 @@
       "issuedOn": "Issued on",
       "expiresOn": "Expires on",
       "nsqfLevel": "NSQF level",
-      "linkedSkill": "Skill it certifies",
       "language": "Language",
       "proficiency": "How well you speak it",
       "canRead": "Can read",
@@ -468,13 +457,6 @@
     "youNeed": "You need",
     "mandatory": "Required",
     "capped": "One required standard is missing, which limits this match.",
-    "levelShort": "{levels} NSQF levels below what this job asks for",
-    "evidence": {
-      "certified": "Certified",
-      "assessed": "Assessed",
-      "self_declared": "Self-declared",
-      "inferred": "Inferred"
-    },
     "closesGap": "Closes {closed} of your {total} missing",
     "coursesHeading": "Courses that close this gap",
     "noCourses": "No course on the platform covers this gap yet.",
@@ -598,32 +580,9 @@
     },
     "status": "Built in the open, sprint by sprint. The national taxonomy, matching, candidate profiles, employer sign-in and self-serve publishing for both vacancies and courses are live. Still to come: Hindi for the corpus itself — the interface is bilingual, the 21,303 standard names are not — along with verified organisations and semantic matching."
   },
-  "orgAuth": {
-    "title": "Employer sign-in",
-    "subtitle": "One code by email. No password to set, forget or reset — and none for us to store.",
-    "signin": "Sign in",
-    "register": "Create an organisation",
-    "emailLabel": "Work email",
-    "emailHint": "We send a six-digit code that expires in five minutes.",
-    "organisationLabel": "Organisation name",
-    "organisationPlaceholder": "Sunrise Multispeciality Hospital",
-    "sendCode": "Send the code",
-    "sending": "Sending…",
-    "codeSent": "We sent a code to {email}.",
-    "codeLabel": "Six-digit code",
-    "devCode": "Development only — your code is {code}",
-    "verify": "Verify and continue",
-    "verifying": "Verifying…",
-    "changeEmail": "Use a different address",
-    "errorRateLimited": "Too many codes requested. Try again in a few minutes.",
-    "errorInvalidEmail": "That does not look like a valid email address.",
-    "errorBadCode": "That code is incorrect or has expired.",
-    "errorGeneric": "Something went wrong. Try again."
-  },
   "employerWorkspace": {
     "title": "Your workspace",
     "subtitle": "Post a vacancy against the National Occupational Standards it actually requires, and see who can do the work.",
-    "actingAs": "Acting as",
     "yourVacancies": "Your vacancies",
     "yourVacanciesNote": "Drafts are visible only here. A vacancy reaches candidates when you publish it.",
     "noVacancies": "No vacancies yet. Create one and describe it with the standards it needs.",
@@ -776,6 +735,8 @@
     "editCourse": "Edit course",
     "publishRefused": "A course needs at least one standard it teaches before it can be published — without one, it can never be recommended to anyone.",
     "saveFailed": "Could not save. Check the details, or confirm this organisation is a training provider.",
+    "signInPrompt": "Sign in with your work email to manage your courses.",
+    "signIn": "Sign in",
     "teachesCount": "{count, plural, =0 {No standards yet} one {Teaches # standard} other {Teaches # standards}}",
     "hours": "{hours} hours",
     "nsqfLevelIs": "NSQF {level}",

@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from api.core.database import Base
+from api.core.database import Base, one_of
 
 # Organisations that own inventory. Sprint 3 needs the record; Sprint 4 layers
 # User and Membership on top of it (ADR-010).
@@ -25,13 +25,10 @@ class Tenant(Base):
 
     __tablename__ = "tenants"
     __table_args__ = (
-        # `personal` was added when candidate sign-in landed and the database
-        # was widened by hand; the model was not, and Alembic does not diff
-        # CHECK bodies so nothing flagged the drift.
-        CheckConstraint(
-            "tenant_type IN ('employer', 'course_provider', 'personal')",
-            name="ck_tenants_type",
-        ),
+        # Generated from TENANT_TYPES, not spelled again. `personal` was once
+        # added to the database by hand while this copy lagged, and Alembic does
+        # not diff CHECK bodies, so nothing flagged the drift.
+        CheckConstraint(one_of("tenant_type", TENANT_TYPES), name="ck_tenants_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -108,7 +105,7 @@ class Membership(Base):
     __tablename__ = "memberships"
     __table_args__ = (
         UniqueConstraint("user_id", "tenant_id", name="uq_membership_user_tenant"),
-        CheckConstraint("role IN ('owner', 'admin', 'member')", name="ck_membership_role"),
+        CheckConstraint(one_of("role", MEMBERSHIP_ROLES), name="ck_membership_role"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

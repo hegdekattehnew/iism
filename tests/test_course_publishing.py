@@ -230,6 +230,77 @@ class TestCoursePublishing:
         assert updated.json()["slug"] == course["slug"]
 
 
+class TestSharedValidation:
+    """`listings.resolve_standards` is the rule both surfaces apply.
+
+    It had **no test in either copy** before Sprint 15, which is how a
+    duplicated rule rots: nothing fails when one side drifts. ADR-026 requires
+    seeded and self-serve inventory to pass the same validation, so these assert
+    the shared path from both directions.
+    """
+
+    @pytest.fixture
+    async def retired_skill(self, db: AsyncSession) -> str:
+        """One of the 52 Sprint-2 skills, retired in Sprint 9. Kept in the table
+        because profiles reference it; excluded from matching."""
+        skill = Skill(
+            slug="hand-hygiene-legacy",
+            name_en="Hand hygiene",
+            skill_type="core",
+            nsqf_level=Decimal("2"),
+            source="legacy",
+        )
+        db.add(skill)
+        await db.commit()
+        return skill.slug
+
+    async def test_a_course_cannot_teach_a_retired_standard(
+        self, client: AsyncClient, db: AsyncSession, retired_skill: str
+    ) -> None:
+        """Matching compares at concept level and excludes `legacy` rows, so a
+        listing anchored to one would be published and permanently unmatchable."""
+        headers, slug = await _provider(client, db, "Retired Standard Academy")
+        refused = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={
+                "title_en": "Teaches Something Retired",
+                "skills": [{"skill_slug": retired_skill, "level_taught": 2}],
+            },
+        )
+        assert refused.status_code == 422
+        assert "taught" in refused.json()["detail"]
+        assert retired_skill in refused.json()["detail"]
+
+    async def test_a_job_cannot_require_a_retired_standard(
+        self, client: AsyncClient, retired_skill: str
+    ) -> None:
+        """The same rule, the other surface, the other verb."""
+        headers, slug = await _employer(client, "Retired Standard Clinic")
+        refused = await client.post(
+            f"/org/{slug}/jobs",
+            headers=headers,
+            json={
+                "title_en": "Requires Something Retired",
+                "skills": [{"skill_slug": retired_skill, "importance": 3}],
+            },
+        )
+        assert refused.status_code == 422
+        assert "required" in refused.json()["detail"]
+
+    async def test_an_unknown_standard_is_named_in_the_refusal(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, slug = await _provider(client, db, "Typo Academy")
+        refused = await client.post(
+            f"/org/{slug}/courses",
+            headers=headers,
+            json={"title_en": "Mistyped", "skills": [{"skill_slug": "no-such-standard"}]},
+        )
+        assert refused.status_code == 422
+        assert "no-such-standard" in refused.json()["detail"]
+
+
 class TestTheTwoSurfacesStayApart:
     """Membership answers *may this person act here*, never *is this the right
     kind of organisation*. Both directions need the second question asked."""

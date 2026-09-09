@@ -21,6 +21,7 @@ from legacy_skill_map import LEGACY_SKILL_MAP  # noqa: E402
 from sqlalchemy import delete, select
 
 from api.core.database import dispose_engine, get_sessionmaker
+from api.modules.geography import resolve_location
 from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import Course, CourseSkill, Job, JobSkill
 from api.modules.skills.models import Skill
@@ -951,6 +952,19 @@ async def seed() -> dict[str, int]:
             job.title_en, job.title_hi = t_en, t_hi
             job.description_en, job.description_hi = d_en, d_hi
             job.location_state, job.location_district = state, district
+            # Resolved through the same service the publishing path uses, so a
+            # seeded listing and a self-serve one are indistinguishable on the
+            # field that decides whether matching can find them (ADR-026).
+            #
+            # The seed set neither FK until Sprint 15. Seeded jobs got them only
+            # from `_backfill_geography` inside `make import-nsqf` -- which must
+            # run *before* `make seed`, so the backfill fired before the rows it
+            # was meant to fix existed. A clean `import-nsqf && seed` therefore
+            # left every seeded job visible at /jobs and invisible to
+            # `match_jobs(state_id=...)`. It only ever looked right because the
+            # importer happened to be re-run afterwards.
+            located = await resolve_location(db, state, district)
+            job.state_id, job.district_id = located.state_id, located.district_id
             job.employment_type = etype
             job.experience_min_years, job.experience_max_years = emin, emax
             job.salary_min_inr, job.salary_max_inr = smin, smax

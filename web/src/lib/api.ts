@@ -71,5 +71,3 @@ api.use(authMiddleware);
 export type DeepHealth =
   paths["/health/deep"]["get"]["responses"][200]["content"]["application/json"];
 export type ComponentHealth = DeepHealth["components"][number];
-export type TaskStatus =
-  paths["/tasks/{job_id}"]["get"]["responses"][200]["content"]["application/json"];

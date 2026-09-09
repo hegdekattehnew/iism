@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from api.core.database import Base
+from api.core.database import Base, one_of
 
 # Imported for its side effect as well as its use: jobs and profiles carry
 # foreign keys to `states` and `districts`, and SQLAlchemy cannot resolve those
@@ -64,10 +64,9 @@ class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
         CheckConstraint(
-            "employment_type IN ('full_time', 'part_time', 'contract', 'apprenticeship')",
-            name="ck_jobs_employment_type",
+            one_of("employment_type", EMPLOYMENT_TYPES), name="ck_jobs_employment_type"
         ),
-        CheckConstraint("status IN ('draft', 'published')", name="ck_jobs_status"),
+        CheckConstraint(one_of("status", STATUSES), name="ck_jobs_status"),
         CheckConstraint(
             "nsqf_level_min IS NULL OR (nsqf_level_min >= 1 AND nsqf_level_min <= 10)",
             name="ck_jobs_nsqf_level",
@@ -154,9 +153,9 @@ class Course(Base):
 
     __tablename__ = "courses"
     __table_args__ = (
-        CheckConstraint("mode IN ('online', 'offline', 'hybrid')", name="ck_courses_mode"),
-        CheckConstraint("language IN ('en', 'hi', 'both')", name="ck_courses_language"),
-        CheckConstraint("status IN ('draft', 'published')", name="ck_courses_status"),
+        CheckConstraint(one_of("mode", COURSE_MODES), name="ck_courses_mode"),
+        CheckConstraint(one_of("language", COURSE_LANGUAGES), name="ck_courses_language"),
+        CheckConstraint(one_of("status", STATUSES), name="ck_courses_status"),
         CheckConstraint(
             "nsqf_level IS NULL OR (nsqf_level >= 1 AND nsqf_level <= 10)",
             name="ck_courses_nsqf_level",
@@ -232,6 +231,19 @@ class CandidateProfile(Base):
         CheckConstraint(
             "gender IS NULL OR gender IN ('female', 'male', 'other', 'prefer_not_to_say')",
             name="ck_candidate_gender",
+        ),
+        # These two were the only closed sets on this table left unconstrained,
+        # while `CandidateProfileFull` types both as `Literal` unions -- and a
+        # closed union on a *response* model turns one out-of-range row into a
+        # 500 for the whole profile. Added in 0017; `tests/test_enumerations.py`
+        # asserts each union and its CHECK still say the same thing.
+        CheckConstraint(
+            one_of("education_level", EDUCATION_LEVELS, nullable=True),
+            name="ck_candidate_education_level",
+        ),
+        CheckConstraint(
+            one_of("preferred_employment_type", EMPLOYMENT_TYPES, nullable=True),
+            name="ck_candidate_preferred_employment",
         ),
         CheckConstraint(
             "notice_period IS NULL OR notice_period IN "
@@ -320,7 +332,7 @@ class CandidateSkill(Base):
         UniqueConstraint("profile_id", "skill_id", name="uq_candidate_skill"),
         CheckConstraint("proficiency BETWEEN 1 AND 5", name="ck_candidate_skill_proficiency"),
         CheckConstraint(
-            "source IN ('self_declared', 'inferred', 'assessed', 'certified')",
+            one_of("source", SKILL_SOURCES),
             name="ck_candidate_skill_source",
         ),
         Index("ix_candidate_skills_skill_id", "skill_id"),

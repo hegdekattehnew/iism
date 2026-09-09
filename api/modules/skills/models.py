@@ -14,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from api.core.database import Base
+from api.core.database import Base, one_of
 
 # Imported for its side effect: `skills.concept_id` is a foreign key to
 # `skill_concepts`, and SQLAlchemy cannot resolve it unless that table is
@@ -40,7 +40,7 @@ class Skill(Base):
 
     __tablename__ = "skills"
     __table_args__ = (
-        CheckConstraint("skill_type IN ('technical', 'core', 'generic')", name="ck_skills_type"),
+        CheckConstraint(one_of("skill_type", SKILL_TYPES), name="ck_skills_type"),
         CheckConstraint(
             "nsqf_level IS NULL OR (nsqf_level >= 1 AND nsqf_level <= 10)",
             name="ck_skills_nsqf_level",
@@ -142,7 +142,7 @@ class SkillAlias(Base):
     __table_args__ = (
         UniqueConstraint("skill_id", "surface_form", name="uq_alias_skill_form"),
         CheckConstraint(
-            "script IN ('latin', 'devanagari', 'transliteration')",
+            one_of("script", ALIAS_SCRIPTS),
             name="ck_alias_script",
         ),
         Index("ix_skill_aliases_skill_id", "skill_id"),
