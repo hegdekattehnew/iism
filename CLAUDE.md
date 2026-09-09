@@ -220,6 +220,15 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - Use the primitives in `web/src/components/ui/`. Nothing outside `globals.css` may hardcode a
   colour; every tone must define both its light and its dark value, or it renders invisible in one
   theme.
+- **`Card` is the border; `CardBody` is the padding.** A `<Card>` with children and no `<CardBody>`
+  renders its text flush against the border. Sprint 11 rebound the name — the old padded `Card`
+  became `Panel` and `ui/card.tsx`'s unpadded one took the name — without migrating the call sites,
+  so `BrowsePanels` and `Audiences` sat unpadded on the **homepage** for four sprints. Nothing
+  caught it: the import still resolved, tsc passed, the build passed, and no test renders a page.
+  **A rename that keeps compiling is the kind that ships.**
+- **In a card grid, one element must take `flex-1`.** Cards stretch to the row height, so without it
+  a two-line description leaves that card's button floating mid-card while its neighbours' sit
+  lower — the row reads as crooked even though every box is identical.
 
 ## Current state
 
