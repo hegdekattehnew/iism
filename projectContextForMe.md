@@ -196,6 +196,13 @@ hiring people or provide training". Partly true, and the audit found worse.
 - **A stale Turbopack cache cost ten minutes.** Every page 500'd with a `JSON.parse` error at a fixed
   byte offset while `npm run build` passed cleanly. `rm -rf web/.next` fixed it. Suspect the cache
   first when the build disagrees with the dev server.
+- **Its second disguise (Sprint 16) is a hydration mismatch.** Fast Refresh updated the *client*
+  bundle and left the *server* module graph behind, so one `<a>` was server-rendered with the old
+  `href` and client-rendered with the new one — reported as "some attributes of the server rendered
+  HTML didn't match the client properties", which reads like a bug in the component and is not one.
+  **The tell is that the React diff shows two values you recognise as the before and after of your
+  own edit.** Same fix: stop the dev server, `rm -rf web/.next`, restart. Do not add
+  `suppressHydrationWarning` — it would hide the real ones.
 
 **Sprint 13 (multi-tenancy you can see) — done** on 2026-09-07. Prompted by a single observation:
 *"I was expecting an option on the frontend to change tenancy after login."* There wasn't one, and
