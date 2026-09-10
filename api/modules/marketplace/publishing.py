@@ -26,6 +26,7 @@ importer: **geography resolves on write.** `state_id` is what
 import uuid
 from typing import cast
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +40,8 @@ from api.modules.marketplace.listings import (
 )
 from api.modules.marketplace.models import Job, JobSkill
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
+
+log = structlog.get_logger("iism.marketplace")
 
 # Fields copied straight from the payload. Listed rather than `model_dump()`ed
 # wholesale so `search_vector` -- GENERATED ALWAYS, and rejected by Postgres on
@@ -182,6 +185,10 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
 
     job.status = "published" if published else "draft"
     await db.commit()
+    log.info(
+        "marketplace.job_published" if published else "marketplace.job_unpublished",
+        slug=slug,
+    )
     return await _load(db, job.id)
 
 
@@ -189,5 +196,8 @@ async def delete_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> None:
     job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    # WARNING, not INFO: irreversible, owner-only, and it is what you go
+    # looking for after "our listing disappeared".
+    log.warning("marketplace.job_deleted", slug=slug)
     await db.delete(job)
     await db.commit()

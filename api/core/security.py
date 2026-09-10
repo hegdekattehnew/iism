@@ -38,6 +38,9 @@ TokenType = Literal["access", "refresh"]
 _T = TypeVar("_T")
 
 
+log = structlog.get_logger("iism.auth")
+
+
 def _aw(value: "Awaitable[_T] | _T") -> "Awaitable[_T]":
     """redis-py shares one signature between its sync and async clients, so
     every call types as `Awaitable[T] | T`. The client here is always async."""
@@ -165,6 +168,11 @@ async def rotate_refresh_token(refresh_token: str) -> TokenPair:
     redis = get_redis()
     stored = await redis.get(_REFRESH_KEY.format(jti=jti))
     if stored is None:
+        # A refresh token presented twice is a race or a theft, and rotation
+        # means the legitimate holder has already exchanged this one. It is
+        # the highest-value security signal in the auth path and it was a
+        # silent 401. `jti`, not the token: the token is a live credential.
+        log.warning("auth.refresh_reuse", user_id=user_id, jti=jti)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token already used or revoked")
 
     await redis.delete(_REFRESH_KEY.format(jti=jti))
@@ -221,6 +229,10 @@ async def check_otp(channel: Channel, identifier: str, code: str) -> bool:
         await redis.expire(attempts_key, settings.otp_ttl_seconds)
     if attempts > settings.otp_max_attempts:
         await redis.delete(code_key)
+        # `channel` and the attempt count only. The identifier is a phone or an
+        # email; the filter would mask it, but a redacted key on every line is
+        # noise we would have chosen to create.
+        log.warning("auth.otp_attempts_exhausted", channel=channel, attempts=attempts)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts. Request a new code."
         )
@@ -242,6 +254,9 @@ async def enforce_otp_rate_limit(channel: Channel, identifier: str) -> None:
     if count == 1:
         await redis.expire(key, settings.otp_request_window_seconds)
     if count > settings.otp_request_limit:
+        # An unthrottled OTP endpoint is a denial-of-wallet on the SMS bill.
+        # Hitting the ceiling is worth seeing before the invoice is.
+        log.warning("auth.otp_rate_limited", channel=channel, count=count)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Too many codes requested. Try again later.",

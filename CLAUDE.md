@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(39 ADRs). Read it before making any structural decision — the summary below
+(40 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -56,7 +56,8 @@ is a condensed index, not a replacement.
 | Identity | UUID primary key; Aadhaar optional verification, not primary ID | ADR-011 |
 | Authorization | Permission-based (RBAC now, designed for ABAC) | ADR-012, ADR-022 |
 | Multi-tenancy | Global users + tenant + membership model, from day 1 | ADR-010 |
-| Observability | OpenTelemetry + Prometheus + Grafana | ADR-019 |
+| Logging | Structured JSON to stdout, one shared processor tail | ADR-040 |
+| Observability | OpenTelemetry + Prometheus + Grafana — **deferred, not built** | ADR-019, ADR-040 |
 | Skill taxonomy | NSQF-aligned, framework-agnostic | ADR-004 |
 | Matching | Hybrid deterministic scoring: skill overlap + semantic similarity + experience | ADR-007 |
 | Career paths | Graph-based role transition engine | ADR-008 |
@@ -74,6 +75,11 @@ api/                     FastAPI modular monolith
     health.py            Per-dependency health probes
     authorization.py     Permissions resolved from membership role (ADR-039).
                          Ask for a Permission, never a role.
+    logging.py           configure_logging(): one JSON stream for structlog and
+                         stdlib alike (ADR-040). Call once per process.
+    redaction.py         The ADR-023 filter. Runs in the shared tail, so no
+                         logger in the process can route around it.
+    middleware.py        Pure ASGI request context: request_id, the access log.
     text.py              slugify, shared by identity and the NSQF importer
   modules/
     identity/            Users, tenants, memberships, OTP sign-in by phone *or* email,
@@ -245,6 +251,43 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   360×640 before adding anything above it.
 
 ## Current state
+
+Sprint 17 (logging you can run a customer on) is done. One JSON stream on stdout, a redaction
+filter that cannot be bypassed, and a request id, user id and tenant id on every line.
+
+- **`Card` is the border; `CardBody` is the padding** — see the frontend conventions above.
+- **The redaction filter is a processor, not a convention.** ADR-023 always specified "an explicit
+  redaction filter"; there wasn't one. It sits in the **shared processor tail**, which is the only
+  position that covers both structlog and `logging.getLogger()`. It **masks, never drops and never
+  raises**: dropping deletes the evidence you need to find the leaking call site, and raising fires
+  inside `Handler.emit` where `logging.raiseExceptions` swallows it to stderr. Touched records are
+  marked `redacted=True`, so one query enumerates every leak.
+- **Never use `structlog.processors.dict_tracebacks`.** Its `ExceptionDictTransformer` defaults to
+  `show_locals=True`, and `code = generate_otp()` is a plain local in four functions in
+  `identity/service.py` — any raise beneath them would write a live OTP into the log. The
+  configuration passes `show_locals=False` and a test asserts both that ours does not leak and that
+  the default recipe *does*.
+- **A redaction pattern must be narrow enough not to eat a timestamp.** The obvious phone regex
+  `\+?\d[\d\- ]{8,14}\d` matches `2026-09-10` and rewrites it to `20260910` — and `timestamp` is
+  on every line, so the loose form corrupts the whole stream and marks every record redacted.
+- **`RequestContextMiddleware` is pure ASGI, not `BaseHTTPMiddleware`.** The latter runs the app in
+  a child task and anyio *copies* the context, so `bind_contextvars` inside `get_current_user` and
+  `_context_for` — both dependencies, both downstream — would be invisible when the access line is
+  written. Every access line would be anonymous. **Do not convert it.**
+- **Log the route template, never the path.** `/org/{org_slug}/jobs`, not the interpolated slug: a
+  customer's name in every line is both a leak and a new CloudWatch field value per request. An
+  unmatched path falls back to a constant, so a 404 flood cannot become a cardinality flood.
+- **The worker's entrypoint is `api/worker.py`.** ARQ's CLI imports the settings module and *then*
+  runs its own `dictConfig`, so configuring at import time is clobbered and every line is emitted
+  twice. The Makefile also passes `--custom-log-dict`, because ARQ logs two lines before any hook
+  exists.
+- **`arq.worker` is pinned to WARNING.** The 5-second heartbeat cron emitted ~34,560 INFO lines a
+  day. At WARNING what survives is exactly the signal: job raised, retries exceeded, job expired,
+  function not found, deserialisation failed.
+- **An authorization denial is logged.** `_context_for`'s 404 and `require`'s two 403s were silent,
+  so a multi-tenant product could not answer "who was refused which organisation". What the log may
+  say and what the response may say are different questions — the caller still gets the same
+  uninformative 404.
 
 Sprint 15 (consolidation) is done. No new product surface: four unpushed sprints reached the
 remote, the tree lost what earned nothing, and the documents were made to agree with the code. What

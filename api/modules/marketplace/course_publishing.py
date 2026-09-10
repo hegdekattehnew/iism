@@ -25,6 +25,7 @@ nothing attached.
 import uuid
 from typing import cast
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,8 @@ from api.modules.marketplace.listings import (
 )
 from api.modules.marketplace.models import Course, CourseSkill
 from api.modules.marketplace.schemas import CourseIn, CourseSkillIn
+
+log = structlog.get_logger("iism.marketplace")
 
 # Copied field by field rather than `model_dump()`ed, so `search_vector` --
 # GENERATED ALWAYS, and rejected by Postgres on any write -- can never reach an
@@ -177,6 +180,10 @@ async def set_published(
 
     course.status = "published" if published else "draft"
     await db.commit()
+    log.info(
+        "marketplace.course_published" if published else "marketplace.course_unpublished",
+        slug=slug,
+    )
     return await _load(db, course.id)
 
 
@@ -186,5 +193,8 @@ async def delete_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> No
     )
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+    # WARNING, not INFO: irreversible, owner-only, and it is what you go
+    # looking for after "our listing disappeared".
+    log.warning("marketplace.course_deleted", slug=slug)
     await db.delete(course)
     await db.commit()

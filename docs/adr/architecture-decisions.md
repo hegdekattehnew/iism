@@ -1314,3 +1314,48 @@ organisation is not news to them, and telling them their role is too narrow is t
   deviation, and `/health` now reports whether it is mounted.
 - Teammate invitations need no restructuring: the model is many memberships from the start, and the
   only thing missing is a way to create the second one.
+
+## ADR-040: Structured JSON logging, superseding ADR-019's tooling
+
+**Status:** Accepted. **Supersedes the tooling half of ADR-019**, which remains the destination.
+
+**Context:** ADR-019 was Accepted and named OpenTelemetry, Prometheus and Grafana, and `CLAUDE.md`
+repeated that claim in the tech-stack table. **None of the three was installed** — not in
+`pyproject.toml`, not in the lockfile — and the gap had gone unnoticed for nineteen sprints because
+nothing forced the question.
+
+What existed instead was thinner than the ADR implied and thinner than anyone assumed: **5 logging
+call sites in 93 Python files** (three `.warning`, one `.exception`, zero `.info` and zero
+`.error`), **no logging configuration of any kind**, and therefore **three uncorrelated sinks in one
+process** — structlog's default `PrintLogger` to stdout in ANSI colour, an unconfigured stdlib
+logger falling through to `lastResort` on stderr, and unhandled tracebacks raw to stderr. No line
+carried a request id, a user id or a tenant id. There were no exception handlers. `/health/deep`
+caught every dependency failure and discarded the reason.
+
+**Decision:** structured JSON to stdout, one object per line, no vendor SDK.
+
+- One `structlog.stdlib.ProcessorFormatter` on one root handler, so structlog-native records and
+  stdlib records — uvicorn, ARQ, SQLAlchemy, the notification adapters — render through one shared
+  tail and land in one stream.
+- **The redaction filter ADR-023 has always specified lives in that shared tail**, which is what
+  makes it unbypassable: reaching for `logging.getLogger()` instead of structlog does not route
+  around it.
+- The process writes to stdout and nothing else. Collection is the platform's job — `awslogs` on
+  ECS, which is why the shape is flat, single-line, and carries `timestamp` rather than
+  `@timestamp` (a CloudWatch reserved field) and `level_number` beside `level` (a string level
+  cannot be range-filtered).
+
+**Why not OpenTelemetry now.** It is the right destination and this ADR does not argue otherwise.
+It is premature while there is no deployed instance to observe: traces without a collector are a
+dependency and a decision, not a capability. When there is somewhere to send them, OTel replaces
+the renderer and the middleware — not the redaction filter, which it would still need.
+
+**Consequences:**
+- `ADR-019` should be read as *deferred*, not *implemented*. Anyone finding no OTel in the tree has
+  found the truth, not a bug.
+- The worker's entry point is `api/worker.py`, not `api.core.tasks.WorkerSettings`: ARQ's CLI
+  applies its own logging config after importing the settings module, so configuration has to
+  happen in `on_startup` or be handed to ARQ with `--custom-log-dict`. Both are used.
+- `DB_ECHO` is refused outside development. `echo=True` attaches SQLAlchemy's own raw handler,
+  bypassing the filter, and logs bound parameters — and a `WHERE users.phone = $1` binds a phone
+  number.
