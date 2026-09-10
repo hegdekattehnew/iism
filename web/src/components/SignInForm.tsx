@@ -141,8 +141,10 @@ export function SignInForm() {
           </Button>
           <p className="text-center text-sm text-muted">
             {t("noAccount")}{" "}
+            {/* Sign-in is one door taking either credential, so the way out
+                of it must not assume the person is a job seeker. */}
             <Link
-              href="/signup/seeker"
+              href="/signup"
               className="text-brand underline-offset-4 hover:underline"
             >
               {t("signUpInstead")}

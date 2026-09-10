@@ -21,13 +21,12 @@
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
     "title": "Find the work you want, and the training that gets you there",
-    "subtitle": "Tell us the job you are aiming for. We show you exactly which skills you are missing, and the courses that close that gap.",
+    "subtitle": "Tell us the job you want. We show you the skills you are missing, and the courses that close the gap.",
     "searchLabel": "Search for a job role or skill",
     "searchPlaceholder": "e.g. General Duty Assistant, welding, retail sales",
     "searchButton": "Search",
-    "primaryCta": "Get my recommendations",
-    "secondaryCta": "Browse courses",
-    "trust": "Free to use · Aligned to the National Skills Qualifications Framework · Hindi and English"
+    "trust": "Free to use · Aligned to the National Skills Qualifications Framework · Hindi and English",
+    "browseLink": "Browse all courses"
   },
   "how": {
     "title": "How it works",
@@ -43,20 +42,21 @@
     "note": "Every score is computed deterministically and can be explained, skill by skill."
   },
   "audiences": {
-    "title": "Built for every side of the market",
+    "title": "Three sides, one set of standards",
     "candidateTitle": "For candidates",
     "candidateBody": "Understand what you are missing, and what to do about it. Free, in your language.",
-    "candidateCta": "Sign up as a job seeker",
+    "candidateCta": "See how it works",
     "employerTitle": "For employers",
     "employerBody": "Post roles as skills, not keywords. Find candidates who genuinely match.",
-    "employerCta": "Sign up to hire",
+    "employerCta": "How hiring works here",
     "providerTitle": "For course providers",
     "providerBody": "Publish courses anchored to Qualification Packs, and see which skills the market is short of.",
-    "providerCta": "Sign up to publish courses"
+    "providerCta": "How publishing works here",
+    "subtitle": "Every vacancy, every course and every candidate is described against the same national framework. That is what makes a match here mean something."
   },
   "browse": {
     "title": "Explore the marketplace",
-    "subtitle": "Content is being added. The structure below is live.",
+    "subtitle": "Every number below is counted live from the platform database.",
     "jobsTitle": "Jobs",
     "jobsBody": "Vocational roles from verified employers.",
     "coursesTitle": "Courses",
@@ -657,7 +657,8 @@
       "admin": "Administrator",
       "member": "Member"
     },
-    "chooseContext": "Switch"
+    "chooseContext": "Choose workspace",
+    "menuHeading": "Workspace"
   },
   "orgSettings": {
     "title": "Organisation profile",
@@ -774,5 +775,23 @@
     "cancel": "Cancel",
     "title": "Your workspace",
     "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close."
+  },
+  "chooser": {
+    "title": "I'm here to…",
+    "seekerLabel": "Find work and training",
+    "seekerMeta": "Mobile number",
+    "employerLabel": "Hire for a role",
+    "employerMeta": "Work email",
+    "providerLabel": "Publish courses",
+    "providerMeta": "Work email",
+    "note": "One account. You can add another role whenever you need it.",
+    "pageTitle": "Create your account",
+    "pageSubtitle": "Pick what you came here to do. You are not locked into it."
+  },
+  "workspace": {
+    "jobSeeker": "Job seeker",
+    "signedInAs": "Signed in as {who}",
+    "goToProfile": "My profile",
+    "goToMatches": "My matches"
   }
 }

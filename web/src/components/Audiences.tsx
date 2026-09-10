@@ -8,14 +8,20 @@ import {
   SectionHeading,
 } from "@/components/ui";
 
-// These cards already described the three entities; now they are the way in.
-// Every route to an account used to land on the candidate phone form, so an
-// employer was two clicks behind a marketing page and a training provider had
-// no registration path anywhere in the product.
+// The *argument*, not the router. These pointed at `/signup/{type}` -- the
+// same three hrefs `RoleChooser` now offers in the hero, about 900px higher on
+// the same page. A visitor meeting the identical three destinations twice in
+// different clothes learns nothing the second time, and no amount of restyling
+// fixes that.
+//
+// So the two are split by what the visitor is asking. The hero chooser answers
+// "where do I go?"; this section answers "why would I?", and sends each side to
+// the page that argues the case. `/employers` and `/providers` are real content
+// pages that the homepage did not link to at all -- only the header nav did.
 const AUDIENCES = [
-  { key: "candidate", href: "/signup/seeker" },
-  { key: "employer", href: "/signup/employer" },
-  { key: "provider", href: "/signup/provider" },
+  { key: "candidate", href: "/#how-it-works" },
+  { key: "employer", href: "/employers" },
+  { key: "provider", href: "/providers" },
 ] as const;
 
 export async function Audiences() {
@@ -23,7 +29,7 @@ export async function Audiences() {
 
   return (
     <Section className="bg-surface-muted">
-      <SectionHeading title={t("title")} />
+      <SectionHeading title={t("title")} subtitle={t("subtitle")} />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         {AUDIENCES.map(({ key, href }) => (

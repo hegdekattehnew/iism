@@ -34,7 +34,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("context");
   const router = useRouter();
   const signedIn = useIsSignedIn();
-  const { organisations, isJobSeeker } = useMemberships();
+  const { organisations, isJobSeeker, isPending } = useMemberships();
   const active = useActiveOrg();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -44,12 +44,32 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   // everyone with no organisation.
   if (!signedIn) return null;
 
+  // Until `/auth/me` resolves, `organisations` is empty and `isJobSeeker` is
+  // false -- which are the same values an organisation-only account has. Every
+  // signed-in job seeker therefore watched their own header read "Switch" and
+  // then change to "Job seeker" a moment later. Say nothing rather than
+  // something wrong: the fallback below is a real state, not a loading one.
+  if (isPending) {
+    return (
+      <div className={stacked ? "" : "relative"}>
+        <div
+          aria-hidden
+          className="h-[34px] w-32 animate-pulse rounded-lg border border-border-token bg-surface-muted"
+        />
+      </div>
+    );
+  }
+
   const current = organisations.find((m) => m.tenant.slug === active);
   const label = current
     ? current.tenant.name
     : isJobSeeker
       ? t("jobSeeker")
-      : t("chooseContext");
+      : // An organisation-only account standing outside any `/employer/` path
+        // genuinely has no current context. This names the thing being chosen;
+        // it used to read "Switch", a verb with no object, which said neither
+        // where you were nor where you could go.
+        t("chooseContext");
 
   const go = (slug: string | null) => {
     setOpen(false);
@@ -92,6 +112,13 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
               : "absolute right-0 z-50 mt-2 w-64 rounded-lg border border-border-token bg-surface p-1 shadow-lg"
           }
         >
+          {/* The menu says what it is a menu of. Without it the list reads as
+              an account menu, and the job-seeker row looks like a link to a
+              page rather than the context you are currently standing in. */}
+          <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
+            {t("menuHeading")}
+          </p>
+
           {/* Only for someone who actually asked to look for work. An account
               created as an employer or a provider has no personal workspace,
               and offering it a job-seeker context it never chose is exactly the

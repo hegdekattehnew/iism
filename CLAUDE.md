@@ -229,6 +229,20 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - **In a card grid, one element must take `flex-1`.** Cards stretch to the row height, so without it
   a two-line description leaves that card's button floating mid-card while its neighbours' sit
   lower — the row reads as crooked even though every box is identical.
+- **`divide-y` does not work in this build.** `divide-border-token` resolves the *colour* and emits
+  no border *width* — computed `borderTopWidth` was `0px` on every row of `RoleChooser`, so the
+  list rendered as one undivided block while the class string looked correct in the markup. Use
+  `border-t border-border-token first:border-t-0` on the children instead.
+- **A two-column hero track must be `minmax(0,1fr)`, never `1fr`.** A `1fr` track has
+  `min-width:auto`, so the hero's search row — a `w-full flex-1` input beside an unshrinkable
+  `size="lg"` submit — can force the track past the container. The hero section carries
+  `overflow-hidden`, so the overflow produces **no scrollbar and no error**: the right-hand column
+  silently disappears at some widths.
+- **The hero has a fold budget, and Hindi is the binding case.** `globals.css` sets
+  `html[lang="hi"] body { line-height: 1.7 }`, so Devanagari runs ~15% taller than the same copy in
+  English. Before Sprint 16 the hero's Search button sat below the fold at 360×640 in Hindi while
+  passing in English. Measure `getBoundingClientRect().bottom` of the submit button on `/hi` at
+  360×640 before adding anything above it.
 
 ## Current state
 

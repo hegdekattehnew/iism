@@ -17,8 +17,11 @@ export async function CtaBand() {
           </p>
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+          {/* `/signup`, not `/signup/seeker`. "Get started free" is the last
+              thing on the homepage and names no audience, so sending it to the
+              job-seeker form answered a question it had not asked. */}
           <ButtonLink
-            href="/signup/seeker"
+            href="/signup"
             variant="secondary"
             size="lg"
             className="border-transparent"

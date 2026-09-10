@@ -70,7 +70,10 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
       >
         {tn("signIn")}
       </Link>
-      <ButtonLink href="/signup/seeker" size={size}>
+      {/* `/signup`, not `/signup/seeker`. This header renders on every route,
+          so hardcoding the job-seeker path offered an employer reading `/jobs`
+          the one signup they did not want and no sign of the other two. */}
+      <ButtonLink href="/signup" size={size}>
         {tn("getStarted")}
       </ButtonLink>
     </>
