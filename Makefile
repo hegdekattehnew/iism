@@ -107,7 +107,10 @@ api: ## Run the API with reload (http://localhost:8000)
 
 .PHONY: worker
 worker: ## Run the ARQ background worker
-	$(VENV)/bin/arq api.core.tasks.WorkerSettings
+	# api.worker, not api.core.tasks: arq runs its own dictConfig *after*
+	# importing the settings module, so logging has to be configured from
+	# on_startup or every worker line is emitted twice.
+	$(VENV)/bin/arq --custom-log-dict api.worker.LOG_CONFIG api.worker.WorkerSettings
 
 .PHONY: web
 web: ## Run the Next.js dev server (http://localhost:3000)

@@ -132,6 +132,19 @@ def build_tail(log_format: str) -> list[Processor]:
     return tail
 
 
+def dict_config() -> dict[str, Any]:
+    """The config as a plain dict, for `arq --custom-log-dict`.
+
+    arq's CLI applies exactly one logging config, *before* the worker starts:
+    its own `default_log_config`, or whatever this returns if it is named on
+    the command line. Handing it ours is what stops arq's first two lines
+    ("Starting worker for N functions", the redis version banner) escaping as
+    text -- they are emitted before `on_startup`, so no hook can catch them.
+    """
+    settings = get_settings()
+    return _dict_config(settings.log_level.upper(), settings.log_format)
+
+
 def _dict_config(level: str, log_format: str) -> dict[str, Any]:
     return {
         "version": 1,
