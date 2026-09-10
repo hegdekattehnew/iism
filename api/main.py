@@ -12,6 +12,7 @@ from api.core.cache import close_redis
 from api.core.config import get_settings
 from api.core.database import dispose_engine
 from api.core.health import DeepHealth, check_database, check_redis, check_worker
+from api.core.logging import configure_logging
 from api.core.tasks import close_task_pool, get_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.geography import router as geography_router
@@ -32,6 +33,12 @@ from api.modules.skills import router as skills_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Again, deliberately. uvicorn runs its own `dictConfig` *after* importing
+    # this module, which re-attaches its text handlers to the `uvicorn.*`
+    # loggers and undoes the call below. Lifespan startup is the first hook
+    # that runs after uvicorn has finished, and `configure_logging` is
+    # idempotent, so this is a correction rather than a second configuration.
+    configure_logging()
     yield
     await close_task_pool()
     await close_redis()
@@ -54,6 +61,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # Everything downstream of assembly -- handlers, services, the engine -- calls
 # `get_settings()` at call time. The two handlers below are the pattern.
 _settings = get_settings()
+
+# Before the app object, so anything the routers log at import time is already
+# formatted and redacted rather than going out through structlog's defaults.
+configure_logging()
 
 app = FastAPI(
     title=_settings.app_name,

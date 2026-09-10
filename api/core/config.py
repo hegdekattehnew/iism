@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,6 +51,13 @@ class Settings(BaseSettings):
     # exercised without an SMS provider. Must never be true outside development.
     otp_expose_in_response: bool = True
 
+    # --- logging ---
+    log_level: str = "INFO"
+    # Defaults to `json` so a missing environment variable fails toward the
+    # machine-readable format. `.env.example` sets `console` for development,
+    # where a human is the reader.
+    log_format: Literal["json", "console"] = "json"
+
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
@@ -72,6 +80,13 @@ class Settings(BaseSettings):
             raise ValueError(f"JWT_SECRET_KEY must be at least {MIN_JWT_SECRET_BYTES} bytes")
         if self.otp_expose_in_response:
             raise ValueError("OTP_EXPOSE_IN_RESPONSE must be false outside development")
+        if self.db_echo:
+            # `echo=True` makes SQLAlchemy attach its *own* raw StreamHandler
+            # to `sqlalchemy.engine.Engine` -- bypassing the redaction filter
+            # entirely -- and it logs bound parameters. `select(User).where(
+            # User.phone == phone)` binds a phone number. Same class of leak as
+            # exposing the OTP, so it gets the same startup refusal.
+            raise ValueError("DB_ECHO must be false outside development")
         return self
 
     @property
