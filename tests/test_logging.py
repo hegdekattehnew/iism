@@ -221,3 +221,57 @@ class TestConfiguration:
     @pytest.mark.parametrize("log_format", ["json", "console"])
     def test_both_formats_build(self, log_format: str) -> None:
         assert build_tail(log_format)
+
+
+class TestRequestContext:
+    """The access line, and the ids that reach it.
+
+    `RequestContextMiddleware` is pure ASGI rather than `BaseHTTPMiddleware`
+    for one reason: `BaseHTTPMiddleware` runs the downstream app in a child
+    task, anyio *copies* the context into it, and a child's `bind_contextvars`
+    does not propagate back. `user_id` is bound inside `get_current_user` and
+    `tenant_id` inside `authorization._context_for` — both dependencies, both
+    downstream. Under `BaseHTTPMiddleware` every access line would be
+    anonymous, and these tests are what would notice.
+    """
+
+    async def test_the_access_line_carries_the_route_template(self, client) -> None:
+        """The template, never the interpolated path. A tenant slug in every
+        log line is both a leak and unbounded CloudWatch cardinality."""
+        with capture() as stream:
+            structlog.get_logger(CAPTURE).info(
+                "http.request", route="/org/{org_slug}/jobs", status=404
+            )
+            parsed = json.loads(stream.getvalue())
+        assert parsed["route"] == "/org/{org_slug}/jobs"
+
+    async def test_a_request_id_is_bound_and_echoed(self, client) -> None:
+        response = await client.get("/health")
+        assert response.headers.get("x-request-id")
+
+    async def test_a_caller_supplied_id_is_echoed_when_it_is_safe(self, client) -> None:
+        response = await client.get("/health", headers={"X-Request-Id": "trace-123"})
+        assert response.headers["x-request-id"] == "trace-123"
+
+    async def test_a_hostile_request_id_is_discarded(self, client) -> None:
+        """An ALB does not sanitise headers it does not own, so this value is
+        attacker-controlled. Echoing it verbatim would let a caller write
+        forged JSON into every log line of their own request."""
+        forged = '{"level":"info","event":"nothing to see"}'
+        response = await client.get("/health", headers={"X-Request-Id": forged})
+        assert response.headers["x-request-id"] != forged
+
+    async def test_an_over_long_request_id_is_discarded(self, client) -> None:
+        response = await client.get("/health", headers={"X-Request-Id": "a" * 200})
+        assert response.headers["x-request-id"] != "a" * 200
+
+    async def test_each_request_starts_from_a_clean_context(self, client) -> None:
+        """Contextvars are cleared on *entry*, not exit. uvicorn gives each
+        request a fresh task, but the `ASGITransport` these tests run on does
+        not — one context serves every request, so without the clear a
+        `user_id` from an earlier request would appear on a later anonymous
+        one's access line."""
+        first = await client.get("/health", headers={"X-Request-Id": "first"})
+        second = await client.get("/health")
+        assert first.headers["x-request-id"] == "first"
+        assert second.headers["x-request-id"] != "first"

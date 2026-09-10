@@ -13,6 +13,7 @@ from api.core.config import get_settings
 from api.core.database import dispose_engine
 from api.core.health import DeepHealth, check_database, check_redis, check_worker
 from api.core.logging import configure_logging
+from api.core.middleware import RequestContextMiddleware
 from api.core.tasks import close_task_pool, get_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.geography import router as geography_router
@@ -79,7 +80,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # So the browser client can read the id and a bug report can quote it.
+    expose_headers=["x-request-id"],
 )
+
+# Added last, so it runs outermost: `add_middleware` prepends. Every response
+# -- CORS preflights and 404s included -- therefore gets an access line and an
+# `x-request-id`.
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(skills_router)
 app.include_router(geography_router)

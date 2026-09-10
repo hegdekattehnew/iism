@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import jwt
+import structlog
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -263,4 +264,9 @@ async def get_current_user(
     user = await db.get(User, uuid.UUID(payload["sub"]))
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or inactive")
+    # Bound here rather than in the middleware, because identity is resolved by
+    # a dependency. This works only because `RequestContextMiddleware` is pure
+    # ASGI: same task, same context, so the access line written after the
+    # handler sees it. The opaque id only -- never phone, email or name.
+    structlog.contextvars.bind_contextvars(user_id=str(user.id))
     return user

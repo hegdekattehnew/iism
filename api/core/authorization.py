@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+import structlog
 from fastapi import Depends, HTTPException, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +39,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     # its own organisation routes -- the same cycle `get_current_user` avoids
     # the same way.
     from api.modules.identity.models import Tenant, User
+
+
+log = structlog.get_logger("iism.authz")
 
 
 class Permission(StrEnum):
@@ -137,9 +141,16 @@ async def _context_for(db: AsyncSession, user: "User", slug: str) -> TenantConte
     if row is None:
         # One answer for "no such organisation", "not a member" and "that is a
         # personal workspace". Distinguishing them tells a prober which slugs
-        # exist.
+        # exist -- to the *caller*. The log may say more, and should: a
+        # multi-tenant product that cannot answer "who was refused which
+        # organisation" has no audit trail at all, and this was silent.
+        log.warning("authz.tenant_denied", org_slug=slug, reason="no_membership")
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Organisation not found")
     membership, tenant = row
+    # Same reasoning as `user_id` in `get_current_user`: resolved in a
+    # dependency, bound here, and visible on the access line because the
+    # middleware is pure ASGI. Opaque ids and a role name, nothing personal.
+    structlog.contextvars.bind_contextvars(tenant_id=str(tenant.id), tenant_role=membership.role)
     return TenantContext(
         user=user,
         tenant=tenant,
@@ -183,6 +194,11 @@ def require(
             # 403 here, not 404: the caller has already proved membership, so
             # the organisation's existence is not news to them. Telling them
             # their role is insufficient is the useful answer.
+            log.warning(
+                "authz.permission_denied",
+                permission=permission.value,
+                role=context.role,
+            )
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 f"Your role ({context.role}) does not permit {permission.value}",
@@ -190,6 +206,12 @@ def require(
         if publishes is not None:
             expected = PUBLISHES[publishes]
             if context.tenant.tenant_type != expected:
+                log.warning(
+                    "authz.wrong_tenant_type",
+                    publishes=publishes,
+                    expected=expected,
+                    actual=context.tenant.tenant_type,
+                )
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
                     f"Only a {expected.replace('_', ' ')} can publish a {publishes}",
