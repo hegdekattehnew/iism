@@ -16,20 +16,12 @@ import logging
 from api.adapters.notifications.base import NotificationError
 from api.core.config import get_settings
 
+# Re-exported, not redefined -- see the sibling note in `console.py`.
+from api.core.redaction import mask_email
+
+__all__ = ["ConsoleEmailProvider", "mask_email"]
+
 logger = logging.getLogger("iism.notifications")
-
-
-def mask_email(address: str) -> str:
-    """`priya.sharma@example.com` -> `pr****@example.com`.
-
-    The domain survives because it is what a support conversation needs; the
-    local part does not, because that is the half that identifies a person.
-    """
-    local, _, domain = address.partition("@")
-    if not domain:
-        return "*" * len(address)
-    keep = local[:2] if len(local) > 3 else ""
-    return f"{keep}{'*' * max(len(local) - len(keep), 1)}@{domain}"
 
 
 class ConsoleEmailProvider:

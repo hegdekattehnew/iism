@@ -17,17 +17,15 @@ import logging
 from api.adapters.notifications.base import NotificationError
 from api.core.config import get_settings
 
+# Re-exported, not redefined. The mask moved to `api/core/redaction.py` when it
+# became one arm of the process-wide filter ADR-023 asks for; keeping the name
+# importable from here means the call site below still reads as its own
+# argument for masking, and nothing outside had to change.
+from api.core.redaction import mask_phone
+
+__all__ = ["ConsoleNotificationProvider", "mask_phone"]
+
 logger = logging.getLogger("iism.notifications")
-
-
-def mask_phone(phone: str) -> str:
-    """+919812349999 -> +9198*****999.
-
-    Enough to correlate a support report, not enough to identify or dial.
-    """
-    if len(phone) < 8:
-        return "*" * len(phone)
-    return f"{phone[:5]}{'*' * (len(phone) - 8)}{phone[-3:]}"
 
 
 class ConsoleNotificationProvider:
