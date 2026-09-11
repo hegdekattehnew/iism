@@ -53,17 +53,31 @@ migration: ## Autogenerate a migration: make migration m="add courses"
 
 .PHONY: seed
 seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempotent)
-	$(PY) scripts/seed_skills.py
-	$(PY) scripts/seed_marketplace.py
-	$(PY) scripts/seed_candidates.py
+	$(NO_TIMEOUT) $(PY) scripts/seed_skills.py
+	$(NO_TIMEOUT) $(PY) scripts/seed_marketplace.py
+	$(NO_TIMEOUT) $(PY) scripts/seed_candidates.py
 
 .PHONY: evaluate
 evaluate: ## Score the matcher against the hand-labelled golden set
-	$(PY) scripts/evaluate_matching.py
+	$(NO_TIMEOUT) $(PY) scripts/evaluate_matching.py
 
 # ---------------------------------------------------------------- backup
+# Operator scripts share the app's database engine, which now carries a
+# statement timeout. The importer and the seed run legitimately long statements.
+NO_TIMEOUT := DB_STATEMENT_TIMEOUT_MS=0
+
 PG := iism-postgres-1
-DUMP ?= backups/iism-$(shell date +%Y%m%d-%H%M).sql.gz
+MONGO := iism-mongo-1
+MONGO_DB ?= iism_nsqf_master_data
+# Outside the working tree, and encrypted. Dumps used to land in backups/ inside
+# the repository -- gitignored, but a full dump holds real users' phones and
+# profiles, and one `git add -f` or one careless zip away from leaving the
+# machine. The passphrase comes from the environment and is never stored here.
+BACKUP_DIR ?= $(HOME)/iism-backups
+STAMP := $(shell date +%Y%m%d-%H%M%S)
+ENCRYPT := openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:IISM_BACKUP_PASSPHRASE
+DECRYPT := openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:IISM_BACKUP_PASSPHRASE
+REQUIRE_PASSPHRASE = @test -n "$$IISM_BACKUP_PASSPHRASE" || { echo "Set IISM_BACKUP_PASSPHRASE first -- dumps are encrypted."; exit 1; }
 
 .PHONY: db-schema
 db-schema: ## Refresh backups/schema.sql (DDL only, committed to git)
@@ -72,21 +86,47 @@ db-schema: ## Refresh backups/schema.sql (DDL only, committed to git)
 	@echo "backups/schema.sql  $$(wc -c < backups/schema.sql | tr -d ' ') bytes"
 
 .PHONY: db-dump
-db-dump: ## Full dump, schema + data, gzipped (NOT committed -- ~40 MB)
-	@mkdir -p backups
+db-dump: ## Encrypted full Postgres dump to $(BACKUP_DIR) (needs IISM_BACKUP_PASSPHRASE)
+	$(REQUIRE_PASSPHRASE)
+	@mkdir -p $(BACKUP_DIR) && chmod 700 $(BACKUP_DIR)
 	@docker exec $(PG) pg_dump -U iism -d iism --no-owner --no-privileges \
-	  | gzip -c > $(DUMP)
-	@echo "$(DUMP)  $$(du -h $(DUMP) | cut -f1)"
+	  | gzip -c | $(ENCRYPT) > $(BACKUP_DIR)/iism-pg-$(STAMP).sql.gz.enc
+	@echo "$(BACKUP_DIR)/iism-pg-$(STAMP).sql.gz.enc"
 
 .PHONY: db-restore
-db-restore: ## Restore from a dump: make db-restore DUMP=backups/iism-....sql.gz
+db-restore: ## Restore Postgres: make db-restore DUMP=... [INTO=iism] (DROPS the target)
+	$(REQUIRE_PASSPHRASE)
 	@test -f "$(DUMP)" || { echo "No such dump: $(DUMP)"; exit 1; }
-	@echo "This DROPS and recreates the iism database. Ctrl-C within 5s to abort."
+	@echo "This DROPS and recreates database '$(or $(INTO),iism)'. Ctrl-C within 5s to abort."
 	@sleep 5
-	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS iism WITH (FORCE);"
-	@docker exec $(PG) psql -U iism -d postgres -c "CREATE DATABASE iism;"
-	@gunzip -c $(DUMP) | docker exec -i $(PG) psql -U iism -d iism -v ON_ERROR_STOP=1 -q
-	@echo "restored from $(DUMP)"
+	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS $(or $(INTO),iism) WITH (FORCE);"
+	@docker exec $(PG) psql -U iism -d postgres -c "CREATE DATABASE $(or $(INTO),iism);"
+	@$(DECRYPT) < $(DUMP) | gunzip -c \
+	  | docker exec -i $(PG) psql -U iism -d $(or $(INTO),iism) -v ON_ERROR_STOP=1 -q
+	@echo "restored $(DUMP) into $(or $(INTO),iism)"
+
+.PHONY: mongo-dump
+mongo-dump: ## Encrypted dump of the NSQF source of record to $(BACKUP_DIR)
+	$(REQUIRE_PASSPHRASE)
+	@mkdir -p $(BACKUP_DIR) && chmod 700 $(BACKUP_DIR)
+	@docker exec $(MONGO) mongodump -u iism -p iism --authenticationDatabase admin \
+	  --db $(MONGO_DB) --archive --gzip --quiet \
+	  | $(ENCRYPT) > $(BACKUP_DIR)/iism-mongo-$(STAMP).archive.gz.enc
+	@echo "$(BACKUP_DIR)/iism-mongo-$(STAMP).archive.gz.enc"
+
+.PHONY: mongo-restore
+mongo-restore: ## Restore Mongo: make mongo-restore DUMP=... [INTO=<db>] (replaces INTO)
+	$(REQUIRE_PASSPHRASE)
+	@test -f "$(DUMP)" || { echo "No such dump: $(DUMP)"; exit 1; }
+	@$(DECRYPT) < $(DUMP) | docker exec -i $(MONGO) mongorestore -u iism -p iism \
+	  --authenticationDatabase admin --archive --gzip --drop --quiet \
+	  --nsFrom '$(MONGO_DB).*' --nsTo '$(or $(INTO),$(MONGO_DB)).*'
+	@echo "restored $(DUMP) into $(or $(INTO),$(MONGO_DB))"
+
+.PHONY: restore-drill
+restore-drill: ## Prove both backups restore: dump, restore into scratch, compare, clean up
+	$(REQUIRE_PASSPHRASE)
+	@BACKUP_DIR=$(BACKUP_DIR) MONGO_DB=$(MONGO_DB) scripts/restore_drill.sh
 
 .PHONY: mongosh
 mongosh: ## Open a mongosh shell against the NSQF source
@@ -94,7 +134,7 @@ mongosh: ## Open a mongosh shell against the NSQF source
 
 .PHONY: import-nsqf
 import-nsqf: ## Project the NSQF corpus from MongoDB into PostgreSQL (idempotent)
-	$(PY) scripts/import_nsqf.py
+	$(NO_TIMEOUT) $(PY) scripts/import_nsqf.py
 
 .PHONY: psql
 psql: ## Open a psql shell in the container
