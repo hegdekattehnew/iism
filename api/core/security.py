@@ -285,3 +285,27 @@ async def get_current_user(
     # handler sees it. The opaque id only -- never phone, email or name.
     structlog.contextvars.bind_contextvars(user_id=str(user.id))
     return user
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db_session),
+) -> "User | None":
+    """The signed-in user if there is one, and `None` otherwise -- never a 401.
+
+    For public routes that must behave differently for someone already signed
+    in. `POST /auth/org/register` is the reason it exists: it minted a brand-new
+    `User` for any unfamiliar address, so a signed-in candidate who opened
+    `/signup/employer` and typed a fresh work email ended up with two separate
+    accounts -- the fork ADR-038 exists to prevent.
+
+    An expired or malformed token counts as anonymous rather than as an error,
+    because on a public page the honest reading of a stale token is "not signed
+    in", and failing a signup form over it would be worse.
+    """
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials, db)
+    except HTTPException:
+        return None

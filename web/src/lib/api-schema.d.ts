@@ -392,9 +392,20 @@ export interface paths {
          * Register Organisation
          * @description Create an organisation and its first account, for someone with neither.
          *
-         *     The response is identical whether or not the address already has an
-         *     account; only the email differs. Verifying the code that follows is what
-         *     signs the user in, via the ordinary email path.
+         *     Signed out: the response is identical whether or not the address already
+         *     has an account; only the email differs. Verifying the code that follows is
+         *     what signs the user in, via the ordinary email path.
+         *
+         *     **Signed in: no new account, ever.** This route used to ignore who was
+         *     calling and mint a fresh `User` for any unfamiliar address, so a candidate
+         *     who opened `/signup/employer` and typed a work email forked into two
+         *     identities -- the outcome ADR-038 exists to prevent. Sprint 13 documented it
+         *     in `CreateOrgForm.tsx`, removed the button, and left the route open; the
+         *     homepage role chooser then put the button back. Now the organisation is
+         *     added to the caller's own account, exactly as `POST /me/organisations`
+         *     would. The typed address is not linked: linking a credential needs its own
+         *     verification, and doing it silently here would be the takeover-by-typo
+         *     `confirm_link` is built to refuse.
          */
         post: operations["register_organisation_auth_org_register_post"];
         delete?: never;
@@ -2154,6 +2165,25 @@ export interface components {
             tenant_type: "employer" | "course_provider";
         };
         /**
+         * OrgRegisterResponse
+         * @description Cold registration's answer.
+         *
+         *     Signed out: identical in shape and content for a known and an unknown
+         *     address, `organisation_slug` always null. Signed in: no code is sent, the
+         *     organisation is added to the caller's own account, and its slug comes back
+         *     -- the caller is disclosing nothing about anyone but themselves.
+         */
+        OrgRegisterResponse: {
+            /** Sent */
+            sent: boolean;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Debug Code */
+            debug_code?: string | null;
+            /** Organisation Slug */
+            organisation_slug?: string | null;
+        };
+        /**
          * OrganisationIn
          * @description What a member may change. Everything absent from here is not theirs to set.
          *
@@ -2320,6 +2350,37 @@ export interface components {
             required_by: number;
             /** Held By */
             held_by: number;
+        };
+        /**
+         * SignInOut
+         * @description What a successful code verification returns.
+         *
+         *     `created` and `organisation_slug` are safe to disclose **here and nowhere
+         *     earlier**: the caller has just proved they control the phone or mailbox, so
+         *     telling them whether the account was new reveals nothing they could not
+         *     already learn by reading their own messages. At *request* time the same fact
+         *     would be an enumeration oracle, which is why `OtpRequestResponse` carries
+         *     nothing of the kind.
+         */
+        SignInOut: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+            /** Organisation Slug */
+            organisation_slug?: string | null;
         };
         /** SkillCount */
         SkillCount: {
@@ -3179,7 +3240,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokenPairOut"];
+                    "application/json": components["schemas"]["SignInOut"];
                 };
             };
             /** @description Validation Error */
@@ -3245,7 +3306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokenPairOut"];
+                    "application/json": components["schemas"]["SignInOut"];
                 };
             };
             /** @description Validation Error */
@@ -3278,7 +3339,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OtpRequestResponse"];
+                    "application/json": components["schemas"]["OrgRegisterResponse"];
                 };
             };
             /** @description Validation Error */

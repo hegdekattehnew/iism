@@ -14,6 +14,8 @@ account:
   in route handlers -- the one thing ADR-032 named explicitly.
 """
 
+import json
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
@@ -21,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider, get_notification_provider
+from api.core.cache import get_redis
 from api.core.config import get_settings
 from api.core.security import (
     Channel,
@@ -37,14 +40,20 @@ from api.modules.identity.models import Membership, Tenant, User
 _CODE_MESSAGE = "Your IISM verification code is {code}. It expires in 5 minutes."
 _CODE_SUBJECT = "Your IISM verification code"
 
-# Sent instead of a code when someone tries to register an address that already
-# has an account. The HTTP response is identical either way, so the difference
-# reaches the address owner and nobody else -- which is the point.
-# Prepended to the code when someone tries to register an address that already
-# has an account. No second organisation is created; they simply sign in.
+# Prepended to the code when someone registers an address that already has an
+# account. The HTTP response is identical either way; the difference reaches the
+# mailbox, whose owner is the only person entitled to it.
 _ALREADY_REGISTERED = (
-    "This address already has an IISM account, so no new organisation was created."
+    "This address already has an IISM account. Entering this code signs you in "
+    "and adds the new organisation to it."
 )
+
+# A known address asking for a new organisation. Held here until the code comes
+# back rather than provisioned at request time: creating it immediately would
+# let anyone who knows an address attach an organisation to someone else's
+# account. Until Sprint 18 the name was simply discarded, and the person was
+# signed into whatever organisation they already had.
+_PENDING_ORG_KEY = "auth:pending_org:{address}"
 
 
 def _personal_tenant_slug(user_id_hex: str) -> str:
@@ -129,8 +138,10 @@ async def verify_otp_and_sign_in(
 ) -> tuple[User, TokenPair, bool]:
     """Verify the code, creating the account on first successful sign-in.
 
-    Returns (user, tokens, created) — `created` lets the client route a brand new
-    user to profile setup rather than straight to a bare profile page.
+    Returns (user, tokens, created). `created` reaches the client on the verify
+    response (`SignInOut`) -- it was computed and then dropped by the route until
+    Sprint 18, while this docstring claimed a client used it. It is safe there
+    and nowhere earlier: the caller has already proved they hold the phone.
     """
     if not await check_otp("sms", phone, code):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
@@ -156,7 +167,7 @@ async def verify_otp_and_sign_in(
 
 async def verify_email_and_sign_in(
     db: AsyncSession, address: str, code: str
-) -> tuple[User, TokenPair, bool]:
+) -> tuple[User, TokenPair, bool, str | None]:
     """Sign in with an email code.
 
     Unlike the phone path this does **not** create an account on first success.
@@ -173,12 +184,60 @@ async def verify_email_and_sign_in(
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
 
-    if user.email_verified_at is None:
+    # "Created" on this path means *first sign-in*: the account row is written
+    # at registration, but nobody has proved they hold the mailbox until now.
+    created = user.email_verified_at is None
+    if created:
         user.email_verified_at = datetime.now(UTC)
+
+    organisation_slug: str | None = None
+    pending = await get_redis().getdel(_PENDING_ORG_KEY.format(address=address.lower()))
+    if pending:
+        # They asked for this organisation at registration and have now proved
+        # the address is theirs. One identity, one more membership (ADR-038).
+        wanted = json.loads(pending)
+        tenant = await provision_organisation(db, user, wanted["name"], wanted["tenant_type"])
+        organisation_slug = tenant.slug
 
     await db.commit()
     await db.refresh(user)
-    return user, await issue_token_pair(user.id), False
+    if organisation_slug is None and created:
+        organisation_slug = await _only_organisation_slug(db, user.id)
+    return user, await issue_token_pair(user.id), created, organisation_slug
+
+
+async def _only_organisation_slug(db: AsyncSession, user_id: uuid.UUID) -> str | None:
+    """The slug of the user's organisation, if they hold exactly one.
+
+    A brand-new account registered one organisation, so that is where it should
+    land. With more than one there is no honest answer, and guessing from an
+    unordered list is the defect this replaces.
+    """
+    slugs = (
+        await db.scalars(
+            select(Tenant.slug)
+            .join(Membership, Membership.tenant_id == Tenant.id)
+            .where(Membership.user_id == user_id, Tenant.tenant_type != "personal")
+            .limit(2)
+        )
+    ).all()
+    return slugs[0] if len(slugs) == 1 else None
+
+
+async def has_personal_membership(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Whether this person ever signed up to look for work.
+
+    Only `provision_candidate` creates a personal tenant, and only on a first
+    phone sign-in, so an organisation-first account never has one. Everything
+    candidate-shaped -- the profile, matches -- is gated on this.
+    """
+    found = await db.scalar(
+        select(Membership.id)
+        .join(Tenant, Tenant.id == Membership.tenant_id)
+        .where(Membership.user_id == user_id, Tenant.tenant_type == "personal")
+        .limit(1)
+    )
+    return found is not None
 
 
 async def provision_organisation(
@@ -215,9 +274,13 @@ async def register_organisation(
     a prober could read the difference straight off the response.
 
     So a known address gets a **real sign-in code**, exactly as if it had used
-    the sign-in endpoint, and no second organisation is created. The two paths
-    are then genuinely indistinguishable to the caller, and the outcome is
-    better anyway: registering twice signs you in rather than failing.
+    the sign-in endpoint. The two paths are then genuinely indistinguishable to
+    the caller, and the outcome is better anyway: registering twice signs you in
+    rather than failing.
+
+    The organisation it asked for is **held, not discarded** -- see
+    `_PENDING_ORG_KEY` -- and created on the existing account once the code
+    proves the address is theirs.
     """
     settings = get_settings()
     await enforce_otp_rate_limit("email", address)
@@ -232,6 +295,11 @@ async def register_organisation(
         body = _CODE_MESSAGE
     else:
         # The address owner learns what happened; the caller learns nothing.
+        await get_redis().set(
+            _PENDING_ORG_KEY.format(address=address.lower()),
+            json.dumps({"name": name.strip(), "tenant_type": tenant_type}),
+            ex=settings.otp_ttl_seconds,
+        )
         body = _ALREADY_REGISTERED + " " + _CODE_MESSAGE
 
     code = generate_otp()
@@ -282,8 +350,15 @@ async def confirm_link(
     if not await check_otp(channel, identifier, code):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
 
-    column = User.phone if channel == "sms" else User.email
-    holder = await db.scalar(select(User).where(column == identifier))
+    # Case-insensitive for email, as every other email lookup here is. A
+    # case-sensitive comparison let `Admin@Clinic.in` walk past a 409 meant to
+    # protect `admin@clinic.in`, straight into the unique index.
+    match = (
+        User.phone == identifier
+        if channel == "sms"
+        else func.lower(User.email) == identifier.lower()
+    )
+    holder = await db.scalar(select(User).where(match))
     if holder is not None and holder.id != user.id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Already linked to another account")
 

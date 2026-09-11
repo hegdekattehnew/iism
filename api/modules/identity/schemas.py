@@ -152,6 +152,39 @@ class TokenPairOut(BaseModel):
     expires_in: int
 
 
+class SignInOut(TokenPairOut):
+    """What a successful code verification returns.
+
+    `created` and `organisation_slug` are safe to disclose **here and nowhere
+    earlier**: the caller has just proved they control the phone or mailbox, so
+    telling them whether the account was new reveals nothing they could not
+    already learn by reading their own messages. At *request* time the same fact
+    would be an enumeration oracle, which is why `OtpRequestResponse` carries
+    nothing of the kind.
+    """
+
+    # True on the first successful sign-in for this identity. A returning user
+    # is told they already had an account and landed on their workspace rather
+    # than in the onboarding wizard.
+    created: bool = False
+    # The organisation this sign-in was *for*, when there is one: the one just
+    # added on verification, or the only one a brand-new account holds. Lets the
+    # client land exactly there rather than guessing from an unordered list.
+    organisation_slug: str | None = None
+
+
+class OrgRegisterResponse(OtpRequestResponse):
+    """Cold registration's answer.
+
+    Signed out: identical in shape and content for a known and an unknown
+    address, `organisation_slug` always null. Signed in: no code is sent, the
+    organisation is added to the caller's own account, and its slug comes back
+    -- the caller is disclosing nothing about anyone but themselves.
+    """
+
+    organisation_slug: str | None = None
+
+
 class TenantOut(BaseModel):
     """An organisation as the **public** sees it.
 

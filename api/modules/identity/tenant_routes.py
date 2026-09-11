@@ -40,7 +40,11 @@ async def update_organisation(
     published URL, changing the type would strand listings already published
     under it, and verification is ours to assert rather than theirs to claim.
     """
-    for field, value in payload.model_dump().items():
+    # `exclude_unset`: a partial body must not blank the fields it omitted.
+    # Without it any client sending only `name` nulled the description, website,
+    # logo and contact address -- latent only because `OrgSettings` happens to
+    # send all six.
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(context.tenant, field, value)
     await db.commit()
     await db.refresh(context.tenant)

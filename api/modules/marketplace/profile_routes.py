@@ -6,7 +6,10 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
-from api.core.security import get_current_user
+
+# Candidate routes require a candidate, not merely a signed-in account: an
+# organisation-only user used to get a CandidateProfile created on first look.
+from api.modules.identity import get_current_candidate
 from api.modules.identity.models import User
 from api.modules.marketplace import profile_service, schemas
 from api.modules.marketplace.models import CandidateProfile
@@ -30,7 +33,7 @@ async def _view(
 
 @router.get("/profile", response_model=schemas.CandidateProfileFull)
 async def get_profile(
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     return await _view(db, user)
@@ -39,7 +42,7 @@ async def get_profile(
 @router.put("/profile", response_model=schemas.CandidateProfileFull)
 async def update_profile(
     payload: schemas.CandidateProfileUpdateFull,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     fields = payload.model_dump(exclude_unset=True)
@@ -59,7 +62,7 @@ async def update_profile(
 
 @router.post("/profile/onboarding/complete", response_model=schemas.CandidateProfileFull)
 async def complete_onboarding(
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     profile = await profile_service.complete_onboarding(db, user.id)
@@ -72,7 +75,7 @@ async def complete_onboarding(
 @router.post("/profile/skills", response_model=schemas.CandidateProfileFull)
 async def add_skill(
     payload: schemas.CandidateSkillAdd,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     profile = await profile_service.add_skill(db, user.id, payload.skill_slug, payload.proficiency)
@@ -82,7 +85,7 @@ async def add_skill(
 @router.delete("/profile/skills/{skill_slug}", response_model=schemas.CandidateProfileFull)
 async def remove_skill(
     skill_slug: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     profile = await profile_service.remove_skill(db, user.id, skill_slug)
@@ -130,7 +133,7 @@ async def _values(db: AsyncSession, collection: str, body: dict) -> dict:
 async def add_entry(
     collection: str,
     body: dict,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     values = await _values(db, collection, body)
@@ -143,7 +146,7 @@ async def update_entry(
     collection: str,
     entry_id: uuid.UUID,
     body: dict,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     values = await _values(db, collection, body)
@@ -155,7 +158,7 @@ async def update_entry(
 async def remove_entry(
     collection: str,
     entry_id: uuid.UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     profile = await profile_service.remove_child(db, user.id, collection, entry_id)

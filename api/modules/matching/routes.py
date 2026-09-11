@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
-from api.core.security import get_current_user
 from api.modules.analytics import record
+
+# Candidate routes require a candidate, not merely a signed-in account: an
+# organisation-only user used to get a CandidateProfile created on first look.
+from api.modules.identity import get_current_candidate
 from api.modules.identity.models import User
 from api.modules.marketplace import ensure_profile
 from api.modules.marketplace.models import CandidateProfile
@@ -59,7 +62,7 @@ def _to_match(scored: service.ScoredJob) -> schemas.MatchOut:
 async def list_matches(
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
 ) -> schemas.MatchPage:
     profile = await _profile(db, user)
     scored = await service.match_jobs(db, profile.id, limit=limit)
@@ -81,7 +84,7 @@ async def list_matches(
 async def match_detail(
     slug: str,
     db: AsyncSession = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_candidate),
 ) -> schemas.MatchDetail:
     """One job, scored, with the courses that close its gap."""
     profile = await _profile(db, user)

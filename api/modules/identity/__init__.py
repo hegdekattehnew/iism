@@ -1,5 +1,6 @@
 """Public interface of the identity module (ADR-009, ADR-010, ADR-032)."""
 
+from api.modules.identity.dependencies import get_current_candidate
 from api.modules.identity.models import (
     MEMBERSHIP_ROLES,
     TENANT_TYPES,
@@ -14,6 +15,7 @@ from api.modules.identity.tenant_routes import router as organisation_router
 
 __all__ = [
     "account_router",
+    "get_current_candidate",
     "MEMBERSHIP_ROLES",
     "TENANT_TYPES",
     "Membership",
