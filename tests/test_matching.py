@@ -411,3 +411,70 @@ class TestEmployerConsole:
 
     async def test_an_unknown_employer_is_a_404(self, pool, client) -> None:
         assert (await client.get("/employer/nobody/overview")).status_code == 404
+
+
+async def test_the_employer_overview_costs_the_same_for_one_vacancy_or_many(
+    db: AsyncSession,
+) -> None:
+    """It ran four queries per published vacancy, so the first page an employer
+    opens got slower with every job they posted (Sprint 20). The number of
+    statements must not depend on the number of vacancies -- and batching must
+    not change a single pool."""
+    from sqlalchemy import event
+
+    from api.modules.matching.employer import job_pools
+
+    skill = Skill(
+        slug="n-plus-one-x",
+        name_en="Handle patient records",
+        skill_type="technical",
+        nsqf_level=Decimal("4"),
+        nos_code="TST/N0901",
+        source="nsqf",
+    )
+    tenant = Tenant(slug="n-plus-one-employer", name="Batch Hospital", tenant_type="employer")
+    db.add_all([skill, tenant])
+    await db.flush()
+    for name in ("holder", "other"):
+        user = User(phone=f"+9199100{abs(hash(name)) % 100000:05d}")
+        db.add(user)
+        await db.flush()
+        profile = CandidateProfile(user_id=user.id, headline=name, years_experience=1)
+        db.add(profile)
+        await db.flush()
+        if name == "holder":
+            db.add(CandidateSkill(profile_id=profile.id, skill_id=skill.id, proficiency=3))
+
+    async def add_job(n: int) -> None:
+        job = Job(
+            slug=f"n-plus-one-{n}", tenant_id=tenant.id, title_en=f"Clerk {n}", status="published"
+        )
+        db.add(job)
+        await db.flush()
+        db.add(JobSkill(job_id=job.id, skill_id=skill.id, importance=4, is_mandatory=True))
+        await db.commit()
+
+    statements: list[str] = []
+
+    def count(conn, cursor, statement, *args) -> None:  # type: ignore[no-untyped-def]
+        statements.append(statement)
+
+    async def measure() -> tuple[int, list]:
+        statements.clear()
+        connection = (await db.connection()).sync_connection
+        assert connection is not None
+        event.listen(connection, "before_cursor_execute", count)
+        try:
+            pools = await job_pools(db, tenant.id)
+        finally:
+            event.remove(connection, "before_cursor_execute", count)
+        return len(statements), pools
+
+    await add_job(1)
+    one, pools = await measure()
+    for n in (2, 3, 4):
+        await add_job(n)
+    four, pools = await measure()
+
+    assert one == four, f"{one} statements for one vacancy, {four} for four"
+    assert [(p.pool, p.ready, p.nearly) for p in pools] == [(1, 1, 0)] * 4

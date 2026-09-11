@@ -97,56 +97,93 @@ async def _pool_held(
     return out
 
 
-async def _candidates_for(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
-    requirements = (await requirements_for(db, [job.id])).get(job.id, [])
-    if not requirements:
-        return []
+async def _candidates_for_jobs(
+    db: AsyncSession, jobs: list[Job]
+) -> dict[uuid.UUID, list[ScoredCandidate]]:
+    """Every job's scored pool, in the same number of queries however many jobs.
 
-    concept_keys = [r.concept_id for r in requirements if r.concept_id]
-    skill_keys = [r.skill_id for r in requirements]
+    This ran once per job, so the overview an employer opens first grew by
+    thirteen statements with every vacancy they posted -- 18 for one, 57 for
+    four (Sprint 20). Now: requirements for all jobs, one retrieval over the
+    union of their standards, then held skills and profiles for the union of
+    candidates. The pools are partitioned in memory and the scorer is unchanged.
+    `tests/test_matching.py` counts the statements for one vacancy and for four.
+    """
+    if not jobs:
+        return {}
+    requirements = await requirements_for(db, [job.id for job in jobs])
+    concept_keys = {r.concept_id for reqs in requirements.values() for r in reqs if r.concept_id}
+    skill_keys = {r.skill_id for reqs in requirements.values() for r in reqs}
+    if not skill_keys:
+        return {job.id: [] for job in jobs}
 
     # Retrieval, mirrored: only candidates sharing at least one required
     # standard. Someone with nothing in common scores zero, and a page of zeroes
     # is not a shortlist.
-    profile_ids = list(
-        (
-            await db.scalars(
-                select(CandidateSkill.profile_id)
-                .join(Skill, Skill.id == CandidateSkill.skill_id)
-                .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
-                .distinct()
-                .limit(RETRIEVAL_LIMIT)
-            )
-        ).all()
-    )
-    if not profile_ids:
-        return []
-
-    held_by_profile = await _pool_held(db, profile_ids)
-    profiles = {
-        p.id: p
-        for p in (
-            await db.scalars(select(CandidateProfile).where(CandidateProfile.id.in_(profile_ids)))
-        ).all()
-    }
-
-    scored = [
-        ScoredCandidate(
-            profile=profiles[pid],
-            result=score_match(
-                requirements,
-                held_by_profile.get(pid, []),
-                job_level_min=job.nsqf_level_min,
-                candidate_level=attained_level(held_by_profile.get(pid, []), requirements),
-            ),
+    rows = (
+        await db.execute(
+            select(CandidateSkill.profile_id, Skill.id, Skill.concept_id)
+            .join(Skill, Skill.id == CandidateSkill.skill_id)
+            .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
+            .distinct()
         )
-        for pid in profile_ids
-        if pid in profiles
-    ]
-    # Score, then coverage, then id: a stable order, so the same pool always
-    # ranks the same way.
-    scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, str(s.profile.id)))
-    return scored
+    ).all()
+    by_concept: dict[uuid.UUID, set[uuid.UUID]] = {}
+    by_skill: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for profile_id, skill_id, concept_id in rows:
+        by_skill.setdefault(skill_id, set()).add(profile_id)
+        if concept_id:
+            by_concept.setdefault(concept_id, set()).add(profile_id)
+
+    pools: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for job in jobs:
+        members: set[uuid.UUID] = set()
+        for r in requirements.get(job.id, []):
+            members |= by_skill.get(r.skill_id, set())
+            if r.concept_id:
+                members |= by_concept.get(r.concept_id, set())
+        # Sorted before the cap, so which candidates survive it is a fact about
+        # the data rather than about the order Postgres happened to return rows.
+        pools[job.id] = sorted(members, key=str)[:RETRIEVAL_LIMIT]
+
+    everyone = list({pid for pool in pools.values() for pid in pool})
+    held_by_profile = await _pool_held(db, everyone)
+    profiles = (
+        {
+            p.id: p
+            for p in (
+                await db.scalars(select(CandidateProfile).where(CandidateProfile.id.in_(everyone)))
+            ).all()
+        }
+        if everyone
+        else {}
+    )
+
+    out: dict[uuid.UUID, list[ScoredCandidate]] = {}
+    for job in jobs:
+        reqs = requirements.get(job.id, [])
+        scored = [
+            ScoredCandidate(
+                profile=profiles[pid],
+                result=score_match(
+                    reqs,
+                    held_by_profile.get(pid, []),
+                    job_level_min=job.nsqf_level_min,
+                    candidate_level=attained_level(held_by_profile.get(pid, []), reqs),
+                ),
+            )
+            for pid in pools[job.id]
+            if pid in profiles and reqs
+        ]
+        # Score, then coverage, then id: a stable order, so the same pool always
+        # ranks the same way.
+        scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, str(s.profile.id)))
+        out[job.id] = scored
+    return out
+
+
+async def _candidates_for(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
+    return (await _candidates_for_jobs(db, [job]))[job.id]
 
 
 async def get_employer(db: AsyncSession, slug: str) -> Tenant | None:
@@ -185,9 +222,10 @@ async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
             )
         ).all()
     )
+    scored_by_job = await _candidates_for_jobs(db, jobs)
     pools: list[JobPool] = []
     for job in jobs:
-        scored = await _candidates_for(db, job)
+        scored = scored_by_job[job.id]
         pools.append(
             JobPool(
                 job=job,
