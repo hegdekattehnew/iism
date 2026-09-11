@@ -79,6 +79,18 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 20 (safe to deploy) — complete, 2026-09-11.** No new product surface; the NFR gaps that
+need no outside account, closed before the first deployment. Consent recorded server-side at
+signup (DPDP Act 2023), self-serve export and deletion at `/account`, privacy notice / terms /
+grievance pages in both languages **marked draft pending legal review**, analytics purged after
+12 months. Security headers on API and web (web CSP report-only), rate limiting on every class of
+request, body-size cap, `/docs` local-only, DB pool and statement timeout. Encrypted backups outside
+the tree, **MongoDB covered for the first time**, restore drill run and passed. `uv.lock` committed
+and CI installing from it, dependency audits and Dependabot, a first-load JS budget, axe checks,
+error pages that say "unavailable" instead of 404, and the employer overview's N+1 gone. Details in
+`CLAUDE.md` → Current state. **Still open, needing the owner:** a named grievance officer
+(`web/src/lib/legal.ts`), legal review of the three pages, and the pull request.
+
 **Sprint 19 (every door opens onto all three) — complete, 2026-09-11.** The registration page at
 `/signup/[type]` now switches between job seeker, employer and training provider in place, instead
 of committing whoever arrived to the type in the URL. Links, not a toggle; the form is keyed so
@@ -681,7 +693,7 @@ Three processes must run for the full stack: **api, worker, web.**
 
 ## 10. Git state
 
-**Pushed 2026-09-09**, at the start of Sprint 15 and before anything else in it.
+**Pushed 2026-09-11**, at the end of Sprint 20 — verified with the command below, not assumed.
 
 This section was wrong in the most expensive possible way, and the shape of the mistake is worth
 keeping. It said "Pushed 2026-09-07 … that risk is closed", because the last commit to actually
@@ -693,8 +705,9 @@ checked**; re-check it, do not read it here.
 - Branch **`v2/foundations`**, tracking `origin/v2/foundations`.
 - Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
   branch tip against the document is what failed for four sprints.
-- **No pull request is open yet.** `gh` is not installed on this machine, so the PR has to be
-  opened in the browser:
+- **No pull request is open yet, so CI has never run on this branch** — it triggers on `main`
+  and on pull requests. Sprint 20's audit steps and bundle budget are untested in CI until it is.
+  `gh` is not installed on this machine, so the PR has to be opened in the browser:
   `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`
 - Two things a reviewer needs telling: it is a 211-file, +35,107-line change spanning eight
   sprints and is not reviewable as a single unit, and it **contains a deliberate rollback**
@@ -712,21 +725,35 @@ checked**; re-check it, do not read it here.
 
 `backups/README.md` is the full account. In short:
 
-- **A crashed container loses nothing** — the data is in the `pgdata` volume. Deleting the volume
-  is what loses it.
-- `make db-dump` writes ~40 MB gzipped in about eight seconds; `make db-restore DUMP=...` brings
-  it back in about five. **Verified** by restoring into a scratch database and comparing row
-  counts, extensions, indexes and the `GENERATED` tsvector table by table.
-- Dumps are **git-ignored**. `backups/schema.sql` (61 KB DDL) is committed and refreshed with
-  `make db-schema`.
-- **716,187 of 716,257 rows are derived** and rebuild from MongoDB with `make import-nsqf && make
-  seed`. Only **70 rows are irreplaceable** — users, profiles, analytics events. That ratio is why
-  rebuilding from source is the honest default today, and why it stops being sufficient the moment
-  real users arrive.
-- **MongoDB is covered by none of this.** It is the source of record for the corpus (ADR-034), and
-  if it is lost the taxonomy cannot be rebuilt from anything in this repository.
+- **A crashed container loses nothing** — the data is in Docker volumes. Deleting one loses it.
+- Since Sprint 20 every dump is **encrypted** (`IISM_BACKUP_PASSPHRASE`, openssl aes-256-cbc with
+  pbkdf2) and written to **`~/iism-backups`, outside the working tree**. `make db-dump` /
+  `db-restore` for Postgres, `make mongo-dump` / `mongo-restore` for MongoDB — **which had no
+  backup at all before**, although it is the corpus's only source (ADR-034).
+- **`make restore-drill`** dumps both, restores into scratch databases, compares exact counts and
+  drops them. **Run 2026-09-11, passed**: Postgres 36 tables, key counts identical; MongoDB 7
+  collections, every count identical.
+- **`backups/iism-20260907-1003.sql.gz` is a plaintext dump from before encryption**, holding real
+  accounts in the clear. Gitignored, never committed, still on disk. Left for the owner to delete
+  once an encrypted dump exists — not deleted on their behalf.
+- `backups/schema.sql` (DDL) is committed and refreshed with `make db-schema`.
+- Almost every Postgres row is derived and rebuilds from MongoDB with `make import-nsqf && make
+  seed`. People — accounts, consent, profiles, analytics — exist only in a dump.
 
 ## 11. What comes next
+
+**Sprint 21 — first deployment.** AWS **Mumbai (ap-south-1)** for data residency: Dockerfiles, ECS
+Fargate for api and worker, RDS Postgres with encryption at rest and automated backups,
+ElastiCache, CloudWatch with a set log retention, secrets in Secrets Manager. Organisation sign-in
+works on day one through **Amazon SES**; job-seeker sign-in waits for a **DLT-registered SMS
+sender**, which takes weeks — start it now. Deployment settings that must not be forgotten:
+`RATE_LIMIT_TRUST_FORWARDED=true` behind the ALB (and never without it), `PYTHONUNBUFFERED=1`,
+`IISM_BACKUP_PASSPHRASE` in Secrets Manager, and the CSP header switched from report-only to
+enforced once a production build runs clean. Field-level encryption (ADR-023) lands before résumés
+or Aadhaar are collected; neither is today.
+
+**Before any real user:** a named grievance officer, legal review of the privacy notice and terms,
+and the pull request opened so CI — including the new audit steps — actually runs on this branch.
 
 Matching works, is measured, and is now visible from both sides. What is missing is mostly
 **evidence and reach**, not mechanism.
@@ -816,16 +843,17 @@ Fixed since the last audit: the four missing filter indexes, and the browsers th
   number. It now logs `notification dispatched to +9198*****999 (63 chars)`.
 - Added composite indexes on the columns every listing filters by.
 
-**Still open, in rough priority order:**
-1. **No rate limiting outside the OTP path.** `/skills/search` runs a 4-way
-   UNION with trigram matching, completely unthrottled.
-2. **No security headers** — no HSTS, CSP, X-Frame-Options, X-Content-Type-
-   Options. Missing CSP matters more than usual because tokens sit in
-   `localStorage`, so any XSS is full account takeover.
-3. **No DPDP erasure or export endpoints.** Zero routes for deletion, export or
-   consent. Legally required in the target market.
-4. `/health/deep` is public and returns raw exception strings.
-5. No request body size limit; a 3 MB body is parsed before rejection.
+**Closed in Sprint 20 (2026-09-11):** rate limiting on every class of request
+(auth, write, read — per account when signed in, per IP otherwise, fails open);
+security headers on the API and the web app (the web CSP is **report-only** and
+still allows inline scripts — see `CLAUDE.md`); DPDP consent, export and erasure;
+a 256 KB request body cap; `/docs` and `/openapi.json` local-only; CORS without
+credentials.
+
+**Still open:**
+1. `/health/deep` is public and returns raw exception strings.
+2. The web CSP is not yet enforced, and enforcing it strictly needs nonces, which
+   need dynamic rendering.
 
 **Verified safe, so do not re-litigate:** SQL injection is not possible — the
 raw search query is fully parameterised and `x'; DROP TABLE skills; --` left
@@ -835,10 +863,10 @@ the logs. CORS is restricted to one origin.
 ## 12. Open risks — state these honestly, do not soften
 
 - ~~The work exists in one place.~~ **Re-closed 2026-09-09** — and it had quietly re-opened:
-  this line said "Closed 2026-09-07" while Sprints 11–14 sat unpushed. See §10. What
-  remains is that **MongoDB is backed up by nothing**: it is the source of record for the corpus
-  (ADR-034), it lives only in a local Docker volume, and if it is lost the taxonomy cannot be
-  rebuilt from anything in this repository or on GitHub.
+  this line said "Closed 2026-09-07" while Sprints 11–14 sat unpushed. See §10. MongoDB,
+  which it named as unbacked, gained encrypted dumps and a passed restore drill in Sprint 20 — but
+  the dumps are on this laptop, so a lost laptop still loses both copies until Sprint 21 puts them
+  somewhere else.
 
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.
@@ -884,8 +912,13 @@ are hard blockers rather than gaps.
 2. **No Dockerfile and no deploy target.** `infra/` holds a single `docker-compose.yml` for local
    Postgres, Redis and Mongo. There is no application image, no Terraform (ADR-028 defers it), and
    CI runs lint, typecheck, tests and the web build with nothing to ship them to.
-3. **MongoDB is backed up by nothing** (§12). Postgres has `make db-dump`/`db-restore`, verified.
-   Mongo is the source of record for the corpus and lives only in a local Docker volume.
+3. ~~MongoDB is backed up by nothing.~~ **Closed in Sprint 20**: encrypted dumps of both
+   databases and a passed restore drill (§10a). What remains is off-machine storage, which is
+   Sprint 21's.
+
+Also closed in Sprint 20, and would have been blockers: consent, export and erasure (DPDP Act
+2023), privacy notice / terms / grievance pages — **still drafts pending legal review, and the
+grievance officer is not yet named** — rate limiting, and security headers.
 
 **Required before real candidate data, not before a pilot instance.**
 

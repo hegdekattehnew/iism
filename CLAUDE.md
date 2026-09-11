@@ -256,6 +256,59 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 20 (safe to deploy) is done. No new product surface: the non-functional requirements that
+need no outside account — privacy law, web security, abuse protection, recovery, quality gates —
+closed before the first deployment in Sprint 21.
+
+- **Consent is a server-side record, not a checkbox.** `users.consent_version` / `consented_at`
+  (0018) hold which notice was agreed and when; a checkbox the API never hears about proves
+  nothing. Nullable and **not backfilled** — writing a version into old rows would fabricate
+  consent nobody gave. `PRIVACY_NOTICE_VERSION` lives in **both** `api/core/config.py` and
+  `web/src/lib/legal.ts`; a test compares them, because drift makes every signup fail with 428.
+  Change both together, and only when people must agree again.
+- **The phone path asks for consent *after* the code, never before.** Verification creates the
+  account, so an unknown number without the current version gets 428 `consent_required` — after
+  the code proves the caller holds the phone. Asking earlier would answer "is this number
+  registered?" to anyone (ADR-038). Org registration checks it up front, before any lookup, so the
+  answer is the same for a known and unknown address. **Sign-in never creates an account**: the
+  428 is shown as "no account yet — sign up".
+- **`api/modules/privacy/` depends on every module and nothing depends on it.** Export and erasure
+  span identity, the profile, listings and analytics; letting any of those reach into the others
+  would break ADR-014. Erasure deletes table by table rather than trusting cascades, clears
+  `analytics_events.user_id` (the events identify nobody once the account is gone), and revokes
+  refresh tokens **after** the commit. The only owner of an organisation others belong to is
+  **refused** (409) — deletion never leaves an organisation nobody can run.
+- **Hardening is middleware, for the Sprint 15 reason** — a guard each handler must remember is one
+  that eventually is not there. `SecurityHeaders`, `BodySizeLimit` and `RateLimit` are pure ASGI
+  like `RequestContextMiddleware`. **The limiter fails open**: an unreachable Redis must not become
+  an unavailable platform. Signed-in callers count per account, anonymous ones per IP, because
+  carrier-grade NAT puts many strangers behind one address. **`X-Forwarded-For` is ignored unless
+  `RATE_LIMIT_TRUST_FORWARDED=true`** — honouring it from anyone lets a client pick a fresh identity
+  per request; set it only behind the ALB. Tests disable the limiter in `conftest.py`; its own
+  tests switch it back on.
+- **`/docs` and `/openapi.json` exist in local environments only.** `make gen-api` reads the local
+  one. CORS no longer grants credentials — auth is a bearer header and no route uses a cookie.
+- **A 15-second statement timeout applies to every connection.** The seed, evaluate and
+  import-nsqf targets run with `DB_STATEMENT_TIMEOUT_MS=0`; a new long-running script needs the same.
+- **The web CSP ships report-only**, and still allows `'unsafe-inline'` scripts: Next's inline
+  bootstrap carries no nonce on statically rendered pages, and nonces force dynamic rendering.
+  Enforcing it is a deliberate trade against static rendering, not a header rename. Verified clean
+  in the browser console; switch the header name once a production build is clean too.
+- **A detail page calls `notFound()` only on a 404.** Every failure used to land there, so an API
+  outage told visitors the listing did not exist. `error.tsx` says "unavailable"; `global-error`
+  reads `messages/fatal.json` rather than both full catalogues.
+- **Form controls use `border-input-border`, not `border-border-token`.** The shared border is
+  1.23:1 on white — fine for a card, a WCAG 1.4.11 failure for an input you must find to type in.
+- **`a11y.test.tsx` runs axe with `color-contrast` off** — jsdom has no layout, so it would pass
+  everything. It includes a case proving axe *does* report a violation; keep it.
+- **The employer overview costs the same for one vacancy or forty.** It scored per job: 18
+  statements for one, 57 for four. `_candidates_for_jobs` batches; a test counts statements.
+- **Backups are encrypted and live outside the tree** (`~/iism-backups`, `IISM_BACKUP_PASSPHRASE`),
+  and MongoDB is finally covered. `make restore-drill` restores both into scratch databases and
+  compares exact counts — run and passed 2026-09-11. See `backups/README.md`.
+- **CI installs from `uv.lock` (`--locked`)** and audits both dependency trees; Dependabot opens
+  grouped weekly updates; a first-load JS budget (700 KB) runs after the build.
+
 Sprint 19 (every door opens onto all three) is done. `/signup/[type]` rendered exactly one form,
 fixed by the URL: arrive at `/signup/seeker` — from the chooser's first row, a bookmark, a typed
 address — and the page offered phone registration and nothing else, so an employer or a training
