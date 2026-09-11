@@ -13,7 +13,12 @@ from api.core.config import get_settings
 from api.core.database import dispose_engine
 from api.core.health import DeepHealth, check_database, check_redis, check_worker
 from api.core.logging import configure_logging
-from api.core.middleware import RequestContextMiddleware
+from api.core.middleware import (
+    BodySizeLimitMiddleware,
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from api.core.tasks import close_task_pool, get_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.geography import router as geography_router
@@ -29,6 +34,7 @@ from api.modules.marketplace import (
 )
 from api.modules.matching import employer_org_router, mount_employer_console
 from api.modules.matching import router as matching_router
+from api.modules.privacy import router as privacy_router
 from api.modules.skills import router as skills_router
 
 
@@ -71,22 +77,40 @@ app = FastAPI(
     title=_settings.app_name,
     version=_settings.app_version,
     lifespan=lifespan,
+    # Interactive docs are a map of every route, parameter and schema, handed to
+    # whoever asks. Useful on a laptop -- `make gen-api` reads `/openapi.json` --
+    # and a reconnaissance gift anywhere else. Same allowlist as the demo routes.
+    docs_url="/docs" if _settings.is_local else None,
+    redoc_url="/redoc" if _settings.is_local else None,
+    openapi_url="/openapi.json" if _settings.is_local else None,
 )
 
-# The web client is a separate origin in development.
+# `add_middleware` prepends, so these read inside-out. The resulting order,
+# outermost first:
+#
+#   RequestContext  -- every response, rejections included, gets an access line
+#                      and an x-request-id
+#   SecurityHeaders -- and every response, rejections included, gets the headers
+#   CORS            -- outside the two below, so a 413 or 429 still carries CORS
+#                      headers and the browser can read the status instead of
+#                      reporting an opaque network error
+#   BodySizeLimit
+#   RateLimit
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[_settings.web_base_url],
-    allow_credentials=True,
+    # False: authentication is a bearer header, and no route sets or reads a
+    # cookie. Allowing credentials across origins was a permission granted for
+    # nothing.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     # So the browser client can read the id and a bug report can quote it.
     expose_headers=["x-request-id"],
 )
-
-# Added last, so it runs outermost: `add_middleware` prepends. Every response
-# -- CORS preflights and 404s included -- therefore gets an access line and an
-# `x-request-id`.
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 app.include_router(skills_router)
@@ -102,6 +126,7 @@ app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)
 app.include_router(analytics_router)
+app.include_router(privacy_router)
 
 app.include_router(employer_org_router)
 

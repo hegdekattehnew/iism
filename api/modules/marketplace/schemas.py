@@ -49,8 +49,10 @@ class JobOut(BaseModel):
     slug: str
     title_en: str
     title_hi: str | None = None
-    description_en: str | None = None
-    description_hi: str | None = None
+    # Bounded on the way in, not in the column (free prose stays `Text`): the
+    # cap is about what one request may make us store and render, not the data.
+    description_en: str | None = Field(None, max_length=10_000)
+    description_hi: str | None = Field(None, max_length=10_000)
     location_state: str | None = None
     location_district: str | None = None
     employment_type: EmploymentType
@@ -92,8 +94,10 @@ class JobIn(BaseModel):
 
     title_en: str = Field(min_length=3, max_length=200)
     title_hi: str | None = Field(None, max_length=200)
-    description_en: str | None = None
-    description_hi: str | None = None
+    # Bounded on the way in, not in the column (free prose stays `Text`): the
+    # cap is about what one request may make us store and render, not the data.
+    description_en: str | None = Field(None, max_length=10_000)
+    description_hi: str | None = Field(None, max_length=10_000)
     location_state: str | None = Field(None, max_length=120)
     location_district: str | None = Field(None, max_length=120)
     employment_type: EmploymentType = "full_time"
@@ -102,7 +106,7 @@ class JobIn(BaseModel):
     salary_min_inr: int | None = Field(None, ge=0)
     salary_max_inr: int | None = Field(None, ge=0)
     nsqf_level_min: NsqfLevelIn | None = None
-    skills: list[JobSkillIn] = Field(default_factory=list)
+    skills: list[JobSkillIn] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
     def _ranges_are_the_right_way_round(self) -> "JobIn":
@@ -139,8 +143,10 @@ class CourseOut(BaseModel):
     slug: str
     title_en: str
     title_hi: str | None = None
-    description_en: str | None = None
-    description_hi: str | None = None
+    # Bounded on the way in, not in the column (free prose stays `Text`): the
+    # cap is about what one request may make us store and render, not the data.
+    description_en: str | None = Field(None, max_length=10_000)
+    description_hi: str | None = Field(None, max_length=10_000)
     mode: CourseMode
     language: CourseLanguage
     duration_hours: int | None = None
@@ -176,14 +182,16 @@ class CourseIn(BaseModel):
 
     title_en: str = Field(min_length=3, max_length=200)
     title_hi: str | None = Field(None, max_length=200)
-    description_en: str | None = None
-    description_hi: str | None = None
+    # Bounded on the way in, not in the column (free prose stays `Text`): the
+    # cap is about what one request may make us store and render, not the data.
+    description_en: str | None = Field(None, max_length=10_000)
+    description_hi: str | None = Field(None, max_length=10_000)
     mode: CourseMode = "offline"
     language: CourseLanguage = "both"
     duration_hours: int | None = Field(None, ge=1, le=10_000)
     fee_inr: int | None = Field(None, ge=0)
     nsqf_level: NsqfLevelIn | None = None
-    skills: list[CourseSkillIn] = Field(default_factory=list)
+    skills: list[CourseSkillIn] = Field(default_factory=list, max_length=50)
 
 
 class OrgCourseOut(CourseDetail):

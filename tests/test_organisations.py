@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import ROLE_PERMISSIONS, Permission
 from api.core.cache import get_redis
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.geography.models import State
 from api.modules.identity import Membership, Tenant
 from api.modules.marketplace.models import Job
@@ -89,7 +90,11 @@ async def _clear_otp_state():
 async def _headers_for_phone(client: AsyncClient, phone: str | None = None) -> dict[str, str]:
     phone = phone or _phone()
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
-    body = (await client.post("/auth/otp/verify", json={"phone": phone, "code": code})).json()
+    body = (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
+    ).json()
     return {"authorization": f"Bearer {body['access_token']}"}
 
 
@@ -100,7 +105,12 @@ async def _register_org(
     address = address or _email()
     requested = await client.post(
         "/auth/org/register",
-        json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+        json={
+            "email": address,
+            "organisation_name": name,
+            "tenant_type": "employer",
+            "consent_version": CONSENT,
+        },
     )
     code = requested.json()["debug_code"]
     tokens = (
@@ -223,6 +233,7 @@ class TestOrganisationRegistration:
             "email": address,
             "organisation_name": "Whoever",
             "tenant_type": "employer",
+            "consent_version": CONSENT,
         }
         first = await client.post("/auth/org/register", json=payload)
         second = await client.post("/auth/org/register", json=payload)
@@ -238,7 +249,12 @@ class TestOrganisationRegistration:
         for name in ("Real Clinic", "Impostor Clinic"):
             await client.post(
                 "/auth/org/register",
-                json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+                json={
+                    "email": address,
+                    "organisation_name": name,
+                    "tenant_type": "employer",
+                    "consent_version": CONSENT,
+                },
             )
 
         assert await db.scalar(select(Tenant).where(Tenant.name == "Impostor Clinic")) is None

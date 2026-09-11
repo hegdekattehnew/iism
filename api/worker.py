@@ -21,9 +21,12 @@ which is why the settings class there is no longer the documented entrypoint.
 
 from typing import Any
 
+from arq import cron
+
 from api.core.logging import configure_logging, dict_config
 from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
+from api.modules.analytics.tasks import purge_expired_analytics
 
 # Named on the command line as `arq --custom-log-dict api.worker.LOG_CONFIG`.
 # arq applies exactly one logging config and it applies it *before* the worker
@@ -55,7 +58,12 @@ class WorkerSettings:
     `on_startup`, which is where logging gets configured."""
 
     functions = _Tasks.functions
-    cron_jobs = _Tasks.cron_jobs
+    # Registered here, the composition root, rather than in `core/tasks.py`:
+    # core must not import a feature module. 21:30 UTC is 03:00 in India.
+    cron_jobs = [
+        *_Tasks.cron_jobs,
+        cron(purge_expired_analytics, hour={21}, minute={30}, run_at_startup=False),
+    ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings
     keep_result = _Tasks.keep_result

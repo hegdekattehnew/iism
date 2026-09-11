@@ -28,10 +28,22 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
+        # Explicit, not SQLAlchemy's silent 5+10 with a 30-second wait: a pool
+        # sized by nobody is a pool nobody can reason about under load, and a
+        # request that waits half a minute for a connection has already failed.
+        server_settings = (
+            {"statement_timeout": str(settings.db_statement_timeout_ms)}
+            if settings.db_statement_timeout_ms > 0
+            else {}
+        )
         _engine = create_async_engine(
             settings.database_url,
             echo=settings.db_echo,
             pool_pre_ping=True,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_timeout=settings.db_pool_timeout_seconds,
+            connect_args={"server_settings": server_settings},
         )
     return _engine
 

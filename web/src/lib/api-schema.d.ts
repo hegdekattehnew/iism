@@ -925,6 +925,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/account/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export My Data
+         * @description Everything held about the caller, as one JSON document (DPDP Act 2023).
+         */
+        get: operations["export_my_data_me_account_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/account/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Deletion
+         * @description What deleting this account would take with it. Changes nothing.
+         */
+        get: operations["preview_deletion_me_account_deletion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete My Account
+         * @description Erase the account. Irreversible; the client shows the preview first.
+         */
+        delete: operations["delete_my_account_me_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates": {
         parameters: {
             query?: never;
@@ -1531,6 +1591,22 @@ export interface components {
             version: string;
             /** Components */
             components: components["schemas"]["ComponentHealth"][];
+        };
+        /**
+         * DeletionPreview
+         * @description What deleting this account takes with it -- shown *before* confirming.
+         *
+         *     `organisations_deleted`: organisations this person is the only member of.
+         *     Nobody else can administer them, so they and their listings are removed.
+         *     `blocked_by`: organisations where others remain but nobody else is an
+         *     owner. Deleting would leave them unowned, so deletion is refused until
+         *     ownership is passed on.
+         */
+        DeletionPreview: {
+            /** Organisations Deleted */
+            organisations_deleted: components["schemas"]["OrganisationFate"][];
+            /** Blocked By */
+            blocked_by: components["schemas"]["OrganisationFate"][];
         };
         /** DistrictOut */
         DistrictOut: {
@@ -2163,6 +2239,8 @@ export interface components {
              * @enum {string}
              */
             tenant_type: "employer" | "course_provider";
+            /** Consent Version */
+            consent_version: string;
         };
         /**
          * OrgRegisterResponse
@@ -2182,6 +2260,15 @@ export interface components {
             debug_code?: string | null;
             /** Organisation Slug */
             organisation_slug?: string | null;
+        };
+        /** OrganisationFate */
+        OrganisationFate: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Listings */
+            listings: number;
         };
         /**
          * OrganisationIn
@@ -2260,6 +2347,8 @@ export interface components {
             phone: string;
             /** Code */
             code: string;
+            /** Consent Version */
+            consent_version?: string | null;
         };
         /** PerformanceElementOut */
         PerformanceElementOut: {
@@ -2664,6 +2753,10 @@ export interface components {
             phone_verified_at?: string | null;
             /** Email Verified At */
             email_verified_at?: string | null;
+            /** Consent Version */
+            consent_version?: string | null;
+            /** Consented At */
+            consented_at?: string | null;
             /** Preferred Locale */
             preferred_locale: string;
             /** Memberships */
@@ -4476,6 +4569,66 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    export_my_data_me_account_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    preview_deletion_me_account_deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionPreview"];
+                };
+            };
+        };
+    };
+    delete_my_account_me_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

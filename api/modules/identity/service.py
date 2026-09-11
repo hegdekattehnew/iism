@@ -114,9 +114,29 @@ async def request_email_otp(address: str) -> tuple[int, str | None]:
 # ------------------------------------------------------------------ candidates
 
 
-async def provision_candidate(db: AsyncSession, phone: str) -> User:
+def require_current_consent(version: str | None, *, status_code: int) -> None:
+    """Refuse unless `version` is the notice currently in force.
+
+    A stale version means the form someone agreed to is not the text in force
+    now, and recording it would record consent to something else.
+    """
+    if version != get_settings().privacy_notice_version:
+        raise HTTPException(status_code, "consent_required")
+
+
+def record_consent(user: User, version: str) -> None:
+    user.consent_version = version
+    user.consented_at = datetime.now(UTC)
+
+
+async def provision_candidate(
+    db: AsyncSession, phone: str, consent_version: str | None = None
+) -> User:
     """A candidate account and its personal tenant, in one go (ADR-010)."""
     user = User(phone=phone, phone_verified_at=datetime.now(UTC))
+    if consent_version is not None:
+        # The seed provisions demo candidates with no consent to record.
+        record_consent(user, consent_version)
     db.add(user)
     await db.flush()
 
@@ -134,7 +154,7 @@ async def provision_candidate(db: AsyncSession, phone: str) -> User:
 
 
 async def verify_otp_and_sign_in(
-    db: AsyncSession, phone: str, code: str
+    db: AsyncSession, phone: str, code: str, consent_version: str | None = None
 ) -> tuple[User, TokenPair, bool]:
     """Verify the code, creating the account on first successful sign-in.
 
@@ -149,10 +169,25 @@ async def verify_otp_and_sign_in(
     user = await db.scalar(select(User).where(User.phone == phone))
     created = False
     if user is None:
-        user = await provision_candidate(db, phone)
+        # This path creates accounts, so it is where consent is recorded. The
+        # check runs *after* the code is verified: the caller has proved they
+        # hold the phone, so "this number has no account yet" tells them
+        # nothing they could not learn from their own messages. Asking earlier
+        # would make the request an enumeration oracle (ADR-038). The code is
+        # consumed either way; the client asks for consent and a fresh code.
+        require_current_consent(consent_version, status_code=status.HTTP_428_PRECONDITION_REQUIRED)
+        assert consent_version is not None  # noqa: S101 - narrowed by the check above
+        user = await provision_candidate(db, phone, consent_version)
         created = True
     elif user.phone_verified_at is None:
         user.phone_verified_at = datetime.now(UTC)
+    if (
+        consent_version == get_settings().privacy_notice_version
+        and user.consent_version != consent_version
+    ):
+        # An existing account agreeing through a form that records it -- the
+        # only way an account created before Sprint 20 gains a consent record.
+        record_consent(user, consent_version)
 
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
@@ -263,7 +298,7 @@ async def provision_organisation(
 
 
 async def register_organisation(
-    db: AsyncSession, address: str, name: str, tenant_type: str
+    db: AsyncSession, address: str, name: str, tenant_type: str, consent_version: str
 ) -> tuple[int, str | None]:
     """Cold registration: an email address that may or may not already exist.
 
@@ -282,12 +317,16 @@ async def register_organisation(
     `_PENDING_ORG_KEY` -- and created on the existing account once the code
     proves the address is theirs.
     """
+    # Before any lookup, so a missing or stale version gets the same answer
+    # whether or not the address already has an account.
+    require_current_consent(consent_version, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
     settings = get_settings()
     await enforce_otp_rate_limit("email", address)
 
     existing = await db.scalar(select(User).where(func.lower(User.email) == address.lower()))
     if existing is None:
         user = User(email=address)
+        record_consent(user, consent_version)
         db.add(user)
         await db.flush()
         await provision_organisation(db, user, name, tenant_type)

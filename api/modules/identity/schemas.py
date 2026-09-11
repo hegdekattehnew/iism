@@ -58,6 +58,10 @@ class OtpRequestResponse(BaseModel):
 class OtpVerify(BaseModel):
     phone: PhoneStr
     code: str = Field(min_length=4, max_length=8)
+    # Required only when this verification *creates* an account -- the phone
+    # path provisions on first successful sign-in. Signing in to an existing
+    # account needs no fresh consent.
+    consent_version: str | None = Field(default=None, max_length=32)
 
     @field_validator("phone")
     @classmethod
@@ -90,6 +94,9 @@ class OrgRegisterRequest(BaseModel):
     email: EmailStr
     organisation_name: Annotated[str, Field(min_length=2, max_length=120)]
     tenant_type: OrgTenantType = "employer"
+    # Required, and checked before any lookup: the answer for a missing or stale
+    # version must not depend on whether the address already has an account.
+    consent_version: Annotated[str, Field(min_length=1, max_length=32)]
 
     @field_validator("email", mode="after")
     @classmethod
@@ -249,5 +256,7 @@ class UserOut(BaseModel):
     # one merely typed in. Both look the same otherwise, and the difference is
     # what a second credential is for.
     email_verified_at: datetime | None = None
+    consent_version: str | None = None
+    consented_at: datetime | None = None
     preferred_locale: str
     memberships: list[MembershipOut] = Field(default_factory=list)

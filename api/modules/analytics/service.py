@@ -13,9 +13,11 @@ been committed. Every current caller is a read endpoint.
 """
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
 import structlog
+from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics.models import EVENT_NAMES, AnalyticsEvent
@@ -60,3 +62,19 @@ async def record(
         log.exception("analytics.record_failed", event_name=name)
         # Leave the session usable for whatever the handler does next.
         await db.rollback()
+
+
+async def purge_expired(db: AsyncSession, *, older_than_days: int) -> int:
+    """Delete events older than the retention period. Returns how many went.
+
+    Events carry no name, phone or email, but they are tied to an account, and
+    data kept "in case" is data held without a purpose (DPDP Act 2023). Nothing
+    ever deleted them before.
+    """
+    result = await db.execute(
+        delete(AnalyticsEvent).where(
+            AnalyticsEvent.occurred_at < func.now() - timedelta(days=older_than_days)
+        )
+    )
+    await db.commit()
+    return int(getattr(result, "rowcount", 0) or 0)

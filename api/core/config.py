@@ -9,6 +9,11 @@ MIN_JWT_SECRET_BYTES = 32
 _DEFAULT_SECRET = "change-me-in-production"  # noqa: S105 - a placeholder, not a secret
 LOCAL_ENVIRONMENTS = frozenset({"development", "test"})
 
+# The privacy notice and terms a new account agrees to. Bump it whenever either
+# text changes: consent is recorded against a version, and consent to a notice
+# nobody can identify later is consent nobody can prove (DPDP Act 2023).
+PRIVACY_NOTICE_VERSION = "2026-09-11"
+
 
 class Settings(BaseSettings):
     """Environment-driven configuration. Never hardcode secrets (ADR-023)."""
@@ -57,6 +62,38 @@ class Settings(BaseSettings):
     # machine-readable format. `.env.example` sets `console` for development,
     # where a human is the reader.
     log_format: Literal["json", "console"] = "json"
+
+    # --- privacy (DPDP Act 2023) ---
+    privacy_notice_version: str = PRIVACY_NOTICE_VERSION
+    # Analytics events carry no name, phone or email, but they are tied to an
+    # account, and data kept "just in case" is data held without a purpose.
+    analytics_retention_days: int = 365
+
+    # --- abuse protection ---
+    # Per minute. Signed-in requests are limited per *user*, anonymous ones per
+    # IP: Indian mobile carriers put many subscribers behind one address (CGNAT),
+    # and a per-IP limit alone would throttle strangers for each other.
+    rate_limit_enabled: bool = True
+    rate_limit_reads_per_minute: int = 300
+    rate_limit_writes_per_minute: int = 60
+    rate_limit_auth_per_minute: int = 30
+    # MUST be true behind a load balancer. Otherwise every request appears to
+    # come from the balancer itself and the whole platform shares one bucket.
+    # False by default because trusting the header without a proxy in front lets
+    # any caller choose their own identity for the limiter.
+    rate_limit_trust_forwarded: bool = False
+    # JSON only. A job description is a few kilobytes; nothing legitimate needs
+    # more, and an unbounded body is a cheap way to exhaust a worker's memory.
+    max_request_body_bytes: int = 256 * 1024
+
+    # --- database pool ---
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout_seconds: int = 10
+    # A runaway query holds a connection until it finishes. 0 disables it; the
+    # Makefile does exactly that for the importer and the seed, which run
+    # legitimately long statements through this same engine.
+    db_statement_timeout_ms: int = 15000
 
     @property
     def is_development(self) -> bool:

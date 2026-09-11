@@ -84,6 +84,14 @@ class User(Base):
         DateTime(timezone=True), default=None
     )
 
+    # Which privacy notice and terms this person agreed to, and when (DPDP Act
+    # 2023). Consent has to be provable, and consent to a text nobody can
+    # identify later proves nothing. Null for accounts created before Sprint 20:
+    # they never agreed through a recorded notice, and a backfilled version
+    # would fabricate a record of something that did not happen.
+    consent_version: Mapped[str | None] = mapped_column(default=None)
+    consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
     is_active: Mapped[bool] = mapped_column(default=True)
     preferred_locale: Mapped[str] = mapped_column(default="en")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

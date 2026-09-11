@@ -14,6 +14,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.identity import Tenant, User
 from api.modules.marketplace.models import CandidateProfile
 from api.modules.skills.models import Skill
@@ -83,6 +84,7 @@ class TestNoSecondAccount:
                 "email": address,
                 "organisation_name": "Fork Test Clinic",
                 "tenant_type": "employer",
+                "consent_version": CONSENT,
             },
         )
         assert response.status_code == 200
@@ -110,6 +112,7 @@ class TestNoSecondAccount:
                 "email": address,
                 "organisation_name": "Stranger Clinic",
                 "tenant_type": "employer",
+                "consent_version": CONSENT,
             },
         )
         assert response.json()["sent"] is True
@@ -126,6 +129,7 @@ class TestNoSecondAccount:
                 "email": _email(),
                 "organisation_name": "Stale Clinic",
                 "tenant_type": "employer",
+                "consent_version": CONSENT,
             },
         )
         assert response.status_code == 200
@@ -194,7 +198,10 @@ class TestVerificationSaysWhatHappened:
                 "debug_code"
             ]
             body = (
-                await client.post("/auth/otp/verify", json={"phone": phone, "code": code})
+                await client.post(
+                    "/auth/otp/verify",
+                    json={"phone": phone, "code": code, "consent_version": CONSENT},
+                )
             ).json()
             assert body["created"] is expected
 
@@ -209,6 +216,7 @@ class TestVerificationSaysWhatHappened:
                     "email": address,
                     "organisation_name": "Landing Clinic",
                     "tenant_type": "employer",
+                    "consent_version": CONSENT,
                 },
             )
         ).json()["debug_code"]
@@ -223,7 +231,12 @@ class TestVerificationSaysWhatHappened:
         address still produce the same keys."""
         address = _email()
         await _register_org(client, "Known Clinic", address)
-        payload = {"email": address, "organisation_name": "Whoever", "tenant_type": "employer"}
+        payload = {
+            "email": address,
+            "organisation_name": "Whoever",
+            "tenant_type": "employer",
+            "consent_version": CONSENT,
+        }
         known = await client.post("/auth/org/register", json=payload)
         fresh = await client.post("/auth/org/register", json={**payload, "email": _email()})
         assert set(known.json()) == set(fresh.json())
@@ -249,6 +262,7 @@ class TestTheTypedNameIsNotDiscarded:
                     "email": address,
                     "organisation_name": "Second Clinic",
                     "tenant_type": "course_provider",
+                    "consent_version": CONSENT,
                 },
             )
         ).json()["debug_code"]
@@ -325,7 +339,9 @@ class TestCredentialLinking:
             await client.post("/me/credentials/phone", headers=headers, json={"phone": phone})
         ).json()["debug_code"]
         clash = await client.post(
-            "/me/credentials/phone/verify", headers=headers, json={"phone": phone, "code": code}
+            "/me/credentials/phone/verify",
+            headers=headers,
+            json={"phone": phone, "code": code},
         )
         assert clash.status_code == 409
 
@@ -350,7 +366,11 @@ class TestCredentialLinking:
 
 async def _sign_in_by_phone(client: AsyncClient, phone: str) -> dict:
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
-    return (await client.post("/auth/otp/verify", json={"phone": phone, "code": code})).json()
+    return (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
+    ).json()
 
 
 # --------------------------------------------------------------- untested routes

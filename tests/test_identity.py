@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.cache import get_redis
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.identity import Membership, Tenant, User, normalise_phone
 
 
@@ -31,7 +32,9 @@ async def _sign_in(client: AsyncClient, phone: str | None = None) -> tuple[str, 
     phone = phone or _phone()
     req = await client.post("/auth/otp/request", json={"phone": phone})
     code = req.json()["debug_code"]
-    res = await client.post("/auth/otp/verify", json={"phone": phone, "code": code})
+    res = await client.post(
+        "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+    )
     body = res.json()
     return body["access_token"], body["refresh_token"], phone
 
@@ -51,7 +54,9 @@ async def test_verify_accepts_a_different_format_than_requested(
     phone = _phone()
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
     spaced = f"+91 {phone[:5]} {phone[5:]}"
-    res = await client.post("/auth/otp/verify", json={"phone": spaced, "code": code})
+    res = await client.post(
+        "/auth/otp/verify", json={"phone": spaced, "code": code, "consent_version": CONSENT}
+    )
     assert res.status_code == 200
 
 
@@ -72,7 +77,9 @@ async def test_otp_request_rejects_a_short_number(client: AsyncClient) -> None:
 async def test_wrong_code_is_rejected(client: AsyncClient) -> None:
     phone = _phone()
     await client.post("/auth/otp/request", json={"phone": phone})
-    res = await client.post("/auth/otp/verify", json={"phone": phone, "code": "000000"})
+    res = await client.post(
+        "/auth/otp/verify", json={"phone": phone, "code": "000000", "consent_version": CONSENT}
+    )
     assert res.status_code == 401
 
 
@@ -80,17 +87,21 @@ async def test_code_cannot_be_replayed(client: AsyncClient) -> None:
     phone = _phone()
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
     assert (
-        await client.post("/auth/otp/verify", json={"phone": phone, "code": code})
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
     ).status_code == 200
     assert (
-        await client.post("/auth/otp/verify", json={"phone": phone, "code": code})
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
     ).status_code == 401
 
 
 async def test_brute_force_is_blocked_after_five_attempts(client: AsyncClient) -> None:
     phone = _phone()
     await client.post("/auth/otp/request", json={"phone": phone})
-    codes = [{"phone": phone, "code": "000000"} for _ in range(5)]
+    codes = [{"phone": phone, "code": "000000", "consent_version": CONSENT} for _ in range(5)]
     for payload in codes:
         assert (await client.post("/auth/otp/verify", json=payload)).status_code == 401
     assert (await client.post("/auth/otp/verify", json=codes[0])).status_code == 429

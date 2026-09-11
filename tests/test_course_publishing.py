@@ -18,6 +18,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.identity import Tenant
 from api.modules.skills.models import Skill
 
@@ -66,7 +67,12 @@ async def _provider(client: AsyncClient, db: AsyncSession, name: str) -> tuple[d
     address = _email()
     requested = await client.post(
         "/auth/org/register",
-        json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+        json={
+            "email": address,
+            "organisation_name": name,
+            "tenant_type": "employer",
+            "consent_version": CONSENT,
+        },
     )
     code = requested.json()["debug_code"]
     tokens = (
@@ -88,7 +94,12 @@ async def _employer(client: AsyncClient, name: str) -> tuple[dict[str, str], str
     address = _email()
     requested = await client.post(
         "/auth/org/register",
-        json={"email": address, "organisation_name": name, "tenant_type": "employer"},
+        json={
+            "email": address,
+            "organisation_name": name,
+            "tenant_type": "employer",
+            "consent_version": CONSENT,
+        },
     )
     code = requested.json()["debug_code"]
     tokens = (

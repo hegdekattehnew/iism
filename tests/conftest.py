@@ -34,6 +34,9 @@ def _environment(_containers: tuple[str, str]) -> Iterator[None]:
     os.environ["DATABASE_URL"] = db_url
     os.environ["REDIS_URL"] = redis_url
     os.environ["ENVIRONMENT"] = "test"
+    # Every test shares one client address, so the suite's own traffic would trip
+    # the limiter within a few files. The limiter's tests switch it back on.
+    os.environ["RATE_LIMIT_ENABLED"] = "false"
     # A real-length key: PyJWT warns below 32 bytes for HMAC-SHA256, and the
     # warning is worth keeping meaningful rather than muting.
     os.environ["JWT_SECRET_KEY"] = "test-only-key-" + "x" * 40

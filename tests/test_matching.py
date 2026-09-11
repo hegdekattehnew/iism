@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
@@ -193,7 +194,11 @@ async def _auth(client: AsyncClient) -> dict[str, str]:
     """Same shape as tests/test_profile.py, so sign-in behaves identically."""
     phone = "9" + uuid.uuid4().int.__str__()[:9]
     code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
-    body = (await client.post("/auth/otp/verify", json={"phone": phone, "code": code})).json()
+    body = (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
+    ).json()
     return {"authorization": f"Bearer {body['access_token']}"}
 
 

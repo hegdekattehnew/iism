@@ -56,7 +56,9 @@ async def request_otp(payload: schemas.OtpRequest) -> schemas.OtpRequestResponse
 async def verify_otp(
     payload: schemas.OtpVerify, db: AsyncSession = Depends(get_db_session)
 ) -> schemas.SignInOut:
-    _, tokens, created = await service.verify_otp_and_sign_in(db, payload.phone, payload.code)
+    _, tokens, created = await service.verify_otp_and_sign_in(
+        db, payload.phone, payload.code, payload.consent_version
+    )
     return _signed_in(tokens, created=created)
 
 
@@ -116,7 +118,11 @@ async def register_organisation(
             sent=False, expires_in_seconds=0, organisation_slug=tenant.slug
         )
     ttl, debug_code = await service.register_organisation(
-        db, payload.email, payload.organisation_name, payload.tenant_type
+        db,
+        payload.email,
+        payload.organisation_name,
+        payload.tenant_type,
+        payload.consent_version,
     )
     return schemas.OrgRegisterResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
 
