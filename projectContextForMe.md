@@ -79,6 +79,11 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 19 (every door opens onto all three) — complete, 2026-09-11.** The registration page at
+`/signup/[type]` now switches between job seeker, employer and training provider in place, instead
+of committing whoever arrived to the type in the URL. Links, not a toggle; the form is keyed so
+switching gives a clean one. No backend change — registration already handled all three.
+
 **Sprint 18 (one identity, honestly) — complete, 2026-09-11.** Prompted by three defects found by
 hand: "profile" inside an organisation opened the candidate editor; re-registering an existing
 number silently signed you in; there seemed to be no way to be only an organisation. All three

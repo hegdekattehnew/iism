@@ -94,8 +94,16 @@ export const orgMock = {
 function Link({
   href,
   children,
+  replace,
   ...rest
-}: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode }) {
+}: AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string;
+  children: ReactNode;
+  replace?: boolean;
+}) {
+  // `replace` is a navigation option, not an anchor attribute; forwarding it
+  // makes React warn about a non-boolean attribute on <a>.
+  void replace;
   return (
     <a href={href} {...rest}>
       {children}

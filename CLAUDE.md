@@ -256,6 +256,23 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 19 (every door opens onto all three) is done. `/signup/[type]` rendered exactly one form,
+fixed by the URL: arrive at `/signup/seeker` — from the chooser's first row, a bookmark, a typed
+address — and the page offered phone registration and nothing else, so an employer or a training
+provider who landed there had to find the Back button.
+
+- **The registration page carries its own type switch** (`SignUpTypeSwitch`): *Find work · Hire ·
+  Offer training*, framed as what you are here to do, like `RoleChooser`. **Plain links, not a
+  client toggle** — the type is still in the URL, so `/signup/employer` stays linkable from the
+  audience pages; switching needs no JavaScript on the target device; and `replace` keeps three taps
+  from becoming three Back presses.
+- **`SignUpForm` is keyed by `type`.** Switching reuses the same route with a new param, and without
+  the key React keeps the form's state — a phone number typed as a job seeker reappears in the
+  employer's email field, and a code already sent stays on screen. Verified in a browser: type a
+  number, switch to Hire, and the email field is empty.
+- **`/signup` stays the neutral entry** — the header, the closing band and sign-in all point there.
+  The switch is for people who arrived at a specific type and meant another.
+
 Sprint 18 (one identity, honestly) is done. Three defects found by hand in one sitting were one
 defect: the product models three actor types and one identity holding several roles, and the
 interface assumed the job-seeker case. A scan found seven more of the same family.

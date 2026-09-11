@@ -731,7 +731,12 @@
     "existingHintPhone": "Already registered with this number? We will simply sign you in — nothing is duplicated.",
     "existingHintEmail": "Already registered with this address? Entering the code signs you in and adds the new organisation to that same account.",
     "alreadySignedIn": "You are already signed in.",
-    "continue": "Continue"
+    "continue": "Continue",
+    "switch": {
+      "seeker": "Find work",
+      "employer": "Hire",
+      "provider": "Offer training"
+    }
   },
   "providerWorkspace": {
     "yourCourses": "Your courses",
