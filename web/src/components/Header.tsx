@@ -1,13 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AuthNav } from "@/components/AuthNav";
 import { ContextSwitcher, useActiveOrg } from "@/components/ContextSwitcher";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { Logo } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { SEEKER, rememberContext } from "@/lib/context";
 import { useOrgType } from "@/lib/org";
 
 /** What a job seeker is here to do. Also what an anonymous visitor sees. */
@@ -23,16 +24,14 @@ const SEEKER_NAV = [
  *  than going somewhere that happens to be an organisation.
  *
  *  A training provider used to be shown "Vacancies", which is not a thing they
- *  can have. */
+ *  can have.
+ *
+ *  The organisation's profile is not here: it is the header's *profile* control
+ *  (`AuthNav`), in the slot "My profile" occupies for a job seeker, so the same
+ *  place means the same thing in every context. */
 const ORG_NAV = {
-  employer: [
-    { key: "vacancies", href: "" },
-    { key: "settings", href: "/settings" },
-  ],
-  course_provider: [
-    { key: "courses_org", href: "" },
-    { key: "settings", href: "/settings" },
-  ],
+  employer: [{ key: "vacancies", href: "" }],
+  course_provider: [{ key: "courses_org", href: "" }],
 } as const;
 
 export function Header() {
@@ -40,12 +39,28 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const activeOrg = useActiveOrg();
   const orgType = useOrgType(activeOrg);
+  const pathname = usePathname();
+  // Inside an organisation, its nav -- once we know what kind it is. The old
+  // fallback, `ORG_NAV[orgType ?? "employer"]`, showed a training provider
+  // "Vacancies" on every first paint, because `orgType` is null until
+  // `/auth/me` resolves. The same fix `ContextSwitcher` already made: show
+  // nothing rather than something wrong.
   const nav: { key: string; href: string }[] = activeOrg
-    ? ORG_NAV[orgType ?? "employer"].map(({ key, href }) => ({
-        key,
-        href: `/employer/${activeOrg}${href}`,
-      }))
+    ? orgType
+      ? ORG_NAV[orgType].map(({ key, href }) => ({
+          key,
+          href: `/employer/${activeOrg}${href}`,
+        }))
+      : []
     : SEEKER_NAV.map(({ key, href }) => ({ key, href }));
+
+  // Remember which side of the account was last used, so signing in lands a
+  // dual-role person where they left off instead of always on `/matches`.
+  // A preference, not an authority -- see `lib/context.ts`.
+  useEffect(() => {
+    if (activeOrg) rememberContext(activeOrg);
+    else if (/^\/(matches|profile)(\/|$)/.test(pathname)) rememberContext(SEEKER);
+  }, [activeOrg, pathname]);
   // Closed on click rather than in an effect keyed to the path: the effect form
   // sets state during render-commit, which React 19 flags.
   const close = () => setOpen(false);

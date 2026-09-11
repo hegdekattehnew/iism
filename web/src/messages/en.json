@@ -15,7 +15,6 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "vacancies": "Vacancies",
-    "settings": "Settings",
     "courses_org": "Courses"
   },
   "hero": {
@@ -303,7 +302,9 @@
     "identifierPlaceholder": "98765 43210 or you@example.com",
     "errorInvalidId": "That does not look like a mobile number or an email address.",
     "noAccount": "No account yet?",
-    "signUpInstead": "Sign up"
+    "signUpInstead": "Sign up",
+    "orgProfile": "Organisation profile",
+    "myWorkspace": "My workspace"
   },
   "profilePage": {
     "title": "My profile",
@@ -726,7 +727,11 @@
     "signInInstead": "Sign in",
     "errorInvalid": "Check the details and try again.",
     "errorBadCode": "That code is incorrect or has expired.",
-    "errorGeneric": "Something went wrong. Try again."
+    "errorGeneric": "Something went wrong. Try again.",
+    "existingHintPhone": "Already registered with this number? We will simply sign you in — nothing is duplicated.",
+    "existingHintEmail": "Already registered with this address? Entering the code signs you in and adds the new organisation to that same account.",
+    "alreadySignedIn": "You are already signed in.",
+    "continue": "Continue"
   },
   "providerWorkspace": {
     "yourCourses": "Your courses",
@@ -793,5 +798,13 @@
     "signedInAs": "Signed in as {who}",
     "goToProfile": "My profile",
     "goToMatches": "My matches"
+  },
+  "returning": {
+    "back": "Welcome back — you already had an account, so we signed you in."
+  },
+  "seekerOnly": {
+    "title": "This is an organisation account",
+    "body": "Matches and a candidate profile belong to accounts that signed up to look for work.",
+    "goToWorkspace": "Go to my workspace"
   }
 }

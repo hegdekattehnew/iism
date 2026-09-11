@@ -3,20 +3,38 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 
+import { useActiveOrg } from "@/components/ContextSwitcher";
 import { ButtonLink, buttonVariants } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, getRefreshToken, useIsSignedIn } from "@/lib/auth";
+import { cn } from "@/lib/cn";
+import { forgetContext } from "@/lib/context";
+import { useMemberships } from "@/lib/org";
 
-/** Header auth controls. Rendered client-side, because whether someone is
- *  signed in is only knowable in the browser. */
+/**
+ * Header auth controls. Rendered client-side, because whether someone is
+ * signed in is only knowable in the browser.
+ *
+ * **Signed in, the "profile" slot follows the context the person is standing
+ * in.** It used to render "My matches" and "My profile" for every signed-in
+ * identity, unconditionally -- so inside `/employer/tnt` the header showed the
+ * organisation's nav in the middle and the job seeker's buttons on the right,
+ * and "My profile" took an organisation owner to the candidate editor. This was
+ * the only signed-in header component that never asked what the account holds.
+ *
+ * Inside an organisation you belong to: that organisation's profile. Outside
+ * one: matches and profile, but only for an account that signed up to look for
+ * work. An organisation-only account never sees the job-seeker side.
+ */
 export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("auth");
   const tn = useTranslations("nav");
   const router = useRouter();
   const qc = useQueryClient();
   const signedIn = useIsSignedIn();
+  const active = useActiveOrg();
+  const { organisations, isJobSeeker, isPending } = useMemberships();
 
   const signOut = async () => {
     const refresh_token = getRefreshToken();
@@ -25,6 +43,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
     if (refresh_token)
       await api.POST("/auth/logout", { body: { refresh_token } });
     clearTokens();
+    forgetContext();
     // The QueryClient is created once per browser session, so without this the
     // previous person's profile, matches, memberships and vacancies stay in
     // memory and render to whoever signs in next until fresh queries resolve.
@@ -37,14 +56,38 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const size = stacked ? "lg" : "sm";
 
   if (signedIn) {
+    // Standing in an organisation this account actually belongs to. A slug in
+    // the URL alone is not enough -- the page will say "no access".
+    const inOrg =
+      active !== null && organisations.some((m) => m.tenant.slug === active);
+    const onlyOrg = organisations.length === 1 ? organisations[0] : null;
+
     return (
       <>
-        <ButtonLink href="/matches" size={size}>
-          {t("myMatches")}
-        </ButtonLink>
-        <ButtonLink href="/profile" variant="secondary" size={size}>
-          {t("myProfile")}
-        </ButtonLink>
+        {/* Nothing while `/auth/me` is in flight: an empty slot for a moment is
+            better than the wrong person's buttons for a moment. */}
+        {isPending ? null : inOrg ? (
+          <ButtonLink
+            href={`/employer/${active}/settings`}
+            variant="secondary"
+            size={size}
+          >
+            {t("orgProfile")}
+          </ButtonLink>
+        ) : isJobSeeker ? (
+          <>
+            <ButtonLink href="/matches" size={size}>
+              {t("myMatches")}
+            </ButtonLink>
+            <ButtonLink href="/profile" variant="secondary" size={size}>
+              {t("myProfile")}
+            </ButtonLink>
+          </>
+        ) : onlyOrg ? (
+          <ButtonLink href={`/employer/${onlyOrg.tenant.slug}`} size={size}>
+            {t("myWorkspace")}
+          </ButtonLink>
+        ) : null}
         <button
           type="button"
           onClick={() => void signOut()}

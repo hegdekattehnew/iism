@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 
+import { ReturningNotice } from "@/components/ReturningNotice";
 import { OrgWorkspace } from "@/components/employer/OrgWorkspace";
 
 export default async function Page({
@@ -15,6 +16,7 @@ export default async function Page({
   // "Post a vacancy" to training providers.
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-12 sm:py-16">
+      <ReturningNotice />
       <OrgWorkspace orgSlug={org} />
     </div>
   );

@@ -249,8 +249,57 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   English. Before Sprint 16 the hero's Search button sat below the fold at 360×640 in Hindi while
   passing in English. Measure `getBoundingClientRect().bottom` of the submit button on `/hi` at
   360×640 before adding anything above it.
+- **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
+  cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
+  18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,
+  assert on rendered links and text.
 
 ## Current state
+
+Sprint 18 (one identity, honestly) is done. Three defects found by hand in one sitting were one
+defect: the product models three actor types and one identity holding several roles, and the
+interface assumed the job-seeker case. A scan found seven more of the same family.
+
+- **`POST /auth/org/register` never mints a second account for a signed-in caller.** It ignored who
+  was calling, so a candidate who opened `/signup/employer` and typed a work email became two
+  `User`s — the fork ADR-038 exists to prevent. Sprint 13 documented it, removed the button and left
+  the route open; Sprint 16's homepage `RoleChooser` then put a more prominent button back. The
+  route takes `get_optional_user`: signed in, the organisation becomes a second *membership*.
+  **Guard the route, not the button** — a public page will always find its way back to a public
+  endpoint.
+- **A signed-in surface branches on membership, never on "signed in" alone.** `get_current_user`
+  answers *is someone signed in*; `get_current_candidate` answers *did they sign up to look for
+  work*, and gates `/me/profile*` and `/me/matches*`. Before it, an organisation-only account that
+  opened `/profile` had a `CandidateProfile` created and committed by `ensure_profile` and was walked
+  into the candidate wizard. `ensure_profile` stays lazy — for candidates who have not got round to
+  it, not for accounts that never asked.
+- **What a sign-in reveals, it reveals on *verify*, never on request.** `SignInOut` carries
+  `created` and `organisation_slug`; the caller has just proved they hold the phone or mailbox, so
+  nothing is disclosed that their own messages would not. `OtpRequestResponse` still carries
+  nothing, and the request-time oracle stays shut (ADR-038). `created` had been computed and
+  thrown away by the route while its docstring claimed a client read it.
+- **A known address registering a new organisation keeps the name it typed.** Held in Redis at
+  `auth:pending_org:{address}` and provisioned on the existing account at verification — never at
+  request time, which would let anyone who knows an address attach an organisation to someone else.
+- **The header's profile slot follows the context.** `AuthNav` rendered "My matches" / "My profile"
+  for every signed-in identity; inside `/employer/{slug}` it now offers **Organisation profile**,
+  and an organisation-only account never sees the job-seeker side anywhere. `nav.settings` is gone
+  from `ORG_NAV` because that control *is* the organisation profile. `Header` renders no org nav
+  until it knows the org's type — `ORG_NAV[orgType ?? "employer"]` flashed "Vacancies" at providers.
+- **Landing lives in one pure function**, `landingFor` in `web/src/lib/context.ts`. Sign-in sent
+  every dual-role person to `/matches` and `.find()`-ed an unordered `memberships` array for everyone
+  else, while a comment claimed "newest". The last-used context is remembered in localStorage as a
+  *preference*, honoured only if this account still holds it — which is what makes it safe on a
+  shared phone.
+- **`web/` has a test runner.** `npm test` (Vitest + Testing Library) runs in CI. Tests mock exactly
+  three seams — `@/lib/auth`, `@/lib/org`, `@/i18n/navigation` — through `src/test/harness.tsx`,
+  because *who is signed in, what they hold and which URL they are on* is what varied in every
+  defect. Proved non-vacuous by swapping the pre-sprint components back in: 10 of 15 fail. The
+  provider-nav test passes against the old code once memberships have loaded — the *loading-state*
+  test is the one that detects that defect; do not delete it as redundant.
+- **Never gate a commit on `make check | grep`.** The pipeline's exit status is `grep`'s, so
+  `make check | grep … && git commit` committed a failing lint this sprint. Capture `make check`'s
+  own exit code and branch on that.
 
 Sprint 17 (logging you can run a customer on) is done. One JSON stream on stdout, a redaction
 filter that cannot be bypassed, and a request id, user id and tenant id on every line.

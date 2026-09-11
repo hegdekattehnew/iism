@@ -37,7 +37,11 @@ export function WorkspaceIdentity({
   if (!signedIn || isPending || !data) return null;
 
   const org = organisations.find((m) => m.tenant.slug === active);
-  const context = org ? org.tenant.name : isJobSeeker ? t("jobSeeker") : null;
+  // An organisation-only account has no job-seeker side to link across to.
+  // The cross-link below was hardcoded to `/matches` and `/profile` for
+  // everyone, which is the same assumption `AuthNav` made.
+  if (!org && !isJobSeeker) return null;
+  const context = org ? org.tenant.name : t("jobSeeker");
   // `full_name` is optional and usually unset until someone fills in their
   // profile, so fall back to the credential they actually signed in with.
   const who = data.full_name || data.phone || data.email;

@@ -1,14 +1,17 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Field, Text } from "@/components/profile/fields";
-import { Button } from "@/components/ui";
+import { WELCOME_BACK } from "@/components/ReturningNotice";
+import { Button, ButtonLink } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-import { setTokens } from "@/lib/auth";
+import { setTokens, useIsSignedIn } from "@/lib/auth";
+import { SEEKER, landingFor, lastContext } from "@/lib/context";
+import { useMemberships } from "@/lib/org";
 
 /**
  * Signing up as one of the three things this marketplace is for.
@@ -36,6 +39,103 @@ const TENANT_TYPE: Record<
 };
 
 export function SignUpForm({ type }: { type: SignUpType }) {
+  // Two different forms, not one form with branches: they ask for different
+  // things and call different endpoints, and hooks must not change order.
+  return useIsSignedIn() ? (
+    <AlreadySignedIn type={type} />
+  ) : (
+    <ColdSignUp type={type} />
+  );
+}
+
+/**
+ * Someone already signed in, arriving at a signup page.
+ *
+ * The homepage role chooser links every visitor to `/signup/employer`, and the
+ * cold form behind it posted `/auth/org/register` with a fresh email -- which
+ * minted a second `User`, forking the account (ADR-038). The API now refuses
+ * to do that, and this is the interface not asking in the first place: an
+ * organisation is added to the account you are already in, with no email and
+ * no code, exactly as the header's "Create an organisation" does.
+ */
+function AlreadySignedIn({ type }: { type: SignUpType }) {
+  const t = useTranslations("signup");
+  const tc = useTranslations("context");
+  const router = useRouter();
+  const qc = useQueryClient();
+  const { data, isPending, memberships } = useMemberships();
+  const [organisation, setOrganisation] = useState("");
+
+  const create = useMutation({
+    mutationFn: async (tenant_type: "employer" | "course_provider") => {
+      const { data: tenant, error } = await api.POST("/me/organisations", {
+        body: { organisation_name: organisation, tenant_type },
+      });
+      if (error || !tenant) throw new Error("create failed");
+      return tenant;
+    },
+    onSuccess: async (tenant) => {
+      // The switcher labels contexts from `/auth/me`; the new one must reach it.
+      await qc.invalidateQueries({ queryKey: ["me"] });
+      router.push(`/employer/${tenant.slug}`);
+    },
+  });
+
+  if (type === "seeker") {
+    // Nothing to create. A job seeker already has the job-seeker side, and an
+    // organisation-only account cannot acquire one through any route -- so
+    // this offers the way on rather than a form that would fork the account.
+    return (
+      <div className="mx-auto w-full max-w-sm text-center">
+        <p className="text-sm text-muted">{t("alreadySignedIn")}</p>
+        {!isPending && data && (
+          <ButtonLink
+            href={landingFor(memberships, { last: lastContext() })}
+            className="mt-4"
+          >
+            {t("continue")}
+          </ButtonLink>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="mx-auto w-full max-w-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        create.mutate(TENANT_TYPE[type]);
+      }}
+    >
+      <p className="mb-4 text-sm text-muted">{tc("createOrgHint")}</p>
+      <Field label={t("orgNameLabel")}>
+        <Text
+          required
+          minLength={2}
+          value={organisation}
+          onChange={(e) => setOrganisation(e.target.value)}
+          placeholder={t(`${type}Placeholder`)}
+        />
+      </Field>
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-6 w-full"
+        disabled={create.isPending}
+      >
+        {create.isPending ? tc("creating") : tc("create")}
+      </Button>
+      {create.isError && (
+        <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+          {tc("createError")}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function ColdSignUp({ type }: { type: SignUpType }) {
   const t = useTranslations("signup");
   const ta = useTranslations("auth");
   const router = useRouter();
@@ -68,6 +168,13 @@ export function SignUpForm({ type }: { type: SignUpType }) {
       return data;
     },
     onSuccess: (data) => {
+      // Only a signed-in caller gets an organisation back from this call, and
+      // this form is for signed-out ones -- but a token that appeared since the
+      // page rendered should land them in it, not strand them at a code prompt.
+      if ("organisation_slug" in data && data.organisation_slug) {
+        router.push(`/employer/${data.organisation_slug}`);
+        return;
+      }
       setDevCode(data.debug_code ?? null);
       setSent(true);
     },
@@ -103,17 +210,26 @@ export function SignUpForm({ type }: { type: SignUpType }) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
       });
-      if (isSeeker) {
+      // A brand-new job seeker goes to the profile wizard. Anyone else who
+      // "signed up" with a number or address that was already registered was
+      // signed in -- deliberately, so the request stays no enumeration oracle
+      // -- and is now told so, and landed on their workspace rather than
+      // walked back through onboarding.
+      if (isSeeker && data.created) {
         router.push("/profile");
         return;
       }
-      // Land in the organisation just created. A person may already hold
-      // several, so the newest non-personal membership is the one they meant.
       const me = await api.GET("/auth/me");
-      const org = (me.data?.memberships ?? []).find(
-        (m) => m.tenant.tenant_type !== "personal",
-      );
-      router.push(org ? `/employer/${org.tenant.slug}` : "/profile");
+      const target = landingFor(me.data?.memberships ?? [], {
+        // The organisation this sign-in was for, named by the API. This used
+        // to be `.find()` over an unordered list while the comment above it
+        // claimed "the newest".
+        organisationSlug: data.organisation_slug ?? null,
+        // They came through the job-seeker door, so the job-seeker side is
+        // what they meant, whatever they used last.
+        last: isSeeker ? SEEKER : lastContext(),
+      });
+      router.push(data.created ? target : `${target}?${WELCOME_BACK}`);
     },
     onError: (e: Error) =>
       setError(
@@ -177,6 +293,12 @@ export function SignUpForm({ type }: { type: SignUpType }) {
           >
             {request.isPending ? t("sending") : t("sendCode")}
           </Button>
+          {/* Said up front, because the request cannot say it: a response
+              that differed for a registered number would tell anyone which
+              numbers are registered. */}
+          <p className="mt-4 text-xs text-muted">
+            {t(isSeeker ? "existingHintPhone" : "existingHintEmail")}
+          </p>
         </form>
       ) : (
         <form

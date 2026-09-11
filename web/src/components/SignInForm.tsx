@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens } from "@/lib/auth";
+import { landingFor, lastContext } from "@/lib/context";
 
 type Step = "phone" | "code";
 
@@ -83,16 +84,18 @@ export function SignInForm() {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
       });
-      // Route on what the account holds, not on which key opened the door. An
-      // organisation with no personal workspace never asked to be a job seeker.
+      // Route on what the account holds, not on which key opened the door --
+      // and not by preferring one role. This sent anyone with a personal
+      // membership to `/matches`, so a candidate who also hires could never
+      // be delivered to their organisation, and took `.find()` over an
+      // unordered list for everyone else. `landingFor` honours where they
+      // last were.
       const me = await api.GET("/auth/me");
-      const memberships = me.data?.memberships ?? [];
-      const org = memberships.find((m) => m.tenant.tenant_type !== "personal");
-      const personal = memberships.some(
-        (m) => m.tenant.tenant_type === "personal",
-      );
       router.push(
-        org && !personal ? `/employer/${org.tenant.slug}` : "/matches",
+        landingFor(me.data?.memberships ?? [], {
+          organisationSlug: data.organisation_slug ?? null,
+          last: lastContext(),
+        }),
       );
     },
     onError: (e: Error) =>

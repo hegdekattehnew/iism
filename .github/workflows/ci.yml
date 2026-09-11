@@ -55,4 +55,7 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint
+      # The actor-type branches: nothing above renders a component, and every
+      # Sprint 18 defect was a .tsx conditional that compiled perfectly.
+      - run: npm test
       - run: npm run build

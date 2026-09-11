@@ -79,6 +79,16 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 18 (one identity, honestly) — complete, 2026-09-11.** Prompted by three defects found by
+hand: "profile" inside an organisation opened the candidate editor; re-registering an existing
+number silently signed you in; there seemed to be no way to be only an organisation. All three
+were one defect, and a scan found seven more — most seriously that `POST /auth/org/register` forked
+a signed-in candidate into a second account, which Sprint 16's homepage chooser had made easy to
+reach. Fixed and verified end to end in a browser; `web/` gained its first test runner. Details in
+`CLAUDE.md` → Current state. **Still open:** nothing can remove a membership, so an account that
+already has a personal tenant stays a job seeker; no organisation can add a second member; and
+`is_verified` has no writer.
+
 **Sprint 15 (consolidation) — complete, 2026-09-09.** No new product surface. The push, the
 deletions, the shared-policy extraction, three new test files, and this document made true.
 
