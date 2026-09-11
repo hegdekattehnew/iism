@@ -733,9 +733,8 @@ checked**; re-check it, do not read it here.
 - **`make restore-drill`** dumps both, restores into scratch databases, compares exact counts and
   drops them. **Run 2026-09-11, passed**: Postgres 36 tables, key counts identical; MongoDB 7
   collections, every count identical.
-- **`backups/iism-20260907-1003.sql.gz` is a plaintext dump from before encryption**, holding real
-  accounts in the clear. Gitignored, never committed, still on disk. Left for the owner to delete
-  once an encrypted dump exists — not deleted on their behalf.
+- The last plaintext dump (`backups/iism-20260907-1003.sql.gz`, pre-encryption, real accounts in
+  the clear) was **deleted by the owner on 2026-09-11**. It was gitignored and never committed.
 - `backups/schema.sql` (DDL) is committed and refreshed with `make db-schema`.
 - Almost every Postgres row is derived and rebuilds from MongoDB with `make import-nsqf && make
   seed`. People — accounts, consent, profiles, analytics — exist only in a dump.

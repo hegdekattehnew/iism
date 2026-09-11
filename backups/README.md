@@ -60,9 +60,9 @@ IISM_BACKUP_PASSPHRASE=… make restore-drill
 
 **Dumps are not committed to git**, and no longer live in this directory at all.
 
-> **An older plaintext dump may still be here.** `iism-20260907-1003.sql.gz` predates encryption
-> and holds real accounts in the clear. It is gitignored, so it was never committed, but it is
-> still on disk inside the project. Make an encrypted dump, then delete it.
+The last plaintext dump (`iism-20260907-1003.sql.gz`, from before encryption) was deleted by the
+owner on 2026-09-11. It was gitignored and never committed. If a `*.sql.gz` ever appears here
+again, it is unencrypted: move it to an encrypted dump and delete it.
 
 ## Path 2 — rebuild from source  *(no dump needed)*
 
