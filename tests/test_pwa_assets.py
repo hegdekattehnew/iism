@@ -42,6 +42,6 @@ def test_personal_and_computed_routes_are_never_cached() -> None:
     security boundary, so it is asserted rather than trusted to a code review."""
     sw = (PUBLIC / "sw.js").read_text()
     deny = sw[sw.index("const DENY") : sw.index("// Public taxonomy")]
-    for route in ("/me/", "/auth/", "/employer/", "/matches", "/profile", "/signin"):
+    for route in ("/me/", "/auth/", "/employer/", "/matches", "/profile", "/signin", "/account"):
         assert f'"{route}"' in deny, route
     assert 'request.headers.has("authorization")' in sw

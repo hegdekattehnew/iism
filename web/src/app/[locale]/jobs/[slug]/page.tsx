@@ -18,8 +18,12 @@ export default async function JobDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("jobsPage");
 
-  const { data, error } = await api.GET("/jobs/{slug}", { params: { path: { slug } } });
-  if (error || !data) notFound();
+  const { data, error, response } = await api.GET("/jobs/{slug}", { params: { path: { slug } } });
+  // Only a 404 is "not found". Every failure used to land here, so an API
+  // outage told visitors the listing did not exist; `error.tsx` now says the
+  // page is unavailable instead.
+  if (response.status === 404) notFound();
+  if (error || !data) throw new Error(`API responded ${response.status}`);
 
   const isHi = locale === "hi";
   const title = isHi && data.title_hi ? data.title_hi : data.title_en;

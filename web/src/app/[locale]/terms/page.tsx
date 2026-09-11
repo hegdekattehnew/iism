@@ -1,6 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { LegalPage } from "@/components/LegalPage";
 
 export default async function Page({
   params,
@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <PlaceholderPage titleKey="terms" noteKey="legal" />;
+  return <LegalPage doc="terms" />;
 }

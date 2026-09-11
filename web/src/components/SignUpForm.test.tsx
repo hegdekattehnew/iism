@@ -63,3 +63,32 @@ describe("SignUpForm — a stranger is told up front what an existing number doe
     ).toBeTruthy();
   });
 });
+
+describe("SignUpForm — consent is asked for, and cannot be skipped", () => {
+  it.each(["seeker", "employer", "provider"] as const)(
+    "a stranger signing up as %s must tick the notice before a code is sent",
+    (type) => {
+      // DPDP Act 2023: consent has to be given before processing starts, and
+      // `required` is what stops the form submitting without it.
+      world.signedIn = false;
+      renderUi(<SignUpForm type={type} />);
+
+      const box = screen.getByRole("checkbox", { name: /privacy notice/ });
+      expect(box).toHaveProperty("required", true);
+      expect(
+        screen.getByRole("link", { name: "privacy notice" }).getAttribute("href"),
+      ).toBe("/privacy");
+      expect(
+        screen.getByRole("link", { name: "terms of use" }).getAttribute("href"),
+      ).toBe("/terms");
+    },
+  );
+
+  it("asks nothing of someone already signed in", () => {
+    // They agreed when their account was made; adding an organisation to it
+    // is not a new data subject.
+    world.memberships = [personal()];
+    renderUi(<SignUpForm type="employer" />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});

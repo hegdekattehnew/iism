@@ -18,10 +18,14 @@ export default async function CourseDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("coursesPage");
 
-  const { data, error } = await api.GET("/courses/{slug}", {
+  const { data, error, response } = await api.GET("/courses/{slug}", {
     params: { path: { slug } },
   });
-  if (error || !data) notFound();
+  // Only a 404 is "not found". Every failure used to land here, so an API
+  // outage told visitors the listing did not exist; `error.tsx` now says the
+  // page is unavailable instead.
+  if (response.status === 404) notFound();
+  if (error || !data) throw new Error(`API responded ${response.status}`);
 
   const isHi = locale === "hi";
   const title = isHi && data.title_hi ? data.title_hi : data.title_en;

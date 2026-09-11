@@ -39,6 +39,8 @@ const DENY = [
   "/matches",
   "/profile",
   "/signin",
+  // Sprint 20: the account page shows consent and deletion state.
+  "/account",
 ];
 
 // Public taxonomy and marketplace reads. Slow-moving, identical for everyone,

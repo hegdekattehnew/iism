@@ -3,7 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 
 const BASE =
-  "mt-1.5 w-full rounded-lg border border-border-token bg-background px-3 py-2.5 text-sm " +
+  "mt-1.5 w-full rounded-lg border border-input-border bg-background px-3 py-2.5 text-sm " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 export function Field({
@@ -44,7 +44,7 @@ export function Check({ label, ...props }: ComponentProps<"input"> & { label: st
       <input
         type="checkbox"
         {...props}
-        className="h-4 w-4 rounded border-border-token accent-brand"
+        className="h-4 w-4 rounded border-input-border accent-brand"
       />
       {label}
     </label>

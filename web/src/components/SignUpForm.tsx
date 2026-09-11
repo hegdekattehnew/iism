@@ -10,6 +10,7 @@ import { Button, ButtonLink } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens, useIsSignedIn } from "@/lib/auth";
+import { PRIVACY_NOTICE_VERSION } from "@/lib/legal";
 import { SEEKER, landingFor, lastContext } from "@/lib/context";
 import { useMemberships } from "@/lib/org";
 
@@ -146,6 +147,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const request = useMutation({
@@ -162,6 +164,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
               email: identifier,
               organisation_name: organisation,
               tenant_type: TENANT_TYPE[type],
+              consent_version: PRIVACY_NOTICE_VERSION,
             },
           });
       if (err || !data) throw new Error(String(response.status));
@@ -197,7 +200,14 @@ function ColdSignUp({ type }: { type: SignUpType }) {
         response,
       } = isSeeker
         ? await api.POST("/auth/otp/verify", {
-            body: { phone: identifier, code },
+            // The phone path creates the account on verification, so this is
+            // where consent is recorded (DPDP Act 2023). An existing number
+            // simply signs in, and the version is recorded if it was missing.
+            body: {
+              phone: identifier,
+              code,
+              consent_version: PRIVACY_NOTICE_VERSION,
+            },
           })
         : await api.POST("/auth/email/otp/verify", {
             body: { email: identifier, code },
@@ -233,7 +243,12 @@ function ColdSignUp({ type }: { type: SignUpType }) {
     },
     onError: (e: Error) =>
       setError(
-        Number(e.message) === 429 ? ta("errorRateLimited") : t("errorBadCode"),
+        Number(e.message) === 429
+          ? ta("errorRateLimited")
+          : // A notice newer than this page: the version it sent is stale.
+            Number(e.message) === 428
+            ? t("errorConsent")
+            : t("errorBadCode"),
       ),
   });
 
@@ -284,6 +299,43 @@ function ColdSignUp({ type }: { type: SignUpType }) {
               </Field>
             </>
           )}
+
+          {/* Required, and recorded server-side with the notice's version and
+              the time: a checkbox the API never hears about proves nothing.
+              The links open a new tab so reading them loses no typing. */}
+          <label className="mt-5 flex items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input-border accent-brand"
+            />
+            <span>
+              {t.rich("consent", {
+                privacy: (chunks) => (
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-brand underline underline-offset-4"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+                terms: (chunks) => (
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-brand underline underline-offset-4"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </span>
+          </label>
 
           <Button
             type="submit"

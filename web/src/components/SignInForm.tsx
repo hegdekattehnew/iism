@@ -35,6 +35,9 @@ export function SignInForm() {
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The number verified but has no account. Sign-in never creates one: that
+  // needs consent to the privacy notice, which only signup asks for.
+  const [unregistered, setUnregistered] = useState(false);
 
   const errorFor = (status: number | undefined, fallback: string) =>
     status === 429
@@ -67,6 +70,7 @@ export function SignInForm() {
   const verify = useMutation({
     mutationFn: async () => {
       setError(null);
+      setUnregistered(false);
       const {
         data,
         error: err,
@@ -98,8 +102,13 @@ export function SignInForm() {
         }),
       );
     },
-    onError: (e: Error) =>
-      setError(errorFor(Number(e.message), t("errorBadCode"))),
+    onError: (e: Error) => {
+      if (Number(e.message) === 428) {
+        setUnregistered(true);
+        return;
+      }
+      setError(errorFor(Number(e.message), t("errorBadCode")));
+    },
   });
 
   return (
@@ -131,7 +140,7 @@ export function SignInForm() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder={t("identifierPlaceholder")}
-              className="mt-1.5 w-full rounded-lg border border-border-token bg-surface px-4 py-3 text-base tracking-wide placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className="mt-1.5 w-full rounded-lg border border-input-border bg-surface px-4 py-3 text-base tracking-wide placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             />
           </div>
           <Button
@@ -175,7 +184,7 @@ export function SignInForm() {
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="mt-1.5 w-full rounded-lg border border-border-token bg-surface px-4 py-3 text-center text-2xl font-semibold tracking-[0.4em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className="mt-1.5 w-full rounded-lg border border-input-border bg-surface px-4 py-3 text-center text-2xl font-semibold tracking-[0.4em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             />
           </div>
 
@@ -204,6 +213,7 @@ export function SignInForm() {
                 setCode("");
                 setDevCode(null);
                 setError(null);
+                setUnregistered(false);
               }}
               className="text-muted hover:text-foreground hover:underline"
             >
@@ -228,6 +238,21 @@ export function SignInForm() {
         >
           {error}
         </p>
+      )}
+
+      {unregistered && (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
+          <p>{t("unregistered")}</p>
+          <Link
+            href="/signup/seeker"
+            className="mt-1 inline-block font-medium underline underline-offset-4"
+          >
+            {t("unregisteredAction")}
+          </Link>
+        </div>
       )}
     </div>
   );

@@ -88,6 +88,17 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
             {t("myWorkspace")}
           </ButtonLink>
         ) : null}
+        {/* Every signed-in account, whatever it holds: the DPDP rights --
+            download, delete, see what was agreed -- belong to the person. */}
+        <Link
+          href="/account"
+          className={cn(
+            buttonVariants({ variant: "ghost", size }),
+            "text-foreground",
+          )}
+        >
+          {t("account")}
+        </Link>
         <button
           type="button"
           onClick={() => void signOut()}

@@ -15,7 +15,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "vacancies": "Vacancies",
-    "courses_org": "Courses"
+    "courses_org": "Courses",
+    "skipToContent": "Skip to main content"
   },
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
@@ -92,7 +93,6 @@
     "body": "This page is being written. Nothing here is a placeholder for a feature — the surrounding product works; this is text that has to be right before it is published.",
     "back": "Back to home",
     "generic": "Being drafted ahead of public release. Until it is published we would rather show nothing than show text nobody has checked.",
-    "legal": "Being drafted with legal review. A privacy or terms page written carelessly is worse than one that is honestly still in progress.",
     "contact": "Being drafted. In the meantime, the fastest route in is whoever sent you this link.",
     "careers": "Being drafted. There is no open role posted yet."
   },
@@ -304,7 +304,10 @@
     "noAccount": "No account yet?",
     "signUpInstead": "Sign up",
     "orgProfile": "Organisation profile",
-    "myWorkspace": "My workspace"
+    "myWorkspace": "My workspace",
+    "account": "Account",
+    "unregistered": "There is no account with this number yet. That code has been used — sign up instead; it asks you to agree to our privacy notice first.",
+    "unregisteredAction": "Create an account"
   },
   "profilePage": {
     "title": "My profile",
@@ -736,7 +739,9 @@
       "seeker": "Find work",
       "employer": "Hire",
       "provider": "Offer training"
-    }
+    },
+    "consent": "I have read the <privacy>privacy notice</privacy> and agree to the <terms>terms of use</terms>.",
+    "errorConsent": "Our privacy notice has changed since this page loaded. Reload the page, read it, and agree again."
   },
   "providerWorkspace": {
     "yourCourses": "Your courses",
@@ -811,5 +816,210 @@
     "title": "This is an organisation account",
     "body": "Matches and a candidate profile belong to accounts that signed up to look for work.",
     "goToWorkspace": "Go to my workspace"
+  },
+  "account": {
+    "title": "Your account",
+    "subtitle": "Your data, what you agreed to, and the way out.",
+    "signedOut": "Sign in to see your account.",
+    "signIn": "Sign in",
+    "consentTitle": "Consent",
+    "consentGiven": "You agreed to the privacy notice of {version} on {date}.",
+    "consentMissing": "No consent is recorded for this account: it was created before consent was recorded. Read the notice — and if you do not agree, delete your account below.",
+    "readNotice": "Read the privacy notice",
+    "exportTitle": "Download your data",
+    "exportBody": "Everything we hold about you — your account, memberships, profile and activity — as one JSON file.",
+    "exportButton": "Download my data",
+    "exporting": "Preparing…",
+    "exportError": "The download could not be prepared. Try again.",
+    "deleteTitle": "Delete your account",
+    "deleteBody": "This removes your account, your profile and your personal workspace. It cannot be undone.",
+    "deleteButton": "Delete my account…",
+    "confirmTitle": "Before you confirm",
+    "loadingPreview": "Checking what goes with it…",
+    "nothingElse": "Nothing else goes with it: you are not the only member of any organisation.",
+    "orgsGoing": "These organisations have no other members, so they and their listings are deleted too:",
+    "orgLine": "{name} — {listings, plural, =0 {no listings} one {# listing} other {# listings}}",
+    "blocked": "You are the only owner of an organisation that others belong to. Ownership has to pass to someone else first, or it would be left with nobody able to run it — write to the grievance officer for help:",
+    "confirmButton": "Delete permanently",
+    "deleting": "Deleting…",
+    "cancel": "Cancel",
+    "deleteError": "Your account could not be deleted. Nothing was changed. Try again."
+  },
+  "errors": {
+    "badge": "Unavailable",
+    "title": "This page could not load",
+    "body": "Something on our side failed — the page may exist, but we could not reach it just now. Try again in a moment.",
+    "retry": "Try again",
+    "home": "Go to the homepage",
+    "reference": "Reference: {digest}",
+    "notFoundBadge": "404",
+    "notFoundTitle": "This page does not exist",
+    "notFoundBody": "The link may be old, or the listing may have been withdrawn.",
+    "browseJobs": "Browse jobs"
+  },
+  "legal": {
+    "draftBadge": "Draft — pending legal review",
+    "draftNote": "This text is written to be accurate about how IISM works today. It has not yet been reviewed by a lawyer and may change before public launch.",
+    "version": "Version {version}",
+    "toBeAppointed": "To be appointed",
+    "officerHeading": "Grievance officer",
+    "officerName": "Name",
+    "officerEmail": "Email",
+    "officerPhone": "Phone",
+    "officerAddress": "Address",
+    "accountLink": "Go to your Account page",
+    "privacy": {
+      "title": "Privacy notice",
+      "intro": "This notice explains what the Intelligent Integrated Skill Marketplace (IISM) holds about you, why, for how long, and how to exercise your rights under India's Digital Personal Data Protection Act, 2023.",
+      "sections": [
+        {
+          "title": "Who is responsible",
+          "body": [
+            "IISM is the data fiduciary for the personal data described here: we decide why and how it is processed. Questions and complaints go to our grievance officer — see the grievance page."
+          ]
+        },
+        {
+          "title": "What we hold",
+          "body": [
+            "Your account: the mobile number or email address you sign up with, and your name if you add one.",
+            "If you look for work: the profile you build — skills, experience, education, certifications, languages, and the roles and places you prefer.",
+            "If you represent an organisation: its name, contact email and public profile, and the vacancies or courses it publishes.",
+            "Activity: which matches, gaps and courses you open. These records carry no name, number or email.",
+            "We do not collect Aadhaar numbers, résumé files or assessment results today. If that changes, this notice changes first."
+          ]
+        },
+        {
+          "title": "Why we hold it",
+          "body": [
+            "To sign you in with a one-time code — there are no passwords.",
+            "To match job seekers with vacancies and courses against the National Occupational Standards, and to show each person the gap between them and a role.",
+            "To let employers see who could fill a vacancy. Employers see a reference, headline, district, years of experience and skill gap — never your name, number or email.",
+            "To measure, in aggregate, whether the marketplace is working."
+          ]
+        },
+        {
+          "title": "Who else sees it",
+          "body": [
+            "We do not sell personal data.",
+            "Service providers process it on our behalf and under contract: cloud hosting in India, and the SMS and email services that deliver sign-in codes."
+          ]
+        },
+        {
+          "title": "How long we keep it",
+          "body": [
+            "Your account and profile: until you delete your account.",
+            "Activity records: 12 months, then deleted automatically.",
+            "Encrypted backups: replaced on a rolling schedule, so deleted data leaves them within that cycle."
+          ]
+        },
+        {
+          "title": "Your rights",
+          "body": [
+            "Access: download everything we hold about you, as one file, from your Account page.",
+            "Correction: edit your profile at any time.",
+            "Erasure and withdrawing consent: delete your account from your Account page. It is as easy as signing up, and it removes your profile and any organisation only you belong to.",
+            "Grievance: raise a complaint with our grievance officer; if it is not resolved, you may approach the Data Protection Board of India.",
+            "Nomination: you may nominate someone to exercise these rights for you in the event of death or incapacity — write to the grievance officer."
+          ]
+        },
+        {
+          "title": "Children",
+          "body": [
+            "The marketplace is for people aged 18 and over. We do not knowingly create accounts for children."
+          ]
+        },
+        {
+          "title": "Changes to this notice",
+          "body": [
+            "Each version is dated. When the notice changes in a way that matters, we ask you to agree again before you continue."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms of use",
+      "intro": "These terms govern your use of IISM. By creating an account you agree to them.",
+      "sections": [
+        {
+          "title": "The service",
+          "body": [
+            "IISM connects job seekers, employers and training providers around the national skill standards. Matches and gaps are computed from those standards; they are guidance, not a guarantee of employment or admission."
+          ]
+        },
+        {
+          "title": "Your account",
+          "body": [
+            "One person, one account. Keep your sign-in codes to yourself — anyone holding a code can sign in as you.",
+            "Give accurate information. Skills you add are shown as self-declared until evidence verifies them."
+          ]
+        },
+        {
+          "title": "Organisations",
+          "body": [
+            "Publish only real vacancies and courses, with honest terms.",
+            "Never ask a job seeker to pay in return for a job or an interview.",
+            "Use what you see about candidates only to recruit for the vacancy it was shown against."
+          ]
+        },
+        {
+          "title": "What is not allowed",
+          "body": [
+            "Scraping, bulk downloading or automated access beyond ordinary use.",
+            "Impersonating a person or organisation, or misrepresenting a qualification.",
+            "Trying to reach data that is not yours, or to disrupt the service."
+          ]
+        },
+        {
+          "title": "Suspension and closure",
+          "body": [
+            "We may suspend an account that breaks these terms. You may close yours at any time from your Account page."
+          ]
+        },
+        {
+          "title": "Liability",
+          "body": [
+            "IISM is provided as it is. To the extent the law allows, we are not liable for decisions that employers, providers or job seekers make using it."
+          ]
+        },
+        {
+          "title": "Law and disputes",
+          "body": [
+            "These terms are governed by the laws of India."
+          ]
+        },
+        {
+          "title": "Changes",
+          "body": [
+            "Each version is dated. When the terms change in a way that matters, we ask you to agree again."
+          ]
+        }
+      ]
+    },
+    "grievance": {
+      "title": "Grievance redressal",
+      "intro": "If you have a complaint about how IISM handles your personal data, or about content on the marketplace, write to our grievance officer.",
+      "sections": [
+        {
+          "title": "How to raise a grievance",
+          "body": [
+            "Write to the grievance officer from the mobile number or email your account uses, so we can confirm it is you.",
+            "Say what happened, when, and what you would like done. Do not send sign-in codes — we will never ask for them."
+          ]
+        },
+        {
+          "title": "What happens next",
+          "body": [
+            "We acknowledge a grievance within 24 hours and aim to resolve it within 15 days.",
+            "If you are not satisfied with the outcome, you may approach the Data Protection Board of India."
+          ]
+        },
+        {
+          "title": "Things you can do yourself",
+          "body": [
+            "Some requests need no one's help: download your data or delete your account from your Account page."
+          ]
+        }
+      ]
+    }
   }
 }

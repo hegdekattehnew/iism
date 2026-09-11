@@ -9,6 +9,9 @@
   --foreground: #0f172a;
   --muted: #64748b;
   --border: #e2e8f0;
+  /* A form control's edge. `--border` is 1.23:1 on white, which is fine for a
+     card and fails WCAG 1.4.11 (3:1) for an input you have to find to type in. */
+  --input-border: #7c8aa0;
   --brand: #1f4e79;
   --brand-strong: #163a5a;
   --brand-contrast: #ffffff;
@@ -23,6 +26,7 @@
     --foreground: #e2e8f0;
     --muted: #94a3b8;
     --border: #1e293b;
+    --input-border: #5b6b82;
     --brand: #5b9bd5;
     --brand-strong: #7db3e3;
     --brand-contrast: #041022;
@@ -37,6 +41,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border-token: var(--border);
+  --color-input-border: var(--input-border);
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
   --color-brand-contrast: var(--brand-contrast);

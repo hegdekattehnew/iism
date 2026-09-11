@@ -284,3 +284,15 @@ async def test_retention_removes_old_events_and_keeps_recent_ones(db: AsyncSessi
         )
     ).all()
     assert len(left) == 1 and left[0] > now - timedelta(days=11)
+
+
+def test_the_web_client_sends_the_version_the_api_accepts() -> None:
+    """Two constants, two languages, one fact. If they drift, every signup is
+    refused with 428 -- found here in CI rather than by the first real user."""
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "web/src/lib/legal.ts").read_text()
+    match = re.search(r'PRIVACY_NOTICE_VERSION = "([^"]+)"', source)
+    assert match is not None
+    assert match.group(1) == CONSENT

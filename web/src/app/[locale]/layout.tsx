@@ -57,14 +57,26 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const tn = await getTranslations({ locale, namespace: "nav" });
 
   return (
     <html lang={locale}>
       <body className="flex min-h-screen flex-col antialiased">
+        {/* First focusable thing on every page: a keyboard or switch user
+            otherwise tabs through the whole header on every navigation. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+        >
+          {tn("skipToContent")}
+        </a>
         <NextIntlClientProvider>
           <QueryProvider>
             <Header />
-            <main className="flex-1">{children}</main>
+            {/* tabIndex so the skip link moves focus here, not just scroll. */}
+            <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+              {children}
+            </main>
             <Footer />
             <ServiceWorkerRegistrar />
           </QueryProvider>
