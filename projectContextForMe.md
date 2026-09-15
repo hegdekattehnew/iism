@@ -4,8 +4,8 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-09 · Sprints 1–15 built. Sprint 15 was consolidation: no new product
-surface, four unpushed sprints pushed, the documents made to agree with the code.
+**Last updated:** 2026-09-15 · Sprints 1–20 built and pushed. Sprint 20 ("safe to deploy") closed the
+non-functional gaps that need no outside account; Sprint 21 is the first deployment.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -30,11 +30,11 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **39 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/adr/architecture-decisions.md` | **40 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
-| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The sprint plan, 1–8.** Sprint 7 is marked superseded but still holds the translation-pipeline design. Lives outside the repo. |
+| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprint 20's is the latest). Lives outside the repo. |
 | `docs/nsqf-source-data-findings.md` | **Everything measured about the NSQF corpus** — field-naming traps, level distributions, content volumes, deduplication rates, translation costs, data-quality issues. Read before touching the importer. |
 | This file | Session-to-session continuity, environment quirks, hard-won gotchas. |
 
@@ -105,6 +105,19 @@ reach. Fixed and verified end to end in a browser; `web/` gained its first test 
 `CLAUDE.md` → Current state. **Still open:** nothing can remove a membership, so an account that
 already has a personal tenant stays a job seeker; no organisation can add a second member; and
 `is_verified` has no writer.
+
+**Sprint 17 (logging you can run a customer on) — complete, 2026-09-10.** One structured JSON stream
+on stdout for the API, the worker and stdlib loggers alike (ADR-040), a redaction filter in the
+shared processor tail that masks phones, emails and OTPs so no logger can route around it (ADR-023),
+and a request id, user id and tenant id on every line. The worker's heartbeat noise (~34,500
+lines a day) was silenced by pinning `arq.worker` to WARNING. Details in `CLAUDE.md`.
+
+**Sprint 16 (who is this for) — complete, 2026-09-10.** The homepage now says which three roles the
+marketplace serves (a role chooser beside the hero), the job-seeker landing makes clear where you
+are, and the header switcher names contexts instead of saying "Switch". Also found and fixed:
+`BrowsePanels` and `Audiences` had sat unpadded on the homepage for four sprints after the `Card` /
+`CardBody` rename, and `divide-y` emits no border width in this build. The hero's fold budget is
+measured in Hindi, the binding case. Details in `CLAUDE.md` → Frontend conventions.
 
 **Sprint 15 (consolidation) — complete, 2026-09-09.** No new product surface. The push, the
 deletions, the shared-policy extraction, three new test files, and this document made true.
@@ -423,10 +436,19 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
+*Refreshed 2026-09-15.* Authored code: `api/` 78 files / 11,579 lines · `scripts/` 8 / 2,553 ·
+`tests/` 23 / 5,751 · `migrations/` 19 / 1,750 · `web/src/` 117 / 10,234 (excluding the generated
+client).
+
 ```
 api/                    FastAPI modular monolith
-  main.py               app, health, demo task endpoints
-  core/                 config, database, cache, tasks (ARQ), health
+  main.py               app assembly, health, middleware order, demo task endpoints
+  worker.py             ARQ entrypoint -- configures logging, registers crons (analytics purge)
+  core/                 config, database (pool + statement timeout), cache, tasks (ARQ),
+                        health, security (tokens, OTP, get_current_user), authorization
+                        (permissions from membership, ADR-039), logging + redaction
+                        (ADR-040/023), middleware (request context, security headers,
+                        body-size cap, rate limiting -- all pure ASGI), text
   modules/skills/       models.py     Skill, SkillAlias (the leaf)
                         hierarchy.py  AwardingBody, Sector, SubSector, Occupation,
                                       QualificationPack, QpSkill, QpEntryRoute,
@@ -436,14 +458,19 @@ api/                    FastAPI modular monolith
                         concepts.py   SkillConcept -- rows that mean the same thing
                         + schemas, service, routes, __init__ (public interface)
   modules/matching/     scoring.py (pure), service.py (retrieval + gap + courses),
+                        employer.py (the same scorer reversed, batched per employer),
                         schemas, routes. No model client, by ADR-036.
   modules/analytics/    analytics_events (ADR-025). record() commits.
   modules/geography/    State, District, SubDistrict. Its own module because jobs
                         and profiles reference it and neither is a skill. No routes
                         yet -- nothing consumes it over HTTP.
-  modules/marketplace/  Job, JobSkill, Course, CourseSkill + browse/detail endpoints
-  modules/identity/     User, Tenant, Membership, OTP sign-in, JWT
-  core/security.py      tokens, OTP hashing, rate limits, get_current_user
+  modules/marketplace/  Job, JobSkill, Course, CourseSkill, CandidateProfile + collections;
+                        publishing.py (jobs) and course_publishing.py (courses) are siblings,
+                        listings.py their shared policy
+  modules/identity/     User, Tenant, Membership, OTP sign-in by phone or email, credential
+                        linking, organisations and their profile, consent record
+  modules/privacy/      DPDP export, deletion preview and erasure. Depends on every module;
+                        nothing depends on it.
   adapters/notifications/  NotificationProvider protocol + console impl
   adapters/nsqf/        base.py       NsqfSource port (6 iterators)
                         documents.py  ALL document parsing, shared by every source
@@ -451,7 +478,12 @@ api/                    FastAPI modular monolith
                         normalise.py  levels, HH:MM, credits, slugs, NCO codes
                         importer.py   phased projection into Postgres
 web/                    Next.js 16 PWA
-  src/app/[locale]/     13 routes, all bilingual
+  src/app/[locale]/     27 routes, all bilingual: browse (skills, jobs, courses), signin,
+                        signup/[type], profile, matches, account, employer/[org] (+ settings,
+                        candidates/[job]), audience pages, privacy/terms/grievance, status
+                        (local only), error.tsx, not-found.tsx, a catch-all
+  src/lib/legal.ts      PRIVACY_NOTICE_VERSION (must match api/core/config.py) + grievance officer
+  src/test/harness.tsx  the three mocked seams for Vitest component tests
   src/components/       Header, Hero, HowItWorks, Audiences, BrowsePanels, CtaBand,
                         Footer, SkillBrowser, SkillRequirements, SkillQualifications,
                         SkillRelated, SystemStatus, DevPanel, PlaceholderPage, ui
@@ -467,14 +499,16 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0010 (skills.qp_count), 0011 (geography),
                         0012 (structure, entry routes, content, pruning),
                         0013 (skill concepts + 'legacy' source),
-                        0014 (analytics events)
+                        0014 (analytics events), 0015 (employer analytics events),
+                        0016 (organisation profile), 0017 (profile enum CHECKs),
+                        0018 (user consent)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
                         retire_legacy_skills.py, seed_candidates.py (demo profiles +
                         the golden pairs), evaluate_matching.py — all idempotent
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
-backups/                schema.sql (committed DDL) + README.md (the three restore paths).
-                        *.sql.gz dumps are git-ignored: 40 MB and regenerable.
+backups/                schema.sql (committed DDL) + README.md (restore paths, drill record).
+                        Dumps are encrypted and live in ~/iism-backups, never here.
 tests/                  pytest + testcontainers
 ```
 
@@ -509,18 +543,24 @@ make up          # start Postgres + Redis, wait for healthy
 make migrate     # alembic upgrade head
 make seed        # taxonomy + marketplace + demo candidates (idempotent)
 make evaluate    # score the matcher against the golden set
-make db-dump     # full backup, ~40 MB gzipped, ~8s
-make db-restore DUMP=backups/iism-....sql.gz   # ~5s, DROPS and recreates the db
+make db-dump     # encrypted Postgres dump -> ~/iism-backups (needs IISM_BACKUP_PASSPHRASE)
+make db-restore DUMP=~/iism-backups/iism-pg-....sql.gz.enc   # DROPS and recreates the target
+make mongo-dump  # encrypted dump of the NSQF source of record
+make mongo-restore DUMP=...  # [INTO=<db>]
+make restore-drill  # dump both, restore into scratch dbs, compare counts, clean up
 make db-schema   # refresh backups/schema.sql (DDL only, committed)
 make import-nsqf # project the NSQF corpus from Mongo into Postgres (idempotent)
 make api         # uvicorn on :8000
 make worker      # ARQ worker
 make web         # Next.js on :3000
 make check       # ruff + mypy + pytest  <- run before claiming anything works
-make gen-api     # regenerate the TS client after ANY endpoint change
+make gen-api     # regenerate the TS client after ANY endpoint change (reads local /openapi.json)
+cd web && npm test && npm run build && npm run budget   # web tests, build, first-load JS budget
 ```
 
-Three processes must run for the full stack: **api, worker, web.**
+Three processes must run for the full stack: **api, worker, web.** The API and web reload on
+change; **the worker does not** — restart `make worker` after any change to `api/`, or it keeps
+running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned copies).
 
 ## 8. Gotchas — each of these cost real time
 
