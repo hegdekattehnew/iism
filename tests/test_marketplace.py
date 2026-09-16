@@ -4,6 +4,7 @@ from dataclasses import fields
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.identity import Tenant
@@ -201,6 +202,28 @@ async def test_course_detail_carries_level_taught(seeded: dict, client: AsyncCli
 async def test_unknown_slugs_404(client: AsyncClient) -> None:
     assert (await client.get("/jobs/nope")).status_code == 404
     assert (await client.get("/courses/nope")).status_code == 404
+
+
+async def test_a_draft_job_is_not_readable_by_url(seeded: dict, client: AsyncClient) -> None:
+    """Keeping a draft out of the *list* is half the job.
+
+    `get_job_by_slug` had no status filter, so anyone holding the URL read an
+    unfinished vacancy -- and `test_listing_excludes_drafts` above passed
+    throughout, because it only ever asked for the list. Found by walking the
+    employer journey against the running API, not by a test.
+    """
+    assert (await client.get("/jobs/draft-job")).status_code == 404
+
+
+async def test_an_unpublished_course_is_not_readable_by_url(
+    seeded: dict, client: AsyncClient
+) -> None:
+    """Unpublishing must actually withdraw it, not just hide it from browse."""
+    db = seeded["db"]
+    assert (await client.get("/courses/dear")).status_code == 200
+    await db.execute(update(Course).where(Course.slug == "dear").values(status="draft"))
+    await db.flush()
+    assert (await client.get("/courses/dear")).status_code == 404
 
 
 # ------------------------------------------- the edges: skill <-> marketplace

@@ -82,7 +82,16 @@ async def list_jobs(
 
 
 async def get_job_by_slug(db: AsyncSession, slug: str) -> Job | None:
-    return await db.scalar(select(Job).where(Job.slug == slug))
+    """The **public** detail view: published only.
+
+    Without the status filter a draft was readable by anyone holding the URL --
+    200 on a listing its owner had not finished, and on one they had
+    deliberately unpublished. Every other public query here filters; these two
+    did not, and the tests only ever asserted the *list*, which is why it
+    survived. The owner's own view goes through `job_publishing.get_job`,
+    which is scoped to their tenant and shows drafts on purpose.
+    """
+    return await db.scalar(select(Job).where(Job.slug == slug, Job.status == PUBLISHED))
 
 
 async def count_jobs(db: AsyncSession) -> int:
@@ -146,7 +155,16 @@ async def list_courses(
 
 
 async def get_course_by_slug(db: AsyncSession, slug: str) -> Course | None:
-    return await db.scalar(select(Course).where(Course.slug == slug))
+    """The **public** detail view: published only.
+
+    Without the status filter a draft was readable by anyone holding the URL --
+    200 on a listing its owner had not finished, and on one they had
+    deliberately unpublished. Every other public query here filters; these two
+    did not, and the tests only ever asserted the *list*, which is why it
+    survived. The owner's own view goes through `course_publishing.get_course`,
+    which is scoped to their tenant and shows drafts on purpose.
+    """
+    return await db.scalar(select(Course).where(Course.slug == slug, Course.status == PUBLISHED))
 
 
 async def count_courses(db: AsyncSession) -> int:

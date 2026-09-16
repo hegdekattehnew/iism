@@ -48,7 +48,13 @@ async def _startup(ctx: dict[str, Any]) -> None:
         # arq's own "Starting worker for N functions" line is INFO on
         # `arq.worker`, which the logging config drops to WARNING to silence
         # the heartbeat. This replaces it, with more in it.
-        cron_jobs=len(_Tasks.cron_jobs),
+        #
+        # `WorkerSettings.cron_jobs`, not `_Tasks.cron_jobs`: the crons
+        # registered *here* are the ones arq runs, and counting the core list
+        # reported "cron_jobs: 1" on a worker running two. Names, not a count,
+        # so the line says which -- a number cannot be checked against what a
+        # deployment was supposed to schedule.
+        cron_jobs=[c.name for c in WorkerSettings.cron_jobs],
     )
     await publish_heartbeat(ctx)
 
