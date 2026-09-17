@@ -1083,5 +1083,17 @@
     "errorGeneric": "That could not be saved. Try again.",
     "newBadge": "New",
     "applicantsLink": "Applicants ({count})"
+  },
+  "notices": {
+    "title": "{count, plural, one {# update} other {# updates}}",
+    "markRead": "Mark as read",
+    "statusChanged": "{organisation} moved your application for {vacancy} to: {status}.",
+    "status": {
+      "applied": "Applied",
+      "withdrawn": "Withdrawn",
+      "shortlisted": "Shortlisted",
+      "rejected": "Not selected",
+      "hired": "Hired"
+    }
   }
 }

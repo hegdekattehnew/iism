@@ -32,6 +32,7 @@ from api.modules.marketplace.models import (
     JobSkill,
 )
 from api.modules.marketplace.schemas import CandidateProfileFull
+from api.modules.notifications.models import Notification
 from api.modules.privacy.schemas import DeletionPreview, OrganisationFate
 
 log = structlog.get_logger("iism.privacy")
@@ -92,6 +93,14 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     await db.execute(delete(Job).where(Job.tenant_id == tenant_id))
     await db.execute(delete(CourseSkill).where(CourseSkill.course_id.in_(course_ids)))
     await db.execute(delete(Course).where(Course.tenant_id == tenant_id))
+    # No foreign key to cascade from -- the outbox names a recipient by id
+    # rather than pointing at one (see its module docstring) -- so erasure
+    # removes them explicitly, exactly like the applications above.
+    await db.execute(
+        delete(Notification).where(
+            Notification.recipient_kind == "tenant", Notification.recipient_id == tenant_id
+        )
+    )
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
 
@@ -127,6 +136,13 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
 
     await db.execute(
         update(AnalyticsEvent).where(AnalyticsEvent.user_id == user.id).values(user_id=None)
+    )
+    # Unlike an analytics row, a notification is *addressed* to this person: it
+    # cannot be anonymised by dropping the link, so it goes.
+    await db.execute(
+        delete(Notification).where(
+            Notification.recipient_kind == "user", Notification.recipient_id == user.id
+        )
     )
     await db.execute(delete(Membership).where(Membership.user_id == user.id))
     user_id = user.id

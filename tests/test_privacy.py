@@ -350,3 +350,34 @@ class TestApplicationsAreTheirsToo:
         db.expire_all()
         assert await db.scalar(sql_func.count(Application.id)) == 0
         assert await db.scalar(sql_func.count(SavedJob.id)) == 0
+
+
+async def test_deleting_an_account_takes_its_notifications(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """The outbox has no foreign key to cascade from -- it names a recipient by
+    id -- so erasure has to remove these itself. It did not at first, and two
+    notices addressed to a deleted account were found sitting in the dev
+    database."""
+    from api.modules.notifications import Notification, enqueue
+
+    headers, _ = await _candidate(client)
+    me = (await client.get("/auth/me", headers=headers)).json()
+    await enqueue(
+        db,
+        recipient_kind="user",
+        recipient_id=uuid.UUID(me["id"]),
+        channel="in_app",
+        template="application_status_changed",
+        payload={"vacancy": "Something", "organisation": "Someone", "status": "shortlisted"},
+    )
+    await db.commit()
+
+    assert (await client.delete("/me/account", headers=headers)).status_code == 204
+    db.expire_all()
+    left = await db.scalar(
+        select(func.count())
+        .select_from(Notification)
+        .where(Notification.recipient_id == uuid.UUID(me["id"]))
+    )
+    assert left == 0
