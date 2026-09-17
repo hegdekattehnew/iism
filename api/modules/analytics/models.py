@@ -22,7 +22,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from api.core.database import Base
+from api.core.database import Base, one_of
 
 # A closed set, deliberately. An open string column becomes forty spellings of
 # the same event within a month, and no analysis survives that.
@@ -36,18 +36,23 @@ EVENT_NAMES = (
     # candidate's identity, so neither can the event.
     "employer_overview_viewed",
     "employer_shortlist_viewed",
+    # Sprint 21, the loop closing. Still nameless: the subject is the vacancy,
+    # never the person, and `user_id` is the only identity on the row.
+    "application_submitted",
+    "application_withdrawn",
+    "application_status_changed",
+    "job_saved",
 )
 
 
 class AnalyticsEvent(Base):
     __tablename__ = "analytics_events"
     __table_args__ = (
-        CheckConstraint(
-            "name IN ('matches_viewed', 'match_opened', 'gap_viewed', "
-            "'course_recommended', 'course_opened', 'employer_overview_viewed', "
-            "'employer_shortlist_viewed')",
-            name="ck_analytics_event_name",
-        ),
+        # Generated from `EVENT_NAMES`, not spelled out beside it. The literal
+        # form drifted the moment Sprint 21 added four names: the tuple grew,
+        # the CHECK did not, and only the test comparing them noticed. `one_of`
+        # is the project's answer to exactly this class of drift.
+        CheckConstraint(one_of("name", EVENT_NAMES), name="ck_analytics_event_name"),
         Index("ix_analytics_events_name_time", "name", "occurred_at"),
         Index("ix_analytics_events_user", "user_id"),
     )
