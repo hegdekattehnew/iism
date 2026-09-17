@@ -21,13 +21,25 @@ regression, which is how a golden set becomes something people delete.
 
 import asyncio
 import sys
+from datetime import date
 
 from sqlalchemy import delete, select
 
 from api.core.database import dispose_engine, get_sessionmaker
+from api.modules.applications.models import Application
 from api.modules.identity.models import User
 from api.modules.identity.service import provision_candidate
-from api.modules.marketplace.models import CandidateProfile, CandidateSkill
+from api.modules.marketplace.models import (
+    CandidateCertification,
+    CandidateEducation,
+    CandidateExperience,
+    CandidateLanguage,
+    CandidatePreferredLocation,
+    CandidatePreferredRole,
+    CandidateProfile,
+    CandidateSkill,
+    Job,
+)
 from api.modules.skills.models import Skill
 
 # phone, name, headline, state, district, years, [(nos_code, proficiency, source)]
@@ -336,7 +348,65 @@ CANDIDATES: list[tuple[str, str, str, str, str, int, list[tuple[str, int, str]]]
     ),
 ]
 
+
 # (candidate phone, job slug, expectation)
+# Sprint 21. Five of the six repeating collections held **one row between them**
+# across every profile in the database, so the wizard, the completeness meter
+# and any screenshot showed a schema with nothing behind it. A demo profile now
+# looks like a profile.
+#
+# Written per candidate from their own headline and location, so nobody has a
+# work history that contradicts the skills the golden set scores.
+def _history(headline: str, state: str, district: str, years: int) -> dict:
+    role = headline.split(",")[0].split(" with ")[0].strip()
+    return {
+        "experience": {
+            "employer_name": f"{district} Community Hospital",
+            "role_title": role,
+            "location": district,
+            "started_on": date(2026 - max(years, 1), 4, 1),
+            "ended_on": None,
+            "is_current": True,
+            "description": f"{role} on ward duty.",
+        },
+        "education": {
+            "qualification": "Higher Secondary (Class 12)",
+            "institution": f"{state} Government Higher Secondary School",
+            "education_level": "higher_secondary",
+            "year_completed": 2026 - years - 2,
+            "is_pursuing": False,
+        },
+        "certification": {
+            "name": "First aid and basic life support",
+            "issuing_body": "Indian Red Cross Society",
+            "issued_on": date(2026 - min(years, 3), 7, 12),
+        },
+        "languages": [
+            {"language": "Hindi", "proficiency": "fluent", "can_read": True, "can_write": True},
+            {
+                "language": "English",
+                "proficiency": "conversational",
+                "can_read": True,
+                "can_write": False,
+            },
+        ],
+        "roles": [role],
+        "locations": [{"state": state, "district": district}],
+    }
+
+
+# phone -> [(job slug, status)]. Mixed states on purpose: an employer console
+# with an inbox of nothing but "applied" shows none of the triage it offers,
+# and a withdrawn row is what proves the contact details disappear.
+APPLICATIONS: list[tuple[str, str, str]] = [
+    ("+919000000001", "general-duty-assistant-chennai", "shortlisted"),
+    ("+919000000001", "emergency-room-assistant-pune", "applied"),
+    ("+919000000002", "general-duty-assistant-chennai", "applied"),
+    ("+919000000003", "general-duty-assistant-chennai", "rejected"),
+    ("+919000000004", "home-care-attendant-pune", "applied"),
+    ("+919000000005", "cashier-bengaluru", "withdrawn"),
+]
+
 GOLDEN_PAIRS: list[tuple[str, str, str]] = [
     ("+919000000001", "general-duty-assistant-chennai", "top"),
     ("+919000000002", "general-duty-assistant-chennai", "capped_missing_mandatory"),
@@ -349,8 +419,51 @@ GOLDEN_PAIRS: list[tuple[str, str, str]] = [
 ]
 
 
+async def _seed_applications(db) -> int:  # type: ignore[no-untyped-def]
+    """Give the employer console an inbox on a fresh machine.
+
+    Idempotent by (candidate, vacancy), like everything else here. A vacancy
+    that is not seeded is skipped rather than failing the run: the marketplace
+    seed and this one are separate files, and a missing slug is a reason to
+    seed less, not to stop.
+    """
+    count = 0
+    for phone, job_slug, status in APPLICATIONS:
+        user = await db.scalar(select(User).where(User.phone == phone))
+        job = await db.scalar(select(Job).where(Job.slug == job_slug, Job.status == "published"))
+        if user is None or job is None:
+            continue
+        profile = await db.scalar(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
+        if profile is None:
+            continue
+        existing = await db.scalar(
+            select(Application).where(
+                Application.job_id == job.id, Application.profile_id == profile.id
+            )
+        )
+        application = existing or Application(job_id=job.id, profile_id=profile.id)
+        application.status = status
+        # The consent record, exactly as the API would write it: shared when
+        # they applied, revoked if they withdrew.
+        application.contact_shared_at = application.contact_shared_at or _now()
+        application.contact_revoked_at = _now() if status == "withdrawn" else None
+        if existing is None:
+            db.add(application)
+        count += 1
+    await db.flush()
+    return count
+
+
+def _now():  # type: ignore[no-untyped-def]
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC)
+
+
 async def main() -> None:
-    created = skills_added = 0
+    created = skills_added = collections_added = 0
     async with get_sessionmaker()() as db:
         by_code = dict(
             (
@@ -413,9 +526,38 @@ async def main() -> None:
                 skills_added += 1
             await db.flush()
 
+            # Each collection rewritten wholesale, for the same reason the
+            # skills are: a row left over from an earlier edit of this file is
+            # a demo that nobody can explain.
+            history = _history(headline, state, district, years)
+            for model in (
+                CandidateExperience,
+                CandidateEducation,
+                CandidateCertification,
+                CandidateLanguage,
+                CandidatePreferredRole,
+                CandidatePreferredLocation,
+            ):
+                await db.execute(delete(model).where(model.profile_id == profile.id))
+            db.add(CandidateExperience(profile_id=profile.id, **history["experience"]))
+            db.add(CandidateEducation(profile_id=profile.id, **history["education"]))
+            db.add(CandidateCertification(profile_id=profile.id, **history["certification"]))
+            for language in history["languages"]:
+                db.add(CandidateLanguage(profile_id=profile.id, **language))
+            for title in history["roles"]:
+                db.add(CandidatePreferredRole(profile_id=profile.id, title=title))
+            for place in history["locations"]:
+                db.add(CandidatePreferredLocation(profile_id=profile.id, **place))
+            collections_added += 6
+            await db.flush()
+
+        applied = await _seed_applications(db)
         await db.commit()
 
-    print(f"candidates created: {created}  skills attached: {skills_added}")
+    print(
+        f"candidates created: {created}  skills attached: {skills_added}  "
+        f"profile sections: {collections_added}  applications: {applied}"
+    )
     await dispose_engine()
 
 
