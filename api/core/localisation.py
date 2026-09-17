@@ -207,11 +207,17 @@ async def delete_for(db: AsyncSession, entity_type: str, entity_ids: Iterable[uu
 def negotiate(header: str | None, override: str | None, preferred: str | None) -> str:
     """Which language to answer in.
 
-    Order: an explicit `?locale=`, then the signed-in person's own setting,
-    then `Accept-Language`, then the default. The explicit parameter wins
-    because it exists for debugging and for a link someone shares in a
-    particular language; the account setting beats the browser because a person
-    who chose Hindi in this product meant it more than their phone's locale did.
+    Order: an explicit `?locale=`, then `Accept-Language`, then the account's
+    `preferred_locale`, then the default.
+
+    **The header beats the stored preference, and that ordering is deliberate.**
+    The web client sends the locale of the page the person is actually reading
+    -- the one they chose with the switcher -- while `users.preferred_locale`
+    defaults to `"en"` for every account and no surface writes it yet. Ranking
+    it first meant a default silently overrode a real choice: every signed-in
+    reader got English on `/hi`, which is precisely what the first test of this
+    endpoint caught. When a real preference control exists, it can move ahead
+    of the header, because then it will mean something.
 
     Parsing is deliberately shallow -- the first tag, region stripped. Quality
     values are a negotiation this product does not need: it has a handful of
@@ -219,12 +225,12 @@ def negotiate(header: str | None, override: str | None, preferred: str | None) -
     """
     if override:
         return override.strip().lower().split("-")[0]
-    if preferred:
-        return preferred.strip().lower().split("-")[0]
     if header:
         first = header.split(",")[0].strip().lower()
         if first and first != "*":
             return first.split(";")[0].split("-")[0]
+    if preferred:
+        return preferred.strip().lower().split("-")[0]
     return DEFAULT_LOCALE
 
 

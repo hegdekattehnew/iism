@@ -4,8 +4,14 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
+from api.core.localisation import overrides_for, request_locale
 from api.modules.applications import service
-from api.modules.applications.schemas import ApplicationIn, ApplicationOut, SavedJobOut
+from api.modules.applications.schemas import (
+    ApplicationIn,
+    ApplicationOut,
+    JobRef,
+    SavedJobOut,
+)
 from api.modules.identity import User, get_current_candidate
 
 # `get_current_candidate`, not `get_current_user`: applying is the job seeker's
@@ -14,10 +20,19 @@ from api.modules.identity import User, get_current_candidate
 router = APIRouter(prefix="/me", tags=["applications"])
 
 
-def _out(application) -> ApplicationOut:  # type: ignore[no-untyped-def]
+def _out(application, titles: dict | None = None) -> ApplicationOut:  # type: ignore[no-untyped-def]
+    """`titles` carries the vacancy's translated title, when there is one.
+
+    Resolved by the caller rather than here: one query for a whole list, not
+    one per row (ADR-041). Missed on the first pass, and /hi/applications
+    quietly showed English titles until the browser said so.
+    """
+    job = JobRef.model_validate(application.job)
+    if titles:
+        job = job.model_copy(update=titles)
     return ApplicationOut(
         id=application.id,
-        job=application.job,
+        job=job,
         status=application.status,
         message=application.message,
         applied_at=application.created_at,
@@ -30,17 +45,23 @@ async def apply_to_job(
     payload: ApplicationIn,
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> ApplicationOut:
     """Apply, and share your name and contact with that employer for that vacancy."""
-    return _out(await service.apply(db, user, job_slug=payload.job_slug, message=payload.message))
+    application = await service.apply(db, user, job_slug=payload.job_slug, message=payload.message)
+    overrides = await overrides_for(db, "job", [application.job], ("title",), locale)
+    return _out(application, overrides.get(application.job_id))
 
 
 @router.get("/applications", response_model=list[ApplicationOut])
 async def my_applications(
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> list[ApplicationOut]:
-    return [_out(a) for a in await service.list_applications(db, user)]
+    applications = await service.list_applications(db, user)
+    overrides = await overrides_for(db, "job", [a.job for a in applications], ("title",), locale)
+    return [_out(a, overrides.get(a.job_id)) for a in applications]
 
 
 @router.post("/applications/{application_id}/withdraw", response_model=ApplicationOut)
@@ -48,9 +69,12 @@ async def withdraw_application(
     application_id: uuid.UUID,
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> ApplicationOut:
     """Take it back. The employer keeps the fact and loses the contact details."""
-    return _out(await service.withdraw(db, user, application_id))
+    application = await service.withdraw(db, user, application_id)
+    overrides = await overrides_for(db, "job", [application.job], ("title",), locale)
+    return _out(application, overrides.get(application.job_id))
 
 
 @router.post("/saved-jobs", response_model=SavedJobOut, status_code=status.HTTP_201_CREATED)
@@ -58,9 +82,12 @@ async def save_job(
     payload: ApplicationIn,
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> SavedJobOut:
     saved = await service.save_job(db, user, payload.job_slug)
-    return SavedJobOut(job=saved.job, saved_at=saved.created_at)
+    overrides = await overrides_for(db, "job", [saved.job], ("title",), locale)
+    job = JobRef.model_validate(saved.job).model_copy(update=overrides.get(saved.job_id, {}))
+    return SavedJobOut(job=job, saved_at=saved.created_at)
 
 
 @router.get("/saved-jobs", response_model=list[SavedJobOut])

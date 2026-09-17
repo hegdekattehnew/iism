@@ -606,3 +606,26 @@ async def test_applying_all_day_is_capped(
     finally:
         monkeypatch.delenv("MAX_APPLICATIONS_PER_DAY")
         get_settings.cache_clear()
+
+
+async def test_my_applications_are_listed_in_the_language_asked_for(
+    vacancy: dict, client: AsyncClient, db: AsyncSession
+) -> None:
+    """The API resolves language everywhere, not only on the browse pages
+    (ADR-041). This endpoint builds its own JobRef and was missed on the first
+    pass -- /hi/applications quietly showed English titles until a browser
+    check said otherwise."""
+    from api.core import localisation
+
+    await localisation.upsert(db, "job", vacancy["job"].id, "title", "hi", "कैशियर")
+    await db.commit()
+
+    headers = await _candidate(client)
+    await client.post("/me/applications", headers=headers, json={"job_slug": "open-cashier"})
+
+    english = (await client.get("/me/applications", headers=headers)).json()
+    hindi = (
+        await client.get("/me/applications", headers={**headers, "accept-language": "hi"})
+    ).json()
+    assert english[0]["job"]["title"] == "Cashier"
+    assert hindi[0]["job"]["title"] == "कैशियर"
