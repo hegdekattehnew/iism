@@ -256,6 +256,44 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 21 (the loop closes) is done. For twenty sprints the product could **compute** an outcome and
+not **produce** one: a candidate saw ranked vacancies with no button, and an employer saw a pool it
+could not reach. A candidate now applies, withdraws and saves; an employer sees who applied, with
+the contact details to act on it.
+
+- **Applying is the product's one deliberate disclosure, and the candidate makes it.** ADR-037's
+  "no employer-facing payload identifies a candidate" still holds for every *pool* and *ranking*
+  endpoint. An application is the single exception: the name and contact reach **that** employer,
+  for **that** vacancy, recorded as `contact_shared_at` (DPDP Act 2023). Withdrawing sets
+  `contact_revoked_at`, keeps the row and takes the details back, and a withdrawn application
+  cannot be moved along (409) — otherwise shortlisting would put contact back on screen by a side
+  door.
+- **`candidate_card()` is the only construction site for the de-identified payload**, exported from
+  `matching` and used by both the pool and the inbox. That invariant is a property of one function;
+  a second copy is how it stops being true. A test asserts the pool still names nobody.
+- **`score_profiles()` scores named applicants through the same `score_match`.** An applicant need
+  not be in the retrieved pool — anyone may apply, and refusing the under-qualified would be a
+  hiring decision this product does not get to make. **Do not add a second scorer** (ADR-037).
+- **`matching` imports `applications` lazily, inside the counting function.** The two import each
+  other; this is the fix `core/authorization.py` already uses. Both import orders are asserted in a
+  test, because the failure is an ImportError at boot, not a wrong answer.
+- **Applying is gated by `get_current_candidate`**, so pressing Apply can never create a candidate
+  profile for an organisation-only account — and the interface offers that account no button at all,
+  rather than one that always fails.
+- **A row you just created has no loaded relationship.** `save_job` returned the new `SavedJob` and
+  the handler touched `.job`: a lazy load in async context, `MissingGreenlet`, a 500. It passed in
+  one test file only because that job was already in the identity map. Re-query with
+  `populate_existing` before returning anything a handler will serialise.
+- **The analytics CHECK is generated from `EVENT_NAMES` with `one_of`.** It was spelled out beside
+  the tuple as a literal and drifted the moment four names were added. Migration 0020 widens the
+  database's copy; the model no longer has a second copy to drift.
+- **A rolling 24-hour cap on applying** (`MAX_APPLICATIONS_PER_DAY`, default 50) answers patient
+  spraying, which the per-minute write limiter does not. Counted over 24 hours, not a calendar day,
+  so it cannot be doubled by waiting for midnight.
+- **A listing renders the Hindi title when there is one.** `/hi/applications` shipped showing
+  English titles on a Hindi page because the new list read `title_en` unconditionally; every other
+  listing in `web/src` already picked by locale. Found in the browser, not by a test.
+
 Sprint 20 (safe to deploy) is done. No new product surface: the non-functional requirements that
 need no outside account — privacy law, web security, abuse protection, recovery, quality gates —
 closed before the first deployment in Sprint 21.

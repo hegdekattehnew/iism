@@ -4,7 +4,7 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-15 · Sprints 1–20 built and pushed. Sprint 20 ("safe to deploy") closed the
+**Last updated:** 2026-09-17 · Sprints 1–21 built and pushed. Sprint 20 ("safe to deploy") closed the
 non-functional gaps that need no outside account; Sprint 21 is the first deployment.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
@@ -78,6 +78,18 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
   models only, `User` and `Membership` layered on in Sprint 4.
 
 ## 4. Current state
+
+**Sprint 21 (the loop closes) — complete, 2026-09-17.** The marketplace can finally produce an
+outcome. A candidate applies to a vacancy (sharing name and contact with that employer, for that
+vacancy, recorded as consent), withdraws (which takes the contact back and keeps the row), and saves
+vacancies privately. An employer sees who applied, ranked by the same scorer, with the contact
+details to act on, and moves each one to shortlisted, not suitable or hired. Export and erasure
+cover both new tables; a rolling 24-hour cap answers spraying. Migrations 0019 (applications,
+saved_jobs) and 0020 (four analytics names). Seeded candidates gained work histories and six demo
+applications, so a fresh machine shows a profile and an inbox with something in them. **Verified end
+to end against the running API and in the browser in both locales.** Details in `CLAUDE.md`.
+**Still open:** teammate invitations, membership removal and `is_verified` still have no writer;
+deployment moved to Sprint 22.
 
 **Sprint 20 (safe to deploy) — complete, 2026-09-11.** No new product surface; the NFR gaps that
 need no outside account, closed before the first deployment. Consent recorded server-side at
@@ -471,6 +483,9 @@ api/                    FastAPI modular monolith
                         linking, organisations and their profile, consent record
   modules/privacy/      DPDP export, deletion preview and erasure. Depends on every module;
                         nothing depends on it.
+  modules/applications/ Applying, withdrawing, saving, and the employer's inbox. Holds the
+                        product's one deliberate disclosure: contact reaches an employer
+                        because the candidate applied, and goes when they withdraw.
   adapters/notifications/  NotificationProvider protocol + console impl
   adapters/nsqf/        base.py       NsqfSource port (6 iterators)
                         documents.py  ALL document parsing, shared by every source
@@ -501,7 +516,8 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0013 (skill concepts + 'legacy' source),
                         0014 (analytics events), 0015 (employer analytics events),
                         0016 (organisation profile), 0017 (profile enum CHECKs),
-                        0018 (user consent)
+                        0018 (user consent), 0019 (applications + saved jobs),
+                        0020 (application analytics events)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
                         retire_legacy_skills.py, seed_candidates.py (demo profiles +
@@ -781,7 +797,9 @@ checked**; re-check it, do not read it here.
 
 ## 11. What comes next
 
-**Sprint 21 — first deployment.** AWS **Mumbai (ap-south-1)** for data residency: Dockerfiles, ECS
+**Sprint 22 — first deployment** (moved from Sprint 21, which closed the loop instead: deploying a
+product that could not produce an outcome would have bought nothing, and job-seeker sign-in is
+blocked on DLT registration regardless). AWS **Mumbai (ap-south-1)** for data residency: Dockerfiles, ECS
 Fargate for api and worker, RDS Postgres with encryption at rest and automated backups,
 ElastiCache, CloudWatch with a set log retention, secrets in Secrets Manager. Organisation sign-in
 works on day one through **Amazon SES**; job-seeker sign-in waits for a **DLT-registered SMS

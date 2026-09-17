@@ -1,13 +1,21 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
 type Status = "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+
+/** The Hindi title when there is one. Every other listing does this; these two
+ *  did not, so /hi/applications showed English titles on a Hindi page. */
+function useTitle() {
+  const isHi = useLocale() === "hi";
+  return (job: { title_en: string; title_hi?: string | null }) =>
+    isHi && job.title_hi ? job.title_hi : job.title_en;
+}
 
 const TONE: Record<Status, string> = {
   applied: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -21,6 +29,7 @@ const TONE: Record<Status, string> = {
 export function ApplicationList() {
   const t = useTranslations("applications");
   const format = useFormatter();
+  const title = useTitle();
   const { data, isPending, isError } = useQuery({
     queryKey: ["me", "applications"],
     queryFn: async () => {
@@ -57,7 +66,7 @@ export function ApplicationList() {
                       href={`/jobs/${application.job.slug}`}
                       className="text-base font-semibold hover:underline"
                     >
-                      {application.job.title_en}
+                      {title(application.job)}
                     </Link>
                     <p className="text-sm text-muted">{application.job.tenant.name}</p>
                   </div>
@@ -87,6 +96,7 @@ export function ApplicationList() {
 /** Bookmarks. Saving tells the employer nothing, and this page says so. */
 export function SavedList() {
   const t = useTranslations("applications");
+  const title = useTitle();
   const { data, isPending, isError } = useQuery({
     queryKey: ["me", "saved-jobs"],
     queryFn: async () => {
@@ -119,7 +129,7 @@ export function SavedList() {
                 href={`/jobs/${row.job.slug}`}
                 className="text-base font-semibold hover:underline"
               >
-                {row.job.title_en}
+                {title(row.job)}
               </Link>
               <p className="text-sm text-muted">{row.job.tenant.name}</p>
             </CardBody>
