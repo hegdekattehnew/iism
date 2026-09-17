@@ -1359,3 +1359,59 @@ the renderer and the middleware — not the redaction filter, which it would sti
 - `DB_ECHO` is refused outside development. `echo=True` attaches SQLAlchemy's own raw handler,
   bypassing the filter, and logs bound parameters — and a `WHERE users.phone = $1` binds a phone
   number.
+
+## ADR-041: Localisation — source text in the row, translations in one table
+
+**Status:** Accepted (September 2026). Supersedes the two-language assumption in **ADR-033**, whose
+India-first, Hindi-and-English-at-launch decision stands; what is withdrawn is the implementation
+that made "two" structural.
+
+**Context:** ADR-033 was implemented as a column pair per translatable field — `title_en` and
+`title_hi`, `name_en` and `name_hi` — which reached **18 pairs across 12 tables**, 16 `_hi` fields
+in the API schemas, and **37 two-language ternaries** in the web client (`isHi && x.name_hi ?
+x.name_hi : x.name_en`). `web/src/i18n/routing.ts` carried a comment claiming "adding a locale is a
+translation task, not a refactor". It was not: a third language meant a schema migration, new
+response fields, and an edit at every one of those 37 sites. The language switcher — two tabs — was
+the visible symptom of a shape that could not hold three.
+
+The measured state made the timing obvious. Of ~600,000 translatable rows, about **95 carried any
+Hindi at all**: 52 of 21,355 skills (the curated set Sprint 9 retired), 22 of 23 jobs and 21 of 21
+courses (both seeded demo data), and **zero** of 238,370 performance criteria, 185,559 knowledge
+parameters, 4,424 qualification packs, 1,808 occupations and 43 sectors. The column pairs were a
+promise the data had never taken up.
+
+**Decision:**
+
+1. **The base column holds the text in the row's own language.** `title_en` becomes `title`;
+   `name_en` becomes `name`. A `source_locale` column (default `en`) says which language that is,
+   because a job posted by a Hindi-speaking employer is source-Hindi and the corpus is source-English.
+2. **Every other language lives in `content_translations`** — `(entity_type, entity_id, field,
+   locale, text, source)`, unique on the first four. Adding a language is **INSERTs, never DDL**.
+3. **`locale` carries no CHECK constraint**, deliberately, while `entity_type`, `field` and `source`
+   all do. A closed set on `locale` would put adding a language back into a migration, which is the
+   thing this ADR exists to prevent.
+4. **The API resolves language; the client never picks.** Negotiation is `Accept-Language`, then an
+   explicit `?locale=`, then the signed-in user's `preferred_locale`, then the default. Responses
+   carry `title`, `locale_served` and `available_locales` — not one field per language.
+
+**Why a side table rather than JSONB per field.** JSONB (`title: {"en": …, "hi": …}`) reads well and
+costs more than it looks: it rewrites all 600,000 rows for a feature 0.02% of them use, it bloats
+every index that touches a translatable column, and `skills.search_vector` — a GENERATED column —
+would have to parse a JSON document per row on every write. The side table stays empty until
+somebody translates something, and the sparse case is the case.
+
+**Consequences:**
+
+- **Adding a language is: one entry in `web/src/i18n/locales.ts`, one messages file, and rows.** No
+  migration, no schema change, no new response field.
+- **Search has two halves.** The generated vector covers source text with the `english`
+  configuration; translated text is matched through the translations table with `simple` plus
+  trigram, because Postgres ships no stemmer for Hindi (the qualification ADR-033 already made to
+  ADR-021 — and it now applies to every language the product gains).
+- **Untranslated is the normal case, and must read as deliberate.** The fallback chain is
+  requested → source → English, and the response says which locale it actually served, so a client
+  can mark borrowed text rather than presenting it as translated.
+- **This makes the *text* multilingual. It does not make the *taxonomy* portable.** NSQF is an
+  Indian framework (ADR-004/024) and the matching engine scores against it. A market outside India
+  needs its own qualification framework mapped in; a translated interface is not that, and must not
+  be mistaken for it.

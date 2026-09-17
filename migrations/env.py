@@ -8,6 +8,7 @@ from sqlalchemy.pool import NullPool
 
 from api.core.config import get_settings
 from api.core.database import Base
+from api.core.localisation import ContentTranslation as _ContentTranslation  # noqa: F401
 
 # Importing every module's models registers them on Base.metadata so that
 # autogenerate sees them. New modules must be added here.
