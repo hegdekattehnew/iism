@@ -13,10 +13,10 @@ Guidance for Claude Code (and any future contributor) working in this repository
 A marketplace connecting skills, jobs, courses, and assessments, with an intelligence layer
 that matches candidates to opportunities and recommends career paths. India-first,
 multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and English at
-launch (ADR-033).
+launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(40 ADRs). Read it before making any structural decision — the summary below
+(41 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -77,6 +77,8 @@ api/                     FastAPI modular monolith
                          Ask for a Permission, never a role.
     logging.py           configure_logging(): one JSON stream for structlog and
                          stdlib alike (ADR-040). Call once per process.
+    localisation.py      content_translations + locale negotiation (ADR-041). The
+                         API resolves language; the client never picks.
     redaction.py         The ADR-023 filter. Runs in the shared tail, so no
                          logger in the process can route around it.
     middleware.py        Pure ASGI request context: request_id, the access log.
@@ -107,6 +109,9 @@ api/                     FastAPI modular monolith
                          a candidate's contact reaches an employer because they
                          applied, and goes when they withdraw. Depends on
                          marketplace and matching; nothing depends on it.
+    notifications/       The outbox (ADR-006): queued inside the request, sent by the
+                         worker. The row names a recipient and never holds an
+                         address -- that is resolved at send time.
     privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
                          Spans every module; nothing depends on it.
     analytics/           analytics_events (ADR-025). record() COMMITS.
