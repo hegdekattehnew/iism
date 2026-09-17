@@ -45,10 +45,8 @@ log = structlog.get_logger("iism.marketplace")
 # GENERATED ALWAYS, and rejected by Postgres on any write -- can never reach an
 # INSERT by way of a schema someone later widened.
 _PLAIN_FIELDS = (
-    "title_en",
-    "title_hi",
-    "description_en",
-    "description_hi",
+    "title",
+    "description",
     "mode",
     "language",
     "duration_hours",
@@ -122,7 +120,7 @@ async def get_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Cours
 
 async def create_course(db: AsyncSession, tenant_id: uuid.UUID, payload: CourseIn) -> Course:
     course = Course(
-        slug=await unique_slug(db, Course.slug, payload.title_en),
+        slug=await unique_slug(db, Course.slug, payload.title),
         tenant_id=tenant_id,
         # Explicit. `Course.status` defaults to "published" at the model level,
         # so omitting this would put an unfinished syllabus in front of

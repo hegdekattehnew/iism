@@ -4,30 +4,33 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core import localisation
 from api.modules.skills import Skill, SkillAlias, count_skills, search_skills
 
 
 async def _add(
     db: AsyncSession,
     slug: str,
-    name_en: str,
+    name: str,
     name_hi: str | None = None,
     *,
     skill_type: str = "technical",
     nsqf_level: int | None = 4,
-    description_en: str | None = None,
+    description: str | None = None,
     aliases: tuple[tuple[str, str], ...] = (),
 ) -> Skill:
     skill = Skill(
         slug=slug,
-        name_en=name_en,
-        name_hi=name_hi,
-        description_en=description_en,
+        name=name,
+        description=description,
         skill_type=skill_type,
         nsqf_level=nsqf_level,
     )
     db.add(skill)
     await db.flush()
+    # Hindi is a row in content_translations since ADR-041, not a second column.
+    if name_hi:
+        await localisation.upsert(db, "skill", skill.id, "name", "hi", name_hi)
     for form, script in aliases:
         db.add(SkillAlias(skill_id=skill.id, surface_form=form, script=script))
     await db.flush()
@@ -42,7 +45,7 @@ async def seeded(db: AsyncSession) -> AsyncSession:
         "blood-sample-collection",
         "Blood sample collection",
         "रक्त नमूना संग्रह",
-        description_en="Drawing venous blood samples safely.",
+        description="Drawing venous blood samples safely.",
         aliases=(
             ("phlebotomy", "latin"),
             ("रक्त संग्रह", "devanagari"),
@@ -87,7 +90,7 @@ async def test_list_returns_page_and_total(seeded: AsyncSession, client: AsyncCl
     body = (await client.get("/skills")).json()
     assert body["total"] == 3
     assert len(body["items"]) == 3
-    assert body["items"][0]["name_en"] == "Blood sample collection"  # alphabetical
+    assert body["items"][0]["name"] == "Blood sample collection"  # alphabetical
 
 
 async def test_list_filters_by_type(seeded: AsyncSession, client: AsyncClient) -> None:
@@ -112,7 +115,7 @@ async def test_list_paginates(seeded: AsyncSession, client: AsyncClient) -> None
 
 async def test_detail_includes_every_alias(seeded: AsyncSession, client: AsyncClient) -> None:
     body = (await client.get("/skills/blood-sample-collection")).json()
-    assert body["name_hi"] == "रक्त नमूना संग्रह"
+    assert body["name"] == "Blood sample collection"
     assert {a["script"] for a in body["aliases"]} == {
         "latin",
         "devanagari",
@@ -209,8 +212,8 @@ class TestRetiredSkills:
         """A live skill and a retired one, sharing an alias."""
         from api.modules.skills.models import Skill, SkillAlias
 
-        live = Skill(slug="live-standard", name_en="Live standard", source="nsqf")
-        retired = Skill(slug="retired-skill", name_en="Retired skill", source="legacy")
+        live = Skill(slug="live-standard", name="Live standard", source="nsqf")
+        retired = Skill(slug="retired-skill", name="Retired skill", source="legacy")
         db.add_all([live, retired])
         await db.flush()
         db.add(SkillAlias(skill_id=live.id, surface_form="khoon nikalna", script="transliteration"))
@@ -256,3 +259,43 @@ class TestRetiredSkills:
         counted = (await client.get("/skills/count")).json()["count"]
         facet_total = (await client.get("/skills/facets")).json()["total"]
         assert counted == facet_total  # both exclude retired rows, so they agree
+
+
+# -------------------------------------------- the API resolves the language
+
+
+async def test_the_response_is_in_the_language_asked_for(
+    seeded: AsyncSession, client: AsyncClient
+) -> None:
+    """ADR-041: one `name` field carrying the negotiated language. Before this
+    the response had `name_en` *and* `name_hi`, and all 37 render sites picked."""
+    english = (await client.get("/skills/blood-sample-collection")).json()
+    hindi = (
+        await client.get("/skills/blood-sample-collection", headers={"accept-language": "hi"})
+    ).json()
+    assert english["name"] == "Blood sample collection"
+    assert hindi["name"] == "रक्त नमूना संग्रह"
+    assert "name_hi" not in hindi
+
+
+async def test_an_untranslated_row_falls_back_to_its_own_text(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    """Untranslated is the normal case -- 0 of 238,370 performance criteria carry
+    a translation -- and it must read as the row's own text, not as empty."""
+    await _add(db, "wound-dressing", "Wound dressing")
+    body = (await client.get("/skills/wound-dressing", headers={"accept-language": "hi"})).json()
+    assert body["name"] == "Wound dressing"
+
+
+async def test_an_explicit_locale_beats_the_header(
+    seeded: AsyncSession, client: AsyncClient
+) -> None:
+    body = (
+        await client.get(
+            "/skills/blood-sample-collection",
+            params={"locale": "hi"},
+            headers={"accept-language": "en"},
+        )
+    ).json()
+    assert body["name"] == "रक्त नमूना संग्रह"

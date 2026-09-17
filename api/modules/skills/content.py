@@ -38,8 +38,7 @@ class PerformanceElement(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     skill_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
     ordinal: Mapped[int] = mapped_column()
-    name_en: Mapped[str] = mapped_column(Text)
-    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    name: Mapped[str] = mapped_column(Text)
 
     theory_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)
     practical_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)
@@ -69,8 +68,7 @@ class PerformanceCriterion(Base):
     # The source's own "PC1"/"PC2" label. Not unique within a unit, so it is
     # carried for traceability and is never part of a key.
     pc_ref: Mapped[str | None] = mapped_column(String(32), default=None)
-    description_en: Mapped[str] = mapped_column(Text)
-    description_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    description: Mapped[str] = mapped_column(Text)
 
     theory_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)
     practical_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)
@@ -94,8 +92,7 @@ class KnowledgeParameter(Base):
     skill_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
     ordinal: Mapped[int] = mapped_column()
     kp_ref: Mapped[str | None] = mapped_column(String(32), default=None)
-    text_en: Mapped[str] = mapped_column(Text)
-    text_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    text: Mapped[str] = mapped_column(Text)
 
 
 class GenericCriterion(Base):
@@ -116,5 +113,4 @@ class GenericCriterion(Base):
     skill_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
     ordinal: Mapped[int] = mapped_column()
     gs_ref: Mapped[str | None] = mapped_column(String(32), default=None)
-    text_en: Mapped[str] = mapped_column(Text)
-    text_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    text: Mapped[str] = mapped_column(Text)

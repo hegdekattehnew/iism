@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
+from api.core.localisation import overrides_for, request_locale
 from api.modules.marketplace import schemas, service
 from api.modules.marketplace.stats import corpus_stats
 from api.modules.skills import get_skill_by_slug
@@ -42,6 +43,7 @@ async def list_jobs(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> schemas.JobPage:
     items, total = await service.list_jobs(
         db,
@@ -53,8 +55,16 @@ async def list_jobs(
         limit=limit,
         offset=offset,
     )
+    # The API resolves language; the client never picks (ADR-041). One query
+    # for the whole page, and applied at serialisation rather than on the rows
+    # themselves -- an ORM instance with a translated title assigned to it can
+    # be written back by the next commit.
+    overrides = await overrides_for(db, "job", items, ("title", "description"), locale)
     return schemas.JobPage(
-        items=[schemas.JobOut.model_validate(j) for j in items],
+        items=[
+            schemas.JobOut.model_validate(j).model_copy(update=overrides.get(j.id, {}))
+            for j in items
+        ],
         total=total,
         limit=limit,
         offset=offset,
@@ -62,11 +72,16 @@ async def list_jobs(
 
 
 @jobs_router.get("/{slug}", response_model=schemas.JobDetail)
-async def get_job(slug: str, db: AsyncSession = Depends(get_db_session)) -> schemas.JobDetail:
+async def get_job(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
+) -> schemas.JobDetail:
     job = await service.get_job_by_slug(db, slug)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
-    return schemas.JobDetail.model_validate(job)
+    overrides = await overrides_for(db, "job", [job], ("title", "description"), locale)
+    return schemas.JobDetail.model_validate(job).model_copy(update=overrides.get(job.id, {}))
 
 
 # -------------------------------------------------------------------- courses
@@ -82,6 +97,7 @@ async def list_courses(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> schemas.CoursePage:
     items, total = await service.list_courses(
         db,
@@ -93,8 +109,12 @@ async def list_courses(
         limit=limit,
         offset=offset,
     )
+    overrides = await overrides_for(db, "course", items, ("title", "description"), locale)
     return schemas.CoursePage(
-        items=[schemas.CourseOut.model_validate(c) for c in items],
+        items=[
+            schemas.CourseOut.model_validate(c).model_copy(update=overrides.get(c.id, {}))
+            for c in items
+        ],
         total=total,
         limit=limit,
         offset=offset,
@@ -102,11 +122,18 @@ async def list_courses(
 
 
 @courses_router.get("/{slug}", response_model=schemas.CourseDetail)
-async def get_course(slug: str, db: AsyncSession = Depends(get_db_session)) -> schemas.CourseDetail:
+async def get_course(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
+) -> schemas.CourseDetail:
     course = await service.get_course_by_slug(db, slug)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
-    return schemas.CourseDetail.model_validate(course)
+    overrides = await overrides_for(db, "course", [course], ("title", "description"), locale)
+    return schemas.CourseDetail.model_validate(course).model_copy(
+        update=overrides.get(course.id, {})
+    )
 
 
 # ------------------------------------------------------- skill ↔ marketplace

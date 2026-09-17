@@ -76,7 +76,7 @@ async def _held_skills(db: AsyncSession, profile_id: uuid.UUID) -> list[HeldSkil
             select(
                 CandidateSkill.skill_id,
                 Skill.concept_id,
-                Skill.name_en,
+                Skill.name,
                 CandidateSkill.proficiency,
                 CandidateSkill.source,
             )
@@ -88,7 +88,7 @@ async def _held_skills(db: AsyncSession, profile_id: uuid.UUID) -> list[HeldSkil
         HeldSkill(
             skill_id=r.skill_id,
             concept_id=r.concept_id,
-            name_en=r.name_en,
+            name=r.name,
             proficiency=r.proficiency,
             source=r.source,
         )
@@ -108,7 +108,7 @@ async def requirements_for(
                 JobSkill.skill_id,
                 Skill.concept_id,
                 Skill.nos_code,
-                Skill.name_en,
+                Skill.name,
                 Skill.nsqf_level,
                 JobSkill.importance,
                 JobSkill.is_mandatory,
@@ -124,7 +124,7 @@ async def requirements_for(
                 skill_id=r.skill_id,
                 concept_id=r.concept_id,
                 nos_code=r.nos_code,
-                name_en=r.name_en,
+                name=r.name,
                 nsqf_level=r.nsqf_level,
                 importance=r.importance,
                 is_mandatory=r.is_mandatory,
@@ -185,7 +185,7 @@ async def match_jobs(
     ]
     # Score, then coverage, then title: a stable order, so the same inputs
     # always produce the same page.
-    scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, s.job.title_en))
+    scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, s.job.title))
     return scored[:limit]
 
 
@@ -223,7 +223,7 @@ async def courses_closing_gap(
 
     rows = (
         await db.execute(
-            select(CourseSkill.course_id, Skill.concept_id, Skill.id, Skill.name_en)
+            select(CourseSkill.course_id, Skill.concept_id, Skill.id, Skill.name)
             .join(Skill, Skill.id == CourseSkill.skill_id)
             .join(Course, Course.id == CourseSkill.course_id)
             .where(Course.status == "published")
@@ -237,7 +237,7 @@ async def courses_closing_gap(
     for r in rows:
         key = r.concept_id or r.id
         if key in wanted:
-            covered.setdefault(r.course_id, {})[key] = r.name_en
+            covered.setdefault(r.course_id, {})[key] = r.name
 
     courses = {
         c.id: c
@@ -257,7 +257,7 @@ async def courses_closing_gap(
     ]
     # Mandatory coverage first: a course that unblocks an application beats one
     # that merely improves a score.
-    suggestions.sort(key=lambda s: (-s.covers_mandatory, -s.closes_count, s.course.title_en))
+    suggestions.sort(key=lambda s: (-s.covers_mandatory, -s.closes_count, s.course.title))
     return suggestions[:limit]
 
 
@@ -310,7 +310,7 @@ async def entry_routes_for_job(db: AsyncSession, job_id: uuid.UUID) -> EntryRout
     years = [r.experience_years for r in routes if r.experience_years is not None]
     return EntryRouteFit(
         qp_code=qp.qp_code,
-        qp_name=qp.name_en,
+        qp_name=qp.name,
         routes_total=len(routes),
         education_options=sorted({r.education_desc for r in routes if r.education_desc}),
         # The easiest way in is what a candidate needs to know.

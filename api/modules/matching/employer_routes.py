@@ -58,7 +58,7 @@ def candidate_card(profile: CandidateProfile, result: MatchResult) -> schemas.Ca
             schemas.MissingSkillOut(
                 skill_id=m.skill_id,
                 nos_code=m.nos_code,
-                name_en=m.name_en,
+                name=m.name,
                 importance=m.importance,
                 is_mandatory=m.is_mandatory,
                 nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,

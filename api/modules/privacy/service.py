@@ -218,7 +218,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         # the employer's.
         "applications": [
             {
-                "vacancy": application.job.title_en,
+                "vacancy": application.job.title,
                 # `Job.tenant` is typed `object` on the model; the cast is at the
                 # read, not a change to the mapping.
                 "organisation": cast(Tenant, application.job.tenant).name,
@@ -231,7 +231,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             for application in (applications.all() if applications is not None else [])
         ],
         "saved_jobs": [
-            {"vacancy": row.job.title_en, "saved_at": _iso(row.created_at)}
+            {"vacancy": row.job.title, "saved_at": _iso(row.created_at)}
             for row in (saved.all() if saved is not None else [])
         ],
         "activity": [

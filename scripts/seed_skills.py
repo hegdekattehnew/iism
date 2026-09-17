@@ -16,6 +16,7 @@ import asyncio
 
 from sqlalchemy import delete, select
 
+from api.core import localisation
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.skills.models import Skill, SkillAlias
 
@@ -568,13 +569,19 @@ async def seed() -> tuple[int, int, int]:
             else:
                 updated += 1
 
-            skill.name_en = en
-            skill.name_hi = hi
-            skill.description_en = d_en
-            skill.description_hi = d_hi
+            skill.name = en
+            skill.description = d_en
             skill.skill_type = stype
             skill.nsqf_level = level
             await db.flush()
+
+            # Hindi lives in content_translations since ADR-041, so a third
+            # language here is rows rather than columns.
+            for field, text_hi in (("name", hi), ("description", d_hi)):
+                if text_hi:
+                    await localisation.upsert(
+                        db, "skill", skill.id, field, "hi", text_hi, source="imported"
+                    )
 
             # Replace rather than merge: the source of truth is this file.
             await db.execute(delete(SkillAlias).where(SkillAlias.skill_id == skill.id))

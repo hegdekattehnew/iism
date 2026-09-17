@@ -21,7 +21,7 @@ async def _auth(client: AsyncClient) -> dict[str, str]:
 
 
 async def _skill(db: AsyncSession, slug: str) -> Skill:
-    skill = Skill(slug=slug, name_en=slug.replace("-", " ").title(), skill_type="technical")
+    skill = Skill(slug=slug, name=slug.replace("-", " ").title(), skill_type="technical")
     db.add(skill)
     await db.flush()
     return skill

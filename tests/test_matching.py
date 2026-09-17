@@ -31,7 +31,7 @@ def _req(name: str, *, importance: int = 3, mandatory: bool = False, concept=Non
         skill_id=uuid.uuid4(),
         concept_id=concept,
         nos_code=f"X/{name}",
-        name_en=name,
+        name=name,
         nsqf_level=level,
         importance=importance,
         is_mandatory=mandatory,
@@ -43,7 +43,7 @@ def _held(req: RequiredSkill, *, source: str = "certified", proficiency: int = 4
     return HeldSkill(
         skill_id=req.skill_id,
         concept_id=req.concept_id,
-        name_en=req.name_en,
+        name=req.name,
         proficiency=proficiency,
         source=source,
     )
@@ -126,7 +126,7 @@ class TestScoring:
         held = HeldSkill(
             skill_id=uuid.uuid4(),  # a different row entirely
             concept_id=concept,
-            name_en="standard, another issue of it",
+            name="standard, another issue of it",
             proficiency=4,
             source="certified",
         )
@@ -142,7 +142,7 @@ class TestScoring:
         other = HeldSkill(
             skill_id=uuid.uuid4(),
             concept_id=None,
-            name_en="something else",
+            name="something else",
             proficiency=4,
             source="certified",
         )
@@ -183,7 +183,7 @@ class TestScoring:
         ]
         result = score_match(reqs, [])
 
-        assert [m.name_en for m in result.missing] == [
+        assert [m.name for m in result.missing] == [
             "mandatory",
             "optional-high",
             "optional-low",
@@ -288,7 +288,7 @@ class TestEmployerConsole:
         """One vacancy, and three candidates who differ in exactly one way each."""
         mandatory = Skill(
             slug="infection-control-x",
-            name_en="Infection control",
+            name="Infection control",
             skill_type="technical",
             nsqf_level=Decimal("4"),
             nos_code="TST/N0001",
@@ -296,7 +296,7 @@ class TestEmployerConsole:
         )
         optional = Skill(
             slug="bed-making-x",
-            name_en="Replace linen",
+            name="Replace linen",
             skill_type="technical",
             nsqf_level=Decimal("3"),
             nos_code="TST/N0002",
@@ -311,7 +311,7 @@ class TestEmployerConsole:
         job = Job(
             slug="demo-vacancy",
             tenant_id=employer_tenant.id,
-            title_en="Ward Attendant",
+            title="Ward Attendant",
             employment_type="full_time",
             nsqf_level_min=Decimal("3"),
             status="published",
@@ -361,9 +361,7 @@ class TestEmployerConsole:
         assert first["missing_mandatory"] == 0
         assert second["missing_mandatory"] == 1
         assert second["capped_by_mandatory"] is True
-        assert [m["name_en"] for m in second["missing"] if m["is_mandatory"]] == [
-            "Infection control"
-        ]
+        assert [m["name"] for m in second["missing"] if m["is_mandatory"]] == ["Infection control"]
 
     async def test_a_candidate_is_never_identified(self, pool, client) -> None:
         """The surface is unauthenticated, so it may not carry a name, a phone
@@ -426,7 +424,7 @@ async def test_the_employer_overview_costs_the_same_for_one_vacancy_or_many(
 
     skill = Skill(
         slug="n-plus-one-x",
-        name_en="Handle patient records",
+        name="Handle patient records",
         skill_type="technical",
         nsqf_level=Decimal("4"),
         nos_code="TST/N0901",
@@ -447,7 +445,7 @@ async def test_the_employer_overview_costs_the_same_for_one_vacancy_or_many(
 
     async def add_job(n: int) -> None:
         job = Job(
-            slug=f"n-plus-one-{n}", tenant_id=tenant.id, title_en=f"Clerk {n}", status="published"
+            slug=f"n-plus-one-{n}", tenant_id=tenant.id, title=f"Clerk {n}", status="published"
         )
         db.add(job)
         await db.flush()

@@ -47,10 +47,8 @@ log = structlog.get_logger("iism.marketplace")
 # wholesale so `search_vector` -- GENERATED ALWAYS, and rejected by Postgres on
 # any write -- can never reach an INSERT by way of a schema someone extended.
 _PLAIN_FIELDS = (
-    "title_en",
-    "title_hi",
-    "description_en",
-    "description_hi",
+    "title",
+    "description",
     "location_state",
     "location_district",
     "employment_type",
@@ -133,7 +131,7 @@ async def get_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
 async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
     location = await resolve_location(db, payload.location_state, payload.location_district)
     job = Job(
-        slug=await unique_slug(db, Job.slug, payload.title_en, payload.location_district),
+        slug=await unique_slug(db, Job.slug, payload.title, payload.location_district),
         tenant_id=tenant_id,
         # Explicit. `Job.status` defaults to "published" at the model level, so
         # omitting this would put an unfinished listing straight in front of

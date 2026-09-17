@@ -26,8 +26,7 @@ class JobRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     slug: str
-    title_en: str
-    title_hi: str | None = None
+    title: str
     location_state: str | None = None
     location_district: str | None = None
     employment_type: str

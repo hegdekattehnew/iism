@@ -1603,14 +1603,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /**
              * Mode
              * @enum {string}
@@ -1641,14 +1637,10 @@ export interface components {
          *     action on its own endpoint, not something a form can do by setting a string.
          */
         CourseIn: {
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /**
              * Mode
              * @default offline
@@ -1686,14 +1678,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /**
              * Mode
              * @enum {string}
@@ -1750,10 +1738,8 @@ export interface components {
         CourseSuggestionOut: {
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
+            /** Title */
+            title: string;
             /** Mode */
             mode: string;
             /** Duration Hours */
@@ -1773,10 +1759,8 @@ export interface components {
         CriterionOut: {
             /** Pc Ref */
             pc_ref?: string | null;
-            /** Description En */
-            description_en: string;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Description */
+            description: string;
             /** Total Marks */
             total_marks?: number | null;
         };
@@ -1937,14 +1921,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -1978,14 +1958,10 @@ export interface components {
          *     a footgun this schema deliberately keeps out of reach.
          */
         JobIn: {
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -2021,14 +1997,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -2088,10 +2060,8 @@ export interface components {
         JobRef: {
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
+            /** Title */
+            title: string;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -2130,10 +2100,8 @@ export interface components {
         JobSummary: {
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
+            /** Title */
+            title: string;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -2287,8 +2255,8 @@ export interface components {
         MatchedSkillOut: {
             /** Nos Code */
             nos_code?: string | null;
-            /** Name En */
-            name_en: string;
+            /** Name */
+            name: string;
             /** Importance */
             importance: number;
             /** Is Mandatory */
@@ -2316,8 +2284,8 @@ export interface components {
             skill_id: string;
             /** Nos Code */
             nos_code?: string | null;
-            /** Name En */
-            name_en: string;
+            /** Name */
+            name: string;
             /** Importance */
             importance: number;
             /** Is Mandatory */
@@ -2337,14 +2305,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /**
              * Mode
              * @enum {string}
@@ -2411,14 +2375,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Title En */
-            title_en: string;
-            /** Title Hi */
-            title_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -2583,10 +2543,8 @@ export interface components {
         };
         /** PerformanceElementOut */
         PerformanceElementOut: {
-            /** Name En */
-            name_en: string;
-            /** Name Hi */
-            name_hi?: string | null;
+            /** Name */
+            name: string;
             /** Total Marks */
             total_marks?: number | null;
             /** Criteria */
@@ -2635,12 +2593,10 @@ export interface components {
             version: string;
             /** Slug */
             slug: string;
-            /** Name En */
-            name_en: string;
-            /** Name Hi */
-            name_hi?: string | null;
-            /** Job Role En */
-            job_role_en?: string | null;
+            /** Name */
+            name: string;
+            /** Job Role */
+            job_role?: string | null;
             /** Nsqf Level */
             nsqf_level?: number | null;
             /**
@@ -2673,8 +2629,8 @@ export interface components {
         ScarceSkillOut: {
             /** Nos Code */
             nos_code?: string | null;
-            /** Name En */
-            name_en: string;
+            /** Name */
+            name: string;
             /** Required By */
             required_by: number;
             /** Held By */
@@ -2725,14 +2681,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Name En */
-            name_en: string;
-            /** Name Hi */
-            name_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
             /**
              * Skill Type
              * @enum {string}
@@ -2787,14 +2739,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Name En */
-            name_en: string;
-            /** Name Hi */
-            name_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
             /**
              * Skill Type
              * @enum {string}
@@ -2855,14 +2803,10 @@ export interface components {
             id: string;
             /** Slug */
             slug: string;
-            /** Name En */
-            name_en: string;
-            /** Name Hi */
-            name_hi?: string | null;
-            /** Description En */
-            description_en?: string | null;
-            /** Description Hi */
-            description_hi?: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
             /**
              * Skill Type
              * @enum {string}
@@ -3115,6 +3059,8 @@ export interface operations {
                 nsqf_level?: number | null;
                 limit?: number;
                 offset?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
             };
             header?: never;
             path?: never;
@@ -3208,7 +3154,10 @@ export interface operations {
     };
     get_skill_skills__slug__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -3299,6 +3248,8 @@ export interface operations {
                 nsqf_level_max?: number | null;
                 limit?: number;
                 offset?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
             };
             header?: never;
             path?: never;
@@ -3328,7 +3279,10 @@ export interface operations {
     };
     get_job_jobs__slug__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -3368,6 +3322,8 @@ export interface operations {
                 max_fee_inr?: number | null;
                 limit?: number;
                 offset?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
             };
             header?: never;
             path?: never;
@@ -3397,7 +3353,10 @@ export interface operations {
     };
     get_course_courses__slug__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 slug: string;

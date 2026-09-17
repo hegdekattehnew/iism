@@ -10,6 +10,7 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from api.core.localisation import ContentTranslation
 from api.modules.marketplace.models import Course, CourseSkill, Job, JobSkill
 from api.modules.skills.models import Skill
 
@@ -17,18 +18,28 @@ PUBLISHED = "published"
 
 
 def _text_filter(stmt: Select, model: type[Job] | type[Course], q: str) -> Select:
-    """Full text across both languages, with a plain ILIKE fallback.
+    """Full text over the source title, plus any language it was translated into.
 
-    The `simple` half of the vector carries Hindi, which has no stemmer, so a
-    short Devanagari query can miss; ILIKE on the titles catches those.
+    The vector covers the row's own text in both configurations -- Postgres has
+    no Hindi stemmer, so a short Devanagari query can still miss it, and the
+    ILIKE catches those. Translations live in their own table since ADR-041, so
+    a title translated into a language the row was not written in is matched by
+    the subquery rather than by a second column.
     """
     like = f"%{q.lower()}%"
+    entity_type = "job" if model is Job else "course"
     return stmt.where(
         or_(
             model.search_vector.op("@@")(func.websearch_to_tsquery("english", q)),
             model.search_vector.op("@@")(func.websearch_to_tsquery("simple", q)),
-            func.lower(model.title_en).like(like),
-            func.lower(func.coalesce(model.title_hi, "")).like(like),
+            func.lower(model.title).like(like),
+            model.id.in_(
+                select(ContentTranslation.entity_id).where(
+                    ContentTranslation.entity_type == entity_type,
+                    ContentTranslation.field.in_(("title", "description")),
+                    func.lower(ContentTranslation.text).like(like),
+                )
+            ),
         )
     )
 
@@ -78,7 +89,7 @@ async def list_jobs(
     if nsqf_level_max is not None:
         stmt = stmt.where(or_(Job.nsqf_level_min.is_(None), Job.nsqf_level_min <= nsqf_level_max))
 
-    return await _paged(db, stmt, Job.title_en, limit, offset)
+    return await _paged(db, stmt, Job.title, limit, offset)
 
 
 async def get_job_by_slug(db: AsyncSession, slug: str) -> Job | None:
@@ -111,7 +122,7 @@ async def jobs_requiring_skill(
         select(Job)
         .join(JobSkill, JobSkill.job_id == Job.id)
         .where(JobSkill.skill_id == skill_id, Job.status == PUBLISHED)
-        .order_by(JobSkill.is_mandatory.desc(), JobSkill.importance.desc(), Job.title_en)
+        .order_by(JobSkill.is_mandatory.desc(), JobSkill.importance.desc(), Job.title)
         .limit(limit)
     )
     return list((await db.scalars(stmt)).unique())
@@ -151,7 +162,7 @@ async def list_courses(
     if max_fee_inr is not None:
         stmt = stmt.where(or_(Course.fee_inr.is_(None), Course.fee_inr <= max_fee_inr))
 
-    return await _paged(db, stmt, Course.title_en, limit, offset)
+    return await _paged(db, stmt, Course.title, limit, offset)
 
 
 async def get_course_by_slug(db: AsyncSession, slug: str) -> Course | None:
@@ -183,7 +194,7 @@ async def courses_teaching_skill(
         select(Course)
         .join(CourseSkill, CourseSkill.course_id == Course.id)
         .where(CourseSkill.skill_id == skill_id, Course.status == PUBLISHED)
-        .order_by(Course.fee_inr.asc().nulls_last(), Course.title_en)
+        .order_by(Course.fee_inr.asc().nulls_last(), Course.title)
         .limit(limit)
     )
     return list((await db.scalars(stmt)).unique())

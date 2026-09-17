@@ -31,7 +31,7 @@ def _email() -> str:
 async def taught_skill(db: AsyncSession) -> str:
     skill = Skill(
         slug="sterile-technique-tst-n0101",
-        name_en="Apply sterile technique",
+        name="Apply sterile technique",
         skill_type="technical",
         nsqf_level=Decimal("4"),
         nos_code="TST/N0101",
@@ -46,7 +46,7 @@ async def taught_skill(db: AsyncSession) -> str:
 async def second_taught_skill(db: AsyncSession) -> str:
     skill = Skill(
         slug="waste-segregation-tst-n0102",
-        name_en="Segregate biomedical waste",
+        name="Segregate biomedical waste",
         skill_type="technical",
         nsqf_level=Decimal("3"),
         nos_code="TST/N0102",
@@ -120,7 +120,7 @@ class TestCoursePublishing:
             f"/org/{slug}/courses",
             headers=headers,
             json={
-                "title_en": "Sterile Technique for Ward Staff",
+                "title": "Sterile Technique for Ward Staff",
                 "mode": "hybrid",
                 "language": "both",
                 "duration_hours": 60,
@@ -148,7 +148,7 @@ class TestCoursePublishing:
         created = await client.post(
             f"/org/{slug}/courses",
             headers=headers,
-            json={"title_en": "Quietly Drafted Course", "skills": []},
+            json={"title": "Quietly Drafted Course", "skills": []},
         )
 
         public = (await client.get("/courses", params={"limit": 100})).json()
@@ -165,7 +165,7 @@ class TestCoursePublishing:
             await client.post(
                 f"/org/{slug}/courses",
                 headers=headers,
-                json={"title_en": "Teaches Nothing", "skills": []},
+                json={"title": "Teaches Nothing", "skills": []},
             )
         ).json()
 
@@ -185,7 +185,7 @@ class TestCoursePublishing:
             f"/org/{slug}/courses",
             headers=headers,
             json={
-                "title_en": "Two Modules, One Standard",
+                "title": "Two Modules, One Standard",
                 "skills": [
                     {"skill_slug": taught_skill, "level_taught": 3},
                     {"skill_slug": taught_skill, "level_taught": 4},
@@ -205,7 +205,7 @@ class TestCoursePublishing:
                 f"/org/{slug}/courses",
                 headers=headers,
                 json={
-                    "title_en": "Rewritten Syllabus",
+                    "title": "Rewritten Syllabus",
                     "skills": [{"skill_slug": taught_skill, "level_taught": 3}],
                 },
             )
@@ -215,7 +215,7 @@ class TestCoursePublishing:
             f"/org/{slug}/courses/{course['slug']}",
             headers=headers,
             json={
-                "title_en": "Rewritten Syllabus",
+                "title": "Rewritten Syllabus",
                 "skills": [{"skill_slug": second_taught_skill, "level_taught": 4}],
             },
         )
@@ -229,14 +229,14 @@ class TestCoursePublishing:
             await client.post(
                 f"/org/{slug}/courses",
                 headers=headers,
-                json={"title_en": "Original Course Title", "skills": []},
+                json={"title": "Original Course Title", "skills": []},
             )
         ).json()
 
         updated = await client.put(
             f"/org/{slug}/courses/{course['slug']}",
             headers=headers,
-            json={"title_en": "Completely Different Title", "skills": []},
+            json={"title": "Completely Different Title", "skills": []},
         )
         assert updated.json()["slug"] == course["slug"]
 
@@ -256,7 +256,7 @@ class TestSharedValidation:
         because profiles reference it; excluded from matching."""
         skill = Skill(
             slug="hand-hygiene-legacy",
-            name_en="Hand hygiene",
+            name="Hand hygiene",
             skill_type="core",
             nsqf_level=Decimal("2"),
             source="legacy",
@@ -275,7 +275,7 @@ class TestSharedValidation:
             f"/org/{slug}/courses",
             headers=headers,
             json={
-                "title_en": "Teaches Something Retired",
+                "title": "Teaches Something Retired",
                 "skills": [{"skill_slug": retired_skill, "level_taught": 2}],
             },
         )
@@ -292,7 +292,7 @@ class TestSharedValidation:
             f"/org/{slug}/jobs",
             headers=headers,
             json={
-                "title_en": "Requires Something Retired",
+                "title": "Requires Something Retired",
                 "skills": [{"skill_slug": retired_skill, "importance": 3}],
             },
         )
@@ -306,7 +306,7 @@ class TestSharedValidation:
         refused = await client.post(
             f"/org/{slug}/courses",
             headers=headers,
-            json={"title_en": "Mistyped", "skills": [{"skill_slug": "no-such-standard"}]},
+            json={"title": "Mistyped", "skills": [{"skill_slug": "no-such-standard"}]},
         )
         assert refused.status_code == 422
         assert "no-such-standard" in refused.json()["detail"]
@@ -323,7 +323,7 @@ class TestTheTwoSurfacesStayApart:
         refused = await client.post(
             f"/org/{slug}/jobs",
             headers=headers,
-            json={"title_en": "Vacancy from a training provider", "skills": []},
+            json={"title": "Vacancy from a training provider", "skills": []},
         )
         assert refused.status_code == 403
 
@@ -342,7 +342,7 @@ class TestTheTwoSurfacesStayApart:
         headers, slug = await _provider(client, db, "Every Write Academy")
 
         # A provider against the vacancy surface: every write, refused.
-        job_body = {"title_en": "Not a provider's business", "skills": []}
+        job_body = {"title": "Not a provider's business", "skills": []}
         assert (
             await client.post(f"/org/{slug}/jobs", headers=headers, json=job_body)
         ).status_code == 403
@@ -363,7 +363,7 @@ class TestTheTwoSurfacesStayApart:
         """The mirror. A guard that holds in one direction only is not a guard."""
         headers, slug = await _employer(client, "Every Write Clinic")
 
-        body = {"title_en": "Not an employer's business", "skills": []}
+        body = {"title": "Not an employer's business", "skills": []}
         assert (
             await client.post(f"/org/{slug}/courses", headers=headers, json=body)
         ).status_code == 403

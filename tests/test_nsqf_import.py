@@ -189,7 +189,7 @@ class TestImport:
 
         names = set(
             (
-                await db.scalars(select(Occupation.name_en).where(Occupation.occupation_ref == "1"))
+                await db.scalars(select(Occupation.name).where(Occupation.occupation_ref == "1"))
             ).all()
         )
         assert names == {"Sample Collection", "Store Operations"}
@@ -337,7 +337,7 @@ class TestIdempotency:
         revised._docs["nos"][0] = {**revised._docs["nos"][0], "unitTitle": "Collect samples"}
         await _import(db, revised)
 
-        titles = (await db.scalars(select(Skill.name_en).where(Skill.nos_code == "HC/N0001"))).all()
+        titles = (await db.scalars(select(Skill.name).where(Skill.nos_code == "HC/N0001"))).all()
         assert titles == ["Collect samples"]
 
 
@@ -432,7 +432,7 @@ class TestGeography:
             Job(
                 slug="j",
                 tenant_id=tenant_id,
-                title_en="J",
+                title="J",
                 location_state="Karnataka",
                 location_district="Bengaluru",
             )
@@ -477,7 +477,7 @@ class TestContentLayer:
         )
         assert element is not None
         assert element.total_marks == Decimal("40.00")
-        assert element.name_en == "Prepare for the procedure"
+        assert element.name == "Prepare for the procedure"
 
     async def test_an_empty_criterion_is_not_stored(self, db, source) -> None:
         """One source criterion has a blank description. A row saying nothing is
@@ -498,7 +498,7 @@ class TestContentLayer:
 
         knowledge = (
             await db.scalars(
-                select(KnowledgeParameter.text_en)
+                select(KnowledgeParameter.text)
                 .join(Skill, KnowledgeParameter.skill_id == Skill.id)
                 .where(Skill.nos_code == "HC/N0001")
                 .order_by(KnowledgeParameter.ordinal)
@@ -629,7 +629,7 @@ class TestRequirementsApi:
 
         body = response.json()
         assert body["criteria_count"] == 4
-        assert [e["name_en"] for e in body["elements"]] == [
+        assert [e["name"] for e in body["elements"]] == [
             "Prepare for the procedure",
             "Draw and label the sample",
         ]
@@ -645,7 +645,7 @@ class TestRequirementsApi:
         body = (await client.get(f"/skills/{slug}/requirements")).json()
         first = body["elements"][0]["criteria"]
         assert [c["pc_ref"] for c in first] == ["PC1", "PC2"]
-        assert first[0]["description_en"].startswith("confirm patient identity")
+        assert first[0]["description"].startswith("confirm patient identity")
 
     async def test_a_standard_with_no_criteria_serves_an_empty_bundle(
         self, db, client, source

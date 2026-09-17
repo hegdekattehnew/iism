@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core import localisation
 from api.modules.identity import Tenant
 from api.modules.marketplace import (
     Course,
@@ -27,15 +28,13 @@ async def seeded(db: AsyncSession) -> dict:
     skill — enough to prove the joins in both directions."""
     hygiene = Skill(
         slug="hand-hygiene",
-        name_en="Hand hygiene",
-        name_hi="हाथ की स्वच्छता",
+        name="Hand hygiene",
         skill_type="core",
         nsqf_level=2,
     )
     blood = Skill(
         slug="blood-sample-collection",
-        name_en="Blood sample collection",
-        name_hi="रक्त नमूना संग्रह",
+        name="Blood sample collection",
         skill_type="technical",
         nsqf_level=4,
     )
@@ -51,9 +50,8 @@ async def seeded(db: AsyncSession) -> dict:
     gda = Job(
         slug="gda",
         tenant_id=hospital.id,
-        title_en="General Duty Assistant",
-        title_hi="जनरल ड्यूटी असिस्टेंट",
-        description_en="Ward support work.",
+        title="General Duty Assistant",
+        description="Ward support work.",
         location_state="Tamil Nadu",
         location_district="Chennai",
         employment_type="full_time",
@@ -63,8 +61,8 @@ async def seeded(db: AsyncSession) -> dict:
     phleb = Job(
         slug="phleb",
         tenant_id=hospital.id,
-        title_en="Phlebotomist",
-        description_en="Sample collection.",
+        title="Phlebotomist",
+        description="Sample collection.",
         location_state="Telangana",
         employment_type="contract",
         experience_min_years=1,
@@ -73,7 +71,7 @@ async def seeded(db: AsyncSession) -> dict:
     draft = Job(
         slug="draft-job",
         tenant_id=hospital.id,
-        title_en="Unpublished role",
+        title="Unpublished role",
         status="draft",
         experience_min_years=0,
     )
@@ -82,7 +80,7 @@ async def seeded(db: AsyncSession) -> dict:
     cheap = Course(
         slug="cheap",
         tenant_id=academy.id,
-        title_en="Infection basics",
+        title="Infection basics",
         mode="online",
         language="hi",
         fee_inr=1800,
@@ -91,7 +89,7 @@ async def seeded(db: AsyncSession) -> dict:
     dear = Course(
         slug="dear",
         tenant_id=academy.id,
-        title_en="Phlebotomy Technician",
+        title="Phlebotomy Technician",
         mode="offline",
         language="both",
         fee_inr=9000,
@@ -99,6 +97,15 @@ async def seeded(db: AsyncSession) -> dict:
     )
     db.add_all([cheap, dear])
     await db.flush()
+
+    # The Hindi that used to sit in `*_hi` columns (ADR-041). The Devanagari
+    # search test below is what proves the new path actually resolves it.
+    for entity, row_id, field, text in (
+        ("skill", hygiene.id, "name", "हाथ की स्वच्छता"),
+        ("skill", blood.id, "name", "रक्त नमूना संग्रह"),
+        ("job", gda.id, "title", "जनरल ड्यूटी असिस्टेंट"),
+    ):
+        await localisation.upsert(db, entity, row_id, field, "hi", text)
 
     db.add_all(
         [

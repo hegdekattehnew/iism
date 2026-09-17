@@ -47,12 +47,10 @@ class JobOut(BaseModel):
 
     id: uuid.UUID
     slug: str
-    title_en: str
-    title_hi: str | None = None
+    title: str
     # Bounded on the way in, not in the column (free prose stays `Text`): the
     # cap is about what one request may make us store and render, not the data.
-    description_en: str | None = Field(None, max_length=10_000)
-    description_hi: str | None = Field(None, max_length=10_000)
+    description: str | None = Field(None, max_length=10_000)
     location_state: str | None = None
     location_district: str | None = None
     employment_type: EmploymentType
@@ -92,12 +90,10 @@ class JobIn(BaseModel):
     a footgun this schema deliberately keeps out of reach.
     """
 
-    title_en: str = Field(min_length=3, max_length=200)
-    title_hi: str | None = Field(None, max_length=200)
+    title: str = Field(min_length=3, max_length=200)
     # Bounded on the way in, not in the column (free prose stays `Text`): the
     # cap is about what one request may make us store and render, not the data.
-    description_en: str | None = Field(None, max_length=10_000)
-    description_hi: str | None = Field(None, max_length=10_000)
+    description: str | None = Field(None, max_length=10_000)
     location_state: str | None = Field(None, max_length=120)
     location_district: str | None = Field(None, max_length=120)
     employment_type: EmploymentType = "full_time"
@@ -141,12 +137,10 @@ class CourseOut(BaseModel):
 
     id: uuid.UUID
     slug: str
-    title_en: str
-    title_hi: str | None = None
+    title: str
     # Bounded on the way in, not in the column (free prose stays `Text`): the
     # cap is about what one request may make us store and render, not the data.
-    description_en: str | None = Field(None, max_length=10_000)
-    description_hi: str | None = Field(None, max_length=10_000)
+    description: str | None = Field(None, max_length=10_000)
     mode: CourseMode
     language: CourseLanguage
     duration_hours: int | None = None
@@ -180,12 +174,10 @@ class CourseIn(BaseModel):
     action on its own endpoint, not something a form can do by setting a string.
     """
 
-    title_en: str = Field(min_length=3, max_length=200)
-    title_hi: str | None = Field(None, max_length=200)
+    title: str = Field(min_length=3, max_length=200)
     # Bounded on the way in, not in the column (free prose stays `Text`): the
     # cap is about what one request may make us store and render, not the data.
-    description_en: str | None = Field(None, max_length=10_000)
-    description_hi: str | None = Field(None, max_length=10_000)
+    description: str | None = Field(None, max_length=10_000)
     mode: CourseMode = "offline"
     language: CourseLanguage = "both"
     duration_hours: int | None = Field(None, ge=1, le=10_000)

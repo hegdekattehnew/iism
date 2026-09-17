@@ -1,6 +1,6 @@
 """One table for every translation, and one way to read it (ADR-041).
 
-Translatable text used to be a column pair per field -- `title_en` beside
+Translatable text used to be a column pair per field -- `title` beside
 `title_hi` -- which reached 18 pairs across 12 tables and made a third language
 a schema migration. The base column now holds the text in the row's own
 language, `source_locale` says which language that is, and everything else
@@ -16,12 +16,26 @@ is what the owning module calls instead.
 import uuid
 from collections.abc import Iterable, Sequence
 from datetime import datetime
+from typing import TYPE_CHECKING, Protocol
 
-from sqlalchemy import CheckConstraint, DateTime, Index, Text, UniqueConstraint, func, select
+from fastapi import Depends, Query, Request
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Index,
+    Text,
+    UniqueConstraint,
+    func,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.core.database import Base, one_of
+from api.core.security import get_optional_user
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from api.modules.identity.models import User
 
 # What can be translated. Closed, like every other set in this project: an open
 # string column becomes four spellings of "qualification_pack" within a month.
@@ -42,7 +56,7 @@ ENTITY_TYPES = (
     "generic_criterion",
 )
 
-# The translatable fields, after the rename: `title_en` -> `title` and so on.
+# The translatable fields, after the rename: `title` -> `title` and so on.
 FIELDS = ("name", "title", "description", "text", "job_role")
 
 # Where the text came from. A machine translation and a reviewed one are not
@@ -129,7 +143,7 @@ def resolve(
     """Requested language, else the row's own text.
 
     The caller holds the fallback chain in one place rather than at every
-    render site -- which is what the 37 `isHi && x.name_hi ? … : x.name_en`
+    render site -- which is what the 37 `isHi && x.name_hi ? … : x.name`
     ternaries were, one chain spelled out 37 times.
     """
     return translations.get((entity_id, field)) or source_text
@@ -187,4 +201,83 @@ async def delete_for(db: AsyncSession, entity_type: str, entity_ids: Iterable[uu
             ContentTranslation.entity_type == entity_type,
             ContentTranslation.entity_id.in_(ids),
         )
+    )
+
+
+def negotiate(header: str | None, override: str | None, preferred: str | None) -> str:
+    """Which language to answer in.
+
+    Order: an explicit `?locale=`, then the signed-in person's own setting,
+    then `Accept-Language`, then the default. The explicit parameter wins
+    because it exists for debugging and for a link someone shares in a
+    particular language; the account setting beats the browser because a person
+    who chose Hindi in this product meant it more than their phone's locale did.
+
+    Parsing is deliberately shallow -- the first tag, region stripped. Quality
+    values are a negotiation this product does not need: it has a handful of
+    locales, not a content-negotiated API.
+    """
+    if override:
+        return override.strip().lower().split("-")[0]
+    if preferred:
+        return preferred.strip().lower().split("-")[0]
+    if header:
+        first = header.split(",")[0].strip().lower()
+        if first and first != "*":
+            return first.split(";")[0].split("-")[0]
+    return DEFAULT_LOCALE
+
+
+class HasId(Protocol):
+    """Anything with a primary key -- which is every row this resolves for."""
+
+    id: uuid.UUID
+
+
+async def overrides_for(
+    db: AsyncSession,
+    entity_type: str,
+    rows: Sequence[HasId],
+    fields: Sequence[str],
+    locale: str,
+) -> dict[uuid.UUID, dict[str, str]]:
+    """Per-row field overrides for a page of rows, in one query.
+
+    Returned as plain dictionaries rather than applied to the rows themselves.
+    **Never mutate the loaded row**: several read endpoints call `record()`,
+    which commits, so a translated title assigned to an ORM instance would be
+    written back to the database as though someone had edited the listing.
+    """
+    ids = [row.id for row in rows]
+    translations = await translations_for(db, entity_type, ids, locale)
+    if not translations:
+        return {}
+    out: dict[uuid.UUID, dict[str, str]] = {}
+    for row in rows:
+        row_id = row.id
+        found = {
+            field: translations[(row_id, field)]
+            for field in fields
+            if (row_id, field) in translations
+        }
+        if found:
+            out[row_id] = found
+    return out
+
+
+async def request_locale(
+    request: Request,
+    locale: str | None = Query(None, description="Override the negotiated language"),
+    user: "User | None" = Depends(get_optional_user),
+) -> str:
+    """The language this response should be in (ADR-041).
+
+    A dependency rather than a parameter on forty handlers, for the reason
+    `require()` absorbed its second question in Sprint 15: a thing every
+    handler must remember is one that eventually is not there.
+    """
+    return negotiate(
+        request.headers.get("accept-language"),
+        locale,
+        user.preferred_locale if user is not None else None,
     )

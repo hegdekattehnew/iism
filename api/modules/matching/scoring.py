@@ -59,7 +59,7 @@ class RequiredSkill:
     skill_id: uuid.UUID
     concept_id: uuid.UUID | None
     nos_code: str | None
-    name_en: str
+    name: str
     nsqf_level: Decimal | None
     importance: int
     is_mandatory: bool
@@ -71,7 +71,7 @@ class HeldSkill:
 
     skill_id: uuid.UUID
     concept_id: uuid.UUID | None
-    name_en: str
+    name: str
     proficiency: int
     source: str
 
@@ -79,7 +79,7 @@ class HeldSkill:
 @dataclass(frozen=True)
 class MatchedSkill:
     nos_code: str | None
-    name_en: str
+    name: str
     importance: int
     is_mandatory: bool
     evidence: str
@@ -91,7 +91,7 @@ class MissingSkill:
     skill_id: uuid.UUID
     concept_id: uuid.UUID | None
     nos_code: str | None
-    name_en: str
+    name: str
     importance: int
     is_mandatory: bool
     nsqf_level: Decimal | None
@@ -159,7 +159,7 @@ def score_match(
                     skill_id=req.skill_id,
                     concept_id=req.concept_id,
                     nos_code=req.nos_code,
-                    name_en=req.name_en,
+                    name=req.name,
                     importance=req.importance,
                     is_mandatory=req.is_mandatory,
                     nsqf_level=req.nsqf_level,
@@ -172,7 +172,7 @@ def score_match(
         matched.append(
             MatchedSkill(
                 nos_code=req.nos_code,
-                name_en=req.name_en,
+                name=req.name,
                 importance=req.importance,
                 is_mandatory=req.is_mandatory,
                 evidence=hit.source,
@@ -186,7 +186,7 @@ def score_match(
         # Nothing in common. Returning the level and evidence components alone
         # would give every job in the catalogue a small non-zero score for
         # everyone, which is noise that ranking then has to see past.
-        missing.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name_en))
+        missing.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name))
         return MatchResult(
             score=0,
             coverage=0.0,
@@ -226,8 +226,8 @@ def score_match(
 
     # Most important first, so the reason reads in the order a person cares
     # about: what is mandatory and missing, then what matters most.
-    missing.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name_en))
-    matched.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name_en))
+    missing.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name))
+    matched.sort(key=lambda m: (not m.is_mandatory, -m.importance, m.name))
 
     return MatchResult(
         score=round(raw * 100),

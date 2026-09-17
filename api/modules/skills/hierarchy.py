@@ -65,8 +65,7 @@ class AwardingBody(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     body_ref: Mapped[str | None] = mapped_column(String(32), default=None)
-    name_en: Mapped[str] = mapped_column(Text)
-    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(String(360), unique=True, index=True)
     body_type: Mapped[str] = mapped_column(String(32), default="awarding_body")
     logo_url: Mapped[str | None] = mapped_column(String(1024), default=None)
@@ -84,8 +83,7 @@ class Sector(Base):
     sector_ref: Mapped[str] = mapped_column(unique=True, index=True)
     # Also the qualification code prefix, and the key shared with AwardingBody.
     sector_code: Mapped[str | None] = mapped_column(String(32), index=True, default=None)
-    name_en: Mapped[str] = mapped_column()
-    name_hi: Mapped[str | None] = mapped_column(default=None)
+    name: Mapped[str] = mapped_column()
     slug: Mapped[str] = mapped_column(unique=True, index=True)
     logo_url: Mapped[str | None] = mapped_column(String(1024), default=None)
     awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -108,8 +106,7 @@ class SubSector(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     sector_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sectors.id", ondelete="CASCADE"))
     sub_sector_ref: Mapped[str] = mapped_column()
-    name_en: Mapped[str] = mapped_column()
-    name_hi: Mapped[str | None] = mapped_column(default=None)
+    name: Mapped[str] = mapped_column()
 
     sector: Mapped["Sector"] = relationship(back_populates="sub_sectors")
 
@@ -134,8 +131,7 @@ class Occupation(Base):
     occupation_ref: Mapped[str] = mapped_column(String(64), index=True)
     code: Mapped[str | None] = mapped_column(String(16), default=None)
     sector_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sectors.id", ondelete="CASCADE"))
-    name_en: Mapped[str] = mapped_column(Text)
-    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    name: Mapped[str] = mapped_column(Text)
 
 
 class QualificationPack(Base):
@@ -157,10 +153,8 @@ class QualificationPack(Base):
     version: Mapped[str] = mapped_column()
     slug: Mapped[str] = mapped_column(unique=True, index=True)
 
-    name_en: Mapped[str] = mapped_column()
-    name_hi: Mapped[str | None] = mapped_column(default=None)
-    job_role_en: Mapped[str | None] = mapped_column(default=None)
-    job_role_hi: Mapped[str | None] = mapped_column(default=None)
+    name: Mapped[str] = mapped_column()
+    job_role: Mapped[str | None] = mapped_column(default=None)
 
     nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
     status: Mapped[str | None] = mapped_column(default=None)
@@ -321,7 +315,7 @@ class ModelCurriculum(Base):
         ForeignKey("qualification_packs.id", ondelete="SET NULL"), default=None
     )
 
-    job_role_en: Mapped[str | None] = mapped_column(default=None)
+    job_role: Mapped[str | None] = mapped_column(default=None)
     nsqf_level: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
     status: Mapped[str | None] = mapped_column(default=None)
     # Minutes, not hours: the source gives HH:MM strings and integer minutes is

@@ -31,7 +31,7 @@ async def vacancy(db: AsyncSession) -> dict:
     """One published vacancy, one draft, and the standard they need."""
     skill = Skill(
         slug="apply-test-standard",
-        name_en="Process payments",
+        name="Process payments",
         skill_type="technical",
         nsqf_level=Decimal("4"),
         nos_code="TST/N7001",
@@ -44,11 +44,11 @@ async def vacancy(db: AsyncSession) -> dict:
     published = Job(
         slug="open-cashier",
         tenant_id=employer.id,
-        title_en="Cashier",
+        title="Cashier",
         employment_type="full_time",
         status="published",
     )
-    draft = Job(slug="secret-cashier", tenant_id=employer.id, title_en="Secret", status="draft")
+    draft = Job(slug="secret-cashier", tenant_id=employer.id, title="Secret", status="draft")
     db.add_all([published, draft])
     await db.flush()
     db.add(JobSkill(job_id=published.id, skill_id=skill.id, importance=5, is_mandatory=True))
@@ -359,7 +359,7 @@ async def _employer_with_job(
             f"/org/{org}/jobs",
             headers=headers,
             json={
-                "title_en": "Inbox Cashier",
+                "title": "Inbox Cashier",
                 "skills": [{"skill_slug": skill_slug, "importance": 5, "is_mandatory": True}],
             },
         )

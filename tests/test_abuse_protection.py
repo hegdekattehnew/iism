@@ -104,10 +104,10 @@ async def test_an_undeclared_oversized_body_is_abandoned(client: AsyncClient) ->
 
 def test_listing_descriptions_and_skill_lists_are_bounded() -> None:
     with pytest.raises(ValidationError):
-        JobIn.model_validate({"title_en": "Nurse", "description_en": "x" * 10_001})
+        JobIn.model_validate({"title": "Nurse", "description": "x" * 10_001})
     skills = [{"skill_slug": f"s-{i}"} for i in range(51)]
     with pytest.raises(ValidationError):
-        JobIn.model_validate({"title_en": "Nurse", "skills": skills})
+        JobIn.model_validate({"title": "Nurse", "skills": skills})
 
 
 # -------------------------------------------------------------- rate limits

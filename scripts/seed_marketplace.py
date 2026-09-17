@@ -20,6 +20,7 @@ import uuid
 from legacy_skill_map import LEGACY_SKILL_MAP  # noqa: E402
 from sqlalchemy import delete, select
 
+from api.core import localisation
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.geography import resolve_location
 from api.modules.identity.models import Tenant
@@ -38,7 +39,7 @@ TENANTS = [
     ("retail-skills-council-academy", "Retail Skills Academy", "course_provider", "Mumbai"),
 ]
 
-# slug, tenant, title_en, title_hi, desc_en, desc_hi, state, district,
+# slug, tenant, title, title_hi, desc_en, desc_hi, state, district,
 # employment_type, exp_min, exp_max, sal_min, sal_max, nsqf_min,
 # [(skill_slug, importance 1-5, mandatory)]
 JOBS = [
@@ -500,7 +501,7 @@ JOBS = [
     ),
 ]
 
-# slug, tenant, title_en, title_hi, desc_en, desc_hi, mode, language,
+# slug, tenant, title, title_hi, desc_en, desc_hi, mode, language,
 # hours, fee, nsqf_level, [(skill_slug, level_taught)]
 COURSES = [
     (
@@ -859,6 +860,18 @@ COURSES = [
 ]
 
 
+async def _translate(db, entity_type: str, row, fields: dict[str, str | None]) -> None:  # type: ignore[no-untyped-def]
+    """Write this row's Hindi as translations (ADR-041).
+
+    Flushes first: a row created moments ago has no id until it is, and a
+    translation keyed on `None` would be silently useless.
+    """
+    await db.flush()
+    for field, text in fields.items():
+        if text:
+            await localisation.upsert(db, entity_type, row.id, field, "hi", text, source="imported")
+
+
 async def seed() -> dict[str, int]:
     stats = {
         "tenants": 0,
@@ -949,8 +962,11 @@ async def seed() -> dict[str, int]:
                 db.add(job)
                 stats["jobs"] += 1
             job.tenant_id = tenants[tslug].id
-            job.title_en, job.title_hi = t_en, t_hi
-            job.description_en, job.description_hi = d_en, d_hi
+            job.title, job.description = t_en, d_en
+            # Hindi is a translation now, not a second column (ADR-041), and the
+            # seed writes it the way the API does -- so a seeded listing and a
+            # self-serve one stay indistinguishable here too.
+            await _translate(db, "job", job, {"title": t_hi, "description": d_hi})
             job.location_state, job.location_district = state, district
             # Resolved through the same service the publishing path uses, so a
             # seeded listing and a self-serve one are indistinguishable on the
@@ -1017,8 +1033,8 @@ async def seed() -> dict[str, int]:
                 db.add(course)
                 stats["courses"] += 1
             course.tenant_id = tenants[tslug].id
-            course.title_en, course.title_hi = t_en, t_hi
-            course.description_en, course.description_hi = d_en, d_hi
+            course.title, course.description = t_en, d_en
+            await _translate(db, "course", course, {"title": t_hi, "description": d_hi})
             course.mode, course.language = mode, lang
             course.duration_hours, course.fee_inr = hours, fee
             course.nsqf_level = nsqf

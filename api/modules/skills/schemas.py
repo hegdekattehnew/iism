@@ -32,10 +32,8 @@ class SkillOut(BaseModel):
 
     id: uuid.UUID
     slug: str
-    name_en: str
-    name_hi: str | None = None
-    description_en: str | None = None
-    description_hi: str | None = None
+    name: str
+    description: str | None = None
     skill_type: SkillType
     nsqf_level: NsqfLevel | None = None
     qp_count: int = 0
@@ -115,9 +113,8 @@ class QualificationRefOut(BaseModel):
     qp_code: str
     version: str
     slug: str
-    name_en: str
-    name_hi: str | None = None
-    job_role_en: str | None = None
+    name: str
+    job_role: str | None = None
     nsqf_level: NsqfLevel | None = None
     # How the qualification uses this unit. An elective sits inside a named
     # "choose from" group, and dropping that distinction would present an option
@@ -137,16 +134,14 @@ class CriterionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     pc_ref: str | None = None
-    description_en: str
-    description_hi: str | None = None
+    description: str
     total_marks: float | None = None
 
 
 class PerformanceElementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    name_en: str
-    name_hi: str | None = None
+    name: str
     total_marks: float | None = None
     criteria: list[CriterionOut] = Field(default_factory=list)
 

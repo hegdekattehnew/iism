@@ -50,11 +50,14 @@ EDUCATION_LEVELS = (
 # Same pattern as Skill.search_vector: english config for English text, simple
 # for Hindi (Postgres ships no Hindi stemmer). Computed() keeps the ORM from
 # writing it — Postgres rejects any write to a GENERATED ALWAYS column.
+# Both configurations over the *same* column: since ADR-041 a source column
+# may hold any language -- `source_locale` says which -- and Postgres ships
+# no Hindi stemmer, so `simple` is what keeps Devanagari matchable.
 _TSV = (
-    "setweight(to_tsvector('english', coalesce(title_en, '')), 'A') || "
-    "setweight(to_tsvector('simple',  coalesce(title_hi, '')), 'A') || "
-    "setweight(to_tsvector('english', coalesce(description_en, '')), 'C') || "
-    "setweight(to_tsvector('simple',  coalesce(description_hi, '')), 'C')"
+    "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('simple',  coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('english', coalesce(description, '')), 'C') || "
+    "setweight(to_tsvector('simple',  coalesce(description, '')), 'C')"
 )
 
 
@@ -83,10 +86,12 @@ class Job(Base):
     slug: Mapped[str] = mapped_column(unique=True, index=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
 
-    title_en: Mapped[str] = mapped_column()
-    title_hi: Mapped[str | None] = mapped_column(default=None)
-    description_en: Mapped[str | None] = mapped_column(default=None)
-    description_hi: Mapped[str | None] = mapped_column(default=None)
+    title: Mapped[str] = mapped_column()
+    # Which language the author wrote in (ADR-041). The corpus is English; a
+    # vacancy posted in Hindi is source-Hindi, which is why the search vector
+    # now indexes the same column in both configurations.
+    source_locale: Mapped[str] = mapped_column(default="en")
+    description: Mapped[str | None] = mapped_column(default=None)
 
     location_state: Mapped[str | None] = mapped_column(default=None)
     location_district: Mapped[str | None] = mapped_column(default=None)
@@ -170,10 +175,12 @@ class Course(Base):
     slug: Mapped[str] = mapped_column(unique=True, index=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
 
-    title_en: Mapped[str] = mapped_column()
-    title_hi: Mapped[str | None] = mapped_column(default=None)
-    description_en: Mapped[str | None] = mapped_column(default=None)
-    description_hi: Mapped[str | None] = mapped_column(default=None)
+    title: Mapped[str] = mapped_column()
+    # Which language the author wrote in (ADR-041). The corpus is English; a
+    # vacancy posted in Hindi is source-Hindi, which is why the search vector
+    # now indexes the same column in both configurations.
+    source_locale: Mapped[str] = mapped_column(default="en")
+    description: Mapped[str | None] = mapped_column(default=None)
 
     mode: Mapped[str] = mapped_column(default="offline")
     language: Mapped[str] = mapped_column(default="both")

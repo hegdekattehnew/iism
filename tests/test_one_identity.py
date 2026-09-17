@@ -35,7 +35,7 @@ async def skill_slug(db: AsyncSession) -> str:
     shadowing bug everywhere else."""
     skill = Skill(
         slug="ward-standard-tst-n9001",
-        name_en="Maintain a safe ward environment",
+        name="Maintain a safe ward environment",
         skill_type="technical",
         nsqf_level=Decimal("4"),
         nos_code="TST/N9001",
@@ -383,7 +383,7 @@ async def _published_job(client: AsyncClient, skill_slug: str) -> tuple[dict, st
             f"/org/{slug}/jobs",
             headers=headers,
             json={
-                "title_en": "Ward Assistant",
+                "title": "Ward Assistant",
                 "skills": [{"skill_slug": skill_slug, "importance": 5, "is_mandatory": True}],
             },
         )

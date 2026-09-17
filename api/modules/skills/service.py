@@ -32,16 +32,25 @@ WITH q AS (
 matches AS (
     -- canonical names, exact then prefix
     SELECT s.id AS skill_id,
-           CASE WHEN lower(s.name_en) = q.norm
-                  OR lower(coalesce(s.name_hi, '')) = q.norm THEN 4.0
-                ELSE 3.0 END AS score,
-           s.name_en AS matched_on,
-           CASE WHEN lower(s.name_en) = q.norm
-                  OR lower(coalesce(s.name_hi, '')) = q.norm THEN 'exact'
-                ELSE 'prefix' END AS match_kind
+           CASE WHEN lower(s.name) = q.norm THEN 4.0 ELSE 3.0 END AS score,
+           s.name AS matched_on,
+           CASE WHEN lower(s.name) = q.norm THEN 'exact' ELSE 'prefix' END AS match_kind
     FROM skills s, q
-    WHERE lower(s.name_en) LIKE q.norm || '%'
-       OR lower(coalesce(s.name_hi, '')) LIKE q.norm || '%'
+    WHERE lower(s.name) LIKE q.norm || '%'
+
+    UNION ALL
+
+    -- translated names. Until ADR-041 this was `s.name_hi` beside the canonical
+    -- name; it is a row in content_translations now, and searching it here is
+    -- what keeps a Devanagari query working for *any* language, not only Hindi.
+    SELECT ct.entity_id,
+           CASE WHEN lower(ct.text) = q.norm THEN 4.0 ELSE 3.0 END,
+           ct.text,
+           CASE WHEN lower(ct.text) = q.norm THEN 'exact' ELSE 'prefix' END
+    FROM content_translations ct, q
+    WHERE ct.entity_type = 'skill'
+      AND ct.field = 'name'
+      AND lower(ct.text) LIKE q.norm || '%'
 
     UNION ALL
 
@@ -61,7 +70,7 @@ matches AS (
     -- mixes english-stemmed and simple-tokenised text
     SELECT s.id,
            1.0 + ts_rank(s.search_vector, websearch_to_tsquery('english', q.raw)),
-           s.name_en,
+           s.name,
            'text'
     FROM skills s, q
     WHERE s.search_vector @@ websearch_to_tsquery('english', q.raw)
@@ -90,7 +99,7 @@ JOIN skills s ON s.id = b.skill_id
 -- `khoon nikalna` still resolves -- to a real NOS. One filter here covers all
 -- four branches above, which is why the join is worth keeping.
 WHERE s.source <> 'legacy'
-ORDER BY b.score DESC, s.name_en ASC
+ORDER BY b.score DESC, s.name ASC
 LIMIT :limit
 """
 )
@@ -142,9 +151,9 @@ async def list_skills(
     rows = await db.scalars(
         select(Skill)
         .where(*filters)
-        # Most-used first. name_en is the tie-break, and without it offset
+        # Most-used first. name is the tie-break, and without it offset
         # paging over equal counts can repeat or skip rows between pages.
-        .order_by(Skill.qp_count.desc(), Skill.name_en)
+        .order_by(Skill.qp_count.desc(), Skill.name)
         .limit(limit)
         .offset(offset)
     )
@@ -165,9 +174,8 @@ class QualificationRef:
     qp_code: str
     version: str
     slug: str
-    name_en: str
-    name_hi: str | None
-    job_role_en: str | None
+    name: str
+    job_role: str | None
     nsqf_level: float | None
     requirement: str
     group_name: str | None
@@ -195,7 +203,7 @@ async def qualifications_for_skill(
         await db.execute(
             joined.order_by(
                 QualificationPack.nsqf_level.desc().nullslast(),
-                QualificationPack.name_en,
+                QualificationPack.name,
             ).limit(limit)
         )
     ).all()
@@ -205,13 +213,12 @@ async def qualifications_for_skill(
                 qp_code=qp.qp_code,
                 version=qp.version,
                 slug=qp.slug,
-                name_en=qp.name_en,
-                name_hi=qp.name_hi,
-                job_role_en=qp.job_role_en,
+                name=qp.name,
+                job_role=qp.job_role,
                 nsqf_level=float(qp.nsqf_level) if qp.nsqf_level is not None else None,
                 requirement=link.requirement,
                 group_name=link.group_name,
-                sector_name_en=sector.name_en if sector is not None else None,
+                sector_name_en=sector.name if sector is not None else None,
                 sector_slug=sector.slug if sector is not None else None,
             )
             for link, qp, sector in rows
@@ -257,14 +264,14 @@ async def requirements_for_skill(db: AsyncSession, skill_id: uuid.UUID) -> Requi
 
     knowledge = (
         await db.scalars(
-            select(KnowledgeParameter.text_en)
+            select(KnowledgeParameter.text)
             .where(KnowledgeParameter.skill_id == skill_id)
             .order_by(KnowledgeParameter.ordinal)
         )
     ).all()
     generic = (
         await db.scalars(
-            select(GenericCriterion.text_en)
+            select(GenericCriterion.text)
             .where(GenericCriterion.skill_id == skill_id)
             .order_by(GenericCriterion.ordinal)
         )

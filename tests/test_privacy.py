@@ -199,7 +199,7 @@ class TestDeletion:
         headers, slug = await _organisation(client, "Solo Clinic")
         tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
         assert tenant is not None
-        db.add(Job(slug=f"solo-{uuid.uuid4().hex[:6]}", tenant_id=tenant.id, title_en="Nurse"))
+        db.add(Job(slug=f"solo-{uuid.uuid4().hex[:6]}", tenant_id=tenant.id, title="Nurse"))
         await db.commit()
         tenant_id = tenant.id
 
@@ -313,7 +313,7 @@ class TestApplicationsAreTheirsToo:
         tenant = TenantModel(slug="export-co", name="Export Co", tenant_type="employer")
         db.add(tenant)
         await db.flush()
-        db.add(JobModel(slug="export-job", tenant_id=tenant.id, title_en="Exported Role"))
+        db.add(JobModel(slug="export-job", tenant_id=tenant.id, title="Exported Role"))
         await db.commit()
 
         headers, _ = await _candidate(client)
@@ -339,7 +339,7 @@ class TestApplicationsAreTheirsToo:
         tenant = TenantModel(slug="erase-co", name="Erase Co", tenant_type="employer")
         db.add(tenant)
         await db.flush()
-        db.add(JobModel(slug="erase-job", tenant_id=tenant.id, title_en="Erased Role"))
+        db.add(JobModel(slug="erase-job", tenant_id=tenant.id, title="Erased Role"))
         await db.commit()
 
         headers, _ = await _candidate(client)

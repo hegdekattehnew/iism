@@ -43,7 +43,7 @@ async def seeded_skill_slug(db: AsyncSession) -> str:
     so a job-posting test has to bring its own vocabulary."""
     skill = Skill(
         slug="follow-infection-control-tst-n0001",
-        name_en="Follow infection control policies",
+        name="Follow infection control policies",
         skill_type="technical",
         nsqf_level=Decimal("4"),
         nos_code="TST/N0001",
@@ -58,7 +58,7 @@ async def seeded_skill_slug(db: AsyncSession) -> str:
 async def second_skill_slug(db: AsyncSession) -> str:
     skill = Skill(
         slug="replace-linen-and-make-beds-tst-n0002",
-        name_en="Replace linen and make beds",
+        name="Replace linen and make beds",
         skill_type="technical",
         nsqf_level=Decimal("3"),
         nos_code="TST/N0002",
@@ -307,7 +307,7 @@ class TestAuthorization:
             await client.post(
                 f"/org/{personal}/jobs",
                 headers=headers,
-                json={"title_en": "Not from a personal workspace", "skills": []},
+                json={"title": "Not from a personal workspace", "skills": []},
             )
         ).status_code == 404
 
@@ -325,7 +325,7 @@ class TestAuthorization:
         refused = await client.post(
             f"/org/{slug}/jobs",
             headers=headers,
-            json={"title_en": "Vacancy from a training provider", "skills": []},
+            json={"title": "Vacancy from a training provider", "skills": []},
         )
         assert refused.status_code == 403
 
@@ -353,7 +353,7 @@ class TestAuthorization:
         membership.role = "member"
         await db.commit()
 
-        body = {"title_en": "Same token, two answers", "skills": []}
+        body = {"title": "Same token, two answers", "skills": []}
         assert (
             await client.post(f"/org/{owned}/jobs", headers=headers, json=body)
         ).status_code == 201
@@ -400,7 +400,7 @@ class TestAuthorization:
         refused = await client.post(
             f"/org/{slug}/jobs",
             headers=headers,
-            json={"title_en": "Anything", "skills": []},
+            json={"title": "Anything", "skills": []},
         )
         assert refused.status_code == 403
 
@@ -419,7 +419,7 @@ class TestPublishing:
         created = await client.post(
             f"/org/{slug}/jobs",
             headers=headers,
-            json={"title_en": "Quietly Drafted Role", "skills": []},
+            json={"title": "Quietly Drafted Role", "skills": []},
         )
         assert created.status_code == 201
         assert created.json()["status"] == "draft"
@@ -435,7 +435,7 @@ class TestPublishing:
             await client.post(
                 f"/org/{slug}/jobs",
                 headers=headers,
-                json={"title_en": "Requires Nothing", "skills": []},
+                json={"title": "Requires Nothing", "skills": []},
             )
         ).json()
 
@@ -448,7 +448,7 @@ class TestPublishing:
             f"/org/{slug}/jobs",
             headers=headers,
             json={
-                "title_en": "Mistyped",
+                "title": "Mistyped",
                 "skills": [{"skill_slug": "no-such-standard", "importance": 3}],
             },
         )
@@ -466,7 +466,7 @@ class TestPublishing:
             f"/org/{slug}/jobs",
             headers=headers,
             json={
-                "title_en": "Merged Requirements",
+                "title": "Merged Requirements",
                 "skills": [
                     {"skill_slug": seeded_skill_slug, "importance": 2, "is_mandatory": False},
                     {"skill_slug": seeded_skill_slug, "importance": 5, "is_mandatory": True},
@@ -488,7 +488,7 @@ class TestPublishing:
                 f"/org/{slug}/jobs",
                 headers=headers,
                 json={
-                    "title_en": "Rewritten",
+                    "title": "Rewritten",
                     "skills": [{"skill_slug": seeded_skill_slug, "importance": 3}],
                 },
             )
@@ -498,7 +498,7 @@ class TestPublishing:
             f"/org/{slug}/jobs/{job['slug']}",
             headers=headers,
             json={
-                "title_en": "Rewritten",
+                "title": "Rewritten",
                 "skills": [{"skill_slug": second_skill_slug, "importance": 4}],
             },
         )
@@ -514,7 +514,7 @@ class TestPublishing:
                 f"/org/{slug}/jobs",
                 headers=headers,
                 json={
-                    "title_en": "Genuinely Published",
+                    "title": "Genuinely Published",
                     "skills": [{"skill_slug": seeded_skill_slug, "importance": 4}],
                 },
             )
@@ -537,7 +537,7 @@ class TestPublishing:
         created = await client.post(
             f"/org/{slug}/jobs",
             headers=headers,
-            json={"title_en": "Somewhere Real", "location_state": seeded_state, "skills": []},
+            json={"title": "Somewhere Real", "location_state": seeded_state, "skills": []},
         )
         job = await db.scalar(select(Job).where(Job.slug == created.json()["slug"]))
         assert job is not None and job.state_id is not None
@@ -552,14 +552,14 @@ class TestPublishing:
             await client.post(
                 f"/org/{slug}/jobs",
                 headers=headers,
-                json={"title_en": "Original Title", "skills": []},
+                json={"title": "Original Title", "skills": []},
             )
         ).json()
 
         updated = await client.put(
             f"/org/{slug}/jobs/{job['slug']}",
             headers=headers,
-            json={"title_en": "Completely Different Title", "skills": []},
+            json={"title": "Completely Different Title", "skills": []},
         )
         assert updated.json()["slug"] == job["slug"]
 
@@ -617,7 +617,7 @@ class TestOrganisationProfile:
                 f"/org/{slug}/jobs",
                 headers=headers,
                 json={
-                    "title_en": "Publicly Listed Role",
+                    "title": "Publicly Listed Role",
                     "skills": [{"skill_slug": seeded_skill_slug, "importance": 4}],
                 },
             )

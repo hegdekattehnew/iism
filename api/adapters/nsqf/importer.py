@@ -199,7 +199,7 @@ async def _import_criteria(
                     "id": element_id,
                     "skill_id": skill_id,
                     "ordinal": e_ordinal,
-                    "name_en": element.name,
+                    "name": element.name,
                     "theory_marks": element.theory,
                     "practical_marks": element.practical,
                     "viva_marks": element.viva,
@@ -216,7 +216,7 @@ async def _import_criteria(
                         # Kept for traceability only: pcID repeats within a unit
                         # in a small number of standards, so it is never a key.
                         "pc_ref": pc.pc_ref,
-                        "description_en": pc.description,
+                        "description": pc.description,
                         "theory_marks": pc.theory,
                         "practical_marks": pc.practical,
                         "viva_marks": pc.viva,
@@ -258,7 +258,7 @@ async def _import_text_content(
                     "skill_id": skill_id,
                     "ordinal": ordinal,
                     "kp_ref": item.ref,
-                    "text_en": item.text,
+                    "text": item.text,
                 }
             )
         for ordinal, item in enumerate(nos.generic_skills):
@@ -268,7 +268,7 @@ async def _import_text_content(
                     "skill_id": skill_id,
                     "ordinal": ordinal,
                     "gs_ref": item.ref,
-                    "text_en": item.text,
+                    "text": item.text,
                 }
             )
     return (
@@ -307,7 +307,7 @@ async def _build_concepts(db: AsyncSession) -> int:
         await db.execute(
             select(
                 Skill.id,
-                Skill.name_en,
+                Skill.name,
                 Skill.awarding_body_id,
                 Skill.nsqf_level,
                 Skill.qp_count,
@@ -318,7 +318,7 @@ async def _build_concepts(db: AsyncSession) -> int:
 
     groups: dict[tuple[Any, str, Any], list[Any]] = defaultdict(list)
     for row in rows:
-        groups[(row.awarding_body_id, _normalise_concept_name(row.name_en), row.nsqf_level)].append(
+        groups[(row.awarding_body_id, _normalise_concept_name(row.name), row.nsqf_level)].append(
             row
         )
 
@@ -329,7 +329,7 @@ async def _build_concepts(db: AsyncSession) -> int:
         # current qualifications. nos_code breaks ties so a rebuild is stable
         # rather than depending on row order.
         canonical = max(members, key=lambda m: (m.qp_count, m.nos_code or ""))
-        slug = slugify(canonical.name_en)[:200] or "concept"
+        slug = slugify(canonical.name)[:200] or "concept"
         if level is not None:
             slug = f"{slug}-l{str(level).replace('.', '-')}"
         if canonical.nos_code and slug in slugs:
@@ -342,7 +342,7 @@ async def _build_concepts(db: AsyncSession) -> int:
                 "id": uuid.uuid4(),
                 "slug": slug,
                 "normalised_name": normalised,
-                "name_en": canonical.name_en,
+                "name": canonical.name,
                 "awarding_body_id": body_id,
                 "nsqf_level": level,
                 "canonical_skill_id": canonical.id,
@@ -553,7 +553,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
                 "id": uuid.uuid4(),
                 "code": sec.code,
                 "body_ref": sec.ref,
-                "name_en": sec.name,
+                "name": sec.name,
                 "slug": f"{slugify(sec.name)}-{slugify(sec.code)}",
                 "body_type": "awarding_body" if sec.is_awarding_body else "sector_skill_council",
                 "logo_url": sec.logo_url,
@@ -577,7 +577,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
             "id": uuid.uuid4(),
             "sector_ref": sec.ref,
             "sector_code": sec.code,
-            "name_en": sec.name,
+            "name": sec.name,
             "slug": slugify(sec.name),
             "logo_url": sec.logo_url,
             "awarding_body_id": body_ids.get(sec.code),
@@ -601,7 +601,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
                 "id": uuid.uuid4(),
                 "sector_id": parent,
                 "sub_sector_ref": sub_sector.ref,
-                "name_en": sub_sector.name,
+                "name": sub_sector.name,
             }
         for occ in sec.occupations:
             # Keyed on (sector, ref): occupationID is sector-local and reuses
@@ -613,7 +613,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
                     "occupation_ref": occ.ref,
                     "code": occ.code,
                     "sector_id": parent,
-                    "name_en": occ.name,
+                    "name": occ.name,
                 },
             )
     report.sub_sectors = await _chunked_upsert(
@@ -652,8 +652,8 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
             {
                 "id": uuid.uuid4(),
                 "slug": slug,
-                "name_en": nos.title,
-                "description_en": nos.description,
+                "name": nos.title,
+                "description": nos.description,
                 "skill_type": "technical",
                 "nos_code": nos.code,
                 "nos_version": nos.version,
@@ -703,8 +703,8 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
                 "qp_code": qp.code,
                 "version": qp.version,
                 "slug": slug,
-                "name_en": qp.name,
-                "job_role_en": qp.job_role,
+                "name": qp.name,
+                "job_role": qp.job_role,
                 "nsqf_level": qp.nsqf_level,
                 "status": qp.status,
                 "total_hours": qp.total_hours,
@@ -780,10 +780,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
     for start in range(0, len(counts), CHUNK):
         batch = counts[start : start + CHUNK]
         stmt = insert(cast("Any", Skill.__table__)).values(
-            [
-                {"id": uuid.uuid4(), "slug": f"__tmp_{r['nos_code']}", "name_en": "", **r}
-                for r in batch
-            ]
+            [{"id": uuid.uuid4(), "slug": f"__tmp_{r['nos_code']}", "name": "", **r} for r in batch]
         )
         await db.execute(
             stmt.on_conflict_do_update(
@@ -841,7 +838,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
                 "qp_code": mc.qp_code,
                 "mc_version": mc.version,
                 "qp_id": next((i for (c, _v), i in qp_ids.items() if c == mc.qp_code), None),
-                "job_role_en": mc.job_role,
+                "job_role": mc.job_role,
                 "nsqf_level": mc.nsqf_level,
                 "status": mc.status,
                 "total_minutes": mc.total_minutes,

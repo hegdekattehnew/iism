@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
+from api.core.localisation import overrides_for, request_locale
 from api.modules.skills import schemas, service
 
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -47,12 +48,18 @@ async def list_skills(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> schemas.SkillPage:
     items, total = await service.list_skills(
         db, skill_type=skill_type, nsqf_level=nsqf_level, limit=limit, offset=offset
     )
+    # One query for the page, applied at serialisation (ADR-041).
+    overrides = await overrides_for(db, "skill", items, ("name", "description"), locale)
     return schemas.SkillPage(
-        items=[schemas.SkillOut.model_validate(s) for s in items],
+        items=[
+            schemas.SkillOut.model_validate(s).model_copy(update=overrides.get(s.id, {}))
+            for s in items
+        ],
         total=total,
         limit=limit,
         offset=offset,
@@ -70,8 +77,7 @@ async def skill_requirements(
     return schemas.SkillRequirements(
         elements=[
             schemas.PerformanceElementOut(
-                name_en=element.name_en,
-                name_hi=element.name_hi,
+                name=element.name,
                 total_marks=element.total_marks,
                 criteria=[schemas.CriterionOut.model_validate(c) for c in criteria],
             )
@@ -101,8 +107,13 @@ async def skill_qualifications(
 
 # Declared last: a literal path like /skills/search must not be captured by this.
 @router.get("/{slug}", response_model=schemas.SkillDetail)
-async def get_skill(slug: str, db: AsyncSession = Depends(get_db_session)) -> schemas.SkillDetail:
+async def get_skill(
+    slug: str,
+    db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
+) -> schemas.SkillDetail:
     skill = await service.get_skill_by_slug(db, slug)
     if skill is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill not found")
-    return schemas.SkillDetail.model_validate(skill)
+    overrides = await overrides_for(db, "skill", [skill], ("name", "description"), locale)
+    return schemas.SkillDetail.model_validate(skill).model_copy(update=overrides.get(skill.id, {}))

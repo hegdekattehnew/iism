@@ -185,7 +185,7 @@ async def test_certification_links_to_a_taxonomy_skill(
     client: AsyncClient, headers: dict, db: AsyncSession
 ) -> None:
     """The link is what will later let a certificate set source='certified'."""
-    db.add(Skill(slug="blood-sample-collection", name_en="Blood sample collection"))
+    db.add(Skill(slug="blood-sample-collection", name="Blood sample collection"))
     await db.flush()
     body = (
         await client.post(
@@ -241,7 +241,7 @@ async def test_skills_routes_are_not_captured_by_the_generic_handler(
 ) -> None:
     """/me/profile/skills must resolve as skills, not as a collection named
     'skills' -- the same trap as /skills/search versus /skills/{slug}."""
-    db.add(Skill(slug="hand-hygiene", name_en="Hand hygiene"))
+    db.add(Skill(slug="hand-hygiene", name="Hand hygiene"))
     await db.flush()
     added = await client.post(
         "/me/profile/skills", headers=headers, json={"skill_slug": "hand-hygiene", "proficiency": 3}
@@ -258,7 +258,7 @@ async def test_skills_routes_are_not_captured_by_the_generic_handler(
 async def test_completeness_rises_as_the_profile_fills(
     client: AsyncClient, headers: dict, db: AsyncSession
 ) -> None:
-    db.add(Skill(slug="first-aid", name_en="First aid"))
+    db.add(Skill(slug="first-aid", name="First aid"))
     await db.flush()
 
     start = (await client.get("/me/profile", headers=headers)).json()["completeness"]["percent"]

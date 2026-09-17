@@ -34,7 +34,7 @@ async def course(db: AsyncSession) -> Course:
     course = Course(
         slug="a-course-worth-clicking",
         tenant_id=tenant.id,
-        title_en="A Course Worth Clicking",
+        title="A Course Worth Clicking",
         status="published",
     )
     db.add(course)

@@ -53,10 +53,8 @@ class Skill(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(unique=True, index=True)
 
-    name_en: Mapped[str] = mapped_column()
-    name_hi: Mapped[str | None] = mapped_column(default=None)
-    description_en: Mapped[str | None] = mapped_column(default=None)
-    description_hi: Mapped[str | None] = mapped_column(default=None)
+    name: Mapped[str] = mapped_column()
+    description: Mapped[str | None] = mapped_column(default=None)
 
     skill_type: Mapped[str] = mapped_column(default="technical")
 
@@ -114,10 +112,12 @@ class Skill(Base):
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR,
         Computed(
-            "setweight(to_tsvector('english', coalesce(name_en, '')), 'A') || "
-            "setweight(to_tsvector('simple',  coalesce(name_hi, '')), 'A') || "
-            "setweight(to_tsvector('english', coalesce(description_en, '')), 'C') || "
-            "setweight(to_tsvector('simple',  coalesce(description_hi, '')), 'C')",
+            # Both configurations over the same column (ADR-041): a source
+            # column may now hold any language, and Postgres has no Hindi stemmer.
+            "setweight(to_tsvector('english', coalesce(name, '')), 'A') || "
+            "setweight(to_tsvector('simple',  coalesce(name, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(description, '')), 'C') || "
+            "setweight(to_tsvector('simple',  coalesce(description, '')), 'C')",
             persisted=True,
         ),
         nullable=True,

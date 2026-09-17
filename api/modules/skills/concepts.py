@@ -60,8 +60,7 @@ class SkillConcept(Base):
     # Lower-cased, whitespace-collapsed. The grouping key, kept so the rule is
     # visible in the data rather than only in the importer.
     normalised_name: Mapped[str] = mapped_column(Text)
-    name_en: Mapped[str] = mapped_column(Text)
-    name_hi: Mapped[str | None] = mapped_column(Text, default=None)
+    name: Mapped[str] = mapped_column(Text)
 
     awarding_body_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("awarding_bodies.id", ondelete="CASCADE"), default=None

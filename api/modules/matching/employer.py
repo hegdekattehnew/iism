@@ -58,7 +58,7 @@ class ScarceSkill:
     """A standard the employer asks for more often than the pool can supply."""
 
     nos_code: str | None
-    name_en: str
+    name: str
     required_by: int
     held_by: int
 
@@ -80,7 +80,7 @@ async def _pool_held(
                 CandidateSkill.profile_id,
                 CandidateSkill.skill_id,
                 Skill.concept_id,
-                Skill.name_en,
+                Skill.name,
                 CandidateSkill.proficiency,
                 CandidateSkill.source,
             )
@@ -94,7 +94,7 @@ async def _pool_held(
             HeldSkill(
                 skill_id=r.skill_id,
                 concept_id=r.concept_id,
-                name_en=r.name_en,
+                name=r.name,
                 proficiency=r.proficiency,
                 source=r.source,
             )
@@ -286,7 +286,7 @@ async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
             await db.scalars(
                 select(Job)
                 .where(Job.tenant_id == tenant_id, Job.status == "published")
-                .order_by(Job.title_en)
+                .order_by(Job.title)
             )
         ).all()
     )
@@ -308,7 +308,7 @@ async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
         )
     # Most contested first: the vacancy with the deepest pool is the one an
     # employer can fill today.
-    pools.sort(key=lambda p: (-p.ready, -p.pool, p.job.title_en))
+    pools.sort(key=lambda p: (-p.ready, -p.pool, p.job.title))
     return pools
 
 
@@ -340,13 +340,13 @@ async def scarce_skills(
                 Skill.id,
                 Skill.concept_id,
                 Skill.nos_code,
-                Skill.name_en,
+                Skill.name,
                 func.count(func.distinct(Job.id)).label("required_by"),
             )
             .join(JobSkill, JobSkill.skill_id == Skill.id)
             .join(Job, Job.id == JobSkill.job_id)
             .where(Job.tenant_id == tenant_id, Job.status == "published")
-            .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name_en)
+            .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
         )
     ).all()
     if not required:
@@ -376,12 +376,12 @@ async def scarce_skills(
     scarce = [
         ScarceSkill(
             nos_code=r.nos_code,
-            name_en=r.name_en,
+            name=r.name,
             required_by=r.required_by,
             held_by=(by_concept.get(r.concept_id, 0) if r.concept_id else by_skill.get(r.id, 0)),
         )
         for r in required
     ]
     # Most demanded and least supplied first.
-    scarce.sort(key=lambda s: (-s.required_by, s.held_by, s.name_en))
+    scarce.sort(key=lambda s: (-s.required_by, s.held_by, s.name))
     return scarce[:limit]

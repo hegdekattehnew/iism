@@ -14,7 +14,7 @@ from api.modules.skills.schemas import NsqfLevel
 
 class MatchedSkillOut(BaseModel):
     nos_code: str | None = None
-    name_en: str
+    name: str
     importance: int
     is_mandatory: bool
     evidence: str
@@ -24,7 +24,7 @@ class MatchedSkillOut(BaseModel):
 class MissingSkillOut(BaseModel):
     skill_id: uuid.UUID
     nos_code: str | None = None
-    name_en: str
+    name: str
     importance: int
     is_mandatory: bool
     nsqf_level: NsqfLevel | None = None
@@ -34,8 +34,7 @@ class JobSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     slug: str
-    title_en: str
-    title_hi: str | None = None
+    title: str
     location_state: str | None = None
     location_district: str | None = None
     employment_type: str
@@ -69,8 +68,7 @@ class MatchPage(BaseModel):
 
 class CourseSuggestionOut(BaseModel):
     slug: str
-    title_en: str
-    title_hi: str | None = None
+    title: str
     mode: str
     duration_hours: int | None = None
     fee_inr: int | None = None
@@ -141,7 +139,7 @@ class JobPoolOut(BaseModel):
 
 class ScarceSkillOut(BaseModel):
     nos_code: str | None = None
-    name_en: str
+    name: str
     required_by: int
     held_by: int
 
