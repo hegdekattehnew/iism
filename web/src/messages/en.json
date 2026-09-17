@@ -1021,5 +1021,66 @@
         }
       ]
     }
+  },
+  "applications": {
+    "apply": "Apply for this job",
+    "applying": "Sending…",
+    "appliedLabel": "Applied",
+    "withdraw": "Withdraw",
+    "withdrawing": "Withdrawing…",
+    "confirmHeading": "Before you apply",
+    "confirmShare": "Applying sends your name, mobile number and email to {organisation}, for this vacancy only. No other employer sees them.",
+    "confirmWithdrawNote": "If you withdraw later, they stop seeing your contact details.",
+    "confirmCta": "Yes, apply",
+    "cancel": "Cancel",
+    "messageLabel": "Add a note (optional)",
+    "messagePlaceholder": "Why you would suit this work, in a line or two.",
+    "errorDuplicate": "You have already applied for this job.",
+    "errorCap": "You have applied to a lot of jobs today. Try again tomorrow.",
+    "errorSeeker": "This account is set up for an organisation, so it cannot apply for jobs.",
+    "errorGeneric": "Something went wrong. Try again.",
+    "signInToApply": "Sign in to apply",
+    "save": "Save for later",
+    "savedLabel": "Saved",
+    "pageTitle": "My applications",
+    "pageSubtitle": "Every job you applied for, and where each one stands.",
+    "empty": "You have not applied for anything yet.",
+    "emptyCta": "See your matches",
+    "savedPageTitle": "Saved jobs",
+    "savedPageSubtitle": "Jobs you kept to look at again. Saving tells the employer nothing.",
+    "savedEmpty": "You have not saved any jobs yet.",
+    "appliedOn": "Applied on {date}",
+    "navApplications": "My applications",
+    "status": {
+      "applied": "Applied",
+      "withdrawn": "Withdrawn",
+      "shortlisted": "Shortlisted",
+      "rejected": "Not selected",
+      "hired": "Hired"
+    },
+    "statusHint": {
+      "applied": "The employer has your application.",
+      "withdrawn": "You withdrew this. The employer no longer sees your contact details.",
+      "shortlisted": "The employer shortlisted you.",
+      "rejected": "The employer is not taking this one forward.",
+      "hired": "You got the job."
+    }
+  },
+  "employerInbox": {
+    "title": "Applicants",
+    "count": "{count, plural, =0 {No applications yet} one {# application} other {# applications}}",
+    "contactHeading": "Contact",
+    "noteHeading": "Their note",
+    "withdrawnNote": "Withdrawn by the candidate. Their contact details are no longer shared.",
+    "shortlist": "Shortlist",
+    "reject": "Not suitable",
+    "hire": "Mark as hired",
+    "updating": "Saving…",
+    "empty": "Nobody has applied yet. Candidates whose skills match this vacancy can see it on their matches page.",
+    "backToConsole": "Back to the console",
+    "appliedOn": "Applied on {date}",
+    "errorGeneric": "That could not be saved. Try again.",
+    "newBadge": "New",
+    "applicantsLink": "Applicants ({count})"
   }
 }

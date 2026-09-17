@@ -144,6 +144,7 @@ function CandidateList({
 
 export function EmployerConsole() {
   const t = useTranslations("employerConsole");
+  const ti = useTranslations("employerInbox");
   const locale = useLocale();
   const isHi = locale === "hi";
   const [employer, setEmployer] = useState<string | null>(null);
@@ -281,6 +282,9 @@ export function EmployerConsole() {
                           {t("nearlyCount", { count: j.nearly })}
                         </Badge>
                         <Badge>{t("poolCount", { count: j.pool })}</Badge>
+                        {j.new_applications > 0 && (
+                          <Badge tone="good">{ti("newBadge")}</Badge>
+                        )}
                       </div>
                     </div>
 
@@ -292,6 +296,14 @@ export function EmployerConsole() {
                       >
                         {open ? t("hideShortlist") : t("viewShortlist")}
                       </button>
+                      {slug && (
+                        <Link
+                          href={`/employer/${slug}/jobs/${j.job.slug}/applications`}
+                          className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+                        >
+                          {ti("applicantsLink", { count: j.applications })}
+                        </Link>
+                      )}
                       <Link
                         href={`/jobs/${j.job.slug}`}
                         className="text-sm text-muted underline-offset-4 hover:underline"

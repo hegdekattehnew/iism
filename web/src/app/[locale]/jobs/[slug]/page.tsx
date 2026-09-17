@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
+import { ApplyPanel } from "@/components/ApplyPanel";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -58,6 +59,11 @@ export default async function JobDetailPage({
       <ButtonLink href="/jobs" variant="ghost" size="sm" className="-ml-3">
         ← {t("backToJobs")}
       </ButtonLink>
+      {/* Client-side: whether someone is signed in, and whether they are a job
+          seeker, is only knowable in the browser. */}
+      <div className="mt-6">
+        <ApplyPanel jobSlug={data.slug} organisation={data.tenant.name} />
+      </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-brand">

@@ -30,6 +30,7 @@ import { useMemberships } from "@/lib/org";
 export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("auth");
   const tn = useTranslations("nav");
+  const ta = useTranslations("applications");
   const router = useRouter();
   const qc = useQueryClient();
   const signedIn = useIsSignedIn();
@@ -78,6 +79,9 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
           <>
             <ButtonLink href="/matches" size={size}>
               {t("myMatches")}
+            </ButtonLink>
+            <ButtonLink href="/applications" variant="secondary" size={size}>
+              {ta("navApplications")}
             </ButtonLink>
             <ButtonLink href="/profile" variant="secondary" size={size}>
               {t("myProfile")}

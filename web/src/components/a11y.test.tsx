@@ -2,6 +2,7 @@ import axe from "axe-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountPanel } from "@/components/AccountPanel";
+import { ApplyPanel } from "@/components/ApplyPanel";
 import { AuthNav } from "@/components/AuthNav";
 import { SignInForm } from "@/components/SignInForm";
 import { SignUpForm } from "@/components/SignUpForm";
@@ -67,6 +68,14 @@ describe("accessibility — signed in", () => {
       <nav aria-label="Account">
         <AuthNav />
       </nav>,
+    );
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it("the apply panel, and its confirm step", async () => {
+    world.memberships = [personal()];
+    const { container } = renderUi(
+      <ApplyPanel jobSlug="cashier-bengaluru" organisation="Apply Co" />,
     );
     expect(await violations(container)).toEqual([]);
   });

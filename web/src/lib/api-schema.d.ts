@@ -925,6 +925,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Applications */
+        get: operations["my_applications_me_applications_get"];
+        put?: never;
+        /**
+         * Apply To Job
+         * @description Apply, and share your name and contact with that employer for that vacancy.
+         */
+        post: operations["apply_to_job_me_applications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/applications/{application_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Application
+         * @description Take it back. The employer keeps the fact and loses the contact details.
+         */
+        post: operations["withdraw_application_me_applications__application_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/saved-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Saved Jobs */
+        get: operations["my_saved_jobs_me_saved_jobs_get"];
+        put?: never;
+        /** Save Job */
+        post: operations["save_job_me_saved_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/saved-jobs/{job_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unsave Job */
+        delete: operations["unsave_job_me_saved_jobs__job_slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{job_slug}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Applicants
+         * @description Who applied, ranked, with contact details while each application is live.
+         */
+        get: operations["list_applicants_org__org_slug__jobs__job_slug__applications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Application Status
+         * @description Shortlist, reject or hire. A withdrawn application cannot be moved.
+         */
+        patch: operations["set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch"];
+        trace?: never;
+    };
     "/me/account/export": {
         parameters: {
             query?: never;
@@ -1176,6 +1292,75 @@ export interface components {
             script: "latin" | "devanagari" | "transliteration";
         };
         /**
+         * ApplicantOut
+         * @description One application, as the employer sees it.
+         */
+        ApplicantOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+            /** Message */
+            message?: string | null;
+            candidate: components["schemas"]["CandidateCardOut"];
+            contact?: components["schemas"]["ContactOut"] | null;
+        };
+        /** ApplicantPage */
+        ApplicantPage: {
+            job: components["schemas"]["JobRef"];
+            /** Items */
+            items?: components["schemas"]["ApplicantOut"][];
+            /** Total */
+            total: number;
+        };
+        /** ApplicationIn */
+        ApplicationIn: {
+            /** Job Slug */
+            job_slug: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * ApplicationOut
+         * @description The candidate's own view of an application.
+         */
+        ApplicationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            job: components["schemas"]["JobRef"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            /** Message */
+            message?: string | null;
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
          * CandidateCardOut
          * @description A ranked candidate, described without identifying them.
          *
@@ -1365,6 +1550,23 @@ export interface components {
             latency_ms?: number | null;
             /** Detail */
             detail?: string | null;
+        };
+        /**
+         * ContactOut
+         * @description The disclosure itself.
+         *
+         *     Present only while an application is live. This is the **only** payload in
+         *     the product that names a candidate to an employer, and it sits *beside* the
+         *     de-identified card rather than inside it, so ADR-037's invariant stays a
+         *     property of `candidate_card()` and this stays the one exception.
+         */
+        ContactOut: {
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
         };
         /**
          * CorpusStatsOut
@@ -1868,6 +2070,35 @@ export interface components {
             ready: number;
             /** Nearly */
             nearly: number;
+            /**
+             * Applications
+             * @default 0
+             */
+            applications: number;
+            /**
+             * New Applications
+             * @default 0
+             */
+            new_applications: number;
+        };
+        /**
+         * JobRef
+         * @description Enough of a vacancy to recognise it in a list of your own applications.
+         */
+        JobRef: {
+            /** Slug */
+            slug: string;
+            /** Title En */
+            title_en: string;
+            /** Title Hi */
+            title_hi?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Employment Type */
+            employment_type: string;
+            tenant: components["schemas"]["TenantOut"];
         };
         /**
          * JobSkillIn
@@ -2429,6 +2660,15 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /** SavedJobOut */
+        SavedJobOut: {
+            job: components["schemas"]["JobRef"];
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+        };
         /** ScarceSkillOut */
         ScarceSkillOut: {
             /** Nos Code */
@@ -2657,6 +2897,17 @@ export interface components {
             state_code?: number | null;
             /** Name */
             name: string;
+        };
+        /**
+         * StatusIn
+         * @description What an employer may set. `applied` and `withdrawn` are the candidate's.
+         */
+        StatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "shortlisted" | "rejected" | "hired";
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -4560,6 +4811,241 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_applications_me_applications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"][];
+                };
+            };
+        };
+    };
+    apply_to_job_me_applications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_application_me_applications__application_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_saved_jobs_me_saved_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedJobOut"][];
+                };
+            };
+        };
+    };
+    save_job_me_saved_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsave_job_me_saved_jobs__job_slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_applicants_org__org_slug__jobs__job_slug__applications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicantPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                application_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicantOut"];
+                };
             };
             /** @description Validation Error */
             422: {
