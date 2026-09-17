@@ -4,7 +4,7 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-17 · Sprints 1–21 built and pushed. Sprint 20 ("safe to deploy") closed the
+**Last updated:** 2026-09-17 · Sprints 1–22 built and pushed. Sprint 20 ("safe to deploy") closed the
 non-functional gaps that need no outside account; Sprint 21 is the first deployment.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
@@ -78,6 +78,19 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
   models only, `User` and `Membership` layered on in Sprint 4.
 
 ## 4. Current state
+
+**Sprint 22 (many languages, and something arrives) — complete, 2026-09-17.** Two problems, both
+visible only once someone looked. The language switcher was two tabs, and under it the product was
+bilingual by construction: 18 `_en`/`_hi` column pairs, 16 API fields, 37 client ternaries. Now the
+base column holds the row's own text and every other language is a row in `content_translations`
+(ADR-041, migrations 0021–0022) — 187 rows moved, adding a language is INSERTs. The API negotiates
+the language and the client renders what it is given; a Malay skeleton ships as a third locale so
+the machinery is exercised beyond two. And the loop Sprint 21 closed no longer closes silently: an
+outbox (0023) queues an email to the employer when somebody applies and an in-app notice to the
+candidate when their status changes, drained by an ARQ cron. **Migration 0022 was rehearsed against
+a full copy of the development database** — three GENERATED search vectors had to be dropped and
+rebuilt. **Still open:** publishing a listing in two languages (the employer editors lost their
+Hindi inputs), notification preferences, and translating the corpus itself.
 
 **Sprint 21 (the loop closes) — complete, 2026-09-17.** The marketplace can finally produce an
 outcome. A candidate applies to a vacancy (sharing name and contact with that employer, for that
@@ -517,7 +530,9 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0014 (analytics events), 0015 (employer analytics events),
                         0016 (organisation profile), 0017 (profile enum CHECKs),
                         0018 (user consent), 0019 (applications + saved jobs),
-                        0020 (application analytics events)
+                        0020 (application analytics events),
+                        0021 (content translations), 0022 (locale base columns),
+                        0023 (notification outbox)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
                         retire_legacy_skills.py, seed_candidates.py (demo profiles +

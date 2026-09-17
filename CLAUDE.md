@@ -263,6 +263,44 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 22 (many languages, and something arrives) is done. The product was bilingual **by
+construction**: 18 `_en`/`_hi` column pairs across 14 tables, 16 `_hi` fields in the API schemas and
+37 two-language ternaries in the client. A third language was a schema migration. It is now an
+entry in one file, a messages file, and rows.
+
+- **The API resolves language; the client never picks** (ADR-041). `Accept-Language`, then an
+  explicit `?locale=`, then the account's `preferred_locale` — which had existed since Sprint 4 and
+  been read by nothing. Responses carry `title`, not `title_en` *and* `title_hi`.
+- **Translations are applied at serialisation, never by assigning to the loaded row.** Several read
+  endpoints call `record()`, which commits, so a translated title on an ORM instance would be
+  written back as though somebody had edited the listing.
+- **`locale` is the one closed set with no CHECK.** Every other one in this project has a
+  constraint; constraining this would put "add a language" back into a migration.
+- **The base column holds the row's own text**, with `source_locale` on jobs and courses saying
+  which language that is. The corpus is English; a vacancy posted in Hindi is source-Hindi, which
+  is why the rebuilt search vectors index the *same* column with both the `english` and `simple`
+  configurations. Postgres still ships no Hindi stemmer.
+- **A generated column blocks dropping what it reads.** `skills`, `jobs` and `courses` each carried
+  a `search_vector` GENERATED over four of the columns 0022 removes, so each had to be dropped and
+  rebuilt — and `ix_skills_name_en_trgm` with them. Migration 0022 was rehearsed against a full copy
+  of the development database before touching it; down and up again restored exactly 52/22/21 Hindi
+  values. **Rehearse anything of this shape.**
+- **Two is the number that hides the assumption.** A Malay skeleton ships as a third locale —
+  navigation translated, everything else visibly English — because a two-locale product proves
+  nothing about a third. A test holds every locale's messages file to the same key set.
+- **Server components run no client middleware.** The three detail pages were asking the API for the
+  default language on a page that was not in it; each passes `accept-language` explicitly now.
+- **Notifications are queued, never sent inline** (ADR-006). An SMTP timeout while somebody applies
+  must not lose the application, and a test applies through a provider that always raises.
+- **The outbox row names a recipient and never holds an address.** It is resolved at send time, so
+  contact details stay out of a dumped table and out of any log line (ADR-023) — and erasure deletes
+  notifications explicitly, because there is no foreign key to cascade from.
+- **`Tenant.contact_email` is usually empty.** Registration puts the address on the `User` who
+  registered; the organisation profile is where that field is filled in, and most never are. Sending
+  to an organisation falls back to its owner. Do **not** "fix" this by copying the registrant's
+  address into `contact_email`: that field is the organisation's stated inbox, and filling it in on
+  somebody's behalf publishes a personal address they never offered.
+
 Sprint 21 (the loop closes) is done. For twenty sprints the product could **compute** an outcome and
 not **produce** one: a candidate saw ranked vacancies with no button, and an employer saw a pool it
 could not reach. A candidate now applies, withdraws and saves; an employer sees who applied, with
