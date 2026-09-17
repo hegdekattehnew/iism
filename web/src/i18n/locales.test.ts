@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LOCALES } from "@/i18n/locales";
+import { LOCALES, VISIBLE_LOCALES } from "@/i18n/locales";
 
 /** Every key in a message file, flattened to dotted paths. */
 function keys(value: unknown, prefix = ""): string[] {
@@ -39,5 +39,20 @@ describe("locales", () => {
     // Someone looking for Hindi is looking for हिंदी, not for "Hindi".
     expect(LOCALES.map((l) => l.nativeName)).toContain("हिंदी");
     expect(LOCALES.every((l) => l.nativeName.length > 0)).toBe(true);
+  });
+});
+
+describe("what the switcher offers", () => {
+  it("is a subset of what routing accepts", () => {
+    // Malay is routed and tested while its translation is a skeleton; offering
+    // it would show a visitor a mostly-English page in a language they chose.
+    expect(VISIBLE_LOCALES.length).toBeLessThanOrEqual(LOCALES.length);
+    expect(VISIBLE_LOCALES.map((l) => l.code)).toContain("en");
+    expect(VISIBLE_LOCALES.map((l) => l.code)).toContain("hi");
+  });
+
+  it("still routes and translates every locale, offered or not", () => {
+    // The point of keeping it: the machinery stays exercised beyond two.
+    expect(LOCALES.map((l) => l.code)).toContain("ms");
   });
 });

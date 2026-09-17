@@ -121,11 +121,37 @@ export const navigationMock = {
 
 // ------------------------------------------------------------------ render
 
+/**
+ * A missing message key **fails the test**.
+ *
+ * next-intl's default is to log and render the key path itself, which is how
+ * `employerConsole.matchScore` reached the employer's inbox and sat there
+ * looking like a label until someone read the screen. The inbox asked for it in
+ * the console's namespace; it only ever existed in the candidate's. It compiled,
+ * `tsc` was clean, and no test rendered the component.
+ *
+ * Throwing here makes every test in this suite a guard against that, not only
+ * the ones written to look for it.
+ */
+function onIntlError(error: Error & { code?: string }): void {
+  // Only a missing key. Every other next-intl error is about the environment
+  // this renderer runs in -- jsdom has no ambient time zone, for one -- and
+  // turning those into failures would say nothing about the product.
+  if (error.code === "MISSING_MESSAGE") throw error;
+}
+
 export function renderUi(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider
+        locale="en"
+        messages={messages}
+        // Pinned, not the machine's: a formatted date must not depend on where
+        // the test happens to run. India-first, so India's zone.
+        timeZone="Asia/Kolkata"
+        onError={onIntlError}
+      >
         {ui}
       </NextIntlClientProvider>
     </QueryClientProvider>,

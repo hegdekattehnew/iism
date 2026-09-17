@@ -398,13 +398,34 @@ def _history(headline: str, state: str, district: str, years: int) -> dict:
 # phone -> [(job slug, status)]. Mixed states on purpose: an employer console
 # with an inbox of nothing but "applied" shows none of the triage it offers,
 # and a withdrawn row is what proves the contact details disappear.
+#
+# **Every one of the five seeded employers has an inbox.** Until Sprint 22.5
+# these six rows sat across three organisations, two of which nobody could sign
+# in to -- and MedLife and Swift Logistics had no applicants at all, so signing
+# in as either showed a console with nothing in it. An empty inbox is a fair
+# state for a real employer on day one and a poor thing to demonstrate.
 APPLICATIONS: list[tuple[str, str, str]] = [
+    # Apollo Care Hospitals, Chennai
     ("+919000000001", "general-duty-assistant-chennai", "shortlisted"),
-    ("+919000000001", "emergency-room-assistant-pune", "applied"),
     ("+919000000002", "general-duty-assistant-chennai", "applied"),
     ("+919000000003", "general-duty-assistant-chennai", "rejected"),
+    ("+919000000006", "ward-boy-chennai", "applied"),
+    ("+919000000011", "cssd-technician-chennai", "shortlisted"),
+    # Sunrise Multispeciality, Pune
+    ("+919000000001", "emergency-room-assistant-pune", "applied"),
     ("+919000000004", "home-care-attendant-pune", "applied"),
+    ("+919000000016", "icu-attendant-pune", "applied"),
+    # MedLife Diagnostics, Hyderabad
+    ("+919000000012", "phlebotomist-hyderabad", "shortlisted"),
+    ("+919000000013", "phlebotomist-hyderabad", "applied"),
+    ("+919000000014", "lab-technician-hyderabad", "applied"),
+    # GreenMart Retail, Bengaluru
+    ("+919000000004", "store-sales-associate-bengaluru", "shortlisted"),
+    ("+919000000018", "store-supervisor-bengaluru", "applied"),
     ("+919000000005", "cashier-bengaluru", "withdrawn"),
+    # Swift Logistics India, Nagpur
+    ("+919000000019", "warehouse-assistant-nagpur", "applied"),
+    ("+919000000020", "delivery-associate-nagpur", "shortlisted"),
 ]
 
 GOLDEN_PAIRS: list[tuple[str, str, str]] = [

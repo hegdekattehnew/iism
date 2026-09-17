@@ -268,6 +268,38 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 22.5 (demo readiness) is done. No new product surface: the demonstrable product, made
+demonstrable. The readiness check had found that **all six seeded applications belonged to
+organisations with no members** — which is to say the whole of Sprint 21 could not be shown from a
+cold start, because nobody could sign in and look at an inbox.
+
+- **Every seeded organisation has an owner account.** `hiring@apollo-care.example` and its nine
+  siblings, on the reserved documentation domain so none can be a real mailbox. `_owner_for` in the
+  seed mirrors `provision_organisation` — `User` + `Tenant` + `Membership(role="owner")`, consent
+  recorded, email marked verified — because a seeded organisation that behaves differently from a
+  registered one is a fixture, not a demonstration. **Sprint 12's lesson applied one level up**: a
+  tenant with no membership is invisible to everything that reads one.
+- **Every one of the five employers has an inbox.** Sixteen seeded applications in mixed states
+  across all five, not six across three. MedLife and Swift Logistics had none at all.
+- **Fifty courses, chosen by what the vacancies require.** Thirty new ones, and the count is not the
+  point: **every mandatory standard across the twenty vacancies is now taught by at least one
+  course** — two at worst. Two had **none**, so the gap panel naming them offered nothing:
+  `SSC/N9001` (`time-management`) and `SSD/VSQ/N0104` (`emergency-response-coordination`). The
+  acceptance test is the coverage query, not the number of rows.
+- **`scripts/clean_fixtures.py` names its thirteen slugs explicitly and never deletes an account.**
+  `--dry-run` is the default. Pattern-matching fixture organisations in a database that also holds
+  the owner's own is how a cleanup script becomes an incident.
+- **Malay left the switcher, not the codebase.** `LocaleDefinition.visible`; routing, the messages
+  file and the parity test still carry all three, so `/ms` resolves and the machinery stays proven
+  beyond two languages. One line to reverse.
+- **A missing message key now fails a test.** `employerConsole.matchScore` never existed — the key
+  lives in `matchesPage` — so the employer's inbox rendered the literal string
+  "employerConsole.matchScore" where the score belonged. It compiled, `tsc` was clean, and no test
+  rendered that component. `renderUi` now throws on `MISSING_MESSAGE`, which makes **every** test in
+  the suite a guard against this, and `EmployerInbox.test.tsx` covers the screen itself.
+- **`renderUi` pins `timeZone="Asia/Kolkata"`.** A formatted date must not depend on where the test
+  runs.
+
 Sprint 22 (many languages, and something arrives) is done. The product was bilingual **by
 construction**: 18 `_en`/`_hi` column pairs across 14 tables, 16 `_hi` fields in the API schemas and
 37 two-language ternaries in the client. A third language was a schema migration. It is now an

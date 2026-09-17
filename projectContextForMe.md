@@ -79,6 +79,22 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 22.5 (demo readiness) — complete, 2026-09-17.** No new product surface: the readiness
+check before demoing found that the whole of Sprint 21 could not be shown cold, because all six
+seeded applications sat in organisations **nobody could sign in to**. All ten seeded organisations
+now have owner accounts on the reserved `.example` domain, provisioned the way the product does it;
+sixteen applications spread across all five employers in mixed states; fifty courses instead of
+twenty, chosen so that **every mandatory standard across the twenty vacancies is taught by at least
+one course** (two were taught by none, and their gap panels were empty). Thirteen leftover fixture
+organisations were removed by `scripts/clean_fixtures.py` — explicit slugs, `--dry-run` by default,
+**no account deleted**. Malay is hidden from the switcher and still routed. The browser walkthrough
+found one real defect: the employer's inbox rendered `employerConsole.matchScore` as text, because
+that key only ever existed in `matchesPage`; the test harness now fails on any missing key and the
+inbox has its own test file. Verified: `make seed` twice identical, the coverage query, `make
+evaluate` unmoved, 440 backend and 56 web tests, and a cold-start walkthrough in both languages.
+**Still open:** publishing a listing in two languages, notification preferences, a real email
+provider, deployment, and per-country taxonomy (needs its own ADR first).
+
 **Sprint 22 (many languages, and something arrives) — complete, 2026-09-17.** Two problems, both
 visible only once someone looked. The language switcher was two tabs, and under it the product was
 bilingual by construction: 18 `_en`/`_hi` column pairs, 16 API fields, 37 client ternaries. Now the

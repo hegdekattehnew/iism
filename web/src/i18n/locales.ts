@@ -17,6 +17,12 @@ export type LocaleDefinition = {
   englishName: string;
   /** Right-to-left scripts need `dir="rtl"`; none of ours do yet. */
   rtl?: boolean;
+  /**
+   * Offered in the switcher. A locale can exist — routing, messages, tests —
+   * without being offered, which is how a language under translation stays
+   * exercised end to end without a visitor meeting a half-English page.
+   */
+  visible?: boolean;
 };
 
 export const LOCALES: readonly LocaleDefinition[] = [
@@ -27,10 +33,16 @@ export const LOCALES: readonly LocaleDefinition[] = [
   // being machine-translated into 650 keys nobody here can check. It earns its
   // place by exercising the machinery at three locales -- two is the number
   // that hides the assumption this sprint removed.
-  { code: "ms", nativeName: "Bahasa Melayu", englishName: "Malay" },
+  // Routed, tested, and deliberately not offered yet: navigation is translated
+  // and everything else falls back to English. `visible: true` is the whole of
+  // the change when the translation exists.
+  { code: "ms", nativeName: "Bahasa Melayu", englishName: "Malay", visible: false },
 ] as const;
 
 export const LOCALE_CODES = LOCALES.map((l) => l.code);
+
+/** What the switcher offers — a subset of what routing accepts, on purpose. */
+export const VISIBLE_LOCALES = LOCALES.filter((l) => l.visible !== false);
 
 export const DEFAULT_LOCALE = "en";
 

@@ -488,6 +488,7 @@
     "footnote": "Counted live from the platform database, not illustrative."
   },
   "employerConsole": {
+    "matchScore": "{score}% match",
     "title": "Employer console",
     "subtitle": "Rank your applicants against the national standards your vacancy actually requires — and see exactly what each of them is missing.",
     "demoTitle": "This is a demonstration",
