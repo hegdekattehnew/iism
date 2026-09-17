@@ -102,6 +102,13 @@ api/                     FastAPI modular monolith
     matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
                          scoring.py is pure -- no I/O, no clock, no model. employer.py is
                          the same scorer run in reverse for the console (ADR-037).
+    applications/        Applying, withdrawing, saving a vacancy, and the employer's
+                         inbox. Holds the product's **one deliberate disclosure**:
+                         a candidate's contact reaches an employer because they
+                         applied, and goes when they withdraw. Depends on
+                         marketplace and matching; nothing depends on it.
+    privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
+                         Spans every module; nothing depends on it.
     analytics/           analytics_events (ADR-025). record() COMMITS.
 
     Not built. ADR-008's career_paths/ (graph-based role transition) and
