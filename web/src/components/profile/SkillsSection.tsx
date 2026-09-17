@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Select } from "@/components/profile/fields";
@@ -12,7 +12,6 @@ import { type Profile, useProfileMutations } from "@/lib/profile";
 export function SkillsSection({ profile }: { profile: Profile | null }) {
   const t = useTranslations("profilePage");
   const ts = useTranslations("skillsPage");
-  const isHi = useLocale() === "hi";
   const { addSkill, removeSkill } = useProfileMutations();
 
   const [query, setQuery] = useState("");
@@ -65,7 +64,7 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
               className="flex items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2"
             >
               <span className="flex-1 text-sm">
-                {isHi && s.name_hi ? s.name_hi : s.name_en}
+                {s.name}
                 {s.matched_on && s.match_kind === "alias" && (
                   <span className="ml-2 text-xs text-brand">
                     {ts("matchedVia", { term: s.matched_on })}
@@ -92,7 +91,7 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
             className="flex flex-wrap items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2.5"
           >
             <span className="text-sm font-medium">
-              {isHi && s.skill.name_hi ? s.skill.name_hi : s.skill.name_en}
+              {s.skill.name}
             </span>
             <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-muted">
               {t("proficiency", { n: s.proficiency })}

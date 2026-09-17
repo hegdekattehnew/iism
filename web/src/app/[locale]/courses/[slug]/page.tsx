@@ -18,19 +18,22 @@ export default async function CourseDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("coursesPage");
 
-  const { data, error, response } = await api.GET("/courses/{slug}", {
-    params: { path: { slug } },
-  });
+  const { data, error, response } = await api.GET(
+    "/courses/{slug}",
+    // Server-side: the browser middleware that normally carries this
+    // header does not run here, and without it the API answers in the
+    // default language on a page that is not in it (ADR-041).
+    { params: { path: { slug } }, headers: { "accept-language": locale } },
+  );
   // Only a 404 is "not found". Every failure used to land here, so an API
   // outage told visitors the listing did not exist; `error.tsx` now says the
   // page is unavailable instead.
   if (response.status === 404) notFound();
   if (error || !data) throw new Error(`API responded ${response.status}`);
 
-  const isHi = locale === "hi";
-  const title = isHi && data.title_hi ? data.title_hi : data.title_en;
+  const title = data.title;
   const description =
-    isHi && data.description_hi ? data.description_hi : data.description_en;
+    data.description;
   const fee =
     data.fee_inr == null || data.fee_inr === 0
       ? t("feeFree")
@@ -85,7 +88,7 @@ export default async function CourseDetailPage({
                 href={`/skills/${s.skill.slug}`}
                 className="inline-flex items-center gap-2 rounded-lg border border-border-token bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
               >
-                <span>{isHi && s.skill.name_hi ? s.skill.name_hi : s.skill.name_en}</span>
+                <span>{s.skill.name}</span>
                 {s.level_taught != null && (
                   <span className="text-xs text-muted">
                     {t("teachesToLevel", { level: s.level_taught })}

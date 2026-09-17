@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui";
@@ -15,10 +15,8 @@ const PAGE_SIZE = 24;
 
 type Row = {
   slug: string;
-  name_en: string;
-  name_hi?: string | null;
-  description_en?: string | null;
-  description_hi?: string | null;
+  name: string;
+  description?: string | null;
   skill_type: "technical" | "core" | "generic";
   nsqf_level?: number | null;
   qp_count?: number;
@@ -43,8 +41,6 @@ function TypeChip({ type }: { type: Row["skill_type"] }) {
 
 export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
   const t = useTranslations("skillsPage");
-  const locale = useLocale();
-  const isHi = locale === "hi";
 
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState<string>("");
@@ -120,9 +116,9 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
 
   const rows = results.data?.rows ?? [];
   const total = results.data?.total ?? 0;
-  const name = (r: Row) => (isHi && r.name_hi ? r.name_hi : r.name_en);
+  const name = (r: Row) => (r.name);
   const desc = (r: Row) =>
-    isHi && r.description_hi ? r.description_hi : r.description_en;
+    r.description;
 
   // Levels arrive as numbers: 4 renders as "4", 4.5 as "4.5". A trailing ".0"
   // on every whole level is noise on a chip.
@@ -253,9 +249,6 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
               </div>
 
               <h2 className="mt-2.5 text-base font-semibold">{name(r)}</h2>
-              {isHi && r.name_hi && (
-                <p className="text-xs text-muted">{r.name_en}</p>
-              )}
 
               {desc(r) && (
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted">{desc(r)}</p>

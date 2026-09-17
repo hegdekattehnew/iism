@@ -152,7 +152,7 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
               <CardBody>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold">{job.title_en}</h3>
+                    <h3 className="text-base font-semibold">{job.title}</h3>
                     <p className="mt-0.5 text-sm text-muted">
                       {[job.location_district, job.location_state]
                         .filter(Boolean)

@@ -1,4 +1,4 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { api } from "@/lib/api";
 
@@ -14,8 +14,6 @@ const TONE: Record<string, string> = {
 
 export async function SkillQualifications({ slug }: { slug: string }) {
   const t = await getTranslations("skillsPage");
-  const locale = await getLocale();
-  const isHi = locale === "hi";
 
   const { data, error } = await api.GET("/skills/{slug}/qualifications", {
     params: { path: { slug }, query: { limit: SHOWN } },
@@ -69,7 +67,7 @@ export async function SkillQualifications({ slug }: { slug: string }) {
                 </div>
 
                 <p className="mt-2 text-sm font-semibold">
-                  {isHi && q.name_hi ? q.name_hi : q.name_en}
+                  {q.name}
                 </p>
                 {q.sector_name_en && (
                   <p className="mt-0.5 text-xs text-muted">{q.sector_name_en}</p>

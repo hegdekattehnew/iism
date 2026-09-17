@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
-import { LocaleToggle } from "@/components/LocaleToggle";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { Logo } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 
@@ -57,7 +57,7 @@ export async function Footer() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 {tf("language")}
               </p>
-              <LocaleToggle />
+              <LocaleSwitcher />
             </div>
           </div>
 

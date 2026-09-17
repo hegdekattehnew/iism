@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui";
@@ -22,8 +22,7 @@ import { api } from "@/lib/api";
 
 export type Standard = {
   slug: string;
-  name_en: string;
-  name_hi?: string | null;
+  name: string;
   nos_code?: string | null;
   nsqf_level?: number | null;
   matched_on?: string | null;
@@ -43,7 +42,6 @@ export function StandardPicker({
   addLabel: string;
 }) {
   const ts = useTranslations("skillsPage");
-  const isHi = useLocale() === "hi";
   const [query, setQuery] = useState("");
   // The input stays responsive while the request lags behind it, which matters
   // on the low-end Android this is built for.
@@ -79,7 +77,7 @@ export function StandardPicker({
               className="flex items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2"
             >
               <span className="min-w-0 flex-1 text-sm">
-                <span>{isHi && s.name_hi ? s.name_hi : s.name_en}</span>
+                <span>{s.name}</span>
                 {s.nos_code && (
                   <span className="ml-2 font-mono text-[11px] text-muted">
                     {s.nos_code}

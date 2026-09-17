@@ -44,7 +44,7 @@ export function CandidateShortlist({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{q.data?.job.title_en}</h2>
+        <h2 className="text-lg font-semibold">{q.data?.job.title}</h2>
         <p className="mt-1 text-sm text-muted">
           {t("shortlistNote", { count: q.data?.total ?? 0 })}
         </p>
@@ -102,7 +102,7 @@ export function CandidateShortlist({
                   {mandatoryGaps.length > 0 && (
                     <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
                       {te("missingMandatory")}:{" "}
-                      {mandatoryGaps.map((m) => m.name_en).join(" · ")}
+                      {mandatoryGaps.map((m) => m.name).join(" · ")}
                     </p>
                   )}
                 </CardBody>

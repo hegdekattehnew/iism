@@ -49,6 +49,11 @@ async function tryRefresh(): Promise<boolean> {
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
     if (typeof window === "undefined") return request;
+    // The language this page is in, on every call -- one middleware rather
+    // than a parameter at forty call sites. The API resolves the text from it
+    // (ADR-041); the client no longer picks between two fields.
+    const locale = document.documentElement.lang;
+    if (locale) request.headers.set("accept-language", locale);
     const token = getAccessToken();
     if (token) request.headers.set("authorization", `Bearer ${token}`);
     return request;

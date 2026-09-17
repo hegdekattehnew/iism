@@ -19,17 +19,22 @@ export default async function JobDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("jobsPage");
 
-  const { data, error, response } = await api.GET("/jobs/{slug}", { params: { path: { slug } } });
+  const { data, error, response } = await api.GET(
+    "/jobs/{slug}",
+    // Server-side: the browser middleware that normally carries this
+    // header does not run here, and without it the API answers in the
+    // default language on a page that is not in it (ADR-041).
+    { params: { path: { slug } }, headers: { "accept-language": locale } },
+  );
   // Only a 404 is "not found". Every failure used to land here, so an API
   // outage told visitors the listing did not exist; `error.tsx` now says the
   // page is unavailable instead.
   if (response.status === 404) notFound();
   if (error || !data) throw new Error(`API responded ${response.status}`);
 
-  const isHi = locale === "hi";
-  const title = isHi && data.title_hi ? data.title_hi : data.title_en;
+  const title = data.title;
   const description =
-    isHi && data.description_hi ? data.description_hi : data.description_en;
+    data.description;
 
   // Mandatory first — those are what actually gate a hire.
   const skills = [...(data.skills ?? [])].sort(
@@ -119,7 +124,7 @@ export default async function JobDetailPage({
                   {s.is_mandatory ? t("mandatory") : t("optional")}
                 </span>
                 <span className="font-medium">
-                  {isHi && s.skill.name_hi ? s.skill.name_hi : s.skill.name_en}
+                  {s.skill.name}
                 </span>
                 <span className="ml-auto text-xs text-muted">
                   {t("importance", { n: s.importance })}

@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui";
@@ -12,10 +12,8 @@ const TYPES = ["full_time", "part_time", "contract", "apprenticeship"] as const;
 
 type Job = {
   slug: string;
-  title_en: string;
-  title_hi?: string | null;
-  description_en?: string | null;
-  description_hi?: string | null;
+  title: string;
+  description?: string | null;
   location_state?: string | null;
   location_district?: string | null;
   employment_type: (typeof TYPES)[number];
@@ -55,7 +53,6 @@ export function salaryLabel(
 
 export function JobBrowser({ initialSkill = "" }: { initialSkill?: string }) {
   const t = useTranslations("jobsPage");
-  const isHi = useLocale() === "hi";
 
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
@@ -85,9 +82,9 @@ export function JobBrowser({ initialSkill = "" }: { initialSkill?: string }) {
   // Derived from the current result set rather than a separate endpoint —
   // there is no facet API yet and this stays correct for the data on screen.
   const states = [...new Set(rows.map((r) => r.location_state).filter(Boolean))].sort();
-  const title = (j: Job) => (isHi && j.title_hi ? j.title_hi : j.title_en);
+  const title = (j: Job) => (j.title);
   const desc = (j: Job) =>
-    isHi && j.description_hi ? j.description_hi : j.description_en;
+    j.description;
 
   return (
     <div>

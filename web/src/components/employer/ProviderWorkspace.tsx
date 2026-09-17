@@ -160,7 +160,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-base font-semibold">
-                      {course.title_en}
+                      {course.title}
                     </h3>
                     <p className="mt-0.5 text-sm text-muted">
                       {t(`modes.${course.mode}`)}

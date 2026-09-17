@@ -1,4 +1,4 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -11,10 +11,8 @@ const inr = (n: number) => new Intl.NumberFormat("en-IN").format(n);
  * glossary and starts being navigable.
  */
 export async function SkillRelated({ slug }: { slug: string }) {
-  const locale = await getLocale();
   const t = await getTranslations("skillLinks");
   const tc = await getTranslations("coursesPage");
-  const isHi = locale === "hi";
 
   const [jobsRes, coursesRes] = await Promise.all([
     api.GET("/skills/{slug}/jobs", { params: { path: { slug }, query: { limit: 6 } } }),
@@ -40,7 +38,7 @@ export async function SkillRelated({ slug }: { slug: string }) {
                     className="block rounded-lg border border-border-token bg-surface px-3 py-2.5 transition-colors hover:border-brand"
                   >
                     <p className="text-sm font-medium">
-                      {isHi && j.title_hi ? j.title_hi : j.title_en}
+                      {j.title}
                     </p>
                     <p className="text-xs text-muted">
                       {j.tenant.name}
@@ -74,7 +72,7 @@ export async function SkillRelated({ slug }: { slug: string }) {
                     className="block rounded-lg border border-border-token bg-surface px-3 py-2.5 transition-colors hover:border-brand"
                   >
                     <p className="text-sm font-medium">
-                      {isHi && c.title_hi ? c.title_hi : c.title_en}
+                      {c.title}
                     </p>
                     <p className="text-xs text-muted">
                       {c.tenant.name} ·{" "}

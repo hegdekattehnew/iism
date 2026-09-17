@@ -4,20 +4,20 @@
     "tagline": "Connecting candidates, courses and jobs through a shared skill graph"
   },
   "nav": {
-    "jobs": "Jobs",
-    "courses": "Courses",
-    "skills": "Skills",
-    "howItWorks": "How it works",
+    "jobs": "Pekerjaan",
+    "courses": "Kursus",
+    "skills": "Kemahiran",
+    "howItWorks": "Cara ia berfungsi",
     "forEmployers": "For employers",
     "forProviders": "For providers",
-    "signIn": "Sign in",
-    "getStarted": "Get started",
+    "signIn": "Log masuk",
+    "getStarted": "Mula",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "vacancies": "Vacancies",
     "courses_org": "Courses",
-    "skipToContent": "Skip to main content",
-    "language": "Language"
+    "skipToContent": "Langkau ke kandungan utama",
+    "language": "Bahasa"
   },
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
@@ -82,12 +82,12 @@
     "about": "About",
     "contact": "Contact",
     "careers": "Careers",
-    "privacy": "Privacy policy",
-    "terms": "Terms of use",
+    "privacy": "Notis privasi",
+    "terms": "Terma penggunaan",
     "grievance": "Grievance redressal",
     "nsqfNote": "Skill definitions follow the National Skills Qualifications Framework. IISM is not a certifying body.",
     "rights": "All rights reserved.",
-    "language": "Language"
+    "language": "Bahasa"
   },
   "placeholder": {
     "badge": "Drafting",
@@ -296,9 +296,9 @@
     "errorBadCode": "That code is incorrect or has expired.",
     "errorRateLimited": "Too many attempts. Please wait a few minutes and try again.",
     "errorGeneric": "Something went wrong. Please try again.",
-    "signOut": "Sign out",
-    "myProfile": "My profile",
-    "myMatches": "My matches",
+    "signOut": "Log keluar",
+    "myProfile": "Profil saya",
+    "myMatches": "Padanan saya",
     "identifierLabel": "Mobile number or email",
     "identifierPlaceholder": "98765 43210 or you@example.com",
     "errorInvalidId": "That does not look like a mobile number or an email address.",
@@ -306,7 +306,7 @@
     "signUpInstead": "Sign up",
     "orgProfile": "Organisation profile",
     "myWorkspace": "My workspace",
-    "account": "Account",
+    "account": "Akaun",
     "unregistered": "There is no account with this number yet. That code has been used — sign up instead; it asks you to agree to our privacy notice first.",
     "unregisteredAction": "Create an account"
   },
@@ -1024,7 +1024,7 @@
     }
   },
   "applications": {
-    "apply": "Apply for this job",
+    "apply": "Mohon pekerjaan ini",
     "applying": "Sending…",
     "appliedLabel": "Applied",
     "withdraw": "Withdraw",
@@ -1041,7 +1041,7 @@
     "errorSeeker": "This account is set up for an organisation, so it cannot apply for jobs.",
     "errorGeneric": "Something went wrong. Try again.",
     "signInToApply": "Sign in to apply",
-    "save": "Save for later",
+    "save": "Simpan untuk kemudian",
     "savedLabel": "Saved",
     "pageTitle": "My applications",
     "pageSubtitle": "Every job you applied for, and where each one stands.",

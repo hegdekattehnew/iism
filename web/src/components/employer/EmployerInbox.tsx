@@ -63,7 +63,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
     <div className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">
-          {data.job.title_en}
+          {data.job.title}
         </h1>
         <Badge>{t("count", { count: data.total })}</Badge>
       </div>

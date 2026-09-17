@@ -28,7 +28,7 @@ type Taught = {
 function toTaught(course: OrgCourse | null): Taught[] {
   return (course?.skills ?? []).map((s) => ({
     skill_slug: s.skill.slug,
-    name: s.skill.name_en,
+    name: s.skill.name,
     nos_code: s.skill.nos_code,
     level_taught: s.level_taught ?? null,
   }));
@@ -55,7 +55,7 @@ export function CourseEditor({
       ...rs,
       {
         skill_slug: s.slug,
-        name: s.name_en,
+        name: s.name,
         nos_code: s.nos_code,
         level_taught: s.nsqf_level ?? null,
       },
@@ -72,10 +72,8 @@ export function CourseEditor({
     };
 
     onSave({
-      title_en: String(form.get("title_en") ?? "").trim(),
-      title_hi: s("title_hi"),
-      description_en: s("description_en"),
-      description_hi: s("description_hi"),
+      title: String(form.get("title") ?? "").trim(),
+      description: s("description"),
       mode: (s("mode") ?? "offline") as CoursePayload["mode"],
       language: (s("language") ?? "both") as CoursePayload["language"],
       duration_hours: n("duration_hours"),
@@ -95,22 +93,15 @@ export function CourseEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("titleEn")} className="sm:col-span-2">
               <Text
-                name="title_en"
+                name="title"
                 required
-                defaultValue={course?.title_en ?? ""}
+                defaultValue={course?.title ?? ""}
               />
-            </Field>
-            <Field
-              label={t("titleHi")}
-              className="sm:col-span-2"
-              hint={t("titleHiHint")}
-            >
-              <Text name="title_hi" defaultValue={course?.title_hi ?? ""} />
             </Field>
             <Field label={t("descriptionEn")} className="sm:col-span-2">
               <Area
-                name="description_en"
-                defaultValue={course?.description_en ?? ""}
+                name="description"
+                defaultValue={course?.description ?? ""}
               />
             </Field>
             <Field label={t("mode")}>

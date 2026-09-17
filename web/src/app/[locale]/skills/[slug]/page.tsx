@@ -22,20 +22,22 @@ export default async function SkillDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("skillsPage");
 
-  const { data, error, response } = await api.GET("/skills/{slug}", {
-    params: { path: { slug } },
-  });
+  const { data, error, response } = await api.GET(
+    "/skills/{slug}",
+    // Server-side: the browser middleware that normally carries this
+    // header does not run here, and without it the API answers in the
+    // default language on a page that is not in it (ADR-041).
+    { params: { path: { slug } }, headers: { "accept-language": locale } },
+  );
   // Only a 404 is "not found". Every failure used to land here, so an API
   // outage told visitors the listing did not exist; `error.tsx` now says the
   // page is unavailable instead.
   if (response.status === 404) notFound();
   if (error || !data) throw new Error(`API responded ${response.status}`);
 
-  const isHi = locale === "hi";
-  const title = isHi && data.name_hi ? data.name_hi : data.name_en;
-  const secondary = isHi && data.name_hi ? data.name_en : data.name_hi;
+  const title = data.name;
   const description =
-    isHi && data.description_hi ? data.description_hi : data.description_en;
+    data.description;
 
   const byScript = SCRIPTS.map((script) => ({
     script,
@@ -75,7 +77,6 @@ export default async function SkillDetailPage({
       )}
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
-      {secondary && <p className="mt-1 text-lg text-muted">{secondary}</p>}
 
       {description && (
         <section className="mt-8">

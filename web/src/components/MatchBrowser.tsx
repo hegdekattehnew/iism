@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CoverageBar, LevelScale } from "@/components/CoverageBar";
@@ -10,7 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
 type Missing = {
-  name_en: string;
+  name: string;
   nos_code?: string | null;
   importance: number;
   is_mandatory: boolean;
@@ -57,7 +57,7 @@ function SkillChip({
           {t("mandatory")}
         </span>
       )}
-      <span>{skill.name_en}</span>
+      <span>{skill.name}</span>
       {skill.nos_code && (
         <span className="font-mono text-[10px] opacity-70">
           {skill.nos_code}
@@ -82,8 +82,6 @@ function reportCourseOpened(courseSlug: string, fromJobSlug: string) {
 
 export function MatchBrowser() {
   const t = useTranslations("matchesPage");
-  const locale = useLocale();
-  const isHi = locale === "hi";
   const [openSlug, setOpenSlug] = useState<string | null>(null);
 
   const matches = useQuery({
@@ -172,7 +170,7 @@ export function MatchBrowser() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">
-                  {isHi && m.job.title_hi ? m.job.title_hi : m.job.title_en}
+                  {m.job.title}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted">
                   {[m.job.location_district, m.job.location_state]
@@ -213,7 +211,7 @@ export function MatchBrowser() {
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {matched.map((s) => (
-                    <SkillChip key={s.name_en} skill={s} held />
+                    <SkillChip key={s.name} skill={s} held />
                   ))}
                 </div>
               </div>
@@ -226,7 +224,7 @@ export function MatchBrowser() {
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {missing.map((s) => (
-                    <SkillChip key={s.name_en} skill={s} held={false} />
+                    <SkillChip key={s.name} skill={s} held={false} />
                   ))}
                 </div>
               </div>
@@ -272,7 +270,7 @@ export function MatchBrowser() {
                             }
                             className="text-sm font-semibold underline-offset-4 hover:underline"
                           >
-                            {isHi && c.title_hi ? c.title_hi : c.title_en}
+                            {c.title}
                           </Link>
                           {c.duration_hours != null && (
                             <span className="text-xs text-muted">

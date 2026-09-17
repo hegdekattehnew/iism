@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
@@ -12,9 +12,8 @@ type Status = "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
 /** The Hindi title when there is one. Every other listing does this; these two
  *  did not, so /hi/applications showed English titles on a Hindi page. */
 function useTitle() {
-  const isHi = useLocale() === "hi";
-  return (job: { title_en: string; title_hi?: string | null }) =>
-    isHi && job.title_hi ? job.title_hi : job.title_en;
+  return (job: { title: string }) =>
+    job.title;
 }
 
 const TONE: Record<Status, string> = {

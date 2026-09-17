@@ -1,4 +1,4 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { api } from "@/lib/api";
 
@@ -8,8 +8,6 @@ const SHOWN = 8;
 
 export async function SkillRequirements({ slug }: { slug: string }) {
   const t = await getTranslations("skillsPage");
-  const locale = await getLocale();
-  const isHi = locale === "hi";
 
   const { data, error } = await api.GET("/skills/{slug}/requirements", {
     params: { path: { slug } },
@@ -23,7 +21,6 @@ export async function SkillRequirements({ slug }: { slug: string }) {
     return null;
   }
 
-  const text = (en: string, hi?: string | null) => (isHi && hi ? hi : en);
 
   return (
     <section className="mt-10">
@@ -45,7 +42,7 @@ export async function SkillRequirements({ slug }: { slug: string }) {
               <li key={i} className="rounded-xl border border-border-token bg-surface p-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold">
-                    {text(element.name_en, element.name_hi)}
+                    {element.name}
                   </h3>
                   {element.total_marks != null && (
                     <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
@@ -63,7 +60,7 @@ export async function SkillRequirements({ slug }: { slug: string }) {
                         </span>
                       )}
                       <span className="text-muted">
-                        {text(c.description_en, c.description_hi)}
+                        {c.description}
                       </span>
                     </li>
                   ))}

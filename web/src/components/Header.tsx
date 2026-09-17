@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AuthNav } from "@/components/AuthNav";
 import { ContextSwitcher, useActiveOrg } from "@/components/ContextSwitcher";
-import { LocaleToggle } from "@/components/LocaleToggle";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { Logo } from "@/components/ui";
 import { Link, usePathname } from "@/i18n/navigation";
 import { SEEKER, rememberContext } from "@/lib/context";
@@ -86,7 +86,7 @@ export function Header() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <ContextSwitcher />
-          <LocaleToggle />
+          <LocaleSwitcher />
           <AuthNav />
         </div>
 
@@ -143,7 +143,7 @@ export function Header() {
             >
               <AuthNav stacked />
               <div className="pt-2">
-                <LocaleToggle />
+                <LocaleSwitcher />
               </div>
             </div>
           </nav>

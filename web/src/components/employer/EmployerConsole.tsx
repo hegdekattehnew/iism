@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CoverageBar } from "@/components/CoverageBar";
@@ -132,7 +132,7 @@ function CandidateList({
             {mandatoryGaps.length > 0 && (
               <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
                 {t("missingMandatory")}:{" "}
-                {mandatoryGaps.map((m) => m.name_en).join(" · ")}
+                {mandatoryGaps.map((m) => m.name).join(" · ")}
               </p>
             )}
           </li>
@@ -145,8 +145,6 @@ function CandidateList({
 export function EmployerConsole() {
   const t = useTranslations("employerConsole");
   const ti = useTranslations("employerInbox");
-  const locale = useLocale();
-  const isHi = locale === "hi";
   const [employer, setEmployer] = useState<string | null>(null);
   const [openJob, setOpenJob] = useState<string | null>(null);
 
@@ -262,9 +260,7 @@ export function EmployerConsole() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="text-base font-semibold">
-                          {isHi && j.job.title_hi
-                            ? j.job.title_hi
-                            : j.job.title_en}
+                          {j.job.title}
                         </h3>
                         <p className="mt-0.5 text-sm text-muted">
                           {[j.job.location_district, j.job.location_state]
@@ -345,11 +341,11 @@ export function EmployerConsole() {
               <tbody>
                 {scarce.map((s) => (
                   <tr
-                    key={s.nos_code ?? s.name_en}
+                    key={s.nos_code ?? s.name}
                     className="border-b border-border-token last:border-0"
                   >
                     <td className="px-5 py-3">
-                      <span>{s.name_en}</span>
+                      <span>{s.name}</span>
                       {s.nos_code && (
                         <span className="ml-2 font-mono text-[11px] text-muted">
                           {s.nos_code}

@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui";
@@ -14,10 +14,8 @@ const FEE_CAPS = [2000, 5000, 10000] as const;
 
 type Course = {
   slug: string;
-  title_en: string;
-  title_hi?: string | null;
-  description_en?: string | null;
-  description_hi?: string | null;
+  title: string;
+  description?: string | null;
   mode: (typeof MODES)[number];
   language: "en" | "hi" | "both";
   duration_hours?: number | null;
@@ -38,7 +36,6 @@ export function feeLabel(
 
 export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) {
   const t = useTranslations("coursesPage");
-  const isHi = useLocale() === "hi";
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("");
@@ -67,9 +64,9 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
   });
 
   const rows = results.data ?? [];
-  const title = (c: Course) => (isHi && c.title_hi ? c.title_hi : c.title_en);
+  const title = (c: Course) => (c.title);
   const desc = (c: Course) =>
-    isHi && c.description_hi ? c.description_hi : c.description_en;
+    c.description;
 
   return (
     <div>

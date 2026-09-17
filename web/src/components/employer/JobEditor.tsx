@@ -29,7 +29,7 @@ type Requirement = {
 function toRequirements(job: OrgJob | null): Requirement[] {
   return (job?.skills ?? []).map((s) => ({
     skill_slug: s.skill.slug,
-    name: s.skill.name_en,
+    name: s.skill.name,
     nos_code: s.skill.nos_code,
     importance: s.importance,
     is_mandatory: s.is_mandatory,
@@ -59,7 +59,7 @@ export function JobEditor({
       ...rs,
       {
         skill_slug: s.slug,
-        name: s.name_en,
+        name: s.name,
         nos_code: s.nos_code,
         importance: 3,
         is_mandatory: false,
@@ -84,10 +84,8 @@ export function JobEditor({
     };
 
     onSave({
-      title_en: String(form.get("title_en") ?? "").trim(),
-      title_hi: s("title_hi"),
-      description_en: s("description_en"),
-      description_hi: s("description_hi"),
+      title: String(form.get("title") ?? "").trim(),
+      description: s("description"),
       location_state: s("location_state"),
       location_district: s("location_district"),
       employment_type: (s("employment_type") ??
@@ -112,22 +110,15 @@ export function JobEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("titleEn")} className="sm:col-span-2">
               <Text
-                name="title_en"
+                name="title"
                 required
-                defaultValue={job?.title_en ?? ""}
+                defaultValue={job?.title ?? ""}
               />
-            </Field>
-            <Field
-              label={t("titleHi")}
-              className="sm:col-span-2"
-              hint={t("titleHiHint")}
-            >
-              <Text name="title_hi" defaultValue={job?.title_hi ?? ""} />
             </Field>
             <Field label={t("descriptionEn")} className="sm:col-span-2">
               <Area
-                name="description_en"
-                defaultValue={job?.description_en ?? ""}
+                name="description"
+                defaultValue={job?.description ?? ""}
               />
             </Field>
             <Field label={t("state")}>

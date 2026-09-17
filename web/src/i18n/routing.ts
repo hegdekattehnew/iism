@@ -1,10 +1,13 @@
 import { defineRouting } from "next-intl/routing";
 
-// Hindi and English are both live from day one (ADR-033). Adding a locale is a
-// translation task, not a refactor, because nothing is hardcoded to English.
+import { DEFAULT_LOCALE, LOCALE_CODES } from "./locales";
+
+// The list lives in `locales.ts` (ADR-041) so that routing, the switcher and
+// the `hreflang` tags cannot disagree about which languages exist. Adding one
+// is an entry there and a messages file -- nothing here changes.
 export const routing = defineRouting({
-  locales: ["en", "hi"] as const,
-  defaultLocale: "en",
+  locales: LOCALE_CODES,
+  defaultLocale: DEFAULT_LOCALE,
 });
 
-export type Locale = (typeof routing.locales)[number];
+export type Locale = string;
