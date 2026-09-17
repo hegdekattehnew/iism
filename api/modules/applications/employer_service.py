@@ -8,6 +8,7 @@ own history, and the contact details go.
 
 import uuid
 from datetime import datetime
+from typing import cast
 
 import structlog
 from fastapi import HTTPException, status
@@ -16,10 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
 from api.modules.applications.models import Application
-from api.modules.identity.models import User
+from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job
 from api.modules.matching import score_profiles
 from api.modules.matching.scoring import MatchResult
+from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.applications")
 
@@ -93,6 +95,29 @@ async def set_status(
         )
 
     application.status = new_status
+
+    # The candidate hears about it. In-app always -- most signed up with a
+    # phone and have no email, and SMS waits on DLT registration -- plus email
+    # for the minority who do, in whichever language they chose.
+    profile = await db.get(CandidateProfile, application.profile_id)
+    user = await db.get(User, profile.user_id) if profile is not None else None
+    if user is not None:
+        payload = {
+            "vacancy": job.title,
+            "organisation": cast(Tenant, job.tenant).name,
+            "status": new_status,
+            "path": "/applications",
+        }
+        for channel in ("in_app", "email"):
+            await enqueue(
+                db,
+                recipient_kind="user",
+                recipient_id=user.id,
+                channel=channel,
+                template="application_status_changed",
+                payload=payload,
+                locale=user.preferred_locale,
+            )
     await db.commit()
     await record(
         db,

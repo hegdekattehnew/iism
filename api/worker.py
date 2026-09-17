@@ -27,6 +27,7 @@ from api.core.logging import configure_logging, dict_config
 from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
 from api.modules.analytics.tasks import purge_expired_analytics
+from api.modules.notifications.tasks import drain_notifications
 
 # Named on the command line as `arq --custom-log-dict api.worker.LOG_CONFIG`.
 # arq applies exactly one logging config and it applies it *before* the worker
@@ -69,6 +70,10 @@ class WorkerSettings:
     cron_jobs = [
         *_Tasks.cron_jobs,
         cron(purge_expired_analytics, hour={21}, minute={30}, run_at_startup=False),
+        # Every minute: an application that arrives at 09:00 should not be
+        # announced at 09:59. Cheap when the queue is empty -- one indexed
+        # query returning nothing.
+        cron(drain_notifications, minute=set(range(60)), run_at_startup=False),
     ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings

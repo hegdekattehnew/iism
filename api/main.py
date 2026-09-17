@@ -36,6 +36,7 @@ from api.modules.marketplace import (
 )
 from api.modules.matching import employer_org_router, mount_employer_console
 from api.modules.matching import router as matching_router
+from api.modules.notifications import router as notifications_router
 from api.modules.privacy import router as privacy_router
 from api.modules.skills import router as skills_router
 
@@ -130,6 +131,7 @@ app.include_router(matching_router)
 app.include_router(analytics_router)
 app.include_router(applications_router)
 app.include_router(applications_employer_router)
+app.include_router(notifications_router)
 app.include_router(privacy_router)
 
 app.include_router(employer_org_router)

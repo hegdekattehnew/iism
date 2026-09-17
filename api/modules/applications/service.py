@@ -12,6 +12,7 @@ way:
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import structlog
 from fastapi import HTTPException, status
@@ -22,8 +23,10 @@ from api.core.config import get_settings
 from api.modules.analytics import record
 from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import User
+from api.modules.identity.models import Tenant
 from api.modules.marketplace import ensure_profile, get_job_by_slug
 from api.modules.marketplace.models import Job
+from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.applications")
 
@@ -81,6 +84,22 @@ async def apply(
         )
         db.add(application)
 
+    # Queued in the same transaction as the application itself: a notification
+    # for an application that did not commit would be a lie, and sending inline
+    # would let an SMTP timeout fail the application (ADR-006).
+    await enqueue(
+        db,
+        recipient_kind="tenant",
+        recipient_id=job.tenant_id,
+        channel="email",
+        template="application_received",
+        # The vacancy and a link, and nothing about the candidate: who applied
+        # belongs behind the sign-in, on the inbox page.
+        payload={
+            "vacancy": job.title,
+            "path": f"/employer/{cast(Tenant, job.tenant).slug}/jobs/{job.slug}/applications",
+        },
+    )
     await db.commit()
     # After the commit, never inside it: `record()` commits, and a rollback in
     # the middle would take the application with it.
