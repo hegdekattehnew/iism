@@ -134,6 +134,9 @@ class JobPoolOut(BaseModel):
     pool: int
     ready: int
     nearly: int
+    # Sprint 21: the pool is who *could* apply; these are who did.
+    applications: int = 0
+    new_applications: int = 0
 
 
 class ScarceSkillOut(BaseModel):

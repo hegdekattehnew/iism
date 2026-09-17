@@ -328,3 +328,281 @@ class TestSavedJobs:
         assert (
             await client.delete("/me/saved-jobs/open-cashier", headers=headers)
         ).status_code == 204
+
+
+# ------------------------------------------------------- the employer's inbox
+
+
+async def _employer_with_job(
+    client: AsyncClient, skill_slug: str
+) -> tuple[dict[str, str], str, str]:
+    """A real employer account, with a published vacancy of its own."""
+    address = f"inbox-{uuid.uuid4().hex[:8]}@example.org"
+    code = (
+        await client.post(
+            "/auth/org/register",
+            json={
+                "email": address,
+                "organisation_name": "Inbox Hospital",
+                "tenant_type": "employer",
+                "consent_version": CONSENT,
+            },
+        )
+    ).json()["debug_code"]
+    tokens = (
+        await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
+    ).json()
+    headers = {"authorization": f"Bearer {tokens['access_token']}"}
+    org = tokens["organisation_slug"]
+    job = (
+        await client.post(
+            f"/org/{org}/jobs",
+            headers=headers,
+            json={
+                "title_en": "Inbox Cashier",
+                "skills": [{"skill_slug": skill_slug, "importance": 5, "is_mandatory": True}],
+            },
+        )
+    ).json()
+    await client.post(f"/org/{org}/jobs/{job['slug']}/publish", headers=headers)
+    return headers, org, job["slug"]
+
+
+class TestTheEmployerInbox:
+    async def test_an_applicant_arrives_with_their_contact_details(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """The one disclosure this product makes, and the candidate made it."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        await client.put("/me/profile", headers=seeker, json={"headline": "Cashier, two years"})
+        await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+
+        body = (
+            await client.get(f"/org/{org}/jobs/{job_slug}/applications", headers=employer)
+        ).json()
+        assert body["total"] == 1
+        applicant = body["items"][0]
+        assert applicant["status"] == "applied"
+        assert applicant["contact"]["phone"].startswith("+91")
+        # The de-identified card is unchanged and sits beside the disclosure.
+        assert applicant["candidate"]["reference"].startswith("C-")
+        assert applicant["candidate"]["headline"] == "Cashier, two years"
+        assert "phone" not in applicant["candidate"]
+
+    async def test_withdrawing_takes_the_contact_back(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+        await client.post(f"/me/applications/{created['id']}/withdraw", headers=seeker)
+
+        body = (
+            await client.get(f"/org/{org}/jobs/{job_slug}/applications", headers=employer)
+        ).json()
+        applicant = body["items"][0]
+        # The employer keeps the fact and loses the person.
+        assert applicant["status"] == "withdrawn"
+        assert applicant["contact"] is None
+
+    async def test_applicants_are_ranked_by_the_same_scorer(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """Two screens that disagree about who is strongest are worse than one."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        weak = await _candidate(client)
+        strong = await _candidate(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=strong,
+            json={"skill_slug": "apply-test-standard", "proficiency": 5},
+        )
+        for headers in (weak, strong):
+            await client.post("/me/applications", headers=headers, json={"job_slug": job_slug})
+
+        items = (
+            await client.get(f"/org/{org}/jobs/{job_slug}/applications", headers=employer)
+        ).json()["items"]
+        scores = [i["candidate"]["score"] for i in items]
+        assert scores == sorted(scores, reverse=True)
+        assert scores[0] > scores[-1]
+
+    async def test_another_organisations_vacancy_is_404(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        _, _, job_slug = await _employer_with_job(client, "apply-test-standard")
+        other, other_org, _ = await _employer_with_job(client, "apply-test-standard")
+        response = await client.get(f"/org/{other_org}/jobs/{job_slug}/applications", headers=other)
+        assert response.status_code == 404
+
+    async def test_a_candidate_cannot_read_an_inbox(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        _, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        response = await client.get(f"/org/{org}/jobs/{job_slug}/applications", headers=seeker)
+        # Not a member of that organisation: 404, never 403 (ADR-038).
+        assert response.status_code == 404
+
+    async def test_the_ranked_pool_still_names_nobody(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """Applying discloses to the *inbox*. The pool endpoint is unchanged,
+        and ADR-037 still holds there."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        me = (await client.get("/auth/me", headers=seeker)).json()
+        await client.post(
+            "/me/profile/skills",
+            headers=seeker,
+            json={"skill_slug": "apply-test-standard", "proficiency": 4},
+        )
+        await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+
+        pool = (await client.get(f"/org/{org}/candidates/{job_slug}", headers=employer)).text
+        assert me["phone"] not in pool
+        assert "full_name" not in pool
+        assert "contact" not in pool
+
+
+class TestMovingAnApplicationAlong:
+    async def test_shortlisting(self, vacancy: dict, client: AsyncClient) -> None:
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+
+        response = await client.patch(
+            f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+            headers=employer,
+            json={"status": "shortlisted"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "shortlisted"
+        # Still live, so the contact is still there.
+        assert response.json()["contact"] is not None
+
+        mine = (await client.get("/me/applications", headers=seeker)).json()
+        assert mine[0]["status"] == "shortlisted"
+
+    async def test_a_withdrawn_application_cannot_be_moved(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """Otherwise shortlisting would put the contact details back on screen
+        by a side door."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+        await client.post(f"/me/applications/{created['id']}/withdraw", headers=seeker)
+
+        response = await client.patch(
+            f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+            headers=employer,
+            json={"status": "shortlisted"},
+        )
+        assert response.status_code == 409
+
+    async def test_an_employer_cannot_set_the_candidates_statuses(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+        for forbidden in ("applied", "withdrawn", "nonsense"):
+            response = await client.patch(
+                f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+                headers=employer,
+                json={"status": forbidden},
+            )
+            assert response.status_code == 422, forbidden
+
+
+# ------------------------------------------------- counts, and a cap on spray
+
+
+async def test_the_overview_counts_applications_without_extra_queries(
+    vacancy: dict, client: AsyncClient, db: AsyncSession
+) -> None:
+    """The page an employer opens first. Sprint 20 took the per-vacancy cost
+    out of it; adding counts must not put it back."""
+    from sqlalchemy import event
+
+    from api.modules.matching.employer import job_pools
+
+    employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+    seeker = await _candidate(client)
+    await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+
+    body = (await client.get(f"/org/{org}/candidates", headers=employer)).json()
+    pool = next(j for j in body["jobs"] if j["job"]["slug"] == job_slug)
+    assert pool["applications"] == 1
+    assert pool["new_applications"] == 1
+
+    tenant_id = uuid.UUID(
+        (await client.get("/auth/me", headers=employer)).json()["memberships"][0]["tenant"]["id"]
+    )
+    statements: list[str] = []
+
+    def count(conn, cursor, statement, *args) -> None:  # type: ignore[no-untyped-def]
+        statements.append(statement)
+
+    connection = (await db.connection()).sync_connection
+    assert connection is not None
+    event.listen(connection, "before_cursor_execute", count)
+    try:
+        await job_pools(db, tenant_id)
+        with_one = len(statements)
+        statements.clear()
+        await job_pools(db, tenant_id)
+        again = len(statements)
+    finally:
+        event.remove(connection, "before_cursor_execute", count)
+    assert with_one == again
+
+
+async def test_a_withdrawn_application_is_not_counted(vacancy: dict, client: AsyncClient) -> None:
+    employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+    seeker = await _candidate(client)
+    created = (
+        await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+    ).json()
+    await client.post(f"/me/applications/{created['id']}/withdraw", headers=seeker)
+
+    body = (await client.get(f"/org/{org}/candidates", headers=employer)).json()
+    pool = next(j for j in body["jobs"] if j["job"]["slug"] == job_slug)
+    # The row survives; the count is of what an employer can act on.
+    assert pool["applications"] == 0
+
+
+async def test_applying_all_day_is_capped(
+    vacancy: dict, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The per-minute write limit stops a script; this stops patient spraying."""
+    from api.core.config import get_settings
+
+    monkeypatch.setenv("MAX_APPLICATIONS_PER_DAY", "1")
+    get_settings.cache_clear()
+    try:
+        employer_a = await _employer_with_job(client, "apply-test-standard")
+        employer_b = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        first = await client.post(
+            "/me/applications", headers=seeker, json={"job_slug": employer_a[2]}
+        )
+        assert first.status_code == 201
+        second = await client.post(
+            "/me/applications", headers=seeker, json={"job_slug": employer_b[2]}
+        )
+        assert second.status_code == 429
+        assert second.headers["retry-after"] == "3600"
+    finally:
+        monkeypatch.delenv("MAX_APPLICATIONS_PER_DAY")
+        get_settings.cache_clear()

@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from api.modules.applications.models import APPLICATION_STATUSES, EMPLOYER_STATUSES
 from api.modules.identity import TenantOut
+from api.modules.matching import CandidateCardOut
 
 # Closed on the way out so the generated TypeScript client types a status as a
 # union rather than `string`; `tests/test_enumerations.py` holds it to the CHECK.
@@ -60,3 +61,44 @@ class SavedJobOut(BaseModel):
 
     job: JobRef
     saved_at: datetime
+
+
+class ContactOut(BaseModel):
+    """The disclosure itself.
+
+    Present only while an application is live. This is the **only** payload in
+    the product that names a candidate to an employer, and it sits *beside* the
+    de-identified card rather than inside it, so ADR-037's invariant stays a
+    property of `candidate_card()` and this stays the one exception.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class ApplicantOut(BaseModel):
+    """One application, as the employer sees it."""
+
+    application_id: uuid.UUID
+    status: ApplicationStatus
+    applied_at: datetime
+    message: str | None = None
+    # Exactly what the ranked pool shows, built by the same function.
+    candidate: CandidateCardOut
+    # None once withdrawn: the employer keeps the fact and loses the person.
+    contact: ContactOut | None = None
+
+
+class ApplicantPage(BaseModel):
+    job: JobRef
+    items: list[ApplicantOut] = Field(default_factory=list)
+    total: int
+
+
+class StatusIn(BaseModel):
+    """What an employer may set. `applied` and `withdrawn` are the candidate's."""
+
+    status: EmployerStatus

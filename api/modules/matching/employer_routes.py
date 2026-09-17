@@ -17,8 +17,9 @@ from api.core.config import get_settings
 from api.core.database import get_db_session
 from api.modules.analytics import record
 from api.modules.identity.models import Tenant
-from api.modules.marketplace.models import CandidateSkill
+from api.modules.marketplace.models import CandidateProfile, CandidateSkill
 from api.modules.matching import employer, schemas
+from api.modules.matching.scoring import MatchResult
 
 # The demonstration console: no authentication, local environments only.
 router = APIRouter(prefix="/employer", tags=["employer"])
@@ -33,19 +34,26 @@ org_router = APIRouter(prefix="/org/{org_slug}/candidates", tags=["employer"])
 CanShortlist = Depends(require(Permission.CANDIDATE_SHORTLIST, "job"))
 
 
-def _card(scored: employer.ScoredCandidate) -> schemas.CandidateCardOut:
-    p, r = scored.profile, scored.result
+def candidate_card(profile: CandidateProfile, result: MatchResult) -> schemas.CandidateCardOut:
+    """The de-identified view of a candidate -- the only one there is.
+
+    One construction site on purpose: "no employer-facing payload identifies a
+    candidate" (ADR-037) is a property of this function, and a second copy
+    somewhere else is how that stops being true. Sprint 21's applications are
+    the single exception, and they carry contact details *beside* this object,
+    never inside it.
+    """
     return schemas.CandidateCardOut(
         # A stable handle with no personal data in it. Enough to refer to a
         # candidate across a conversation; not enough to identify one.
-        reference=f"C-{str(p.id)[:8].upper()}",
-        headline=p.headline,
-        location_state=p.location_state,
-        location_district=p.location_district,
-        years_experience=p.years_experience,
-        score=r.score,
-        coverage=round(r.coverage, 4),
-        matched=[schemas.MatchedSkillOut(**vars(m)) for m in r.matched],
+        reference=f"C-{str(profile.id)[:8].upper()}",
+        headline=profile.headline,
+        location_state=profile.location_state,
+        location_district=profile.location_district,
+        years_experience=profile.years_experience,
+        score=result.score,
+        coverage=round(result.coverage, 4),
+        matched=[schemas.MatchedSkillOut(**vars(m)) for m in result.matched],
         missing=[
             schemas.MissingSkillOut(
                 skill_id=m.skill_id,
@@ -55,12 +63,18 @@ def _card(scored: employer.ScoredCandidate) -> schemas.CandidateCardOut:
                 is_mandatory=m.is_mandatory,
                 nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,
             )
-            for m in r.missing
+            for m in result.missing
         ],
-        missing_mandatory=r.missing_mandatory,
-        level_shortfall=float(r.level_shortfall) if r.level_shortfall is not None else None,
-        capped_by_mandatory=r.capped_by_mandatory,
+        missing_mandatory=result.missing_mandatory,
+        level_shortfall=(
+            float(result.level_shortfall) if result.level_shortfall is not None else None
+        ),
+        capped_by_mandatory=result.capped_by_mandatory,
     )
+
+
+def _card(scored: employer.ScoredCandidate) -> schemas.CandidateCardOut:
+    return candidate_card(scored.profile, scored.result)
 
 
 @router.get("/employers", response_model=list[schemas.EmployerOut])
@@ -99,6 +113,8 @@ async def _overview(db: AsyncSession, tenant: Tenant) -> schemas.EmployerOvervie
                 pool=p.pool,
                 ready=p.ready,
                 nearly=p.nearly,
+                applications=p.applications,
+                new_applications=p.new_applications,
             )
             for p in pools
         ],

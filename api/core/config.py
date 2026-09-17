@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     # more, and an unbounded body is a cheap way to exhaust a worker's memory.
     max_request_body_bytes: int = 256 * 1024
 
+    # Applying is cheap for a candidate and expensive for an employer reading
+    # the inbox. The per-minute write limit stops a script; this stops a day of
+    # patient spraying, which is what actually ruins an inbox.
+    max_applications_per_day: int = 50
+
     # --- database pool ---
     db_pool_size: int = 5
     db_max_overflow: int = 10

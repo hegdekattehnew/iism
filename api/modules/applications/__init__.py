@@ -12,6 +12,7 @@ the exception, because the candidate chose it: applying shares their name and
 contact with that employer, for that vacancy, and withdrawing takes it back.
 """
 
+from api.modules.applications.employer_routes import router as employer_router
 from api.modules.applications.models import (
     APPLICATION_STATUSES,
     EMPLOYER_STATUSES,
@@ -28,4 +29,5 @@ __all__ = [
     "Application",
     "SavedJob",
     "router",
+    "employer_router",
 ]

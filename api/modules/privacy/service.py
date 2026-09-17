@@ -10,7 +10,7 @@ nobody, and they keep the aggregate counts honest.
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from fastapi import HTTPException, status
@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
 from api.modules.analytics.models import AnalyticsEvent
+from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import Membership, Tenant, User
 from api.modules.marketplace.models import (
     CandidateProfile,
@@ -115,6 +116,12 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
     # by the relationships' own cascade.
     profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id))
     if profile is not None:
+        # Explicitly, before the profile itself. Both cascade from it in the
+        # database, but "everything went" is the one claim an erasure path must
+        # never make on assumption -- and an employer's inbox losing this
+        # applicant entirely is the point.
+        await db.execute(delete(Application).where(Application.profile_id == profile.id))
+        await db.execute(delete(SavedJob).where(SavedJob.profile_id == profile.id))
         await db.delete(profile)
         await db.flush()
 
@@ -154,6 +161,23 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
     if profile is not None:
         profile_out = CandidateProfileFull.model_validate(profile).model_dump(mode="json")
 
+    applications = (
+        await db.scalars(
+            select(Application)
+            .where(Application.profile_id == profile.id)
+            .order_by(Application.created_at)
+        )
+        if profile is not None
+        else None
+    )
+    saved = (
+        await db.scalars(
+            select(SavedJob).where(SavedJob.profile_id == profile.id).order_by(SavedJob.created_at)
+        )
+        if profile is not None
+        else None
+    )
+
     events = (
         await db.scalars(
             select(AnalyticsEvent)
@@ -189,6 +213,27 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             for membership, tenant in memberships
         ],
         "candidate_profile": profile_out,
+        # What this person asked for, and what they were told about it. The
+        # disclosure each application carried is part of their record, not only
+        # the employer's.
+        "applications": [
+            {
+                "vacancy": application.job.title_en,
+                # `Job.tenant` is typed `object` on the model; the cast is at the
+                # read, not a change to the mapping.
+                "organisation": cast(Tenant, application.job.tenant).name,
+                "status": application.status,
+                "message": application.message,
+                "applied_at": _iso(application.created_at),
+                "contact_shared_at": _iso(application.contact_shared_at),
+                "contact_revoked_at": _iso(application.contact_revoked_at),
+            }
+            for application in (applications.all() if applications is not None else [])
+        ],
+        "saved_jobs": [
+            {"vacancy": row.job.title_en, "saved_at": _iso(row.created_at)}
+            for row in (saved.all() if saved is not None else [])
+        ],
         "activity": [
             {
                 "event": event.name,

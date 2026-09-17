@@ -46,6 +46,11 @@ class JobPool:
     """No mandatory standard missing."""
     nearly: int
     """Missing exactly one mandatory standard — the question an employer asks."""
+    applications: int = 0
+    """Live applications: applied, shortlisted or hired. Withdrawn ones are not
+    a pool an employer can act on, and counting them would overstate it."""
+    new_applications: int = 0
+    """Still untriaged — the number that means "there is something to do"."""
 
 
 @dataclass(frozen=True)
@@ -186,6 +191,34 @@ async def _candidates_for(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
     return (await _candidates_for_jobs(db, [job]))[job.id]
 
 
+async def score_profiles(
+    db: AsyncSession, job: Job, profile_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, MatchResult]:
+    """Score named candidates against one vacancy, whoever they are.
+
+    `_candidates_for_jobs` scores the *retrieved* pool -- people who already
+    share a required standard. An applicant need not: anyone may apply, and a
+    marketplace that refused the under-qualified would be making the hiring
+    decision on the employer's behalf. So this scores exactly the profiles it
+    is given, through the same `score_match` (ADR-037). **Do not add a second
+    scorer here**; two scorers drift, and the moment they disagree about one
+    pair neither number can be defended.
+    """
+    if not profile_ids:
+        return {}
+    requirements = (await requirements_for(db, [job.id])).get(job.id, [])
+    held_by_profile = await _pool_held(db, profile_ids)
+    return {
+        pid: score_match(
+            requirements,
+            held_by_profile.get(pid, []),
+            job_level_min=job.nsqf_level_min,
+            candidate_level=attained_level(held_by_profile.get(pid, []), requirements),
+        )
+        for pid in profile_ids
+    }
+
+
 async def get_employer(db: AsyncSession, slug: str) -> Tenant | None:
     return await db.scalar(
         select(Tenant).where(Tenant.slug == slug, Tenant.tenant_type == "employer")
@@ -211,6 +244,41 @@ async def list_employers(db: AsyncSession) -> list[Tenant]:
     )
 
 
+async def _application_counts(
+    db: AsyncSession, job_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """(live, untriaged) per vacancy, in one query however many vacancies.
+
+    One grouped query, for the same reason the pools are batched: this is the
+    page an employer opens first, and a per-job count would put the cost back
+    that Sprint 20 took out.
+    """
+    # Imported inside the function, not at module scope: `applications` imports
+    # this module for the scorer, so a module-level import here is a cycle --
+    # the same reason `core/authorization.py` imports identity's models inside
+    # `_context_for`.
+    from api.modules.applications.models import LIVE_STATUSES, Application
+
+    if not job_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(Application.job_id, Application.status, func.count())
+            .where(Application.job_id.in_(job_ids))
+            .group_by(Application.job_id, Application.status)
+        )
+    ).all()
+    counts: dict[uuid.UUID, tuple[int, int]] = {}
+    for job_id, status, total in rows:
+        live, new = counts.get(job_id, (0, 0))
+        if status in LIVE_STATUSES:
+            live += total
+        if status == "applied":
+            new += total
+        counts[job_id] = (live, new)
+    return counts
+
+
 async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
     """Every vacancy this employer has open, with the pool against each."""
     jobs = list(
@@ -223,15 +291,19 @@ async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
         ).all()
     )
     scored_by_job = await _candidates_for_jobs(db, jobs)
+    counts = await _application_counts(db, [job.id for job in jobs])
     pools: list[JobPool] = []
     for job in jobs:
         scored = scored_by_job[job.id]
+        live, new = counts.get(job.id, (0, 0))
         pools.append(
             JobPool(
                 job=job,
                 pool=len(scored),
                 ready=sum(1 for s in scored if s.result.missing_mandatory == 0),
                 nearly=sum(1 for s in scored if s.result.missing_mandatory == 1),
+                applications=live,
+                new_applications=new,
             )
         )
     # Most contested first: the vacancy with the deepest pool is the one an

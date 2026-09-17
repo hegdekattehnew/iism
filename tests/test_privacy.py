@@ -296,3 +296,57 @@ def test_the_web_client_sends_the_version_the_api_accepts() -> None:
     match = re.search(r'PRIVACY_NOTICE_VERSION = "([^"]+)"', source)
     assert match is not None
     assert match.group(1) == CONSENT
+
+
+# ------------------------------------------- applications follow the account
+
+
+class TestApplicationsAreTheirsToo:
+    async def test_export_carries_applications_and_saved_jobs(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The disclosure an application carried is part of the candidate's own
+        record, not only the employer's."""
+        from api.modules.identity import Tenant as TenantModel
+        from api.modules.marketplace.models import Job as JobModel
+
+        tenant = TenantModel(slug="export-co", name="Export Co", tenant_type="employer")
+        db.add(tenant)
+        await db.flush()
+        db.add(JobModel(slug="export-job", tenant_id=tenant.id, title_en="Exported Role"))
+        await db.commit()
+
+        headers, _ = await _candidate(client)
+        await client.post("/me/applications", headers=headers, json={"job_slug": "export-job"})
+        await client.post("/me/saved-jobs", headers=headers, json={"job_slug": "export-job"})
+
+        body = (await client.get("/me/account/export", headers=headers)).json()
+        assert [a["vacancy"] for a in body["applications"]] == ["Exported Role"]
+        assert body["applications"][0]["organisation"] == "Export Co"
+        assert body["applications"][0]["contact_shared_at"] is not None
+        assert [s["vacancy"] for s in body["saved_jobs"]] == ["Exported Role"]
+
+    async def test_deleting_the_account_empties_the_employers_inbox(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Erasure is not "hidden from the employer" -- the row goes."""
+        from sqlalchemy import func as sql_func
+
+        from api.modules.applications import Application, SavedJob
+        from api.modules.identity import Tenant as TenantModel
+        from api.modules.marketplace.models import Job as JobModel
+
+        tenant = TenantModel(slug="erase-co", name="Erase Co", tenant_type="employer")
+        db.add(tenant)
+        await db.flush()
+        db.add(JobModel(slug="erase-job", tenant_id=tenant.id, title_en="Erased Role"))
+        await db.commit()
+
+        headers, _ = await _candidate(client)
+        await client.post("/me/applications", headers=headers, json={"job_slug": "erase-job"})
+        await client.post("/me/saved-jobs", headers=headers, json={"job_slug": "erase-job"})
+
+        assert (await client.delete("/me/account", headers=headers)).status_code == 204
+        db.expire_all()
+        assert await db.scalar(sql_func.count(Application.id)) == 0
+        assert await db.scalar(sql_func.count(SavedJob.id)) == 0

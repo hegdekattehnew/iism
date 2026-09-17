@@ -11,13 +11,14 @@ way:
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import get_settings
 from api.modules.analytics import record
 from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import User
@@ -52,6 +53,7 @@ async def apply(
     """
     profile = await ensure_profile(db, user.id)
     job = await _published_job(db, job_slug)
+    await _within_daily_cap(db, profile.id)
 
     existing = await db.scalar(
         select(Application).where(
@@ -90,6 +92,29 @@ async def apply(
         subject_id=job.id,
     )
     return await _reload(db, application.id)
+
+
+async def _within_daily_cap(db: AsyncSession, profile_id: uuid.UUID) -> None:
+    """Refuse a candidate who is spraying.
+
+    Counted over applications made in the last 24 hours rather than a calendar
+    day, so the limit cannot be doubled by waiting for midnight. 429 with
+    `retry-after`, like the middleware's own refusals.
+    """
+    limit = get_settings().max_applications_per_day
+    since = datetime.now(UTC) - timedelta(days=1)
+    made = await db.scalar(
+        select(func.count())
+        .select_from(Application)
+        .where(Application.profile_id == profile_id, Application.created_at >= since)
+    )
+    if (made or 0) >= limit:
+        log.warning("application.daily_cap_reached", limit=limit)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "You have applied to a lot of vacancies today. Try again tomorrow.",
+            headers={"retry-after": "3600"},
+        )
 
 
 async def _reload(db: AsyncSession, application_id: uuid.UUID) -> Application:
@@ -160,7 +185,16 @@ async def save_job(db: AsyncSession, user: User, job_slug: str) -> SavedJob:
     db.add(saved)
     await db.commit()
     await record(db, "job_saved", user_id=user.id, subject_type="job", subject_id=job.id)
-    return saved
+    # Re-read rather than returning the instance just added: a freshly
+    # constructed row has no loaded `job`, and touching it in the handler is a
+    # lazy load in async context -- MissingGreenlet, a 500. It passed in one
+    # test file only because that job happened to be in the identity map
+    # already, which is exactly the kind of green that hides a defect.
+    reloaded = await db.scalar(
+        select(SavedJob).where(SavedJob.id == saved.id).execution_options(populate_existing=True)
+    )
+    assert reloaded is not None  # noqa: S101 - just committed in this session
+    return reloaded
 
 
 async def unsave_job(db: AsyncSession, user: User, job_slug: str) -> None:
