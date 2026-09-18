@@ -2824,6 +2824,7 @@ export interface components {
             qp_count: number;
             /** Nos Code */
             nos_code?: string | null;
+            context?: components["schemas"]["SkillContextOut"] | null;
             /**
              * Requirement
              * @enum {string}
@@ -2907,6 +2908,22 @@ export interface components {
             /** Organisation Slug */
             organisation_slug?: string | null;
         };
+        /**
+         * SkillContextOut
+         * @description Where a standard comes from -- what tells two same-named ones apart.
+         */
+        SkillContextOut: {
+            /** Awarding Body */
+            awarding_body?: string | null;
+            /** Sector */
+            sector?: string | null;
+            /** Qualification Code */
+            qualification_code?: string | null;
+            /** Qualification Name */
+            qualification_name?: string | null;
+            /** Qualification Slug */
+            qualification_slug?: string | null;
+        };
         /** SkillCount */
         SkillCount: {
             /** Count */
@@ -2939,6 +2956,7 @@ export interface components {
             qp_count: number;
             /** Nos Code */
             nos_code?: string | null;
+            context?: components["schemas"]["SkillContextOut"] | null;
             /** Aliases */
             aliases?: components["schemas"]["AliasOut"][];
             /**
@@ -2997,6 +3015,7 @@ export interface components {
             qp_count: number;
             /** Nos Code */
             nos_code?: string | null;
+            context?: components["schemas"]["SkillContextOut"] | null;
         };
         /** SkillPage */
         SkillPage: {
@@ -3061,6 +3080,7 @@ export interface components {
             qp_count: number;
             /** Nos Code */
             nos_code?: string | null;
+            context?: components["schemas"]["SkillContextOut"] | null;
             /** Matched On */
             matched_on?: string | null;
             /**

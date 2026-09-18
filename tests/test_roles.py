@@ -267,3 +267,25 @@ class TestAQualificationsStandards:
         )
         assert event is not None
         assert event.payload == {"standards": 4, "variants": 1}
+
+
+class TestWhereAStandardComesFrom:
+    """A quarter of the corpus shares its name with another standard. Search
+    returned two cards both titled "Broad Functions of General Duty Assistant"
+    with nothing on either saying how they differed."""
+
+    async def test_search_names_the_qualification_a_standard_belongs_to(
+        self, client, corpus
+    ) -> None:
+        hits = (await client.get("/skills/search", params={"q": "Standard 0"})).json()
+        hit = next(h for h in hits if h["name"] == "Standard 0")
+        assert hit["nos_code"]
+        # Standard 0 sits in the base pack, its -SI variant and a reissue; the
+        # base code represents it, by the same rule role search uses.
+        assert hit["context"]["qualification_code"] == "HSS/Q9001"
+        assert hit["context"]["qualification_name"] == "Phlebotomist qualification"
+
+    async def test_browsing_carries_it_too(self, client, corpus) -> None:
+        body = (await client.get("/skills", params={"limit": 200})).json()
+        ours = [s for s in body["items"] if s["name"].startswith("Standard ")]
+        assert ours and all(s["context"] is not None for s in ours)

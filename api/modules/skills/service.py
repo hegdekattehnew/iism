@@ -595,3 +595,67 @@ async def unresolved_aliases(db: AsyncSession) -> list[str]:
     )
     found = {row.role_key for row in rows}
     return [t for t in targets if t not in found]
+
+
+# ---------------------------------------------------------------- context
+#
+# A quarter of the corpus shares its name with another standard: 1,778 names
+# across 4,838 rows. Searching "General Duty Assistant" returned two cards both
+# titled "Broad Functions of General Duty Assistant", and nothing on either said
+# how they differed -- the NOS code was dropped, and the one fact a person can
+# read, which qualification each belongs to, was never sent. These are that.
+
+
+@dataclass(frozen=True)
+class SkillContext:
+    awarding_body: str | None
+    sector: str | None
+    qualification_code: str | None
+    qualification_name: str | None
+    qualification_slug: str | None
+
+
+# The representative qualification uses role search's rule -- base code before
+# a -SI variant, then the SSC's own code over a reissuer's -- so a standard and
+# the role it came from never name different packs.
+_CONTEXT_SQL = text(
+    """
+WITH pack AS (
+    SELECT DISTINCT ON (qs.skill_id)
+           qs.skill_id, q.qp_code, q.name, q.slug
+    FROM qp_skills qs
+    JOIN qualification_packs q ON q.id = qs.qp_id AND q.is_current
+    WHERE qs.skill_id = ANY(CAST(:ids AS uuid[]))
+    ORDER BY qs.skill_id,
+             (q.qp_code ~ '-SI[0-9]+$'),
+             length(q.qp_code) - length(replace(q.qp_code, '/', '')),
+             q.qp_code
+)
+SELECT s.id, ab.name AS body, sec.name AS sector,
+       pack.qp_code, pack.name AS qp_name, pack.slug AS qp_slug
+FROM skills s
+LEFT JOIN awarding_bodies ab ON ab.id = s.awarding_body_id
+LEFT JOIN sectors sec ON sec.id = s.sector_id
+LEFT JOIN pack ON pack.skill_id = s.id
+WHERE s.id = ANY(CAST(:ids AS uuid[]))
+"""
+)
+
+
+async def contexts_for(
+    db: AsyncSession, skill_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, SkillContext]:
+    """Where each standard comes from, for a page of them, in one query."""
+    if not skill_ids:
+        return {}
+    rows = await db.execute(_CONTEXT_SQL, {"ids": [str(i) for i in skill_ids]})
+    return {
+        row.id: SkillContext(
+            awarding_body=row.body,
+            sector=row.sector,
+            qualification_code=row.qp_code,
+            qualification_name=row.qp_name,
+            qualification_slug=row.qp_slug,
+        )
+        for row in rows
+    }

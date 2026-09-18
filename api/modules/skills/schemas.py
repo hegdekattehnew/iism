@@ -27,6 +27,16 @@ class AliasOut(BaseModel):
     script: AliasScript
 
 
+class SkillContextOut(BaseModel):
+    """Where a standard comes from -- what tells two same-named ones apart."""
+
+    awarding_body: str | None = None
+    sector: str | None = None
+    qualification_code: str | None = None
+    qualification_name: str | None = None
+    qualification_slug: str | None = None
+
+
 class SkillOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +52,8 @@ class SkillOut(BaseModel):
     # qualification pack all say -- and a picker showing only a name asks them
     # to trust a string match they cannot check.
     nos_code: str | None = None
+    # Filled on the browse and search endpoints only; None elsewhere.
+    context: SkillContextOut | None = None
 
 
 class SkillDetail(SkillOut):

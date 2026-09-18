@@ -207,7 +207,9 @@
     "marks": "{marks} marks",
     "knowledge": "Knowledge and understanding",
     "genericSkills": "Generic skills",
-    "noRequirements": "The current version of this standard publishes no performance criteria."
+    "noRequirements": "The current version of this standard publishes no performance criteria.",
+    "partOf": "Part of {name}",
+    "lookalike": "Same name as another result — compare the codes"
   },
   "jobsPage": {
     "title": "Jobs",
@@ -1124,5 +1126,28 @@
       "rejected": "Not selected",
       "hired": "Hired"
     }
+  },
+  "searchPage": {
+    "title": "Results for “{q}”",
+    "titleEmpty": "Search",
+    "label": "Search for a job, a role or a skill",
+    "placeholder": "e.g. General Duty Assistant, welding, retail sales",
+    "submit": "Search",
+    "prompt": "Type a job title or a skill above.",
+    "loading": "Loading…",
+    "jobsHeading": "Open jobs",
+    "seeAllJobs": "See all {count} jobs",
+    "noJobs": "No open vacancy matches this yet.",
+    "rolesHeading": "Job roles",
+    "rolesNote": "The national qualifications behind the work — what an employer will expect you to know.",
+    "noRoles": "No job role by that name.",
+    "standardsCount": "{count, plural, one {# standard} other {# standards}}",
+    "matchedVia": "Matched “{term}”",
+    "showStandards": "What this job involves",
+    "hideStandards": "Hide",
+    "buildProfile": "Build my profile from this job",
+    "standardsHeading": "Skill standards",
+    "seeAllStandards": "Browse all matching standards",
+    "noStandards": "No standard matches this."
   }
 }

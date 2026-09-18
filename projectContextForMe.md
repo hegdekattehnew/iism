@@ -91,7 +91,7 @@ fits (golden set bit-identical); locality orders equal scores and never changes 
 (trigram index on `job_role`, two analytics names); `migrations/env.py` repaired — it would have
 dropped the live skill trigram index. 501 backend and 66 web tests; verified in the browser as a
 brand-new account in English and Hindi. **CV upload deferred** until the residual gap is visible.
-**Found, not fixed** (task raised): three district names exist in two states and resolve
+**Follow-up the same day:** the homepage search now lands on `/search` — open jobs, then roles, then standards — instead of the standards browser, and every standard card shows its code, level and the qualification it belongs to, flagging same-named results. **Found, not fixed** (task raised): three district names exist in two states and resolve
 arbitrarily, and every NSQF import rewrites every profile's `updated_at`.
 
 **Sprint 22.5 (demo readiness) — complete, 2026-09-17.** No new product surface: the readiness

@@ -7,11 +7,11 @@ export default async function JobsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ skill?: string }>;
+  searchParams: Promise<{ skill?: string; q?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { skill } = await searchParams;
+  const { skill, q } = await searchParams;
   const t = await getTranslations("jobsPage");
 
   return (
@@ -19,7 +19,7 @@ export default async function JobsPage({
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("title")}</h1>
       <p className="mt-2 max-w-3xl text-base text-muted">{t("subtitle")}</p>
       <div className="mt-8">
-        <JobBrowser initialSkill={skill ?? ""} />
+        <JobBrowser initialSkill={skill ?? ""} initialQuery={q ?? ""} />
       </div>
     </div>
   );

@@ -314,6 +314,16 @@ boy", tick what they can do, and have matches.
 - **`migrations/env.py` had been wrong since 0022.** It listed the dropped `ix_skills_name_en_trgm`
   and not the live `ix_skills_name_trgm`, so the next autogenerate would have dropped the index
   behind every fuzzy skill search. Verified by autogenerating with the old file.
+- **The homepage search answers a job title with jobs.** It posted to `/skills`, so "General Duty
+  Assistant" returned 24 technical units and no vacancy. `/search` shows open jobs, then job roles,
+  then standards, each linking to its full page with the query kept (`/jobs` now takes `?q=`).
+- **A standard card says where it comes from.** 1,778 names are shared by 4,838 standards — a
+  quarter of the corpus — and two identically named cards could only be told apart by opening them.
+  Browse and search now carry `context` (qualification, awarding body, sector, batched in one query,
+  representative pack chosen by role search's rule), the card shows the NOS code, and same-named
+  results on a page are flagged "compare the codes". Some twins really are near-identical reissues
+  (same qualification name, zero recorded hours); code and level are then all there is, and the card
+  does not invent more.
 - **Migrations freeze their own value lists.** 0024 builds its CHECK with `one_of()` over a tuple
   written *in the migration*, not the imported `EVENT_NAMES` — importing it would make 0024 produce
   a wider constraint the day a later sprint adds a name.

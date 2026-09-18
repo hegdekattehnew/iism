@@ -31,14 +31,20 @@ async def search_skills(
     db: AsyncSession = Depends(get_db_session),
 ) -> list[schemas.SkillSearchHit]:
     hits = await service.search_skills(db, q, limit=limit)
+    contexts = await service.contexts_for(db, [h.skill.id for h in hits])
     return [
         schemas.SkillSearchHit(
-            **schemas.SkillOut.model_validate(h.skill).model_dump(),
+            **schemas.SkillOut.model_validate(h.skill).model_dump(exclude={"context"}),
             matched_on=h.matched_on,
             match_kind=h.match_kind,
+            context=_context(contexts.get(h.skill.id)),
         )
         for h in hits
     ]
+
+
+def _context(found: service.SkillContext | None) -> schemas.SkillContextOut | None:
+    return schemas.SkillContextOut(**vars(found)) if found is not None else None
 
 
 @router.get("", response_model=schemas.SkillPage)
@@ -55,9 +61,12 @@ async def list_skills(
     )
     # One query for the page, applied at serialisation (ADR-041).
     overrides = await overrides_for(db, "skill", items, ("name", "description"), locale)
+    contexts = await service.contexts_for(db, [s.id for s in items])
     return schemas.SkillPage(
         items=[
-            schemas.SkillOut.model_validate(s).model_copy(update=overrides.get(s.id, {}))
+            schemas.SkillOut.model_validate(s).model_copy(
+                update={**overrides.get(s.id, {}), "context": _context(contexts.get(s.id))}
+            )
             for s in items
         ],
         total=total,

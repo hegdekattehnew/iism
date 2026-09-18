@@ -9,9 +9,13 @@ export async function Hero() {
   const locale = await getLocale();
 
   // Locale-aware. `routing.ts` sets no `localePrefix`, so the default "always"
-  // applies and a bare `action="/skills"` costs a 307 to `/{locale}/skills` --
+  // applies and a bare `action="/search"` costs a 307 to `/{locale}/search` --
   // a wasted round trip on mobile data, on the hero's primary action.
-  const searchAction = getPathname({ href: "/skills", locale });
+  //
+  // `/search`, not `/skills`. The hero promises "Tell us the job you want", and
+  // posting to the standards browser answered a job title with a list of
+  // technical units -- two identically named -- and no vacancy.
+  const searchAction = getPathname({ href: "/search", locale });
 
   return (
     <section className="relative overflow-hidden border-b border-border-token bg-accent-soft">

@@ -20,9 +20,65 @@ type Row = {
   skill_type: "technical" | "core" | "generic";
   nsqf_level?: number | null;
   qp_count?: number;
+  nos_code?: string | null;
+  context?: {
+    awarding_body?: string | null;
+    sector?: string | null;
+    qualification_code?: string | null;
+    qualification_name?: string | null;
+  } | null;
   matched_on?: string | null;
   match_kind?: "exact" | "prefix" | "alias" | "text";
 };
+
+/**
+ * What tells a standard apart from another with the same name.
+ *
+ * A quarter of the corpus shares its name with another standard -- searching
+ * "General Duty Assistant" returned two cards both titled "Broad Functions of
+ * General Duty Assistant", identical until opened. The code and the
+ * qualification each belongs to are what differ, so every card shows them.
+ * Exported so the search results page renders standards the same way.
+ */
+export function StandardOrigin({ row, lookalike }: { row: Row; lookalike: boolean }) {
+  const t = useTranslations("skillsPage");
+  const c = row.context;
+  return (
+    <>
+      {row.nos_code && (
+        <p className="mt-1 font-mono text-[11px] text-muted">{row.nos_code}</p>
+      )}
+      {c?.qualification_name && (
+        <p className="mt-1.5 text-xs text-muted">
+          {t("partOf", { name: c.qualification_name })}
+          {c.qualification_code && (
+            <span className="ml-1 font-mono text-[11px]">({c.qualification_code})</span>
+          )}
+        </p>
+      )}
+      {(c?.awarding_body || c?.sector) && (
+        <p className="mt-0.5 text-xs text-muted">
+          {/* A Sector Skill Council is often stored under its sector's own
+              name ("Healthcare"), which printed "Healthcare · Healthcare". */}
+          {[...new Set([c.awarding_body, c.sector].filter(Boolean))].join(" · ")}
+        </p>
+      )}
+      {lookalike && (
+        <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">{t("lookalike")}</p>
+      )}
+    </>
+  );
+}
+
+/** Names that appear more than once on the page, compared as a reader would. */
+export function lookalikeNames(rows: { name: string }[]): Set<string> {
+  const seen = new Map<string, number>();
+  for (const r of rows) {
+    const key = r.name.trim().toLowerCase();
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
+}
 
 function TypeChip({ type }: { type: Row["skill_type"] }) {
   const t = useTranslations("skillsPage.type");
@@ -116,6 +172,7 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
 
   const rows = results.data?.rows ?? [];
   const total = results.data?.total ?? 0;
+  const lookalikes = lookalikeNames(rows);
   const name = (r: Row) => (r.name);
   const desc = (r: Row) =>
     r.description;
@@ -249,6 +306,10 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
               </div>
 
               <h2 className="mt-2.5 text-base font-semibold">{name(r)}</h2>
+              <StandardOrigin
+                row={r}
+                lookalike={lookalikes.has(r.name.trim().toLowerCase())}
+              />
 
               {desc(r) && (
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted">{desc(r)}</p>

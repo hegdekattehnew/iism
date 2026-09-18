@@ -51,10 +51,17 @@ export function salaryLabel(
   return t("salaryUndisclosed");
 }
 
-export function JobBrowser({ initialSkill = "" }: { initialSkill?: string }) {
+export function JobBrowser({
+  initialSkill = "",
+  initialQuery = "",
+}: {
+  initialSkill?: string;
+  /** From `?q=`: the search results page links here with its query. */
+  initialQuery?: string;
+}) {
   const t = useTranslations("jobsPage");
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
   const [state, setState] = useState("");
   const deferred = useDeferredValue(query.trim());
