@@ -1,30 +1,29 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 
 import { Select } from "@/components/profile/fields";
-import { Button } from "@/components/ui";
-import { api } from "@/lib/api";
+import { RolePicker } from "@/components/profile/RolePicker";
+import { StandardPicker } from "@/components/StandardPicker";
 import { type Profile, useProfileMutations } from "@/lib/profile";
 
+/**
+ * The only part of a profile that changes a match score.
+ *
+ * Naming your role comes first, because a candidate can name a job and cannot
+ * name a National Occupational Standard. Searching the standards directly stays
+ * underneath for anyone whose role is not in the corpus or who knows the unit
+ * they want.
+ *
+ * The fallback is `StandardPicker` itself, not a copy of it. This section used
+ * to carry its own fork of that search, which had lost the NOS code and the
+ * no-results state -- the two things the picker exists to show.
+ */
 export function SkillsSection({ profile }: { profile: Profile | null }) {
   const t = useTranslations("profilePage");
-  const ts = useTranslations("skillsPage");
   const { addSkill, removeSkill } = useProfileMutations();
-
-  const [query, setQuery] = useState("");
   const [proficiency, setProficiency] = useState(3);
-  const deferred = useDeferredValue(query.trim());
-
-  const search = useQuery({
-    queryKey: ["profile-skill-search", deferred],
-    enabled: deferred.length > 0,
-    queryFn: async () =>
-      (await api.GET("/skills/search", { params: { query: { q: deferred, limit: 8 } } }))
-        .data ?? [],
-  });
 
   const held = new Set((profile?.skills ?? []).map((s) => s.skill.slug));
 
@@ -33,16 +32,14 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
       <h2 className="text-base font-semibold">{t("skillsTitle")}</h2>
       <p className="mt-1 text-sm text-muted">{t("skillsSubtitle")}</p>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("searchPlaceholder")}
-          aria-label={t("searchPlaceholder")}
-          className="w-full flex-1 rounded-lg border border-border-token bg-background px-4 py-2.5 text-sm"
-        />
-        <label className="flex items-center gap-2 text-sm">
+      <div className="mt-4">
+        <RolePicker held={held} />
+      </div>
+
+      <div className="mt-6 border-t border-border-token pt-5">
+        <h3 className="text-sm font-medium">{t("roles.fallbackTitle")}</h3>
+        <p className="mt-1 text-xs text-muted">{t("roles.fallbackBody")}</p>
+        <label className="mt-3 flex items-center gap-2 text-sm">
           <span className="whitespace-nowrap text-muted">{t("proficiencyLabel")}</span>
           <Select
             value={proficiency}
@@ -50,39 +47,21 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
             className="mt-0 w-auto"
           >
             {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </Select>
         </label>
+        <div className="mt-3">
+          <StandardPicker
+            chosen={held}
+            placeholder={t("searchPlaceholder")}
+            addLabel={t("add")}
+            onSelect={(s) => addSkill.mutate({ skill_slug: s.slug, proficiency })}
+          />
+        </div>
       </div>
-
-      {deferred && (
-        <ul className="mt-3 space-y-1.5">
-          {(search.data ?? []).map((s) => (
-            <li
-              key={s.slug}
-              className="flex items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2"
-            >
-              <span className="flex-1 text-sm">
-                {s.name}
-                {s.matched_on && s.match_kind === "alias" && (
-                  <span className="ml-2 text-xs text-brand">
-                    {ts("matchedVia", { term: s.matched_on })}
-                  </span>
-                )}
-              </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={held.has(s.slug) || addSkill.isPending}
-                onClick={() => addSkill.mutate({ skill_slug: s.slug, proficiency })}
-              >
-                {t("add")}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
 
       <ul className="mt-5 space-y-2">
         {(profile?.skills ?? []).map((s) => (

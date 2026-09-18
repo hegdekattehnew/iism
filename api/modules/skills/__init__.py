@@ -6,6 +6,7 @@ what ADR-014's microservices path depends on avoiding.
 """
 
 from api.modules.skills.models import ALIAS_SCRIPTS, SKILL_TYPES, Skill, SkillAlias
+from api.modules.skills.roles_routes import router as roles_router
 from api.modules.skills.routes import router
 from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn
 from api.modules.skills.service import (
@@ -15,8 +16,10 @@ from api.modules.skills.service import (
     get_skill_by_slug,
     list_skills,
     qualifications_for_skill,
+    search_roles,
     search_skills,
     skill_facets,
+    standards_for_role,
 )
 
 __all__ = [
@@ -32,7 +35,10 @@ __all__ = [
     "get_skill_by_slug",
     "list_skills",
     "qualifications_for_skill",
+    "roles_router",
     "router",
+    "search_roles",
     "search_skills",
     "skill_facets",
+    "standards_for_role",
 ]

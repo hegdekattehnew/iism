@@ -175,6 +175,8 @@ async def _candidates_for_jobs(
                     held_by_profile.get(pid, []),
                     job_level_min=job.nsqf_level_min,
                     candidate_level=attained_level(held_by_profile.get(pid, []), reqs),
+                    job_min_years=job.experience_min_years,
+                    candidate_years=profiles[pid].years_experience,
                 ),
             )
             for pid in pools[job.id]
@@ -208,12 +210,24 @@ async def score_profiles(
         return {}
     requirements = (await requirements_for(db, [job.id])).get(job.id, [])
     held_by_profile = await _pool_held(db, profile_ids)
+    years: dict[uuid.UUID, int] = {
+        row.id: row.years_experience
+        for row in (
+            await db.execute(
+                select(CandidateProfile.id, CandidateProfile.years_experience).where(
+                    CandidateProfile.id.in_(profile_ids)
+                )
+            )
+        ).all()
+    }
     return {
         pid: score_match(
             requirements,
             held_by_profile.get(pid, []),
             job_level_min=job.nsqf_level_min,
             candidate_level=attained_level(held_by_profile.get(pid, []), requirements),
+            job_min_years=job.experience_min_years,
+            candidate_years=years.get(pid),
         )
         for pid in profile_ids
     }

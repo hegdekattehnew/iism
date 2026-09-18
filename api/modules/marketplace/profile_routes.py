@@ -82,6 +82,39 @@ async def add_skill(
     return await _view(db, user, profile)
 
 
+@router.post("/profile/skills/bulk", response_model=schemas.CandidateProfileFull)
+async def add_skills_bulk(
+    payload: schemas.CandidateSkillsBulkAdd,
+    user: User = Depends(get_current_candidate),
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.CandidateProfileFull:
+    # Here, not at the top: `analytics` loads its routes, which load
+    # `marketplace.models`, which runs this package's `__init__` -- and that
+    # imports this module. A module-level import is an ImportError at boot.
+    from api.modules.analytics import record
+
+    profile, added, updated = await profile_service.add_skills_bulk(
+        db,
+        user.id,
+        [(item.skill_slug, item.proficiency) for item in payload.items],
+        payload.preferred_role_title,
+    )
+    # Counts only -- which standards someone holds is a description of them.
+    # Recorded after the service's commit, so `record()` has nothing of the
+    # handler's left to commit alongside it.
+    await record(
+        db,
+        "skills_bulk_added",
+        user_id=user.id,
+        payload={
+            "added": added,
+            "updated": updated,
+            "from_role": bool(payload.preferred_role_title),
+        },
+    )
+    return await _view(db, user, profile)
+
+
 @router.delete("/profile/skills/{skill_slug}", response_model=schemas.CandidateProfileFull)
 async def remove_skill(
     skill_slug: str,
@@ -126,6 +159,8 @@ async def _values(db: AsyncSession, collection: str, body: dict) -> dict:
         values["skill_id"] = await profile_service.resolve_certification_skill(
             db, values.pop("skill_slug", None)
         )
+    if collection == "preferred_locations":
+        values = await profile_service.resolve_preferred_location(db, values)
     return values
 
 

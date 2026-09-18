@@ -41,10 +41,14 @@ target_metadata = Base.metadata
 # op.execute() in a migration must be listed here.
 MANUALLY_MANAGED_INDEXES = {
     "ix_skills_search_vector",
-    "ix_skills_name_en_trgm",
+    # Renamed by 0022, which dropped `ix_skills_name_en_trgm` and created this.
+    # The set kept the old name for a sprint, so the next autogenerate would have
+    # proposed dropping the index `_SEARCH_SQL`'s fuzzy branch depends on.
+    "ix_skills_name_trgm",
     "ix_skill_aliases_form_trgm",
     "ix_jobs_search_vector",
     "ix_courses_search_vector",
+    "ix_qualification_packs_job_role_trgm",
 }
 
 

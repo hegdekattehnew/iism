@@ -1,5 +1,7 @@
 """Match endpoints. Authenticated: a match is about a specific person."""
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,18 +56,26 @@ def _to_match(scored: service.ScoredJob) -> schemas.MatchOut:
         ],
         missing_mandatory=r.missing_mandatory,
         level_shortfall=float(r.level_shortfall) if r.level_shortfall is not None else None,
+        experience_shortfall=r.experience_shortfall,
         capped_by_mandatory=r.capped_by_mandatory,
+        locality=scored.locality,
     )
 
 
 @router.get("", response_model=schemas.MatchPage)
 async def list_matches(
     limit: int = Query(20, ge=1, le=50),
+    state_id: uuid.UUID | None = Query(
+        None, description="Only vacancies in this state. The candidate's choice, never a default."
+    ),
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_candidate),
 ) -> schemas.MatchPage:
     profile = await _profile(db, user)
-    scored = await service.match_jobs(db, profile.id, limit=limit)
+    # `match_jobs` has accepted `state_id` since Sprint 8 and nothing ever
+    # passed it. Opt-in only: filtering by where someone lives would hide every
+    # vacancy they would move for.
+    scored = await service.match_jobs(db, profile.id, limit=limit, state_id=state_id)
 
     await record(
         db,

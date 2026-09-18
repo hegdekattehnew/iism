@@ -123,6 +123,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Roles */
+        get: operations["search_roles_roles_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/{slug}/standards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Role Standards */
+        get: operations["role_standards_roles__slug__standards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/geography/states": {
         parameters: {
             query?: never;
@@ -651,6 +685,23 @@ export interface paths {
         put?: never;
         /** Add Skill */
         post: operations["add_skill_me_profile_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/profile/skills/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Skills Bulk */
+        post: operations["add_skills_bulk_me_profile_skills_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1555,6 +1606,20 @@ export interface components {
              */
             source: "self_declared" | "inferred" | "assessed" | "certified";
         };
+        /**
+         * CandidateSkillsBulkAdd
+         * @description Several standards at once -- the ones ticked from a suggested role.
+         *
+         *     `preferred_role_title` is the role they came from, recorded as a preferred
+         *     role when given. Bounded at the profile's own cap: a longer list could
+         *     never be accepted, so it is refused before anything is looked up.
+         */
+        CandidateSkillsBulkAdd: {
+            /** Items */
+            items: components["schemas"]["CandidateSkillAdd"][];
+            /** Preferred Role Title */
+            preferred_role_title?: string | null;
+        };
         /** CertificationOut */
         CertificationOut: {
             /**
@@ -2245,11 +2310,18 @@ export interface components {
             missing_mandatory: number;
             /** Level Shortfall */
             level_shortfall?: number | null;
+            /** Experience Shortfall */
+            experience_shortfall?: number | null;
             /**
              * Capped By Mandatory
              * @default false
              */
             capped_by_mandatory: boolean;
+            /**
+             * Locality
+             * @default 0
+             */
+            locality: number;
             /** Courses */
             courses?: components["schemas"]["CourseSuggestionOut"][];
             entry?: components["schemas"]["EntryRouteOut"] | null;
@@ -2275,11 +2347,18 @@ export interface components {
             missing_mandatory: number;
             /** Level Shortfall */
             level_shortfall?: number | null;
+            /** Experience Shortfall */
+            experience_shortfall?: number | null;
             /**
              * Capped By Mandatory
              * @default false
              */
             capped_by_mandatory: boolean;
+            /**
+             * Locality
+             * @default 0
+             */
+            locality: number;
         };
         /** MatchPage */
         MatchPage: {
@@ -2680,6 +2759,102 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * RoleHit
+         * @description One job role, represented by the qualification that best stands for it.
+         */
+        RoleHit: {
+            /** Slug */
+            slug: string;
+            /** Job Role */
+            job_role: string;
+            /** Qp Code */
+            qp_code: string;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /** Sector Name */
+            sector_name?: string | null;
+            /** Standards Count */
+            standards_count: number;
+            /**
+             * Variants
+             * @default 1
+             */
+            variants: number;
+            /** Matched On */
+            matched_on: string;
+            /**
+             * Match Kind
+             * @enum {string}
+             */
+            match_kind: "exact" | "prefix" | "contains" | "fuzzy" | "alias";
+        };
+        /**
+         * RoleStandardOut
+         * @description A standard as it sits inside one qualification.
+         *
+         *     `requirement` and `group_name` are carried through, not flattened: an
+         *     elective rendered as a requirement turns "choose one of these" into "all of
+         *     these are required".
+         */
+        RoleStandardOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Skill Type
+             * @enum {string}
+             */
+            skill_type: "technical" | "core" | "generic";
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /**
+             * Qp Count
+             * @default 0
+             */
+            qp_count: number;
+            /** Nos Code */
+            nos_code?: string | null;
+            /**
+             * Requirement
+             * @enum {string}
+             */
+            requirement: "compulsory" | "elective" | "optional";
+            /** Group Name */
+            group_name?: string | null;
+            /** Weightage */
+            weightage?: number | null;
+        };
+        /** RoleStandards */
+        RoleStandards: {
+            /** Slug */
+            slug: string;
+            /** Job Role */
+            job_role?: string | null;
+            /** Qp Code */
+            qp_code: string;
+            /** Qp Name */
+            qp_name: string;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /** Sector Name */
+            sector_name?: string | null;
+            /**
+             * Variants
+             * @default 1
+             */
+            variants: number;
+            /** Standards */
+            standards: components["schemas"]["RoleStandardOut"][];
         };
         /** SavedJobOut */
         SavedJobOut: {
@@ -3238,6 +3413,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_roles_roles_search_get: {
+        parameters: {
+            query: {
+                /** @description A job title, any script */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    role_standards_roles__slug__standards_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleStandards"];
                 };
             };
             /** @description Validation Error */
@@ -4160,6 +4402,39 @@ export interface operations {
             };
         };
     };
+    add_skills_bulk_me_profile_skills_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateSkillsBulkAdd"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     remove_skill_me_profile_skills__skill_slug__delete: {
         parameters: {
             query?: never;
@@ -4758,6 +5033,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Only vacancies in this state. The candidate's choice, never a default. */
+                state_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -4849,7 +5126,10 @@ export interface operations {
     };
     my_applications_me_applications_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4865,11 +5145,23 @@ export interface operations {
                     "application/json": components["schemas"]["ApplicationOut"][];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     apply_to_job_me_applications_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4902,7 +5194,10 @@ export interface operations {
     };
     withdraw_application_me_applications__application_id__withdraw_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 application_id: string;
@@ -4953,7 +5248,10 @@ export interface operations {
     };
     save_job_me_saved_jobs_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5015,7 +5313,10 @@ export interface operations {
     };
     list_applicants_org__org_slug__jobs__job_slug__applications_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 job_slug: string;

@@ -7,14 +7,19 @@ visible at `/jobs` and invisible to `match_jobs(state_id=…)`, which is the
 quietest kind of broken.
 """
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.nsqf.importer import _DISTRICT_ALIASES
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.geography import resolve_location
 from api.modules.geography.models import District, State
 from api.modules.geography.service import DISTRICT_ALIASES
+from api.modules.marketplace.models import CandidatePreferredLocation, CandidateProfile
 
 
 @pytest.fixture
@@ -108,3 +113,99 @@ class TestGeographyEndpoints:
         form that cannot load its own dropdowns is worse than one anybody can
         read."""
         assert (await client.get("/geography/states")).status_code == 200
+
+
+# ------------------------------------------------------- the candidate's side
+
+
+async def _auth(client: AsyncClient) -> dict[str, str]:
+    phone = "9" + str(uuid.uuid4().int)[:9]
+    code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
+    body = (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
+    ).json()
+    return {"authorization": f"Bearer {body['access_token']}"}
+
+
+async def _profile(db: AsyncSession) -> CandidateProfile:
+    # The newest profile is the one this test just created through the API.
+    return (
+        await db.scalars(select(CandidateProfile).order_by(CandidateProfile.created_at.desc()))
+    ).first()
+
+
+class TestAProfileResolvesOnWrite:
+    """Sprint 23. `update_profile` was a bare setattr loop and the only writer of
+    `CandidateProfile.state_id` was the NSQF importer's backfill -- so every
+    profile written through the API had a NULL state, while every *seeded* one
+    looked right because the import happened to run afterwards. Location-aware
+    matching reads that column; without this it would do nothing, silently."""
+
+    async def test_saving_a_location_resolves_both_halves(
+        self, client: AsyncClient, db: AsyncSession, master
+    ) -> None:
+        headers = await _auth(client)
+        await client.put(
+            "/me/profile",
+            headers=headers,
+            json={"location_state": "Karnataka", "location_district": "Bengaluru"},
+        )
+        profile = await _profile(db)
+        assert profile.state_id == master["karnataka"].id
+        # Through the alias: the corpus says BENGALURU URBAN.
+        assert profile.district_id == master["bengaluru"].id
+
+    async def test_changing_only_the_district_still_resolves_against_the_state_held(
+        self, client: AsyncClient, db: AsyncSession, master
+    ) -> None:
+        headers = await _auth(client)
+        await client.put("/me/profile", headers=headers, json={"location_state": "Maharashtra"})
+        await client.put("/me/profile", headers=headers, json={"location_district": "Pune"})
+        profile = await _profile(db)
+        assert profile.state_id is not None
+        assert profile.district_id == master["pune"].id
+
+    async def test_an_unknown_place_keeps_its_text_and_resolves_nothing(
+        self, client: AsyncClient, db: AsyncSession, master
+    ) -> None:
+        """An unresolvable place is still a place. The ids sit beside the text,
+        never instead of it, and failing to resolve is not an error."""
+        headers = await _auth(client)
+        response = await client.put(
+            "/me/profile",
+            headers=headers,
+            json={"location_state": "Atlantis", "location_district": "Nowhere"},
+        )
+        assert response.status_code == 200
+        assert response.json()["location_state"] == "Atlantis"
+        profile = await _profile(db)
+        assert profile.state_id is None and profile.district_id is None
+
+    async def test_a_save_without_location_leaves_it_alone(
+        self, client: AsyncClient, db: AsyncSession, master
+    ) -> None:
+        headers = await _auth(client)
+        await client.put("/me/profile", headers=headers, json={"location_state": "Karnataka"})
+        await client.put("/me/profile", headers=headers, json={"headline": "Ward attendant"})
+        assert (await _profile(db)).state_id == master["karnataka"].id
+
+    async def test_a_preferred_location_resolves_too(
+        self, client: AsyncClient, db: AsyncSession, master
+    ) -> None:
+        headers = await _auth(client)
+        response = await client.post(
+            "/me/profile/preferred_locations",
+            headers=headers,
+            json={"state": "Karnataka", "district": "Bengaluru"},
+        )
+        assert response.status_code == 200
+        row = await db.scalar(
+            select(CandidatePreferredLocation).where(
+                CandidatePreferredLocation.profile_id == (await _profile(db)).id
+            )
+        )
+        assert row.state == "Karnataka"
+        assert row.state_id == master["karnataka"].id
+        assert row.district_id == master["bengaluru"].id

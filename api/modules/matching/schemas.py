@@ -53,9 +53,14 @@ class MatchOut(BaseModel):
     missing: list[MissingSkillOut] = Field(default_factory=list)
     missing_mandatory: int = 0
     level_shortfall: NsqfLevel | None = None
+    # Years short of the vacancy's minimum, when the candidate is short at all.
+    experience_shortfall: int | None = None
     # True when a missing mandatory standard held the score down. Surfaced so
     # the interface can say *why* a strong-looking match scored where it did.
     capped_by_mandatory: bool = False
+    # 2 in a district the candidate lives or wants to work in, 1 in such a
+    # state, 0 otherwise. Orders equal scores; never changes one.
+    locality: int = 0
 
 
 class MatchPage(BaseModel):

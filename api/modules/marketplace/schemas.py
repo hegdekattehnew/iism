@@ -228,6 +228,18 @@ class CandidateSkillAdd(BaseModel):
     proficiency: int = Field(default=3, ge=1, le=5)
 
 
+class CandidateSkillsBulkAdd(BaseModel):
+    """Several standards at once -- the ones ticked from a suggested role.
+
+    `preferred_role_title` is the role they came from, recorded as a preferred
+    role when given. Bounded at the profile's own cap: a longer list could
+    never be accepted, so it is refused before anything is looked up.
+    """
+
+    items: list[CandidateSkillAdd] = Field(min_length=1, max_length=60)
+    preferred_role_title: str | None = Field(default=None, max_length=120)
+
+
 # ------------------------------------------------- profile child collections
 
 

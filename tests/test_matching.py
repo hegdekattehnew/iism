@@ -5,6 +5,7 @@ point of keeping it that way. Every case here is a rule someone could
 plausibly weaken later without noticing.
 """
 
+import math
 import uuid
 from decimal import Decimal
 
@@ -15,9 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.analytics.models import AnalyticsEvent
+from api.modules.geography.models import District, State
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
 from api.modules.matching.scoring import (
+    EXPERIENCE_WEIGHT,
+    LEVEL_WEIGHT,
     MANDATORY_GAP_CAP,
     HeldSkill,
     RequiredSkill,
@@ -476,3 +480,175 @@ async def test_the_employer_overview_costs_the_same_for_one_vacancy_or_many(
 
     assert one == four, f"{one} statements for one vacancy, {four} for four"
     assert [(p.pool, p.ready, p.nearly) for p in pools] == [(1, 1, 0)] * 4
+
+
+# ------------------------------------------------------- Sprint 23: experience
+
+
+class TestExperience:
+    """ADR-007 always named experience. Until Sprint 23 nothing read it."""
+
+    reqs = [_req("a", importance=5), _req("b", importance=2), _req("c", importance=3)]
+
+    def _score(self, **kwargs) -> int:
+        # Holds two of three, self-declared: a score with room to move either way.
+        held = [_held(r, source="self_declared") for r in self.reqs[:2]]
+        return score_match(self.reqs, held, **kwargs).score
+
+    def test_the_reweighting_is_neutral_for_a_candidate_who_fits(self) -> None:
+        """Experience was carved out of level's 0.15. For someone meeting both
+        floors the two halves sum to what they replaced -- which is what kept
+        every golden pair still. Compared with a tolerance because in binary
+        floating point 0.08 + 0.07 is 0.15000000000000002."""
+        assert math.isclose(LEVEL_WEIGHT + EXPERIENCE_WEIGHT, 0.15)
+        assert self._score(job_min_years=2, candidate_years=2) == self._score()
+
+    def test_being_short_tapers_rather_than_cliffs(self) -> None:
+        met = self._score(job_min_years=3, candidate_years=3)
+        scores = [self._score(job_min_years=3, candidate_years=y) for y in (2, 1, 0)]
+        assert met > scores[0] > scores[1] > scores[2]
+        # Three years short is the floor of the taper: the whole component, no more.
+        assert met - scores[2] == round(EXPERIENCE_WEIGHT * 100)
+
+    def test_the_shortfall_is_reported_in_years(self) -> None:
+        held = [_held(r) for r in self.reqs]
+        result = score_match(self.reqs, held, job_min_years=4, candidate_years=1)
+        assert result.experience_shortfall == 3
+        assert (
+            score_match(self.reqs, held, job_min_years=1, candidate_years=4).experience_shortfall
+            is None
+        )
+
+    def test_a_job_asking_for_no_experience_never_penalises(self) -> None:
+        assert self._score(job_min_years=0, candidate_years=0) == self._score()
+
+    def test_exceeding_what_the_job_asks_is_never_a_penalty(self) -> None:
+        """Declining the over-qualified is a hiring decision (ADR-037). Golden
+        candidate 1 has three years against a vacancy whose maximum is two."""
+        assert self._score(job_min_years=1, candidate_years=25) == self._score()
+
+    def test_an_unstated_figure_is_not_scored_as_zero(self) -> None:
+        assert self._score(job_min_years=5, candidate_years=None) == self._score()
+
+    def test_nothing_in_common_still_scores_zero(self) -> None:
+        """Experience sits after the early return, so it cannot lift a candidate
+        who shares no standard with the job off zero."""
+        result = score_match(self.reqs, [], job_min_years=5, candidate_years=0)
+        assert result.score == 0
+
+
+# --------------------------------------------------------- Sprint 23: locality
+
+
+class TestLocality:
+    """Where a vacancy is orders equal scores. It never changes one."""
+
+    @pytest.fixture
+    async def world(self, db: AsyncSession) -> dict:
+        karnataka = State(state_code=29, slug="karnataka-loc", name="Karnataka")
+        tamil_nadu = State(state_code=33, slug="tamil-nadu-loc", name="Tamil Nadu")
+        db.add_all([karnataka, tamil_nadu])
+        await db.flush()
+        bengaluru = District(district_code=572, name="BENGALURU URBAN", state_id=karnataka.id)
+        mysuru = District(district_code=577, name="Mysuru", state_id=karnataka.id)
+        chennai = District(district_code=603, name="Chennai", state_id=tamil_nadu.id)
+        db.add_all([bengaluru, mysuru, chennai])
+
+        standard = Skill(
+            slug=f"loc-std-{uuid.uuid4().hex[:6]}",
+            name="Retail billing",
+            skill_type="technical",
+            nsqf_level=Decimal("3"),
+            nos_code=f"LOC/{uuid.uuid4().hex[:6]}",
+            source="nsqf",
+        )
+        employer = Tenant(slug=f"loc-{uuid.uuid4().hex[:6]}", name="Store", tenant_type="employer")
+        db.add_all([standard, employer])
+        await db.flush()
+
+        # Titles sort alphabetically in the *opposite* order to locality, so a
+        # pass cannot come from the old title tie-break.
+        jobs = {}
+        for key, title, state, district in [
+            ("far", "A cashier in Chennai", tamil_nadu, chennai),
+            ("state", "B cashier in Mysuru", karnataka, mysuru),
+            ("district", "C cashier in Bengaluru", karnataka, bengaluru),
+        ]:
+            job = Job(
+                slug=f"{key}-{uuid.uuid4().hex[:6]}",
+                tenant_id=employer.id,
+                title=title,
+                employment_type="full_time",
+                status="published",
+                state_id=state.id,
+                district_id=district.id,
+            )
+            db.add(job)
+            await db.flush()
+            db.add(JobSkill(job_id=job.id, skill_id=standard.id, importance=3, is_mandatory=True))
+            jobs[key] = job
+        await db.commit()
+        return {
+            "standard": standard,
+            "jobs": jobs,
+            "karnataka": karnataka,
+            "tamil_nadu": tamil_nadu,
+        }
+
+    async def _candidate(self, client: AsyncClient, world: dict, **location) -> dict:
+        headers = await _auth(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": world["standard"].slug, "proficiency": 3},
+        )
+        if location:
+            await client.put("/me/profile", headers=headers, json=location)
+        return headers
+
+    async def test_equal_scores_order_district_then_state_then_elsewhere(
+        self, client: AsyncClient, world: dict
+    ) -> None:
+        headers = await self._candidate(
+            client, world, location_state="Karnataka", location_district="Bengaluru"
+        )
+        items = (await client.get("/me/matches", headers=headers)).json()["items"]
+        assert len({i["score"] for i in items}) == 1  # a tie, or this proves nothing
+        assert [i["job"]["title"][0] for i in items] == ["C", "B", "A"]
+        assert [i["locality"] for i in items] == [2, 1, 0]
+
+    async def test_a_preferred_location_elsewhere_counts_as_local(
+        self, client: AsyncClient, world: dict
+    ) -> None:
+        """Where someone lives and where they will work are different facts."""
+        headers = await self._candidate(client, world, location_state="Karnataka")
+        await client.post(
+            "/me/profile/preferred_locations",
+            headers=headers,
+            json={"state": "Tamil Nadu", "district": "Chennai"},
+        )
+        items = (await client.get("/me/matches", headers=headers)).json()["items"]
+        assert items[0]["job"]["title"].startswith("A")
+        assert items[0]["locality"] == 2
+
+    async def test_a_candidate_with_no_location_keeps_the_old_order(
+        self, client: AsyncClient, world: dict
+    ) -> None:
+        headers = await self._candidate(client, world)
+        items = (await client.get("/me/matches", headers=headers)).json()["items"]
+        assert [i["job"]["title"][0] for i in items] == ["A", "B", "C"]
+        assert {i["locality"] for i in items} == {0}
+
+    async def test_the_state_filter_is_opt_in_and_works(
+        self, client: AsyncClient, world: dict
+    ) -> None:
+        """`match_jobs` accepted `state_id` from Sprint 8 and nothing passed it."""
+        headers = await self._candidate(client, world)
+        everywhere = (await client.get("/me/matches", headers=headers)).json()["items"]
+        assert len(everywhere) == 3
+        only = (
+            await client.get(
+                "/me/matches", headers=headers, params={"state_id": str(world["tamil_nadu"].id)}
+            )
+        ).json()["items"]
+        assert [i["job"]["title"][0] for i in only] == ["A"]

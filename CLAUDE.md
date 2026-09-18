@@ -97,7 +97,8 @@ api/                     FastAPI modular monolith
                          Occupation → QualificationPack → QpSkill, plus
                          QpEntryRoute, QpNcoCode, ModelCurriculum;
                          content.py = what a standard actually says, ~614k rows
-                         (ADR-004, ADR-034)
+                         (ADR-004, ADR-034). roles_routes.py + role_aliases.py =
+                         role search: a job title to its qualification's standards
     geography/           State, District, SubDistrict, plus the service that resolves a
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
@@ -268,6 +269,55 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+Sprint 23 (say what you do, and we'll name the standards) is done. It began as "should a CV
+populate the profile?" and found something sharper: **exactly one thing on a candidate profile
+changes a match score** — `candidate_skills` — and the only way to add one was to type a search
+against 21,303 standards named like *"Follow infection control policies & procedures including
+biomedical waste disposal protocols"*. A ward attendant will never type that. Now they type "ward
+boy", tick what they can do, and have matches.
+
+- **Role search is the corpus, not a model.** All 4,424 qualification packs carry a `job_role`
+  (median 6 standards). `GET /roles/search` → `GET /roles/{slug}/standards` is
+  `entry_routes_for_job` reversed. Tiers mirror `_SEARCH_SQL` — exact, prefix, contains, then
+  `0.9 × word_similarity` so a guess can never outrank something typed. Key on the pack's **slug**,
+  never `qp_code` (it contains a slash). One row per role: base code before `-SI` variant, then
+  fewest `/` segments (the SSC's own code over a reissuer's), then most standards; `variants` says
+  what was collapsed. Packs with no standards (84) are never offered.
+- **`role_aliases.py` exists because "ward boy" shares no letters with "General Duty Assistant".**
+  Fuzzy matching cannot bridge that; a list can — the `DISTRICT_ALIASES` move. Values must name a
+  current pack with standards; `unresolved_aliases()` checks them against the real corpus. Point at
+  the general pack, never a disability-track variant, and **check the prefixes of any key you add**
+  — this is a typeahead, so "nurse" reaches the nursing-assistant certificate as a prefix of "nurse
+  aide". The starter list awaits review by someone who knows the labour market.
+- **A ticked suggestion is `self_declared`, never `inferred`.** `inferred` scores 0.7 against 0.6,
+  so routing the easy path through it would reward acquiescence: golden candidate 3 would score 87
+  against candidate 1's 88, one point from failing the ordering that makes evidence outrank
+  self-claims. `_write_skills` is the **one** construction site for a candidate's `CandidateSkill`;
+  single and bulk adds both go through it. Nothing in the picker starts ticked, for the same reason.
+- **Bulk add is all or nothing.** A batch crossing the 60-skill cap is refused whole and writes
+  nothing — eight ticked and three landing, with nothing saying which, is worse than a refusal.
+  The role the candidate named becomes a preferred role, which finally connects the completeness
+  meter's heaviest weight to the core loop.
+- **A profile's location resolves on write.** `update_profile` was a bare `setattr`, and the only
+  writer of `CandidateProfile.state_id` was the NSQF importer's backfill — Sprint 15's bug one table
+  over. Seeded profiles looked fine because the import happened to run after them.
+- **Experience scores; location only orders.** `LEVEL_WEIGHT` 0.15 became 0.08 + `EXPERIENCE_WEIGHT`
+  0.07, which is identical for anyone meeting both floors — `make evaluate` is bit-identical. (In
+  floating point `0.08 + 0.07 != 0.15`; the test uses a tolerance.) Exceeding a job's maximum is
+  never penalised (ADR-037). Locality — district 2, state 1 — is a **tie-break in `match_jobs`**,
+  never in `scoring.py`, because that scorer ranks candidates for employers too and a location term
+  there would rank people by proximity. `CandidatePreferredLocation` finally has a reader.
+- **`skills` and `marketplace` import `analytics` inside the handler.** `analytics` loads its routes,
+  which load `marketplace.models`, which load `skills` — a module-level import is an ImportError at
+  boot. `tests/test_import_order.py` imports every entry point first in a fresh interpreter, because
+  inside the test process everything is already in `sys.modules` and a cycle passes unnoticed.
+- **`migrations/env.py` had been wrong since 0022.** It listed the dropped `ix_skills_name_en_trgm`
+  and not the live `ix_skills_name_trgm`, so the next autogenerate would have dropped the index
+  behind every fuzzy skill search. Verified by autogenerating with the old file.
+- **Migrations freeze their own value lists.** 0024 builds its CHECK with `one_of()` over a tuple
+  written *in the migration*, not the imported `EVENT_NAMES` — importing it would make 0024 produce
+  a wider constraint the day a later sprint adds a name.
+
 Sprint 22.5 (demo readiness) is done. No new product surface: the demonstrable product, made
 demonstrable. The readiness check had found that **all six seeded applications belonged to
 organisations with no members** — which is to say the whole of Sprint 21 could not be shown from a
@@ -357,8 +407,9 @@ the contact details to act on it.
   not be in the retrieved pool — anyone may apply, and refusing the under-qualified would be a
   hiring decision this product does not get to make. **Do not add a second scorer** (ADR-037).
 - **`matching` imports `applications` lazily, inside the counting function.** The two import each
-  other; this is the fix `core/authorization.py` already uses. Both import orders are asserted in a
-  test, because the failure is an ImportError at boot, not a wrong answer.
+  other; this is the fix `core/authorization.py` already uses. The failure is an ImportError at
+  boot, not a wrong answer. *(This entry claimed a test asserted both import orders; none did until
+  Sprint 23's `tests/test_import_order.py`.)*
 - **Applying is gated by `get_current_candidate`**, so pressing Apply can never create a candidate
   profile for an organisation-only account — and the interface offers that account no button at all,
   rather than one that always fails.

@@ -176,6 +176,14 @@ export function MatchBrowser() {
                   {[m.job.location_district, m.job.location_state]
                     .filter(Boolean)
                     .join(", ")}
+                  {/* Rendered from the field; nothing computed here. Locality
+                      only orders equal scores, so the badge says where, never
+                      "better". */}
+                  {(m.locality ?? 0) > 0 && (
+                    <span className="ml-2 inline-block rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-brand">
+                      {m.locality === 2 ? t("nearDistrict") : t("nearState")}
+                    </span>
+                  )}
                 </p>
               </div>
               <ScoreDial score={m.score} />
@@ -192,6 +200,12 @@ export function MatchBrowser() {
             {m.capped_by_mandatory && (
               <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
                 {t("capped")}
+              </p>
+            )}
+
+            {m.experience_shortfall != null && (
+              <p className="mt-3 text-xs text-muted">
+                {t("experienceShort", { years: m.experience_shortfall })}
               </p>
             )}
 

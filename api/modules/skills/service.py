@@ -18,6 +18,7 @@ from api.modules.skills.content import (
 )
 from api.modules.skills.hierarchy import QpSkill, QualificationPack, Sector
 from api.modules.skills.models import Skill
+from api.modules.skills.role_aliases import ROLE_ALIASES, alias_scores
 
 MAX_SEARCH_RESULTS = 50
 
@@ -351,3 +352,246 @@ async def search_skills(db: AsyncSession, query: str, *, limit: int = 20) -> lis
         for row in ranked
         if row.skill_id in skills
     ]
+
+
+# ------------------------------------------------------------------ roles
+#
+# Sprint 23. A candidate cannot name a National Occupational Standard -- they are
+# called things like "Follow infection control policies & procedures including
+# biomedical waste disposal protocols" -- but they can name their job. Every one
+# of the 4,424 current qualification packs carries a `job_role`, and the pack
+# names its standards. So: search roles, then offer the pack's standards.
+#
+# This is `matching.entry_routes_for_job` reversed. That derives a qualification
+# from a job's standards; this derives standards from a person's role.
+
+MAX_ROLE_RESULTS = 30
+
+# Tiers mirror `_SEARCH_SQL`: exact 4, prefix 3, contains 2, and fuzzy scaled so
+# it can never reach 2 -- a guess must never outrank something the candidate
+# literally typed. Aliases arrive pre-scored on the same tiers.
+#
+# **One row per role.** The same role appears under many codes: `HSS/Q5601` has
+# 28 `-SI` siblings of four standards each; `BWS/Q0102` is reissued as
+# `DGT/BWS/Q0102` and `IID/BWS/Q0102`. The representative is the base code
+# before a `-SI` variant, then the fewest `/` segments (the SSC's own code
+# rather than a reissuer's), then the most standards, then the code itself so
+# the answer is stable. `-SI` is ordered, not filtered: some roles exist only
+# as variants. `variants` says how many were collapsed, so the screen can.
+#
+# A pack with no standards is never offered -- choosing it would offer nothing.
+_ROLE_SEARCH_SQL = text(
+    """
+WITH q AS (
+    SELECT lower(btrim(CAST(:raw AS text))) AS norm
+),
+aliased AS (
+    SELECT t.role_key, t.score
+    FROM unnest(CAST(:alias_roles AS text[]), CAST(:alias_scores AS float8[]))
+         AS t(role_key, score)
+),
+candidates AS (
+    SELECT qp.id, qp.slug, qp.qp_code, qp.job_role, qp.nsqf_level, qp.sector_id,
+           lower(btrim(qp.job_role)) AS role_key,
+           (SELECT count(*) FROM qp_skills s WHERE s.qp_id = qp.id) AS standards
+    FROM qualification_packs qp, q
+    WHERE qp.is_current
+      AND (lower(qp.job_role) LIKE '%' || q.norm || '%'
+           OR q.norm <% lower(qp.job_role)
+           OR lower(btrim(qp.job_role)) IN (SELECT role_key FROM aliased))
+),
+ranked AS (
+    SELECT c.*,
+           count(*) OVER (PARTITION BY c.role_key) AS variants,
+           row_number() OVER (
+               PARTITION BY c.role_key
+               ORDER BY (c.qp_code ~ '-SI[0-9]+$'),
+                        length(c.qp_code) - length(replace(c.qp_code, '/', '')),
+                        c.standards DESC,
+                        c.qp_code
+           ) AS pick
+    FROM candidates c
+    WHERE c.standards > 0
+),
+scored AS (
+    SELECT r.*,
+           CASE WHEN r.role_key = q.norm THEN 4.0
+                WHEN r.role_key LIKE q.norm || '%' THEN 3.0
+                WHEN r.role_key LIKE '%' || q.norm || '%' THEN 2.0
+                ELSE 0.9 * word_similarity(q.norm, r.role_key)
+           END AS literal,
+           coalesce((SELECT max(a.score) FROM aliased a WHERE a.role_key = r.role_key), 0)
+               AS via_alias,
+           -- Whole-string, not word: breaks ties between fuzzy hits in favour of
+           -- a title that is *about* the query over one that merely contains a
+           -- word of it. Without it "delivery boy" ranked a BIM architecture
+           -- certificate second, because its title ends in "Delivery" and it
+           -- happens to carry more standards.
+           similarity(q.norm, r.role_key) AS closeness
+    FROM ranked r, q
+    WHERE r.pick = 1
+)
+SELECT s.slug, s.qp_code, s.job_role, s.nsqf_level, s.standards, s.variants,
+       s.role_key, s.literal, s.via_alias, sec.name AS sector_name
+FROM scored s
+LEFT JOIN sectors sec ON sec.id = s.sector_id
+ORDER BY greatest(s.literal, s.via_alias) DESC, s.closeness DESC, s.standards DESC, s.job_role
+LIMIT :limit
+"""
+)
+
+
+@dataclass(frozen=True)
+class RoleHit:
+    slug: str
+    qp_code: str
+    job_role: str
+    nsqf_level: float | None
+    sector_name: str | None
+    standards_count: int
+    variants: int
+    matched_on: str
+    match_kind: str
+
+
+def _literal_kind(score: float) -> str:
+    if score >= 4.0:
+        return "exact"
+    if score >= 3.0:
+        return "prefix"
+    if score >= 2.0:
+        return "contains"
+    return "fuzzy"
+
+
+async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list[RoleHit]:
+    """Roles matching what the candidate typed, one row per role."""
+    cleaned = " ".join(query.split())
+    if not cleaned:
+        return []
+    via = alias_scores(cleaned)
+    rows = (
+        await db.execute(
+            _ROLE_SEARCH_SQL,
+            {
+                "raw": cleaned,
+                "alias_roles": list(via),
+                "alias_scores": [score for score, _ in via.values()],
+                "limit": min(limit, MAX_ROLE_RESULTS),
+            },
+        )
+    ).all()
+
+    hits: list[RoleHit] = []
+    for row in rows:
+        # Whichever reached it more strongly explains it. On a tie the literal
+        # match wins: it is the candidate's own words.
+        if row.via_alias > row.literal:
+            kind, matched_on = "alias", via[row.role_key][1]
+        else:
+            kind, matched_on = _literal_kind(float(row.literal)), row.job_role
+        hits.append(
+            RoleHit(
+                slug=row.slug,
+                qp_code=row.qp_code,
+                job_role=row.job_role,
+                nsqf_level=float(row.nsqf_level) if row.nsqf_level is not None else None,
+                sector_name=row.sector_name,
+                standards_count=int(row.standards),
+                variants=int(row.variants),
+                matched_on=matched_on,
+                match_kind=kind,
+            )
+        )
+    return hits
+
+
+@dataclass(frozen=True)
+class RoleStandard:
+    skill: Skill
+    requirement: str
+    group_name: str | None
+    weightage: float | None
+
+
+@dataclass(frozen=True)
+class RoleStandards:
+    qp: QualificationPack
+    sector_name: str | None
+    variants: int
+    standards: list[RoleStandard]
+
+
+# Compulsory first: they are the qualification. Electives after, kept in their
+# groups -- flattening them would turn "choose one of these" into "all of these
+# are required", which is not what the standard says.
+_REQUIREMENT_ORDER = {"compulsory": 0, "elective": 1, "optional": 2}
+
+
+async def standards_for_role(db: AsyncSession, slug: str) -> RoleStandards | None:
+    """A qualification and the standards it is made of."""
+    qp = await db.scalar(select(QualificationPack).where(QualificationPack.slug == slug))
+    if qp is None:
+        return None
+
+    sector_name = (
+        await db.scalar(select(Sector.name).where(Sector.id == qp.sector_id))
+        if qp.sector_id is not None
+        else None
+    )
+    variants = (
+        await db.scalar(
+            select(func.count())
+            .select_from(QualificationPack)
+            .where(
+                QualificationPack.is_current.is_(True),
+                func.lower(func.btrim(QualificationPack.job_role))
+                == func.lower(func.btrim(qp.job_role or "")),
+            )
+        )
+    ) or 1
+
+    rows = (
+        await db.execute(select(QpSkill, Skill).join(Skill).where(QpSkill.qp_id == qp.id))
+    ).all()
+    standards = [
+        RoleStandard(
+            skill=skill,
+            requirement=link.requirement,
+            group_name=link.group_name,
+            weightage=float(link.weightage) if link.weightage is not None else None,
+        )
+        for link, skill in rows
+    ]
+    standards.sort(
+        key=lambda s: (
+            _REQUIREMENT_ORDER.get(s.requirement, 3),
+            s.group_name or "",
+            -(s.weightage if s.weightage is not None else -1.0),
+            s.skill.name,
+        )
+    )
+    return RoleStandards(qp=qp, sector_name=sector_name, variants=variants, standards=standards)
+
+
+async def unresolved_aliases(db: AsyncSession) -> list[str]:
+    """Alias targets that name no current qualification with standards.
+
+    Such an alias matches nothing and fails silently -- which is why editing
+    `role_aliases.py` is verified by running this, against the real corpus.
+    """
+    targets = sorted({role.lower().strip() for role in ROLE_ALIASES.values()})
+    rows = await db.execute(
+        text(
+            """
+            SELECT DISTINCT lower(btrim(qp.job_role)) AS role_key
+            FROM qualification_packs qp
+            WHERE qp.is_current
+              AND lower(btrim(qp.job_role)) = ANY(CAST(:targets AS text[]))
+              AND EXISTS (SELECT 1 FROM qp_skills s WHERE s.qp_id = qp.id)
+            """
+        ),
+        {"targets": targets},
+    )
+    found = {row.role_key for row in rows}
+    return [t for t in targets if t not in found]

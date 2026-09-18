@@ -333,13 +333,13 @@
     "saving": "Saving…",
     "saved": "Saved",
     "skillsTitle": "My skills",
-    "skillsSubtitle": "Search the taxonomy in English or Hindi — typed in either script.",
+    "skillsSubtitle": "Name your job and we'll show the national standards behind it.",
     "searchPlaceholder": "Try 'blood', 'रक्त' or 'khoon nikalna'",
     "add": "Add",
     "remove": "Remove",
     "proficiency": "Level {n} of 5",
     "proficiencyLabel": "How confident are you?",
-    "noSkills": "No skills added yet. Search above to add your first one.",
+    "noSkills": "No skills added yet. Name your job above to add your first ones.",
     "source": {
       "self_declared": "Self-declared",
       "inferred": "Inferred",
@@ -449,6 +449,31 @@
     "errors": {
       "duplicate": "That entry already exists.",
       "generic": "Could not save. Please check the fields."
+    },
+    "roles": {
+      "prompt": "What work do you do?",
+      "placeholder": "e.g. ward boy, delivery, cashier, electrician",
+      "standardsCount": "{count, plural, one {# standard} other {# standards}}",
+      "level": "NSQF {level}",
+      "matchedVia": "Matched “{term}”",
+      "variants": "{count} versions of this qualification — showing the fullest",
+      "noRoles": "No job by that name yet. Try another word, or search the standards directly below.",
+      "changeRole": "Choose a different job",
+      "tickPrompt": "Tick what you can already do. Leave anything you haven't done yet — it will show as a gap, with courses that close it.",
+      "loading": "Loading…",
+      "loadError": "Could not load these standards. Try again.",
+      "groupCore": "Core to the job",
+      "groupElective": "Choose from: {group}",
+      "electives": "electives",
+      "groupOptional": "Optional",
+      "alreadyHeld": "Already on your profile",
+      "asPreferred": "Also save this as a job I'm looking for",
+      "confirm": "{count, plural, =0 {Tick at least one} one {Add # skill} other {Add # skills}}",
+      "adding": "Adding…",
+      "saveError": "Could not add these. Try again.",
+      "added": "{count, plural, one {# skill added} other {# skills added}}. Choose another job to add more.",
+      "fallbackTitle": "Or search the standards directly",
+      "fallbackBody": "If you know the standard you want, or your job isn't listed above."
     }
   },
   "matchesPage": {
@@ -473,7 +498,10 @@
     "viewJob": "View the job",
     "backToMatches": "All matches",
     "loadError": "Could not load your matches.",
-    "hours": "{hours} hours"
+    "hours": "{hours} hours",
+    "nearDistrict": "In your district",
+    "nearState": "In your state",
+    "experienceShort": "{years, plural, one {# year} other {# years}} short of the experience this role asks for"
   },
   "stats": {
     "heading": "Built on the national framework, not a guess",

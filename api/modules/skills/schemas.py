@@ -153,3 +153,46 @@ class SkillRequirements(BaseModel):
     criteria_count: int
     knowledge: list[str]
     generic_skills: list[str]
+
+
+# ------------------------------------------------------------------ roles
+
+
+class RoleHit(BaseModel):
+    """One job role, represented by the qualification that best stands for it."""
+
+    slug: str
+    job_role: str
+    qp_code: str
+    nsqf_level: NsqfLevel | None = None
+    sector_name: str | None = None
+    standards_count: int
+    # How many current qualifications share this role name and were collapsed
+    # into this one row. Said on screen rather than hidden.
+    variants: int = 1
+    matched_on: str
+    match_kind: Literal["exact", "prefix", "contains", "fuzzy", "alias"]
+
+
+class RoleStandardOut(SkillOut):
+    """A standard as it sits inside one qualification.
+
+    `requirement` and `group_name` are carried through, not flattened: an
+    elective rendered as a requirement turns "choose one of these" into "all of
+    these are required".
+    """
+
+    requirement: QpRequirement
+    group_name: str | None = None
+    weightage: float | None = None
+
+
+class RoleStandards(BaseModel):
+    slug: str
+    job_role: str | None = None
+    qp_code: str
+    qp_name: str
+    nsqf_level: NsqfLevel | None = None
+    sector_name: str | None = None
+    variants: int = 1
+    standards: list[RoleStandardOut]

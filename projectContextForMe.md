@@ -79,6 +79,21 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 23 (say what you do, and we'll name the standards) — complete, 2026-09-18.** Asked as "should
+a CV populate the profile?"; answered by finding that only `candidate_skills` changes a score, and
+that the only way to add one was naming a National Occupational Standard nobody can name. A CV would
+have filled experiences and education, which no scorer reads. Now a candidate types their job ("ward
+boy", "ड्राइवर"), the qualification behind it names its standards, and they tick what they can do —
+one request, written `self_declared`, nothing pre-ticked. A curated alias map bridges colloquial
+titles the corpus does not use (**awaiting labour-market review**). Profile location now resolves on
+save; experience enters the score by a split of the level weight that is neutral for anyone who
+fits (golden set bit-identical); locality orders equal scores and never changes one. Migration 0024
+(trigram index on `job_role`, two analytics names); `migrations/env.py` repaired — it would have
+dropped the live skill trigram index. 501 backend and 66 web tests; verified in the browser as a
+brand-new account in English and Hindi. **CV upload deferred** until the residual gap is visible.
+**Found, not fixed** (task raised): three district names exist in two states and resolve
+arbitrarily, and every NSQF import rewrites every profile's `updated_at`.
+
 **Sprint 22.5 (demo readiness) — complete, 2026-09-17.** No new product surface: the readiness
 check before demoing found that the whole of Sprint 21 could not be shown cold, because all six
 seeded applications sat in organisations **nobody could sign in to**. All ten seeded organisations

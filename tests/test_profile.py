@@ -3,9 +3,13 @@
 import uuid
 
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
+from api.modules.analytics import AnalyticsEvent
+from api.modules.marketplace.models import CandidateSkill
+from api.modules.marketplace.profile_service import MAX_SKILLS_PER_PROFILE
 from api.modules.skills import Skill
 
 
@@ -170,3 +174,141 @@ async def test_profile_survives_a_new_session(client: AsyncClient, db: AsyncSess
     second = await sign_in()
     body = (await client.get("/me/profile", headers=second)).json()
     assert [s["skill"]["slug"] for s in body["skills"]] == ["workplace-safety"]
+
+
+# ------------------------------------------------------ Sprint 23: bulk add
+
+
+async def _skills(db: AsyncSession, n: int) -> list[str]:
+    tag = uuid.uuid4().hex[:6]
+    return [(await _skill(db, f"bulk-{tag}-{i}")).slug for i in range(n)]
+
+
+async def _held(db: AsyncSession) -> int:
+    return (await db.scalar(select(func.count()).select_from(CandidateSkill))) or 0
+
+
+def _items(slugs: list[str], proficiency: int = 3) -> list[dict]:
+    return [{"skill_slug": s, "proficiency": proficiency} for s in slugs]
+
+
+class TestAddingSeveralAtOnce:
+    """Ticking the standards of a suggested role is one decision, so it is one
+    request. Everything here is about what that request may and may not do."""
+
+    async def test_every_row_is_self_declared(self, client: AsyncClient, db: AsyncSession) -> None:
+        """A ticked suggestion is still the candidate's own claim. `inferred`
+        would score 0.7 against 0.6 and reward whoever took the easy path."""
+        headers = await _auth(client)
+        slugs = await _skills(db, 4)
+        body = (
+            await client.post(
+                "/me/profile/skills/bulk", headers=headers, json={"items": _items(slugs)}
+            )
+        ).json()
+        assert len(body["skills"]) == 4
+        assert {s["source"] for s in body["skills"]} == {"self_declared"}
+
+    async def test_re_adding_updates_rather_than_duplicating(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        slugs = await _skills(db, 3)
+        await client.post("/me/profile/skills/bulk", headers=headers, json={"items": _items(slugs)})
+        body = (
+            await client.post(
+                "/me/profile/skills/bulk", headers=headers, json={"items": _items(slugs, 5)}
+            )
+        ).json()
+        assert len(body["skills"]) == 3
+        assert {s["proficiency"] for s in body["skills"]} == {5}
+
+    async def test_a_batch_that_would_cross_the_cap_is_refused_whole(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Eight ticked, three land, and nothing says which five went: worse than
+        a refusal. So it is a refusal, and nothing is written."""
+        headers = await _auth(client)
+        first = await _skills(db, MAX_SKILLS_PER_PROFILE - 2)
+        await client.post("/me/profile/skills/bulk", headers=headers, json={"items": _items(first)})
+        before = await _held(db)
+
+        response = await client.post(
+            "/me/profile/skills/bulk", headers=headers, json={"items": _items(await _skills(db, 3))}
+        )
+        assert response.status_code == 400
+        assert "room for 2 more" in response.json()["detail"]
+        assert await _held(db) == before
+
+    async def test_re_adding_held_skills_does_not_count_toward_the_cap(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        full = await _skills(db, MAX_SKILLS_PER_PROFILE)
+        await client.post("/me/profile/skills/bulk", headers=headers, json={"items": _items(full)})
+        response = await client.post(
+            "/me/profile/skills/bulk", headers=headers, json={"items": _items(full[:10], 4)}
+        )
+        assert response.status_code == 200
+
+    async def test_one_unknown_standard_writes_nothing(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        slugs = await _skills(db, 2)
+        before = await _held(db)
+        response = await client.post(
+            "/me/profile/skills/bulk",
+            headers=headers,
+            json={"items": _items([slugs[0], "no-such-standard", slugs[1]])},
+        )
+        assert response.status_code == 404
+        assert "no-such-standard" in response.json()["detail"]
+        assert await _held(db) == before
+
+    async def test_an_empty_batch_is_refused(self, client: AsyncClient) -> None:
+        response = await client.post(
+            "/me/profile/skills/bulk", headers=await _auth(client), json={"items": []}
+        )
+        assert response.status_code == 422
+
+    async def test_the_role_they_came_from_becomes_a_preferred_role_once(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The candidate has just named their target -- the fact the completeness
+        meter weights highest. Recorded once, however often they come back."""
+        headers = await _auth(client)
+        slugs = await _skills(db, 2)
+        payload = {"items": _items(slugs), "preferred_role_title": "General Duty Assistant"}
+        await client.post("/me/profile/skills/bulk", headers=headers, json=payload)
+        payload["preferred_role_title"] = "general duty assistant"
+        response = await client.post("/me/profile/skills/bulk", headers=headers, json=payload)
+        assert response.status_code == 200
+        roles = response.json()["preferred_roles"]
+        assert [r["title"] for r in roles] == ["General Duty Assistant"]
+        assert "preferred_roles" not in response.json()["completeness"]["missing"]
+
+    async def test_it_is_not_read_as_a_profile_collection(self, client: AsyncClient) -> None:
+        """`/me/profile/{collection}` would otherwise capture `skills` and answer
+        "Unknown profile section" to a perfectly good request."""
+        response = await client.post(
+            "/me/profile/skills/bulk", headers=await _auth(client), json={"items": []}
+        )
+        assert response.status_code == 422  # validated as a bulk add, not a 404 section
+
+    async def test_it_is_measured_in_counts_only(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        slugs = await _skills(db, 3)
+        await client.post(
+            "/me/profile/skills/bulk",
+            headers=headers,
+            json={"items": _items(slugs), "preferred_role_title": "Phlebotomist"},
+        )
+        event = await db.scalar(
+            select(AnalyticsEvent)
+            .where(AnalyticsEvent.name == "skills_bulk_added")
+            .order_by(AnalyticsEvent.occurred_at.desc())
+        )
+        assert event.payload == {"added": 3, "updated": 0, "from_role": True}

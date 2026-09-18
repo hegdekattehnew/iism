@@ -15,6 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.marketplace.models import (
+    CandidatePreferredLocation,
+    CandidateProfile,
     CandidateSkill,
     Course,
     CourseSkill,
@@ -40,6 +42,64 @@ RETRIEVAL_LIMIT = 500
 class ScoredJob:
     job: Job
     result: MatchResult
+    # 2 same district, 1 same state, 0 elsewhere or unknown. A tie-break, never
+    # part of the score -- see `_locality`.
+    locality: int = 0
+
+
+@dataclass(frozen=True)
+class CandidateFacts:
+    """What matching reads off the profile besides its skills."""
+
+    years_experience: int | None
+    states: frozenset[uuid.UUID]
+    districts: frozenset[uuid.UUID]
+
+
+async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateFacts:
+    """Where the candidate lives *and* where they said they would work.
+
+    `CandidatePreferredLocation` had no reader at all before Sprint 23. Where
+    someone lives and where they will work are different facts, and either makes
+    a vacancy local to them.
+    """
+    profile = await db.get(CandidateProfile, profile_id)
+    preferred = (
+        await db.execute(
+            select(
+                CandidatePreferredLocation.state_id, CandidatePreferredLocation.district_id
+            ).where(CandidatePreferredLocation.profile_id == profile_id)
+        )
+    ).all()
+    states = {row.state_id for row in preferred if row.state_id}
+    districts = {row.district_id for row in preferred if row.district_id}
+    if profile is not None:
+        if profile.state_id:
+            states.add(profile.state_id)
+        if profile.district_id:
+            districts.add(profile.district_id)
+    return CandidateFacts(
+        years_experience=profile.years_experience if profile is not None else None,
+        states=frozenset(states),
+        districts=frozenset(districts),
+    )
+
+
+def _locality(job: Job, facts: CandidateFacts) -> int:
+    """How local a vacancy is to this candidate. Deliberately **not** a score.
+
+    It orders jobs that scored identically and nothing else, so it can never
+    hide a vacancy or push a better match below a worse one: "a candidate one
+    standard short of a strong match needs telling, not hiding" applies to
+    distance too. It stays out of `scoring.py` because that scorer also ranks
+    candidates for employers (ADR-037), where a location term would quietly
+    rank people by proximity -- a hiring decision this product does not make.
+    """
+    if job.district_id and job.district_id in facts.districts:
+        return 2
+    if job.state_id and job.state_id in facts.states:
+        return 1
+    return 0
 
 
 @dataclass(frozen=True)
@@ -142,6 +202,7 @@ async def match_jobs(
 ) -> list[ScoredJob]:
     """Rank published jobs for one candidate."""
     held = await _held_skills(db, profile_id)
+    facts = await candidate_facts(db, profile_id)
     if not held:
         # No declared skills, no defensible ranking. An arbitrary order dressed
         # up as a match would be worse than an empty list with a prompt to add
@@ -163,7 +224,14 @@ async def match_jobs(
     )
     if state_id is not None:
         retrieval = retrieval.where(Job.state_id == state_id)
-    job_ids = list((await db.scalars(retrieval.distinct().limit(RETRIEVAL_LIMIT))).all())
+    # Ordered before the cap so which jobs survive it is at least reproducible.
+    # Still arbitrary with respect to fit: the real fix is ranking retrieval by
+    # shared-standard count, which is out of scope until the catalogue is large
+    # enough for the cap to bite. Without the ORDER BY, which 500 survived was
+    # Postgres's choice, and could change between two identical requests.
+    job_ids = list(
+        (await db.scalars(retrieval.distinct().order_by(Job.id).limit(RETRIEVAL_LIMIT))).all()
+    )
     if not job_ids:
         return []
 
@@ -178,14 +246,17 @@ async def match_jobs(
                 held,
                 job_level_min=jobs[job_id].nsqf_level_min,
                 candidate_level=attained_level(held, requirements.get(job_id, [])),
+                job_min_years=jobs[job_id].experience_min_years,
+                candidate_years=facts.years_experience,
             ),
+            locality=_locality(jobs[job_id], facts),
         )
         for job_id in job_ids
         if job_id in jobs
     ]
-    # Score, then coverage, then title: a stable order, so the same inputs
-    # always produce the same page.
-    scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, s.job.title))
+    # Score, then coverage, then locality, then title: a stable order, so the
+    # same inputs always produce the same page. Locality only breaks ties.
+    scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, -s.locality, s.job.title))
     return scored[:limit]
 
 
@@ -343,6 +414,7 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
     if job is None:
         return None
     held = await _held_skills(db, profile_id)
+    facts = await candidate_facts(db, profile_id)
     requirements = (await requirements_for(db, [job.id])).get(job.id, [])
     return ScoredJob(
         job=job,
@@ -351,5 +423,8 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
             held,
             job_level_min=job.nsqf_level_min,
             candidate_level=attained_level(held, requirements),
+            job_min_years=job.experience_min_years,
+            candidate_years=facts.years_experience,
         ),
+        locality=_locality(job, facts),
     )

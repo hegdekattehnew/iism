@@ -42,6 +42,12 @@ EVENT_NAMES = (
     "application_withdrawn",
     "application_status_changed",
     "job_saved",
+    # Sprint 23. The sprint's whole hypothesis is that naming a role beats
+    # searching for a standard; without these two it could not be measured.
+    # The payloads carry counts, never which standards -- a skill list is a
+    # description of a person.
+    "role_suggested",
+    "skills_bulk_added",
 )
 
 

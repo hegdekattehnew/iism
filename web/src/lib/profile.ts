@@ -130,6 +130,22 @@ export function useProfileMutations() {
     onSuccess: write,
   });
 
+  // Several standards in one request: the ones ticked from a suggested role.
+  // One decision, one round trip, and all-or-nothing on the server.
+  const addSkillsBulk = useMutation({
+    mutationFn: async (v: {
+      items: { skill_slug: string; proficiency: number }[];
+      preferred_role_title?: string | null;
+    }) => {
+      const { data, error, response } = await api.POST("/me/profile/skills/bulk", {
+        body: v,
+      });
+      if (error) throw new Error(String(response.status));
+      return data;
+    },
+    onSuccess: write,
+  });
+
   const removeSkill = useMutation({
     mutationFn: async (slug: string) => {
       const { data, error } = await api.DELETE("/me/profile/skills/{skill_slug}", {
@@ -156,6 +172,7 @@ export function useProfileMutations() {
     updateEntry,
     removeEntry,
     addSkill,
+    addSkillsBulk,
     removeSkill,
     finishOnboarding,
   };

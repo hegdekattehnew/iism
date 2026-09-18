@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from api.modules.geography import resolve_location
 from api.modules.marketplace.models import (
     CandidateCertification,
     CandidateEducation,
@@ -108,8 +109,33 @@ async def update_profile(
     profile = await get_or_create_profile(db, user_id)
     for key, value in fields.items():
         setattr(profile, key, value)
+    if _LOCATION_FIELDS & fields.keys():
+        # Resolved on write, as a job's is (`publishing.create_job`). Before
+        # Sprint 23 this was a bare setattr and the only writer of `state_id` was
+        # the NSQF importer's backfill -- so every profile written through the
+        # API had a NULL state and was invisible to anything location-aware,
+        # while every *seeded* profile looked fine because the import happened
+        # to run after it. Sprint 15's bug, one table over.
+        #
+        # Both halves from the row, not the payload: a request that changes only
+        # the district must still resolve against the state already held.
+        location = await resolve_location(db, profile.location_state, profile.location_district)
+        profile.state_id, profile.district_id = location.state_id, location.district_id
     await db.commit()
     return await _load(db, profile.id)
+
+
+_LOCATION_FIELDS = {"location_state", "location_district"}
+
+
+async def resolve_preferred_location(db: AsyncSession, values: dict) -> dict:
+    """Adds the resolved ids to a preferred-location payload.
+
+    The free text is kept whatever happens: the ids sit *beside* it, because an
+    unresolvable place is still a place somebody said they would work.
+    """
+    location = await resolve_location(db, values.get("state"), values.get("district"))
+    return {**values, "state_id": location.state_id, "district_id": location.district_id}
 
 
 async def resolve_certification_skill(db: AsyncSession, skill_slug: str | None) -> uuid.UUID | None:
@@ -121,6 +147,82 @@ async def resolve_certification_skill(db: AsyncSession, skill_slug: str | None) 
     return skill.id
 
 
+async def _write_skills(
+    db: AsyncSession, profile: CandidateProfile, items: list[tuple[str, int]]
+) -> tuple[int, int]:
+    """The one place a candidate's own claim becomes a `CandidateSkill` row.
+
+    Both the single add and the bulk add come through here, and nothing else in
+    the request path constructs one. That is what keeps `source` honest: a
+    second construction site is how a suggested standard would one day be
+    written as `inferred` -- which scores *above* `self_declared` (0.7 against
+    0.6), and would let the easy path outrank a candidate who typed the same
+    standards by hand. Suggestion changes how a standard is found, never how
+    well it is evidenced.
+
+    All or nothing. Every slug is resolved and the cap checked **before**
+    anything is written: a batch of eight that lands three, with nothing on
+    screen saying which five were dropped, is worse than a refusal. Does not
+    commit; returns `(added, updated)`.
+    """
+    # Last proficiency wins for a slug listed twice.
+    wanted = dict(items)
+    skills = {
+        skill.slug: skill
+        for skill in await db.scalars(select(Skill).where(Skill.slug.in_(list(wanted))))
+    }
+    unknown = sorted(set(wanted) - skills.keys())
+    if unknown:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Skill not found: {', '.join(unknown)}")
+
+    held = {
+        row.skill_id: row
+        for row in await db.scalars(
+            select(CandidateSkill).where(
+                CandidateSkill.profile_id == profile.id,
+                CandidateSkill.skill_id.in_([s.id for s in skills.values()]),
+            )
+        )
+    }
+    # Only new standards count toward the cap; re-adding one is an edit.
+    new = [slug for slug in wanted if skills[slug].id not in held]
+    current = (
+        await db.scalar(
+            select(func.count())
+            .select_from(CandidateSkill)
+            .where(CandidateSkill.profile_id == profile.id)
+        )
+    ) or 0
+    if current + len(new) > MAX_SKILLS_PER_PROFILE:
+        room = max(MAX_SKILLS_PER_PROFILE - current, 0)
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"A profile may list at most {MAX_SKILLS_PER_PROFILE} skills; "
+            f"there is room for {room} more",
+        )
+
+    for slug, proficiency in wanted.items():
+        existing = held.get(skills[slug].id)
+        if existing is not None:
+            # Re-adding updates the proficiency rather than erroring; that is
+            # what the user means, and it keeps the UI from needing a separate
+            # edit path.
+            existing.proficiency = proficiency
+        else:
+            db.add(
+                CandidateSkill(
+                    profile_id=profile.id,
+                    skill_id=skills[slug].id,
+                    proficiency=proficiency,
+                    # Anything a user says about themselves is self-declared --
+                    # typed or ticked. Only an assessment or certificate may set
+                    # a stronger source.
+                    source="self_declared",
+                )
+            )
+    return len(new), len(wanted) - len(new)
+
+
 async def add_skill(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -128,40 +230,46 @@ async def add_skill(
     proficiency: int,
 ) -> CandidateProfile:
     profile = await get_or_create_profile(db, user_id)
-
-    skill = await db.scalar(select(Skill).where(Skill.slug == skill_slug))
-    if skill is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill not found")
-
-    existing = await db.scalar(
-        select(CandidateSkill).where(
-            CandidateSkill.profile_id == profile.id,
-            CandidateSkill.skill_id == skill.id,
-        )
-    )
-    if existing is not None:
-        # Re-adding updates the proficiency rather than erroring; that is what
-        # the user means, and it keeps the UI from needing a separate edit path.
-        existing.proficiency = proficiency
-    else:
-        if len(profile.skills) >= MAX_SKILLS_PER_PROFILE:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"A profile may list at most {MAX_SKILLS_PER_PROFILE} skills",
-            )
-        db.add(
-            CandidateSkill(
-                profile_id=profile.id,
-                skill_id=skill.id,
-                proficiency=proficiency,
-                # Anything a user types about themselves is self-declared. Only
-                # an assessment or certificate may set a stronger source.
-                source="self_declared",
-            )
-        )
-
+    await _write_skills(db, profile, [(skill_slug, proficiency)])
     await db.commit()
     return await _load(db, profile.id)
+
+
+async def add_skills_bulk(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    items: list[tuple[str, int]],
+    preferred_role_title: str | None = None,
+) -> tuple[CandidateProfile, int, int]:
+    """Several standards in one request, and optionally the role they came from.
+
+    Ticking eight suggested standards is one decision, so it is one request and
+    one commit. The role is recorded as a preferred role because the candidate
+    has just told us their target -- the fact the completeness meter weights
+    highest -- but it is secondary: a duplicate or a full collection is skipped,
+    never allowed to fail the skills it arrived with. Returns the profile and
+    `(added, updated)`.
+    """
+    profile = await get_or_create_profile(db, user_id)
+    added, updated = await _write_skills(db, profile, items)
+
+    title = (preferred_role_title or "").strip()
+    if title:
+        roles = list(
+            await db.scalars(
+                select(CandidatePreferredRole).where(
+                    CandidatePreferredRole.profile_id == profile.id
+                )
+            )
+        )
+        # Check, then insert -- never lean on the unique constraint, whose
+        # IntegrityError would roll back the skills written above.
+        already = any(r.title.strip().lower() == title.lower() for r in roles)
+        if not already and len(roles) < MAX_ROWS_PER_COLLECTION:
+            db.add(CandidatePreferredRole(profile_id=profile.id, title=title))
+
+    await db.commit()
+    return await _load(db, profile.id), added, updated
 
 
 async def remove_skill(db: AsyncSession, user_id: uuid.UUID, skill_slug: str) -> CandidateProfile:

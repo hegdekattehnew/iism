@@ -8,7 +8,7 @@ The output is a *reason structure*, not a number with a sentence attached. The
 interface renders that structure, so the explanation cannot drift away from the
 score it explains.
 
-Five components, and each uses a signal that already exists rather than one
+Six components, and each uses a signal that already exists rather than one
 invented for the purpose:
 
 * **Coverage** — how much of what the job requires the candidate holds,
@@ -20,6 +20,8 @@ invented for the purpose:
   outrank self-declared ones, which is what that column was added for in
   Sprint 4.
 * **Level** — the candidate's attained level against the job's floor.
+* **Experience** — the candidate's years against the job's minimum (Sprint 23).
+  ADR-007 always named experience; until now nothing read it.
 * **Eligibility** — `qp_entry_routes`. Not part of the score: a candidate is
   eligible or they are not, and burying that in a weighted average would hide it.
 """
@@ -48,8 +50,20 @@ MANDATORY_GAP_CAP = 0.45
 # deliberately -- it is the only component derived from what the job actually
 # published about itself.
 COVERAGE_WEIGHT = 0.75
-LEVEL_WEIGHT = 0.15
 EVIDENCE_WEIGHT_SHARE = 0.10
+
+# Experience was carved out of level's 0.15, not added on top. For a candidate
+# who meets both floors, 0.08 x 1 + 0.07 x 1 is the 0.15 x 1 it replaced, so the
+# change is score-neutral for everyone who fits and moves only those who fall
+# short. That identity is what kept all five golden pairs where they were; a
+# test holds it, and it is the thing to preserve when tuning either weight.
+LEVEL_WEIGHT = 0.08
+EXPERIENCE_WEIGHT = 0.07
+
+# Years short of the job's minimum at which the experience component reaches
+# zero. A tapering judgement, not a sourced number: being a year short of three
+# is not the same as having none.
+EXPERIENCE_TAPER_YEARS = 3.0
 
 
 @dataclass(frozen=True)
@@ -111,6 +125,7 @@ class MatchResult:
     missing: list[MissingSkill] = field(default_factory=list)
     missing_mandatory: int = 0
     level_shortfall: Decimal | None = None
+    experience_shortfall: int | None = None
     capped_by_mandatory: bool = False
 
     @property
@@ -134,6 +149,8 @@ def score_match(
     *,
     job_level_min: Decimal | None = None,
     candidate_level: Decimal | None = None,
+    job_min_years: int | None = None,
+    candidate_years: int | None = None,
 ) -> MatchResult:
     """Score one candidate against one job. Pure: no I/O, no clock, no model."""
     if not required:
@@ -212,9 +229,25 @@ def score_match(
             shortfall = job_level_min - candidate_level
             level_score = max(0.0, 1.0 - float(shortfall) / 4.0)
 
+    # Experience fit: the same shape as level. Never a penalty for exceeding
+    # the job's *maximum* -- declining the over-qualified is a hiring decision
+    # this product does not get to make (ADR-037).
+    #
+    # Known limitation, stated rather than hidden: `years_experience` is
+    # NOT NULL DEFAULT 0, so "never filled in" reads as "no experience". It is
+    # not derived from `CandidateExperience` here -- that would be I/O, and this
+    # function stays pure (ADR-036). None means the caller did not say, and is
+    # treated as a fit rather than a zero.
+    experience_score = 1.0
+    years_short: int | None = None
+    if job_min_years and candidate_years is not None and candidate_years < job_min_years:
+        years_short = job_min_years - candidate_years
+        experience_score = max(0.0, 1.0 - years_short / EXPERIENCE_TAPER_YEARS)
+
     raw = (
         COVERAGE_WEIGHT * coverage
         + LEVEL_WEIGHT * level_score
+        + EXPERIENCE_WEIGHT * experience_score
         + EVIDENCE_WEIGHT_SHARE * evidence_score
     )
 
@@ -236,5 +269,6 @@ def score_match(
         missing=missing,
         missing_mandatory=missing_mandatory,
         level_shortfall=shortfall,
+        experience_shortfall=years_short,
         capped_by_mandatory=capped,
     )
