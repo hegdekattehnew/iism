@@ -1,0 +1,12 @@
+{
+  "en": {
+    "title": "Something went wrong",
+    "body": "IISM could not load just now. Try again in a moment.",
+    "retry": "Try again"
+  },
+  "hi": {
+    "title": "कुछ ग़लत हो गया",
+    "body": "IISM अभी लोड नहीं हो सका। थोड़ी देर में फिर कोशिश करें।",
+    "retry": "फिर कोशिश करें"
+  }
+}

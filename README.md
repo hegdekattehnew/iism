@@ -1,47 +1,195 @@
 # Intelligent Integrated Skill Marketplace (IISM)
 
-Workforce Mobility OS — marketplace + intelligence layer for skills, jobs, courses, and
-career progression. India-first, single-sector MVP.
+A marketplace connecting candidates, vocational courses and vocational jobs, with an
+intelligence layer that decomposes all three into NSQF-aligned skills so the system can compute
+what a person is missing for the work they want, and which training closes that gap.
 
-Architecture rationale: [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-Working conventions for this repo: [CLAUDE.md](CLAUDE.md)
+India-first, Hindi and English at launch. See
+[docs/IISM-Product-Definition.docx](docs/IISM-Product-Definition.docx) for what we are building
+and [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md) for the 39 ADRs
+that govern how.
 
-## Status
+## Status — Sprints 1–14 complete
 
-Identity module implemented: authentication (email/password + Google OAuth, JWT
-access/refresh, email verification, password reset) and registration for all actor types
-(Candidate, Employer, Course Provider, Assessment Provider, Government Agency, Platform Admin,
-Super Admin), plus CSV bulk upload and API-key based external intake for candidates. Other
-modules are still skeletons. MVP feature scope beyond identity is being defined next.
+**Sprint 14 — three ways in, one way back.** The homepage asks which of the three you are before it
+asks for a credential: a job seeker signs up with a phone, an employer or a training provider with a
+work email and an organisation name. A provider can now publish courses against the standards they
+teach — the other half of ADR-026, and the reason a provider account previously led to an employer's
+screen with a button wired to nothing. Signing back in is one door that takes either credential and
+routes on what the account holds.
 
-## Stack
+**Sprint 13 — one person, many hats, visibly.** The header carries a context switcher: "Job seeker"
+alongside every organisation you belong to, and picking one changes the navigation, not just the
+page. A candidate can create an organisation without leaving the account they already have, link a
+second way to sign in, and give the organisation a profile a candidate can actually read before
+applying.
 
-Python 3.11 · FastAPI · PostgreSQL + pgvector · Redis · Celery
+**Sprint 12 — the employer becomes a real user.** Register an organisation at
+`/employers/signin` with an email and a six-digit code — no password to set, forget or reset, and
+none for us to store. Post a vacancy by searching the national taxonomy and picking the standards it
+requires, each with an importance and a mandatory flag, then publish it and see ranked candidates
+immediately. One account holds many roles: a candidate can create an organisation from the identity
+they already have, and sign in afterwards by either credential.
 
-## Local setup
+**Sprint 11 — the employer side, and a product you can look at.** The landing page now counts the
+corpus live rather than describing it. `/employers/demo` ranks candidates for a vacancy using the
+*same* scorer that ranks jobs for candidates — run with its arguments swapped — showing who holds
+every mandatory standard, who is exactly one short and which one, and which standards the market
+cannot supply. It is a labelled demonstration: there is no employer sign-in yet, and no candidate
+is ever identified on it. The app is installable, matches render as a coverage bar and a position
+on the NSQF scale, and no route says "coming soon".
+
+**Sprint 10 — matching, and what to do about the gap.** Sign in and open `/matches`: jobs ranked
+by how much of what they need you already have, with the score broken down into what you hold and
+what you are missing, which of those are mandatory, and — for each gap — the courses that close it
+and how many hours that takes. Scoring is deterministic and explainable; no model is consulted.
+`make evaluate` scores it against hand-labelled pairs.
+
+**Sprint 9 — the taxonomy connects.** Every job, course and candidate skill now points at a real
+National Occupational Standard. Open a job and it lists the standards it requires, by code and
+level, each linking to what that standard actually assesses. Search `khoon nikalna` and you reach
+`HSS/N0513`, not a hand-written stand-in — the 149 bilingual aliases were carried across. The 52
+curated skills are retired: hidden from search, kept because profiles reference them.
+
+**Sprint 8 — the national NSQF corpus.** 4,424 qualification packs, 21,303 National Occupational
+Standards, 1,808 occupations and 106 awarding bodies, plus Indian administrative geography — 36
+states, 766 districts, 7,100 sub-districts. Open a standard and see what it actually requires:
+238,370 performance criteria with their marks, 185,559 knowledge parameters, and the
+qualifications that use it with each one's own NSQF level. Open a qualification and see the
+alternative ways in — "12th grade Pass with no experience" or "10th grade pass with three years".
+
+Two honest caveats. The corpus is **English-only**: the source contains no Devanagari, so Hindi
+covers the interface and the 52 hand-curated skills, not the imported ones. And those 52 curated
+skills were kept alongside the national taxonomy, so a handful of concepts exist as two rows.
+
+**Sprint 5 — rich candidate profile.** Work history, education, certifications, languages, target
+roles and preferred locations, plus job preferences and optional personal details. First visit is a
+guided 5-step wizard; after that it is a sectioned editor with a completeness meter that names the
+most valuable thing to add next.
+
+**Sprint 4 — identity and candidate profiles.** Passwordless sign-in with a phone number and a
+6-digit code. Build a profile and declare skills against the taxonomy — search in English, Hindi
+or transliteration. No SMS provider needed in development: the code is returned by the API and
+shown on screen.
+
+**Sprint 3 — marketplace.** 8 organisations, 20 jobs and 20 courses, all bilingual and expressed
+as the skills they require or teach. Open any skill and see both the jobs that need it and the
+courses that teach it — the taxonomy is now a navigable graph rather than a glossary.
+
+**Sprint 2 — skill taxonomy.** 52 bilingual skills, 149 aliases, and search that resolves a
+skill however a real person types it: English, Devanagari, or Hindi in Latin script. Try
+`khoon nikalna` at `/skills` — it finds "Blood sample collection" and tells you why it matched.
+These 52 remain the only skills with Hindi names and aliases; see the Sprint 6 caveat above.
+
+**Sprint 1 — walking skeleton.** Every architectural layer exists and is connected.
+
+| | |
+|---|---|
+| ✅ Postgres 16 + pgvector, Redis 7 | via Docker Compose |
+| ✅ FastAPI, async end to end | health, deep health, demo task endpoints |
+| ✅ Alembic | migration 0001 enables pgvector |
+| ✅ ARQ worker | heartbeat-based liveness (ADR-027) |
+| ✅ Next.js PWA | mobile-first, Hindi + English |
+| ✅ Generated TypeScript client | from the OpenAPI schema |
+| ✅ pytest + testcontainers, CI | disposable Postgres/Redis per run |
+
+**Visible deliverables:** the homepage at `localhost:3000/en` (and `/hi`), browsers at `/skills`,
+`/jobs` and `/courses`, sign-in at `/signin`, the candidate profile at `/profile`, and the System
+Status panel at the foot of the homepage.
+
+The most interesting page is a standard's detail view — try
+`/en/skills/basic-sculptor-and-stone-artist-moortikar-hcs-n1506`. It shows what the standard
+requires (assessable criteria with their marks), the qualifications that use it with each one's own
+NSQF level, and its code, sector and owning body.
+
+Not yet built: Hindi for the imported corpus, semantic similarity and embeddings, résumé builder
+and extractor, organisation/email login, self-serve publishing, a real SMS provider, typed skill
+relations, career paths.
+
+## Prerequisites
+
+- Docker Desktop (running) — Postgres, Redis and MongoDB all run in containers
+- [uv](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Node 24 (`nvm install 24`)
+
+## Setup
 
 ```bash
 cp .env.example .env
-docker compose up -d          # Postgres + Redis
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-alembic upgrade head
-uvicorn app.main:app --reload
+make install
+make up
+make migrate
+make seed
 ```
 
-Health check: `curl http://localhost:8000/health`
+`make seed` loads the skill taxonomy and the marketplace inventory. It is idempotent — run it
+as often as you like.
 
-### Bootstrapping the first Super Admin
-
-`/admin/staff` (for creating more platform staff) requires an existing super admin, so the
-first one must be created directly against the database:
+To load the national NSQF corpus, put it in MongoDB as `iism_nsqf_master_data` and run:
 
 ```bash
-python scripts/create_superuser.py
+make import-nsqf
 ```
 
-## Tests
+Takes about 90 seconds and is idempotent: it upserts on the national codes, keeps only the current
+version of each, and prints a summary with counts plus anything it could not import. Everything
+works without it — you simply get the 52 curated skills instead of 21,303.
+
+The importer deliberately **does not read the `ssc` collection**: it is a portal account registry
+holding personal contact details and bank accounts, and the `sectors` collection supplies the same
+organisations with better coverage and no personal data. See
+[docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
+
+## Run
+
+Three processes, three terminals:
 
 ```bash
-pytest
+make api
 ```
+
+```bash
+make worker
+```
+
+```bash
+make web
+```
+
+Then open **http://localhost:3000** — it redirects to `/en`. All four status cards should be
+green. "Run test task" enqueues a real background job through Redis; the worker picks it up and
+the result appears in the UI.
+
+```bash
+make evaluate
+```
+
+Scores the matcher against hand-labelled candidate/job pairs. Expectations are relative — "a
+candidate holding every mandatory standard outranks one missing it" — so a deliberate change to
+the weights does not read as a regression.
+
+`make help` lists every target.
+
+## Verify
+
+```bash
+make check
+```
+
+Runs Ruff, mypy and the test suite. Tests start their own throwaway Postgres and Redis
+containers, so they never touch your development data and behave identically in CI.
+
+## Notes
+
+- Host ports are **5433** (Postgres), **6380** (Redis) and **27018** (MongoDB) so pre-existing
+  local installs are left alone.
+- MongoDB is pinned to **7.0**. 8.0 will not start on this Docker VM's kernel (SERVER-121912).
+- NSQF levels are `Numeric(3,1)` everywhere, including in Pydantic schemas. The framework uses
+  half-levels and 4.5 alone accounts for 6,780 standards.
+- A level is stated in three places and they are three different facts: the standard's own
+  (`skills.nsqf_level`), the qualification's (`qualification_packs.nsqf_level`), and the level a
+  unit sits at inside a given qualification (`qp_skills.nsqf_level`).
+- The importer is idempotent and takes ~90 seconds. Run it twice and the counts do not move.
+- After changing any API endpoint, run `make gen-api` to regenerate the TypeScript client.
+- Configuration is always read through `get_settings()`. Never bind `settings` at module import
+  time — it cannot then be overridden, and tests silently hit the wrong database.

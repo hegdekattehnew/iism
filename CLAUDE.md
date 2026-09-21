@@ -2,16 +2,21 @@
 
 Guidance for Claude Code (and any future contributor) working in this repository.
 
+> **Start a new session by reading [projectContextForMe.md](projectContextForMe.md).** It carries
+> session-to-session continuity: what has been built, the local machine's quirks, and the gotchas
+> that have already cost time. Update it whenever the shape of the project changes.
+
 ## Project
 
 **Intelligent Integrated Skill Marketplace (IISM)** — evolving toward a **Workforce Mobility OS**.
 
 A marketplace connecting skills, jobs, courses, and assessments, with an intelligence layer
 that matches candidates to opportunities and recommends career paths. India-first,
-single-sector rollout for initial validation (ADR-015).
+multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and English at
+launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(23 ADRs, all `Accepted`). Read it before making any structural decision — the summary below
+(41 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -20,16 +25,16 @@ is a condensed index, not a replacement.
   (AI, graph, scoring). Keep these decoupled — the intelligence layer consumes marketplace
   data, it doesn't own it.
 - **Modular monolith** (ADR-014): one deployable app, organized into clearly bounded modules
-  under `app/modules/`, so it can be split into microservices later without a rewrite. Don't
+  under `api/modules/`, so it can be split into microservices later without a rewrite. Don't
   let modules reach into each other's internals — go through their public interface.
 - **API-first, REST** (ADR-016): no GraphQL for now. Every capability should be reachable via
   a documented REST endpoint, including internal ones consumed by other modules.
 - **Event-driven** (ADR-006): async work (matching, scoring, embeddings) goes through workers,
-  not inline in request handlers. Redis/Celery initially, Kafka is a later migration, not a
-  day-one dependency.
+  not inline in request handlers. Redis + ARQ initially (ADR-027 — ARQ, not Celery, because
+  the app is async end to end), Kafka is a later migration, not a day-one dependency.
 - **Adapter pattern** (ADR-017): every external system (payment providers, assessment
   providers, Aadhaar verification, government systems) sits behind an adapter in
-  `app/adapters/`. Business logic never calls a third-party SDK directly.
+  `api/adapters/`. Business logic never calls a third-party SDK directly.
 - **Hybrid AI** (ADR-005, ADR-018): LLMs (external, not self-hosted/custom-trained) for
   extraction and explanation; deterministic logic for actual decisions (matching, scoring).
   Don't let an LLM call be the thing that decides a match score — it should explain a score
@@ -41,15 +46,18 @@ is a condensed index, not a replacement.
 |---|---|---|
 | Backend | Python + FastAPI | ADR-002 |
 | Database | PostgreSQL + pgvector | ADR-003 |
+| NSQF source of record | MongoDB — raw corpus, projected into Postgres, never read at request time | ADR-034 |
+| NSQF ingestion policy | Selective: the PII-bearing `ssc` collection is never imported | ADR-035 |
 | Embeddings | sentence-transformers, stored in pgvector | ADR-013 |
-| Async / queues | Redis + Celery (→ Kafka later) | ADR-006 |
+| Async / queues | Redis + ARQ (→ Kafka later) | ADR-006, ADR-027 |
 | Cache | Redis | ADR-020 |
 | Search | PostgreSQL full-text search (→ OpenSearch later) | ADR-021 |
 | Auth | Centralized identity service, JWT | ADR-009 |
 | Identity | UUID primary key; Aadhaar optional verification, not primary ID | ADR-011 |
 | Authorization | Permission-based (RBAC now, designed for ABAC) | ADR-012, ADR-022 |
 | Multi-tenancy | Global users + tenant + membership model, from day 1 | ADR-010 |
-| Observability | OpenTelemetry + Prometheus + Grafana | ADR-019 |
+| Logging | Structured JSON to stdout, one shared processor tail | ADR-040 |
+| Observability | OpenTelemetry + Prometheus + Grafana — **deferred, not built** | ADR-019, ADR-040 |
 | Skill taxonomy | NSQF-aligned, framework-agnostic | ADR-004 |
 | Matching | Hybrid deterministic scoring: skill overlap + semantic similarity + experience | ADR-007 |
 | Career paths | Graph-based role transition engine | ADR-008 |
@@ -57,36 +65,101 @@ is a condensed index, not a replacement.
 ## Repository layout
 
 ```
-app/
-  main.py              FastAPI app entrypoint
-  config.py             Settings (pydantic-settings, env-driven)
-  core/                 Cross-cutting: db session, cache, auth/permissions, event bus
+api/                     FastAPI modular monolith
+  main.py                App entrypoint, health, demo task endpoints
+  core/                  Cross-cutting
+    config.py            Settings — ALWAYS via get_settings(), never a module singleton
+    database.py          Async engine, Base, get_db_session dependency
+    cache.py             Async Redis client
+    tasks.py             ARQ worker settings + task registry (ADR-027)
+    health.py            Per-dependency health probes
+    authorization.py     Permissions resolved from membership role (ADR-039).
+                         Ask for a Permission, never a role.
+    logging.py           configure_logging(): one JSON stream for structlog and
+                         stdlib alike (ADR-040). Call once per process.
+    localisation.py      content_translations + locale negotiation (ADR-041). The
+                         API resolves language; the client never picks.
+    redaction.py         The ADR-023 filter. Runs in the shared tail, so no
+                         logger in the process can route around it.
+    middleware.py        Pure ASGI request context: request_id, the access log.
+    text.py              slugify, shared by identity and the NSQF importer
   modules/
-    identity/           Users, tenants, membership, JWT issuance (ADR-009, ADR-010, ADR-011)
-    marketplace/         Jobs, courses, listings, transactions (ADR-001 marketplace layer)
-    skills/              NSQF-aligned skill taxonomy / skill graph (ADR-004)
-    matching/            Hybrid scoring engine (ADR-007)
-    career_paths/        Graph-based role transition engine (ADR-008)
-    intelligence/        LLM extraction/explanation, embeddings (ADR-005, ADR-013, ADR-018)
-  adapters/              External integrations behind adapter interfaces (ADR-017)
+    identity/            Users, tenants, memberships, OTP sign-in by phone *or* email,
+                         credential linking, organisation creation and the organisation
+                         profile (ADR-009/010/011/032/038)
+    marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
+                         the employer's write path and course_publishing.py the provider's;
+                         they are siblings, not one generalisation (ADR-026).
+                         listings.py is what they *do* share: which standards exist,
+                         the refusal of retired ones, slug uniqueness, eager loading.
+    skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
+                         hierarchy.py = AwardingBody → Sector → SubSector →
+                         Occupation → QualificationPack → QpSkill, plus
+                         QpEntryRoute, QpNcoCode, ModelCurriculum;
+                         content.py = what a standard actually says, ~614k rows
+                         (ADR-004, ADR-034). roles_routes.py + role_aliases.py =
+                         role search: a job title to its qualification's standards
+    geography/           State, District, SubDistrict, plus the service that resolves a
+                         written place name on write. Its own module: jobs and
+                         profiles reference it and neither is a skill.
+    matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
+                         scoring.py is pure -- no I/O, no clock, no model. employer.py is
+                         the same scorer run in reverse for the console (ADR-037).
+    applications/        Applying, withdrawing, saving a vacancy, and the employer's
+                         inbox. Holds the product's **one deliberate disclosure**:
+                         a candidate's contact reaches an employer because they
+                         applied, and goes when they withdraw. Depends on
+                         marketplace and matching; nothing depends on it.
+    notifications/       The outbox (ADR-006): queued inside the request, sent by the
+                         worker. The row names a recipient and never holds an
+                         address -- that is resolved at send time.
+    privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
+                         Spans every module; nothing depends on it.
+    analytics/           analytics_events (ADR-025). record() COMMITS.
+
+    Not built. ADR-008's career_paths/ (graph-based role transition) and
+    ADR-005/013/018's intelligence/ (LLM extraction, embeddings) have an ADR
+    each and no code. They were listed here as though they existed until
+    Sprint 15. Everything else in this tree is real; check before assuming.
+
+  adapters/              External integrations behind interfaces (ADR-017)
+    notifications/       NotificationProvider protocol + console impl (the reference)
+    nsqf/                NsqfSource port, Mongo and JSON-file sources, shared document
+                         parsing, normalisation and the importer (ADR-034)
+web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
+  src/i18n/              Locale routing and request config
+  src/messages/          en.json, hi.json — no user-facing string is hardcoded
+  src/components/ui/     The component library — Radix primitives over this project's tokens
+  src/lib/api-schema.d.ts  GENERATED from OpenAPI; never edit by hand
+  public/sw.js           Service worker. Its DENY list is a security boundary, not a cache tweak
+infra/                   docker-compose (Terraform later — ADR-028)
 migrations/              Alembic migrations
-tests/
+tests/                   pytest + testcontainers
 docs/adr/                Architecture Decision Records (source of truth for design choices)
-scripts/
 ```
 
-Each module under `app/modules/` should be internally cohesive (its own models, schemas,
-service logic, routes) and expose a narrow public interface to the rest of the app. This is
+Each module under `api/modules/` is internally cohesive (its own models, schemas, service
+logic, routes) and exposes a narrow public interface via its `__init__.py`. Other modules
+import from `api.modules.<name>` only — never from `.service` or `.models` directly. This is
 what makes the modular-monolith → microservices path (ADR-014) realistic later.
+`api/modules/skills/` is the reference implementation of the pattern; copy its shape.
 
 ## Conventions
 
-- Python 3.11+, fully type-hinted, async FastAPI routes and async SQLAlchemy sessions.
+- Python 3.12, fully type-hinted, async FastAPI routes and async SQLAlchemy sessions.
+- **Never bind config at import time.** Use `get_settings()` inside functions; a module-level
+  `settings = get_settings()` is unoverridable and silently points the engine at the wrong
+  database in tests. **`api/main.py` is the single exception, and the only one admissible**: the
+  app object is assembled once per process and cannot be built without a title, an allowed origin
+  and an environment. What makes it safe is not that it is unavoidable but that it is *tested* —
+  `tests/test_security_hardening.py` boots a fresh subprocess per `ENVIRONMENT` and reads the
+  resulting route table, which is how a guard on the app's own assembly has to be tested. A second
+  module-level binding without that is the thing this rule forbids.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
-  adapter + interface in `app/adapters/`, never a direct SDK call from a module.
-- Secrets and config come from environment variables via `app/config.py` (pydantic-settings),
+  adapter + interface in `api/adapters/`, never a direct SDK call from a module.
+- Secrets and config come from environment variables via `api/core/config.py` (pydantic-settings),
   never hardcoded. See `.env.example` for the expected variables.
 - Anything touching Aadhaar data, resumes, or assessment results must go through the
   encryption path described in ADR-023 — don't persist that data in plaintext, including in
@@ -94,13 +167,777 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - New architectural decisions (new datastore, new auth model, new AI approach, etc.) get a new
   ADR entry in `docs/adr/architecture-decisions.md`, not a silent divergence from the existing
   ones.
+- **Review every autogenerated migration before applying it.** Indexes created with raw SQL are
+  invisible to SQLAlchemy metadata, so autogenerate proposes DROPping them. `migrations/env.py`
+  has an `include_object` guard listing them — add to `MANUALLY_MANAGED_INDEXES` whenever you
+  create an index with `op.execute()`. Alembic also does **not** diff CHECK constraint bodies:
+  widening one is invisible to autogenerate and must be written by hand.
+- **NSQF levels are `Numeric(3, 1)`, never integers.** The national corpus uses half-steps —
+  2.5, 3.5, 4.5, 5.5, 6.5 — and 4.5 alone covers 6,532 skills. Any level that becomes an `int`
+  anywhere in the stack silently excludes 38% of the taxonomy. That includes Pydantic schemas and
+  query parameters, not only columns: widening the column and leaving the schema at `int` returned
+  500 for every affected row while every existing test kept passing.
+- **Output schemas stay permissive; input schemas carry the constraints.** `NsqfLevel` on the way
+  out, `NsqfLevelIn` on the way in. A constraint on a response model turns one odd row into a 500
+  for the entire response.
+- **The exception is a closed set the database itself enforces**, and only while a test says the
+  two agree. Fifteen `Literal` unions sit on output models because a permissive `str` would leave
+  the generated TypeScript client typing every status as `string`. Alembic does not diff CHECK
+  bodies, so a widened constraint is invisible both to autogenerate and to the schema beside it;
+  `tests/test_enumerations.py` compares each union against the constraint on its column and fails
+  on a union with no CHECK at all. Writing it found two — `education_level` and
+  `preferred_employment_type` — closed set in the schema, open column in the database (0017).
+- **A NOS carries its own NSQF level — and so does the qualification, and so does the link
+  between them.** All three are real and different facts. The source names them inconsistently:
+  `nsqf` on a standard, `nsqfLevel` on a qualification. Checking the qualification's spelling
+  against standards returns zero, which is how "a NOS has no level" was once wrongly written into
+  the schema. **Never conclude a field is absent from one collection using another's spelling** —
+  the same trap sits on `type`/`nosType` and `Sectors`/`sectors`.
+- **Sector-local identifiers are not global.** An occupation's `code` *and* its `occupationID` are
+  both scoped to a sector — `"1"` is a different occupation in each of forty sectors. Key on
+  `(sector, ref)`. Assuming the id was global collapsed 1,811 occupations into 529.
+- **Anything from the `ssc` collection is off limits.** It is a portal account registry holding
+  4,027 emails, 4,042 mobile numbers and 50 bank accounts. Sectors and awarding bodies come from
+  the `sectors` collection instead. Nothing in `api/` may read `ssc`.
+- Full record of the source data: [docs/nsqf-source-data-findings.md](docs/nsqf-source-data-findings.md).
+- **Anything touching the NSQF corpus goes through `api/adapters/nsqf/`.** No module imports a
+  MongoDB driver. Document parsing lives in `documents.py` and is shared by every source, so the
+  test fixture exercises the real import path rather than a second reader that can drift from it.
+- **Derived content keys on `(parent, ordinal)`, never the source's own id.** `pcID` repeats within
+  a standard, `kpID` and `skillID` occasionally do. It is deleted and rewritten each import rather
+  than upserted, so anything attached to it later (translations, embeddings) needs its own table.
+- **Free prose columns are `Text`, never `String(n)`.** Two import runs died on `varchar(512)`;
+  occupation names reach 894 characters. Bound only genuine codes and enums.
+- **Review every autogenerated migration for unnamed foreign keys.** Alembic emits
+  `create_foreign_key(None, ...)`, whose generated downgrade calls `drop_constraint(None, ...)` and
+  fails. Twelve appeared across 0011 and 0012.
+- **`make check` passing does not mean the import is right.** It passed while `occupations` held
+  529 rows instead of 1,811. Compare the import report against independently computed expectations.
+- **A model with a cross-module foreign key must import the target module.** SQLAlchemy resolves
+  `ForeignKey("districts.id")` against the metadata, so a script importing `marketplace.models`
+  without `geography.models` fails at mapper configuration. This bit twice in one sprint —
+  marketplace→geography and skills→concepts. Import for the side effect, with a comment saying why.
+- **After mutating a relationship, re-query with `populate_existing=True`.** Without it the
+  instance already in the session's identity map is returned with its stale collection, so the
+  query succeeds and quietly returns the wrong answer. `db.refresh()` does not cascade nested
+  eager loads either — see `api/modules/marketplace/profile_service.py::_load`.
 
-## MVP scope
+## Frontend conventions
 
-Not yet defined in code — this skeleton establishes structure and tooling only. The next step
-is scoping which modules/features are in the first sellable slice (see repo README for status).
-Do not assume every module listed above ships in v1; confirm scope before building out a
-module's business logic.
+- No user-facing string is hardcoded. Everything goes through `next-intl`; both `en.json` and
+  `hi.json` must be updated together (ADR-033).
+- `src/lib/api-schema.d.ts` is generated — run `make gen-api` after changing any endpoint.
+  A breaking backend change should surface as a TypeScript error, not a runtime failure.
+- Mobile-first. The target device is a low-end Android on mobile data.
+- Server state goes through **TanStack Query**, not hand-rolled `useEffect` + `setState`.
+  React 19's `react-hooks/set-state-in-effect` rule treats the hand-rolled form as an error.
+  For anything that must keep polling while the tab is hidden (status boards), set
+  `refetchIntervalInBackground: true` — TanStack pauses intervals on hidden tabs by default.
+- Routes live under `web/src/app/[locale]/`. Every link in the header or footer must resolve;
+  not-yet-built pages render `PlaceholderPage` rather than 404 — and it says *drafting*, never
+  "coming soon", because a visitor reading "coming soon" discounts everything they just saw.
+- Use the primitives in `web/src/components/ui/`. Nothing outside `globals.css` may hardcode a
+  colour; every tone must define both its light and its dark value, or it renders invisible in one
+  theme.
+- **`Card` is the border; `CardBody` is the padding.** A `<Card>` with children and no `<CardBody>`
+  renders its text flush against the border. Sprint 11 rebound the name — the old padded `Card`
+  became `Panel` and `ui/card.tsx`'s unpadded one took the name — without migrating the call sites,
+  so `BrowsePanels` and `Audiences` sat unpadded on the **homepage** for four sprints. Nothing
+  caught it: the import still resolved, tsc passed, the build passed, and no test renders a page.
+  **A rename that keeps compiling is the kind that ships.**
+- **In a card grid, one element must take `flex-1`.** Cards stretch to the row height, so without it
+  a two-line description leaves that card's button floating mid-card while its neighbours' sit
+  lower — the row reads as crooked even though every box is identical.
+- **`divide-y` does not work in this build.** `divide-border-token` resolves the *colour* and emits
+  no border *width* — computed `borderTopWidth` was `0px` on every row of `RoleChooser`, so the
+  list rendered as one undivided block while the class string looked correct in the markup. Use
+  `border-t border-border-token first:border-t-0` on the children instead.
+- **A two-column hero track must be `minmax(0,1fr)`, never `1fr`.** A `1fr` track has
+  `min-width:auto`, so the hero's search row — a `w-full flex-1` input beside an unshrinkable
+  `size="lg"` submit — can force the track past the container. The hero section carries
+  `overflow-hidden`, so the overflow produces **no scrollbar and no error**: the right-hand column
+  silently disappears at some widths.
+- **The hero has a fold budget, and Hindi is the binding case.** `globals.css` sets
+  `html[lang="hi"] body { line-height: 1.7 }`, so Devanagari runs ~15% taller than the same copy in
+  English. Before Sprint 16 the hero's Search button sat below the fold at 360×640 in Hindi while
+  passing in English. Measure `getBoundingClientRect().bottom` of the submit button on `/hi` at
+  360×640 before adding anything above it.
+- **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
+  cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
+  18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,
+  assert on rendered links and text.
+
+## Current state
+
+Sprint 23 (say what you do, and we'll name the standards) is done. It began as "should a CV
+populate the profile?" and found something sharper: **exactly one thing on a candidate profile
+changes a match score** — `candidate_skills` — and the only way to add one was to type a search
+against 21,303 standards named like *"Follow infection control policies & procedures including
+biomedical waste disposal protocols"*. A ward attendant will never type that. Now they type "ward
+boy", tick what they can do, and have matches.
+
+- **Role search is the corpus, not a model.** All 4,424 qualification packs carry a `job_role`
+  (median 6 standards). `GET /roles/search` → `GET /roles/{slug}/standards` is
+  `entry_routes_for_job` reversed. Tiers mirror `_SEARCH_SQL` — exact, prefix, contains, then
+  `0.9 × word_similarity` so a guess can never outrank something typed. Key on the pack's **slug**,
+  never `qp_code` (it contains a slash). One row per role: base code before `-SI` variant, then
+  fewest `/` segments (the SSC's own code over a reissuer's), then most standards; `variants` says
+  what was collapsed. Packs with no standards (84) are never offered.
+- **`role_aliases.py` exists because "ward boy" shares no letters with "General Duty Assistant".**
+  Fuzzy matching cannot bridge that; a list can — the `DISTRICT_ALIASES` move. Values must name a
+  current pack with standards; `unresolved_aliases()` checks them against the real corpus. Point at
+  the general pack, never a disability-track variant, and **check the prefixes of any key you add**
+  — this is a typeahead, so "nurse" reaches the nursing-assistant certificate as a prefix of "nurse
+  aide". The starter list awaits review by someone who knows the labour market.
+- **A ticked suggestion is `self_declared`, never `inferred`.** `inferred` scores 0.7 against 0.6,
+  so routing the easy path through it would reward acquiescence: golden candidate 3 would score 87
+  against candidate 1's 88, one point from failing the ordering that makes evidence outrank
+  self-claims. `_write_skills` is the **one** construction site for a candidate's `CandidateSkill`;
+  single and bulk adds both go through it. Nothing in the picker starts ticked, for the same reason.
+- **Bulk add is all or nothing.** A batch crossing the 60-skill cap is refused whole and writes
+  nothing — eight ticked and three landing, with nothing saying which, is worse than a refusal.
+  The role the candidate named becomes a preferred role, which finally connects the completeness
+  meter's heaviest weight to the core loop.
+- **A profile's location resolves on write.** `update_profile` was a bare `setattr`, and the only
+  writer of `CandidateProfile.state_id` was the NSQF importer's backfill — Sprint 15's bug one table
+  over. Seeded profiles looked fine because the import happened to run after them.
+- **Experience scores; location only orders.** `LEVEL_WEIGHT` 0.15 became 0.08 + `EXPERIENCE_WEIGHT`
+  0.07, which is identical for anyone meeting both floors — `make evaluate` is bit-identical. (In
+  floating point `0.08 + 0.07 != 0.15`; the test uses a tolerance.) Exceeding a job's maximum is
+  never penalised (ADR-037). Locality — district 2, state 1 — is a **tie-break in `match_jobs`**,
+  never in `scoring.py`, because that scorer ranks candidates for employers too and a location term
+  there would rank people by proximity. `CandidatePreferredLocation` finally has a reader.
+- **`skills` and `marketplace` import `analytics` inside the handler.** `analytics` loads its routes,
+  which load `marketplace.models`, which load `skills` — a module-level import is an ImportError at
+  boot. `tests/test_import_order.py` imports every entry point first in a fresh interpreter, because
+  inside the test process everything is already in `sys.modules` and a cycle passes unnoticed.
+- **`migrations/env.py` had been wrong since 0022.** It listed the dropped `ix_skills_name_en_trgm`
+  and not the live `ix_skills_name_trgm`, so the next autogenerate would have dropped the index
+  behind every fuzzy skill search. Verified by autogenerating with the old file.
+- **The homepage search answers a job title with jobs.** It posted to `/skills`, so "General Duty
+  Assistant" returned 24 technical units and no vacancy. `/search` shows open jobs, then job roles,
+  then standards, each linking to its full page with the query kept (`/jobs` now takes `?q=`).
+- **A standard card says where it comes from.** 1,778 names are shared by 4,838 standards — a
+  quarter of the corpus — and two identically named cards could only be told apart by opening them.
+  Browse and search now carry `context` (qualification, awarding body, sector, batched in one query,
+  representative pack chosen by role search's rule), the card shows the NOS code, and same-named
+  results on a page are flagged "compare the codes". Some twins really are near-identical reissues
+  (same qualification name, zero recorded hours); code and level are then all there is, and the card
+  does not invent more.
+- **Migrations freeze their own value lists.** 0024 builds its CHECK with `one_of()` over a tuple
+  written *in the migration*, not the imported `EVENT_NAMES` — importing it would make 0024 produce
+  a wider constraint the day a later sprint adds a name.
+
+Sprint 22.5 (demo readiness) is done. No new product surface: the demonstrable product, made
+demonstrable. The readiness check had found that **all six seeded applications belonged to
+organisations with no members** — which is to say the whole of Sprint 21 could not be shown from a
+cold start, because nobody could sign in and look at an inbox.
+
+- **Every seeded organisation has an owner account.** `hiring@apollo-care.example` and its nine
+  siblings, on the reserved documentation domain so none can be a real mailbox. `_owner_for` in the
+  seed mirrors `provision_organisation` — `User` + `Tenant` + `Membership(role="owner")`, consent
+  recorded, email marked verified — because a seeded organisation that behaves differently from a
+  registered one is a fixture, not a demonstration. **Sprint 12's lesson applied one level up**: a
+  tenant with no membership is invisible to everything that reads one.
+- **Every one of the five employers has an inbox.** Sixteen seeded applications in mixed states
+  across all five, not six across three. MedLife and Swift Logistics had none at all.
+- **Fifty courses, chosen by what the vacancies require.** Thirty new ones, and the count is not the
+  point: **every mandatory standard across the twenty vacancies is now taught by at least one
+  course** — two at worst. Two had **none**, so the gap panel naming them offered nothing:
+  `SSC/N9001` (`time-management`) and `SSD/VSQ/N0104` (`emergency-response-coordination`). The
+  acceptance test is the coverage query, not the number of rows.
+- **`scripts/clean_fixtures.py` names its thirteen slugs explicitly and never deletes an account.**
+  `--dry-run` is the default. Pattern-matching fixture organisations in a database that also holds
+  the owner's own is how a cleanup script becomes an incident.
+- **Malay left the switcher, not the codebase.** `LocaleDefinition.visible`; routing, the messages
+  file and the parity test still carry all three, so `/ms` resolves and the machinery stays proven
+  beyond two languages. One line to reverse.
+- **A missing message key now fails a test.** `employerConsole.matchScore` never existed — the key
+  lives in `matchesPage` — so the employer's inbox rendered the literal string
+  "employerConsole.matchScore" where the score belonged. It compiled, `tsc` was clean, and no test
+  rendered that component. `renderUi` now throws on `MISSING_MESSAGE`, which makes **every** test in
+  the suite a guard against this, and `EmployerInbox.test.tsx` covers the screen itself.
+- **`renderUi` pins `timeZone="Asia/Kolkata"`.** A formatted date must not depend on where the test
+  runs.
+
+Sprint 22 (many languages, and something arrives) is done. The product was bilingual **by
+construction**: 18 `_en`/`_hi` column pairs across 14 tables, 16 `_hi` fields in the API schemas and
+37 two-language ternaries in the client. A third language was a schema migration. It is now an
+entry in one file, a messages file, and rows.
+
+- **The API resolves language; the client never picks** (ADR-041). `Accept-Language`, then an
+  explicit `?locale=`, then the account's `preferred_locale` — which had existed since Sprint 4 and
+  been read by nothing. Responses carry `title`, not `title_en` *and* `title_hi`.
+- **Translations are applied at serialisation, never by assigning to the loaded row.** Several read
+  endpoints call `record()`, which commits, so a translated title on an ORM instance would be
+  written back as though somebody had edited the listing.
+- **`locale` is the one closed set with no CHECK.** Every other one in this project has a
+  constraint; constraining this would put "add a language" back into a migration.
+- **The base column holds the row's own text**, with `source_locale` on jobs and courses saying
+  which language that is. The corpus is English; a vacancy posted in Hindi is source-Hindi, which
+  is why the rebuilt search vectors index the *same* column with both the `english` and `simple`
+  configurations. Postgres still ships no Hindi stemmer.
+- **A generated column blocks dropping what it reads.** `skills`, `jobs` and `courses` each carried
+  a `search_vector` GENERATED over four of the columns 0022 removes, so each had to be dropped and
+  rebuilt — and `ix_skills_name_en_trgm` with them. Migration 0022 was rehearsed against a full copy
+  of the development database before touching it; down and up again restored exactly 52/22/21 Hindi
+  values. **Rehearse anything of this shape.**
+- **Two is the number that hides the assumption.** A Malay skeleton ships as a third locale —
+  navigation translated, everything else visibly English — because a two-locale product proves
+  nothing about a third. A test holds every locale's messages file to the same key set.
+- **Server components run no client middleware.** The three detail pages were asking the API for the
+  default language on a page that was not in it; each passes `accept-language` explicitly now.
+- **Notifications are queued, never sent inline** (ADR-006). An SMTP timeout while somebody applies
+  must not lose the application, and a test applies through a provider that always raises.
+- **The outbox row names a recipient and never holds an address.** It is resolved at send time, so
+  contact details stay out of a dumped table and out of any log line (ADR-023) — and erasure deletes
+  notifications explicitly, because there is no foreign key to cascade from.
+- **`Tenant.contact_email` is usually empty.** Registration puts the address on the `User` who
+  registered; the organisation profile is where that field is filled in, and most never are. Sending
+  to an organisation falls back to its owner. Do **not** "fix" this by copying the registrant's
+  address into `contact_email`: that field is the organisation's stated inbox, and filling it in on
+  somebody's behalf publishes a personal address they never offered.
+
+Sprint 21 (the loop closes) is done. For twenty sprints the product could **compute** an outcome and
+not **produce** one: a candidate saw ranked vacancies with no button, and an employer saw a pool it
+could not reach. A candidate now applies, withdraws and saves; an employer sees who applied, with
+the contact details to act on it.
+
+- **Applying is the product's one deliberate disclosure, and the candidate makes it.** ADR-037's
+  "no employer-facing payload identifies a candidate" still holds for every *pool* and *ranking*
+  endpoint. An application is the single exception: the name and contact reach **that** employer,
+  for **that** vacancy, recorded as `contact_shared_at` (DPDP Act 2023). Withdrawing sets
+  `contact_revoked_at`, keeps the row and takes the details back, and a withdrawn application
+  cannot be moved along (409) — otherwise shortlisting would put contact back on screen by a side
+  door.
+- **`candidate_card()` is the only construction site for the de-identified payload**, exported from
+  `matching` and used by both the pool and the inbox. That invariant is a property of one function;
+  a second copy is how it stops being true. A test asserts the pool still names nobody.
+- **`score_profiles()` scores named applicants through the same `score_match`.** An applicant need
+  not be in the retrieved pool — anyone may apply, and refusing the under-qualified would be a
+  hiring decision this product does not get to make. **Do not add a second scorer** (ADR-037).
+- **`matching` imports `applications` lazily, inside the counting function.** The two import each
+  other; this is the fix `core/authorization.py` already uses. The failure is an ImportError at
+  boot, not a wrong answer. *(This entry claimed a test asserted both import orders; none did until
+  Sprint 23's `tests/test_import_order.py`.)*
+- **Applying is gated by `get_current_candidate`**, so pressing Apply can never create a candidate
+  profile for an organisation-only account — and the interface offers that account no button at all,
+  rather than one that always fails.
+- **A row you just created has no loaded relationship.** `save_job` returned the new `SavedJob` and
+  the handler touched `.job`: a lazy load in async context, `MissingGreenlet`, a 500. It passed in
+  one test file only because that job was already in the identity map. Re-query with
+  `populate_existing` before returning anything a handler will serialise.
+- **The analytics CHECK is generated from `EVENT_NAMES` with `one_of`.** It was spelled out beside
+  the tuple as a literal and drifted the moment four names were added. Migration 0020 widens the
+  database's copy; the model no longer has a second copy to drift.
+- **A rolling 24-hour cap on applying** (`MAX_APPLICATIONS_PER_DAY`, default 50) answers patient
+  spraying, which the per-minute write limiter does not. Counted over 24 hours, not a calendar day,
+  so it cannot be doubled by waiting for midnight.
+- **A listing renders the Hindi title when there is one.** `/hi/applications` shipped showing
+  English titles on a Hindi page because the new list read `title_en` unconditionally; every other
+  listing in `web/src` already picked by locale. Found in the browser, not by a test.
+
+Sprint 20 (safe to deploy) is done. No new product surface: the non-functional requirements that
+need no outside account — privacy law, web security, abuse protection, recovery, quality gates —
+closed before the first deployment in Sprint 21.
+
+- **Consent is a server-side record, not a checkbox.** `users.consent_version` / `consented_at`
+  (0018) hold which notice was agreed and when; a checkbox the API never hears about proves
+  nothing. Nullable and **not backfilled** — writing a version into old rows would fabricate
+  consent nobody gave. `PRIVACY_NOTICE_VERSION` lives in **both** `api/core/config.py` and
+  `web/src/lib/legal.ts`; a test compares them, because drift makes every signup fail with 428.
+  Change both together, and only when people must agree again.
+- **The phone path asks for consent *after* the code, never before.** Verification creates the
+  account, so an unknown number without the current version gets 428 `consent_required` — after
+  the code proves the caller holds the phone. Asking earlier would answer "is this number
+  registered?" to anyone (ADR-038). Org registration checks it up front, before any lookup, so the
+  answer is the same for a known and unknown address. **Sign-in never creates an account**: the
+  428 is shown as "no account yet — sign up".
+- **`api/modules/privacy/` depends on every module and nothing depends on it.** Export and erasure
+  span identity, the profile, listings and analytics; letting any of those reach into the others
+  would break ADR-014. Erasure deletes table by table rather than trusting cascades, clears
+  `analytics_events.user_id` (the events identify nobody once the account is gone), and revokes
+  refresh tokens **after** the commit. The only owner of an organisation others belong to is
+  **refused** (409) — deletion never leaves an organisation nobody can run.
+- **Hardening is middleware, for the Sprint 15 reason** — a guard each handler must remember is one
+  that eventually is not there. `SecurityHeaders`, `BodySizeLimit` and `RateLimit` are pure ASGI
+  like `RequestContextMiddleware`. **The limiter fails open**: an unreachable Redis must not become
+  an unavailable platform. Signed-in callers count per account, anonymous ones per IP, because
+  carrier-grade NAT puts many strangers behind one address. **`X-Forwarded-For` is ignored unless
+  `RATE_LIMIT_TRUST_FORWARDED=true`** — honouring it from anyone lets a client pick a fresh identity
+  per request; set it only behind the ALB. Tests disable the limiter in `conftest.py`; its own
+  tests switch it back on.
+- **`/docs` and `/openapi.json` exist in local environments only.** `make gen-api` reads the local
+  one. CORS no longer grants credentials — auth is a bearer header and no route uses a cookie.
+- **A 15-second statement timeout applies to every connection.** The seed, evaluate and
+  import-nsqf targets run with `DB_STATEMENT_TIMEOUT_MS=0`; a new long-running script needs the same.
+- **The web CSP ships report-only**, and still allows `'unsafe-inline'` scripts: Next's inline
+  bootstrap carries no nonce on statically rendered pages, and nonces force dynamic rendering.
+  Enforcing it is a deliberate trade against static rendering, not a header rename. Verified clean
+  in the browser console; switch the header name once a production build is clean too.
+- **A detail page calls `notFound()` only on a 404.** Every failure used to land there, so an API
+  outage told visitors the listing did not exist. `error.tsx` says "unavailable"; `global-error`
+  reads `messages/fatal.json` rather than both full catalogues.
+- **Form controls use `border-input-border`, not `border-border-token`.** The shared border is
+  1.23:1 on white — fine for a card, a WCAG 1.4.11 failure for an input you must find to type in.
+- **`a11y.test.tsx` runs axe with `color-contrast` off** — jsdom has no layout, so it would pass
+  everything. It includes a case proving axe *does* report a violation; keep it.
+- **The employer overview costs the same for one vacancy or forty.** It scored per job: 18
+  statements for one, 57 for four. `_candidates_for_jobs` batches; a test counts statements.
+- **Backups are encrypted and live outside the tree** (`~/iism-backups`, `IISM_BACKUP_PASSPHRASE`),
+  and MongoDB is finally covered. `make restore-drill` restores both into scratch databases and
+  compares exact counts — run and passed 2026-09-11. See `backups/README.md`.
+- **CI installs from `uv.lock` (`--locked`)** and audits both dependency trees; Dependabot opens
+  grouped weekly updates; a first-load JS budget (700 KB) runs after the build.
+
+Sprint 19 (every door opens onto all three) is done. `/signup/[type]` rendered exactly one form,
+fixed by the URL: arrive at `/signup/seeker` — from the chooser's first row, a bookmark, a typed
+address — and the page offered phone registration and nothing else, so an employer or a training
+provider who landed there had to find the Back button.
+
+- **The registration page carries its own type switch** (`SignUpTypeSwitch`): *Find work · Hire ·
+  Offer training*, framed as what you are here to do, like `RoleChooser`. **Plain links, not a
+  client toggle** — the type is still in the URL, so `/signup/employer` stays linkable from the
+  audience pages; switching needs no JavaScript on the target device; and `replace` keeps three taps
+  from becoming three Back presses.
+- **`SignUpForm` is keyed by `type`.** Switching reuses the same route with a new param, and without
+  the key React keeps the form's state — a phone number typed as a job seeker reappears in the
+  employer's email field, and a code already sent stays on screen. Verified in a browser: type a
+  number, switch to Hire, and the email field is empty.
+- **`/signup` stays the neutral entry** — the header, the closing band and sign-in all point there.
+  The switch is for people who arrived at a specific type and meant another.
+
+Sprint 18 (one identity, honestly) is done. Three defects found by hand in one sitting were one
+defect: the product models three actor types and one identity holding several roles, and the
+interface assumed the job-seeker case. A scan found seven more of the same family.
+
+- **`POST /auth/org/register` never mints a second account for a signed-in caller.** It ignored who
+  was calling, so a candidate who opened `/signup/employer` and typed a work email became two
+  `User`s — the fork ADR-038 exists to prevent. Sprint 13 documented it, removed the button and left
+  the route open; Sprint 16's homepage `RoleChooser` then put a more prominent button back. The
+  route takes `get_optional_user`: signed in, the organisation becomes a second *membership*.
+  **Guard the route, not the button** — a public page will always find its way back to a public
+  endpoint.
+- **A signed-in surface branches on membership, never on "signed in" alone.** `get_current_user`
+  answers *is someone signed in*; `get_current_candidate` answers *did they sign up to look for
+  work*, and gates `/me/profile*` and `/me/matches*`. Before it, an organisation-only account that
+  opened `/profile` had a `CandidateProfile` created and committed by `ensure_profile` and was walked
+  into the candidate wizard. `ensure_profile` stays lazy — for candidates who have not got round to
+  it, not for accounts that never asked.
+- **What a sign-in reveals, it reveals on *verify*, never on request.** `SignInOut` carries
+  `created` and `organisation_slug`; the caller has just proved they hold the phone or mailbox, so
+  nothing is disclosed that their own messages would not. `OtpRequestResponse` still carries
+  nothing, and the request-time oracle stays shut (ADR-038). `created` had been computed and
+  thrown away by the route while its docstring claimed a client read it.
+- **A known address registering a new organisation keeps the name it typed.** Held in Redis at
+  `auth:pending_org:{address}` and provisioned on the existing account at verification — never at
+  request time, which would let anyone who knows an address attach an organisation to someone else.
+- **The header's profile slot follows the context.** `AuthNav` rendered "My matches" / "My profile"
+  for every signed-in identity; inside `/employer/{slug}` it now offers **Organisation profile**,
+  and an organisation-only account never sees the job-seeker side anywhere. `nav.settings` is gone
+  from `ORG_NAV` because that control *is* the organisation profile. `Header` renders no org nav
+  until it knows the org's type — `ORG_NAV[orgType ?? "employer"]` flashed "Vacancies" at providers.
+- **Landing lives in one pure function**, `landingFor` in `web/src/lib/context.ts`. Sign-in sent
+  every dual-role person to `/matches` and `.find()`-ed an unordered `memberships` array for everyone
+  else, while a comment claimed "newest". The last-used context is remembered in localStorage as a
+  *preference*, honoured only if this account still holds it — which is what makes it safe on a
+  shared phone.
+- **`web/` has a test runner.** `npm test` (Vitest + Testing Library) runs in CI. Tests mock exactly
+  three seams — `@/lib/auth`, `@/lib/org`, `@/i18n/navigation` — through `src/test/harness.tsx`,
+  because *who is signed in, what they hold and which URL they are on* is what varied in every
+  defect. Proved non-vacuous by swapping the pre-sprint components back in: 10 of 15 fail. The
+  provider-nav test passes against the old code once memberships have loaded — the *loading-state*
+  test is the one that detects that defect; do not delete it as redundant.
+- **Never gate a commit on `make check | grep`.** The pipeline's exit status is `grep`'s, so
+  `make check | grep … && git commit` committed a failing lint this sprint. Capture `make check`'s
+  own exit code and branch on that.
+
+Sprint 17 (logging you can run a customer on) is done. One JSON stream on stdout, a redaction
+filter that cannot be bypassed, and a request id, user id and tenant id on every line.
+
+- **`Card` is the border; `CardBody` is the padding** — see the frontend conventions above.
+- **The redaction filter is a processor, not a convention.** ADR-023 always specified "an explicit
+  redaction filter"; there wasn't one. It sits in the **shared processor tail**, which is the only
+  position that covers both structlog and `logging.getLogger()`. It **masks, never drops and never
+  raises**: dropping deletes the evidence you need to find the leaking call site, and raising fires
+  inside `Handler.emit` where `logging.raiseExceptions` swallows it to stderr. Touched records are
+  marked `redacted=True`, so one query enumerates every leak.
+- **Never use `structlog.processors.dict_tracebacks`.** Its `ExceptionDictTransformer` defaults to
+  `show_locals=True`, and `code = generate_otp()` is a plain local in four functions in
+  `identity/service.py` — any raise beneath them would write a live OTP into the log. The
+  configuration passes `show_locals=False` and a test asserts both that ours does not leak and that
+  the default recipe *does*.
+- **A redaction pattern must be narrow enough not to eat a timestamp.** The obvious phone regex
+  `\+?\d[\d\- ]{8,14}\d` matches `2026-09-10` and rewrites it to `20260910` — and `timestamp` is
+  on every line, so the loose form corrupts the whole stream and marks every record redacted.
+- **`RequestContextMiddleware` is pure ASGI, not `BaseHTTPMiddleware`.** The latter runs the app in
+  a child task and anyio *copies* the context, so `bind_contextvars` inside `get_current_user` and
+  `_context_for` — both dependencies, both downstream — would be invisible when the access line is
+  written. Every access line would be anonymous. **Do not convert it.**
+- **Log the route template, never the path.** `/org/{org_slug}/jobs`, not the interpolated slug: a
+  customer's name in every line is both a leak and a new CloudWatch field value per request. An
+  unmatched path falls back to a constant, so a 404 flood cannot become a cardinality flood.
+- **The worker's entrypoint is `api/worker.py`.** ARQ's CLI imports the settings module and *then*
+  runs its own `dictConfig`, so configuring at import time is clobbered and every line is emitted
+  twice. The Makefile also passes `--custom-log-dict`, because ARQ logs two lines before any hook
+  exists.
+- **`arq.worker` is pinned to WARNING.** The 5-second heartbeat cron emitted ~34,560 INFO lines a
+  day. At WARNING what survives is exactly the signal: job raised, retries exceeded, job expired,
+  function not found, deserialisation failed.
+- **An authorization denial is logged.** `_context_for`'s 404 and `require`'s two 403s were silent,
+  so a multi-tenant product could not answer "who was refused which organisation". What the log may
+  say and what the response may say are different questions — the caller still gets the same
+  uninformative 404.
+
+Sprint 15 (consolidation) is done. No new product surface: four unpushed sprints reached the
+remote, the tree lost what earned nothing, and the documents were made to agree with the code. What
+it found is more useful than what it deleted.
+
+- **`record()` raised.** Its docstring says "Never raises" and its unknown-name guard called
+  `log.warning("analytics.unknown_event", event=name)` — structlog's bound logger takes the first
+  positional argument as `event`, so the keyword collided and raised `TypeError`, from *above* the
+  `try/except` that exists to absorb exactly this. The same collision sat in the `except` branch,
+  where it would have raised out of the handler whose whole job is to swallow. `analytics/` had no
+  test file; writing one found it in the first run. **Measurement must never be the reason a page
+  fails, and for two sprints it could have been.**
+- **A guard a handler must remember to call is one that eventually is not called.** Three of the
+  eight publishing writes shipped without the tenant-type check while this file asserted all eight
+  had it. The fix was structural: `require(Permission.JOB_UPDATE, "job")` now asks both questions in
+  one declaration and `require_publisher_of` no longer exists as a separate function. Never
+  reintroduce the separate form.
+- **A closed union on an output model is safe only while a test says the CHECK agrees.**
+  `tests/test_enumerations.py` compares all fifteen against their constraints and found two columns
+  with no constraint at all. See the convention above; migration `0017` closes them.
+- **`api/modules/marketplace/listings.py` is the shared *policy*, not a shared entity.** ~22
+  byte-identical lines of standard-existence and retired-row validation lived in both publishing
+  modules with **no test in either copy** — the most drift-prone construct in the pair, and the one
+  thing ADR-026 explicitly requires both paths to agree on. The merge rules stay apart, because
+  those genuinely differ.
+- **The seed now resolves geography itself.** It wrote jobs with a NULL `state_id` and relied on
+  `_backfill_geography` inside `make import-nsqf` — but the seed *requires* the import to have run
+  first, so the documented order is import → seed and the backfill fired **before the rows it
+  needed to fix existed**. A clean `make import-nsqf && make seed` left every seeded job findable
+  at `/jobs` and invisible to `match_jobs(state_id=…)`. Proved by clearing the FKs on 11 seeded
+  jobs and re-running the seed alone: 11 unresolved before, 1 after.
+- **`DISTRICT_ALIASES` exists twice and now has a test saying so.** The geography service's copy
+  and the importer's, with a comment admitting the duplication and nothing enforcing it.
+- **The dev panel moved to `/status`**, which `notFound()`s in production and is linked from
+  nowhere. It was rendering unconditionally below the fold on the landing page, captioned "Not part
+  of the product surface", over a live Postgres/Redis/worker grid.
+- **37 message keys were dead**, `orgAuth` entire — orphaned when Sprint 14 deleted
+  `OrgSignInForm.tsx`. Three rounds of the audit produced false positives before the real number:
+  template-literal prefixes split on `.`, and two `useTranslations` bindings in one file were stored
+  in a dict keyed by variable name, so the second silently overwrote the first. **Do not delete an
+  i18n key on a grep alone.**
+
+Sprint 14 (three ways in, one way back) is done. The homepage offers three
+registration paths, a training provider can finally publish courses, and sign-in is one door that
+takes either credential.
+
+- **Registration is type-aware; sign-in is not.** ADR-032's rule that the *credential* follows the
+  actor type still governs signup. But one identity can hold both credentials and several roles, so
+  at sign-in the credential no longer says who you are — `/signin` detects an `@` and routes on what
+  the account holds. Two doors would ask a question the account can already answer.
+- **`api/modules/marketplace/course_publishing.py` is a sibling of `publishing.py`, not a
+  generalisation.** A `JobSkill` carries importance and mandatory because a match is scored against
+  them; a `CourseSkill` carries only `level_taught`. Duplicates therefore collapse on the **highest
+  level**, not the strongest signal — the seed's own rule. Do not merge the two modules.
+- **A write route declares what it publishes, and the dependency asks both questions.**
+  `require(Permission.JOB_UPDATE, "job")` checks the permission *and* the tenant type, because
+  membership answers *may this person act here*, never *is this the right kind of organisation*.
+  The two were separate until Sprint 15 — a `require(...)` in the signature and a
+  `require_publisher_of(...)` call in the body — and three of the eight publishing writes shipped
+  without the second while this file asserted all eight had it. **A guard a handler must remember
+  to call is one that eventually is not called.** Never reintroduce the separate form.
+- **`/org/{slug}/candidates` requires an employer.** It used to answer 200 to a provider with two
+  empty arrays and `candidates_total`, which has no tenant filter — so the only number on screen was
+  a global count of every candidate on the platform, presented as a pool they could reach.
+- **Every mutation that can 403 needs an `onError`.** `EmployerWorkspace.save` had only `onSuccess`,
+  so a provider filled in a whole vacancy, pressed save, and the form sat there having silently done
+  nothing. That is worse than the 403.
+- **The header nav and the workspace heading both follow `tenant_type`.** Nothing in `web/src` read
+  it before, which is why a training provider was shown "Vacancies" and "Post a vacancy against the
+  National Occupational Standards".
+- **"Job seeker" appears only for an account with a personal membership.** An organisation-first
+  signup creates no personal tenant, and offering it a job-seeker context it never chose is the
+  assumption this sprint removed. That is also the personal tenant's first real job — it had been
+  written once and read nowhere since Sprint 4.
+- **`useMemberships` returns every organisation, not just employers.** Filtering to employers
+  dropped providers out of the switcher, so one created through `CreateOrgForm` was navigated into a
+  workspace it could never return to.
+- **No migration.** `tenant_type` already permitted `course_provider`, `Course.status` already had
+  the draft/published CHECK, and `CourseSkill.level_taught` already existed.
+
+Sprint 13 (multi-tenancy you can see) is done. A signed-in person switches between "Job seeker" and
+each of their organisations from the header, creates an organisation without leaving their account,
+links a second credential, and edits the organisation's public profile.
+
+- **A personal workspace is not an organisation** (`ORGANISATION_TYPES` in
+  `api/core/authorization.py`). Every candidate is `owner` of a personal tenant, so before this
+  filter `_context_for` resolved their own personal slug as an org context and `owner` carried
+  `JOB_CREATE`, `JOB_PUBLISH` and `CANDIDATE_SHORTLIST` — any candidate could read the employer
+  console's aggregate pool and publish a vacancy as "Personal workspace". Verified 200 before, 404
+  after; `tests/test_organisations.py` guards it.
+- **Membership answers *may this person act here*, not *is this the right kind of organisation*.**
+  A job needs an `employer`, a course a `course_provider`; nothing enforced this before. The check
+  arrived here as a separate `require_publisher_of` call and was folded into `require()` itself in
+  Sprint 15, after three of eight writes turned out never to make it — see that sprint's entry.
+- **The switcher lives in the header, not in a page.** A switcher inside `EmployerWorkspace` could
+  not be reached from the one screen that most needs it — its "no access" branch returns first — and
+  `/employer/{org}` had no inbound link from anywhere a signed-in person could already be.
+- **Context is derived from the URL, never stored.** `useActiveOrg()` reads
+  `/employer/{slug}` from the path. Same rule as ADR-038 applies server-side, so the interface can
+  never believe a context the API would refuse, and two tabs can be two organisations.
+- **Creating an organisation must go through `POST /me/organisations`**, which adds a *membership*.
+  The cold `/auth/org/register` path creates a **new `User`** for an unknown address — correct for a
+  stranger, and a duplicate account for someone already signed in.
+- **`qc.clear()` on sign-out.** The `QueryClient` is created once per browser session, so without it
+  the previous person's profile, matches and memberships render to whoever signs in next. Same
+  concern as the service worker's DENY list, one layer up.
+- **`contact_email` is deliberately absent from `TenantOut`**, which is embedded in every public
+  `JobOut` and `CourseOut`. Anything added to that model is published to whatever scrapes `/jobs`;
+  `OrganisationOut` is the members-only view.
+- **`is_verified` is set by an operator, never the organisation.** It is absent from
+  `OrganisationIn`, so no request shape can set it — as are `slug` (a published URL) and
+  `tenant_type` (changing it would strand listings already published under it).
+- **`api/core/authorization.py` imports identity's models lazily**, inside `_context_for`, because
+  `api/modules/identity/` now imports it back for the organisation routes. Same cycle
+  `get_current_user` avoids the same way.
+
+Sprint 12 (one identity, many roles) is done. An employer registers by email, posts a vacancy
+against real National Occupational Standards, publishes it, and sees ranked candidates — and the
+console finally ships to production, because it is behind something.
+
+- **One `User`, many `Membership` rows** (ADR-038). A candidate can create an organisation from
+  their existing identity and link a second credential; both organisation paths land in the same
+  state. **Never fork an account by actor type** — a person is a candidate *and* a hiring manager,
+  and two accounts would split their history permanently.
+- **The active tenant is named by the request and granted by the membership**, never carried in the
+  token. Switching workspaces must not re-issue tokens, one person may hold two tabs as two
+  organisations, and a claim in a 15-minute token outlives a revoked membership.
+- **A tenant you are not a member of is a 404, never a 403.** A 403 confirms the organisation
+  exists, so an employer could enumerate competitors by guessing slugs. An insufficient *role*
+  inside an organisation you do belong to is a 403 — existence is not news to you there.
+- **`api/core/authorization.py` is the only authorization primitive** (ADR-039). Ask for a
+  `Permission`, never a role. `Membership.role` had been written once and read nowhere for eleven
+  sprints; do not add ad-hoc role checks beside this.
+- **Organisations sign in by email OTP, not password** (ADR-038, superseding ADR-032's org half).
+  There is no password anywhere in the product and no hashing dependency; `hash_secret` is
+  HMAC-SHA256 with no work factor and **must not** be repurposed for one.
+- **OTP keys carry their channel**: `auth:otp:{channel}:{identifier}`. Without it a phone and an
+  email could share a code, an attempt counter and a request budget.
+- **Registering a known address sends a sign-in code and creates no second organisation.** The
+  earlier "you already have an account" note made the two responses differ by one field whenever
+  `expose_otp` was on — a readable enumeration oracle. A test asserts they are indistinguishable.
+- **`EmailProvider` is its own port**, not a second method on `NotificationProvider`. Different
+  vendors, different compliance (DLT applies to SMS alone). `ConsoleEmailProvider` refuses
+  production, like its sibling.
+- **`Job.status` defaults to `"published"` in the model**, so `create_job` sets `draft` by hand. A
+  create path that forgets puts an unfinished listing in front of candidates; a test guards it.
+- **A job with no required standards cannot be published.** Matching scores concept overlap, so it
+  would be published and permanently unmatchable.
+- **Geography resolves on write**, in `api/modules/geography/service.py`. It used to happen only in
+  the NSQF importer's backfill, so an API-created job had a NULL `state_id` and was invisible to
+  `match_jobs(state_id=…)` while still appearing at `/jobs`.
+- **`Button` defaults to `type="button"`**, inverting the HTML default. The standards picker's Add
+  button sat inside the job form and silently saved a half-written vacancy instead of adding a
+  standard. Submitting is the special case and every form says so explicitly.
+- **next-intl reads a dot as a namespace separator.** `"employment.full_time"` as a flat key renders
+  as the literal key; it has to be a nested object.
+- **The demonstration console mounts in local environments only** — an allowlist. The previous guard
+  compared against `"production"` alone, which mounted an unauthenticated reader of the candidate
+  pool on `staging`, on CI, and anywhere `ENVIRONMENT` was unset. `/health` reports whether it is on.
+
+Sprint 11 (make it sellable) is done. There is a component library, the landing page proves the
+scale of the corpus from live counts, the employer console ranks candidates for a vacancy, the app
+is installable, matches render as a picture rather than a list, and no route says "coming soon".
+
+- **`api/modules/matching/employer.py` is the same scorer with its arguments swapped** (ADR-037).
+  `score_match` does not care which side of the pair the query started from. **Do not add a second
+  scoring implementation** — two scorers drift, and once they disagree about one pair neither
+  number can be defended.
+- **The employer console refuses to mount in production.** `mount_employer_console` returns `False`
+  outside development, mirroring `ConsoleNotificationProvider`. It is unauthenticated and it reads
+  the candidate pool; a test boots the app in both environments and asserts the route is present in
+  one and absent in the other.
+- **No employer-facing payload identifies a candidate.** Reference, headline, district, years and
+  the gap — never a name, phone, email or user id. Nor may an analytics payload carry one.
+- **Adding an analytics event needs a hand-written migration.** Alembic does not diff CHECK
+  constraint bodies, so a name added to `EVENT_NAMES` alone is accepted by the model and rejected
+  by the database — and `record()` swallows its own failures, so the only symptom is events that
+  silently never appear. Migration `0015` is the pattern.
+- **`web/src/components/ui/` is the component library**, built on Radix primitives and this
+  project's own tokens. The shadcn CLI was tried and reverted: it installs a second dark-mode
+  mechanism (`.dark` class) beside the `prefers-color-scheme` one already in use, 62 duplicate
+  oklch colour tokens, and a font override. Its own docstring records this.
+- **`buttonVariants` lives in `button-variants.ts`, which has no `"use client"`.** Exporting a cva
+  from a client module breaks prerendering of every server component that styles a button —
+  `Attempted to call buttonVariants() from the server`.
+- **Charts render `MatchOut` fields and compute nothing.** The moment a picture derives its own
+  number it can disagree with the score it claims to explain. The one exception is
+  `required − shortfall` in `LevelScale`, which is the scorer's own identity run backwards.
+- **The service worker's DENY list is a security boundary, not an optimisation.** `/me/`, `/auth/`,
+  `/employer/`, `/matches`, `/profile`, `/signin` and anything carrying an `Authorization` header
+  are never cached: a stale match would show a gap already closed, and cached profile data on a
+  shared phone is an ADR-023 problem. `tests/test_pwa_assets.py` asserts it.
+- **The worker registers in production builds only.** In development it would cache hashed chunks
+  that hot reload then replaces. Installability is demonstrated from `npm run build && npm start`.
+- **Icons were generated with `qlmanage -t -s 512`**, which honours the SVG's `width`/`height`
+  attributes rather than the viewBox — a 64px source renders 64px in the corner of a 512 canvas.
+  The sources are square-background SVGs sized 512; the maskable one has no rounded corners,
+  because the launcher applies its own mask and a rounded source is cropped twice.
+- **Twenty seeded candidates, not five.** Most vacancies now have someone fully eligible beside
+  someone missing exactly one mandatory standard, because "who is nearly qualified?" is the first
+  question an employer asks and a pool with no near-misses cannot answer it. The original five
+  remain first in the list and unchanged — the golden set is asserted against them.
+
+Sprint 10 (matching and the gap) is done. A signed-in candidate opens `/matches` and sees ranked
+jobs with a score they can interrogate, the gap named standard by standard, courses that close
+that specific gap, and how to become qualified.
+
+- **`api/modules/matching/scoring.py` is pure and must stay that way.** No I/O, no clock, no model
+  (ADR-036). A score has to be defensible to an employer and reproducible against the golden set,
+  and neither survives a generated number.
+- **A missing mandatory standard caps the score at 45, it does not zero it.** A candidate one
+  standard short of a strong match needs telling, not hiding.
+- **Zero matched standards scores zero**, deliberately. Letting the level and evidence components
+  through alone gave every job in the catalogue a small non-zero score for everyone.
+- **Matching compares at concept level**, which is the whole reason Sprint 9 built that table.
+- **The candidate profile is created lazily, and `/me/matches` creates it too.** It used to 404 for
+  anyone who had not opened `/me/profile` first, which the interface renders as its error state —
+  so every new candidate arriving at matches first was told something had gone wrong instead of
+  being shown the "add your skills" prompt `has_skills` exists for. `ensure_profile` is the single
+  creation path and commits its own write, which is what keeps `record()`'s contract intact.
+- **`record()` commits.** `get_db_session` never commits, so a merely-flushed event is discarded
+  when the request ends — which is exactly what happened the first time this was wired up. Call it
+  only from handlers with no other uncommitted work.
+- **`make evaluate` runs the golden set.** Expectations are *relative* — "this candidate outranks
+  that one" — never absolute scores, or every deliberate weighting change looks like a regression.
+
+Sprint 9 (connect the graph) is done. The national taxonomy is now the operational vocabulary:
+every job, course and candidate skill points at a real National Occupational Standard, and the 52
+hand-curated Sprint 2 skills are retired.
+
+- **`skill_concepts` groups rows that mean the same thing** — same awarding body + same normalised
+  name + same level, giving 18,958 concepts from 21,303 rows. Derived and rebuilt by the importer
+  on every run, like `qp_count`. Never edit it by hand. Level and body stay in the key: 576
+  duplicate groups span levels and 174 cross bodies, and merging those would assert something
+  untrue. Matching will score at concept level so a candidate and a job need not have picked the
+  same row.
+- **`scripts/legacy_skill_map.py` is the single place the old vocabulary maps to the new.** Job and
+  course definitions still read in curated terms because they are legible that way; the map does
+  the translation, so all 50 anchors are auditable in one file rather than across 172 literals.
+- **The map is many-to-one, and that is the finding.** The curated vocabulary was authored at
+  capability level ("hand hygiene", "bed making"); an NOS is a job task ("Follow infection control
+  policies & procedures"). 52 slugs collapse to 38 standards. Seeding therefore merges duplicate
+  links on the strongest signal — highest importance, mandatory beating optional — because a job
+  needing one standard twice is a constraint violation, not two requirements.
+- **Retired skills are `source='legacy'`: hidden from search, browse, count and facets, but their
+  own page still resolves.** They are not deleted because profiles and certificates reference them,
+  and a 404 on a row we deliberately kept would be a broken link of our own making.
+
+Sprint 8 (complete NSQF migration) is done. The national corpus is in Postgres, migrated against
+the full master data after the first attempt was rolled back:
+
+```
+states 36 | districts 766 | sub_districts 7,100
+awarding bodies 106 | sectors 43 | sub_sectors 796 | occupations 1,808
+skills 21,303 | qualification_packs 4,424 | qp_skills 27,278 | model_curricula 1,950
+entry_routes 14,405 | nco_codes 2,541
+performance elements 38,340 | criteria 238,370 | knowledge 185,559 | generic 151,840
+```
+
+`make import-nsqf` takes ~90 seconds and is idempotent. Things to respect:
+
+- **The owning body comes from the code prefix.** `LSC` owns `LSC/Q6101`. That resolves 97% of
+  qualifications and 99.8% of standards; the source's own `originSSC` field reaches 9%. Sector
+  Skill Councils and awarding bodies share `awarding_bodies` because the source does.
+- **`api/modules/geography/` is its own module**, not part of `skills` — jobs and profiles
+  reference it and neither is a skill. A district is tied to a state *only* by the array embedded
+  in each state document; the standalone collection has no state field at all.
+- **Location FKs sit beside the free text, not instead of it.** Not every value resolves, and an
+  unresolvable location is still a location. `Bengaluru` → `BENGALURU URBAN` via an alias map,
+  because "Bengaluru" is what an employer would actually write.
+- **Content tables key on `(parent, ordinal)`, never the source's id.** `pcID` repeats within a
+  unit, so a natural key on it fails partway through an import.
+- **Content is deleted and rewritten each run, not upserted.** A revised standard with fewer
+  criteria must not leave the surplus behind.
+- **7,459 of 21,263 current standards have no performance criteria** in their latest version.
+  That is the data, not a bug — the import writes every row the current versions hold.
+- **The 52 curated skills remain** alongside the 21,303 imported ones, tagged `source='curated'`.
+  Two vocabularies still coexist; that debt is recorded in `projectContextForMe.md` §12.
+- **Still English-only.** The corpus carries no Devanagari; the 149 carried aliases are the only
+  Hindi reaching it.
+
+Sprint 5 (rich candidate profile) is complete. `CandidateProfile` gained personal fields and job
+preferences, plus six repeating collections: experiences, educations, certifications, languages,
+preferred roles and preferred locations. `/profile` is a guided 5-step wizard on first visit and
+a sectioned editor thereafter, with a weighted completeness meter.
+
+Two things to respect:
+- **The six collections share one generic route and one generic editor.** `/me/profile/{collection}`
+  takes an untyped body, which means FastAPI's automatic 422 does **not** apply — the handler
+  translates `ValidationError` itself. Adding a section is an entry in `CHILD_MODELS`, `_PAYLOADS`
+  and `useSectionDefs`, not a new module.
+- **`/me/profile/skills` is declared before `/me/profile/{collection}`** or the literal path gets
+  captured as a collection name. There is a test guarding it.
+
+Sprint 4 (identity + candidate profile) is complete. `identity` holds `User`, `Tenant` and
+`Membership` with passwordless phone/OTP sign-in; `marketplace` gained `CandidateProfile` and
+`CandidateSkill`. `/signin` and `/profile` are live in both locales, and the header reflects
+signed-in state.
+
+Non-obvious things that will bite:
+- **`get_settings()` refuses to start outside development/test** if `JWT_SECRET_KEY` is the
+  default or under 32 bytes, or if `OTP_EXPOSE_IN_RESPONSE` is on. That is deliberate.
+- **OTP codes are stored hashed** in Redis, rate limited per phone, and capped at 5 guesses.
+- **Phone numbers are normalised** to `+91XXXXXXXXXX` before any lookup — `9876543210`,
+  `09876543210` and `+91 98765 43210` must resolve to one account, not three.
+- **`candidate_skills.source` is always `self_declared` when a user adds a skill.** Only an
+  assessment or certificate may set a stronger source; that ordering is what makes verified
+  evidence outrank self-claims in Sprint 5's scoring.
+- **`api/adapters/notifications/` is the ADR-017 reference implementation.** The console
+  provider refuses to run in production, so a missing SMS vendor fails loudly rather than
+  looking like working auth that nobody can complete.
+
+Sprint 3 (marketplace) is complete. `marketplace` holds `Job` + `JobSkill` and `Course` +
+`CourseSkill`; `identity` holds `Tenant` (models only — no auth yet). Seeded with 8 tenants,
+20 jobs and 20 courses, all bilingual and linked to real skill slugs. `/jobs` and `/courses`
+are live with filters and detail pages, and `/skills/[slug]` shows the jobs needing a skill
+and the courses teaching it.
+
+Two things to respect here:
+- **The association tables carry the intelligence.** `JobSkill.importance` / `is_mandatory` and
+  `CourseSkill.level_taught` are what make a weighted score and an honest skill gap possible.
+  A plain many-to-many would not be enough.
+- **`scripts/seed_marketplace.py` fails loudly on an unknown skill slug.** A job with no skills
+  is invisible to matching, and that failure would not otherwise surface until Sprint 5.
+
+Sprint 2 (skill taxonomy) is complete. `skills` holds `Skill` and `SkillAlias`, seeded with 52
+bilingual skills and 149 aliases across Healthcare, Retail and cross-sector core skills.
+Search resolves English, Devanagari and Latin-script transliteration in one query, with a
+trigram fallback for typos. `/skills` and `/skills/[slug]` are live in both locales.
+
+Two things to respect when extending the taxonomy:
+- `Skill.search_vector` is `GENERATED ALWAYS` in Postgres and declared with SQLAlchemy
+  `Computed(...)`. Without `Computed` the ORM puts it in INSERT and Postgres rejects the write.
+- `scripts/seed_skills.py` is idempotent by slug and replaces aliases wholesale. The real NSQF
+  importer must behave the same way, because Qualification Packs get revised and re-issued.
+
+Sprint 1 (walking skeleton) is complete: Docker Compose, async FastAPI, Alembic with pgvector
+enabled, an ARQ worker with heartbeat-based health reporting, a bilingual Next.js PWA, a
+generated TypeScript client, testcontainers-backed tests and CI. The visible deliverable is the
+System Status page at `/en` and `/hi`.
+
+The public homepage template is also in place: header with nav and CTAs, hero with search,
+how-it-works, audience cards, browse panels, CTA band, footer, and the dev/status panel last.
+All 13 routes exist in both locales; content is placeholder where the feature is not built.
+
+Still to come: matching (Sprint 6) — which needs analytics instrumentation and a golden-set
+evaluation harness alongside it. Also outstanding: organisation/email login and self-serve
+publishing, a real SMS provider, the NSQF hierarchy above Skill (SSC → Sector → Occupation → QP → NOS), typed
+SkillRelation edges, embeddings, and analytics instrumentation. Do not assume every module listed
+above ships in v1; confirm scope before building out a module's business logic.
 
 ## Local development
 

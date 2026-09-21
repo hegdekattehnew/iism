@@ -1,0 +1,1153 @@
+{
+  "app": {
+    "short": "IISM",
+    "tagline": "Connecting candidates, courses and jobs through a shared skill graph"
+  },
+  "nav": {
+    "jobs": "Pekerjaan",
+    "courses": "Kursus",
+    "skills": "Kemahiran",
+    "howItWorks": "Cara ia berfungsi",
+    "forEmployers": "For employers",
+    "forProviders": "For providers",
+    "signIn": "Log masuk",
+    "getStarted": "Mula",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "vacancies": "Vacancies",
+    "courses_org": "Courses",
+    "skipToContent": "Langkau ke kandungan utama",
+    "language": "Bahasa"
+  },
+  "hero": {
+    "eyebrow": "NSQF-aligned skill intelligence",
+    "title": "Find the work you want, and the training that gets you there",
+    "subtitle": "Tell us the job you want. We show you the skills you are missing, and the courses that close the gap.",
+    "searchLabel": "Search for a job role or skill",
+    "searchPlaceholder": "e.g. General Duty Assistant, welding, retail sales",
+    "searchButton": "Search",
+    "trust": "Free to use · Aligned to the National Skills Qualifications Framework · Hindi and English",
+    "browseLink": "Browse all courses"
+  },
+  "how": {
+    "title": "How it works",
+    "subtitle": "Four steps, from where you are to where you want to be.",
+    "step1Title": "Tell us your target",
+    "step1Body": "A job you hold now, a job you want, or simply the kind of work you are looking for.",
+    "step2Title": "See your skill gap",
+    "step2Body": "We compare your skills against what that role actually requires, and show you precisely what is missing.",
+    "step3Title": "Close the gap",
+    "step3Body": "We recommend the courses that cover those specific missing skills, ranked by cost, duration and language.",
+    "step4Title": "Get matched",
+    "step4Body": "As your skills grow, better-matched jobs surface automatically.",
+    "note": "Every score is computed deterministically and can be explained, skill by skill."
+  },
+  "audiences": {
+    "title": "Three sides, one set of standards",
+    "candidateTitle": "For candidates",
+    "candidateBody": "Understand what you are missing, and what to do about it. Free, in your language.",
+    "candidateCta": "See how it works",
+    "employerTitle": "For employers",
+    "employerBody": "Post roles as skills, not keywords. Find candidates who genuinely match.",
+    "employerCta": "How hiring works here",
+    "providerTitle": "For course providers",
+    "providerBody": "Publish courses anchored to Qualification Packs, and see which skills the market is short of.",
+    "providerCta": "How publishing works here",
+    "subtitle": "Every vacancy, every course and every candidate is described against the same national framework. That is what makes a match here mean something."
+  },
+  "browse": {
+    "title": "Explore the marketplace",
+    "subtitle": "Every number below is counted live from the platform database.",
+    "jobsTitle": "Jobs",
+    "jobsBody": "Vocational roles from verified employers.",
+    "coursesTitle": "Courses",
+    "coursesBody": "Training mapped to national qualification standards.",
+    "skillsTitle": "Skills",
+    "skillsBody": "The NSQF-aligned taxonomy everything is built on.",
+    "browseCta": "Browse",
+    "countLabel": "in the catalogue",
+    "empty": "Nothing here yet"
+  },
+  "cta": {
+    "title": "Ready to see where you stand?",
+    "subtitle": "Build a profile in a few minutes and get your first recommendations.",
+    "primary": "Get started free",
+    "secondary": "Talk to our team"
+  },
+  "footer": {
+    "product": "Product",
+    "audiences": "Audiences",
+    "company": "Company",
+    "legal": "Legal",
+    "about": "About",
+    "contact": "Contact",
+    "careers": "Careers",
+    "privacy": "Notis privasi",
+    "terms": "Terma penggunaan",
+    "grievance": "Grievance redressal",
+    "nsqfNote": "Skill definitions follow the National Skills Qualifications Framework. IISM is not a certifying body.",
+    "rights": "All rights reserved.",
+    "language": "Bahasa"
+  },
+  "placeholder": {
+    "badge": "Drafting",
+    "body": "This page is being written. Nothing here is a placeholder for a feature — the surrounding product works; this is text that has to be right before it is published.",
+    "back": "Back to home",
+    "generic": "Being drafted ahead of public release. Until it is published we would rather show nothing than show text nobody has checked.",
+    "contact": "Being drafted. In the meantime, the fastest route in is whoever sent you this link.",
+    "careers": "Being drafted. There is no open role posted yet."
+  },
+  "dev": {
+    "title": "Development panel",
+    "subtitle": "Sprint 1 verification. Not part of the product surface.",
+    "show": "Show",
+    "hide": "Hide"
+  },
+  "status": {
+    "title": "System Status",
+    "refresh": "Refresh",
+    "checking": "Checking…",
+    "allUp": "All systems operational",
+    "someDown": "Degraded — one or more components are down",
+    "unreachable": "API unreachable",
+    "environment": "Environment",
+    "version": "Version",
+    "lastChecked": "Last checked"
+  },
+  "components": {
+    "api": "API",
+    "postgres": "PostgreSQL",
+    "redis": "Redis",
+    "worker": "Background worker",
+    "up": "Up",
+    "down": "Down"
+  },
+  "task": {
+    "title": "Async pipeline",
+    "description": "Enqueue a real background job. The worker picks it up, and the result comes back here — proving the async path is wired, not merely tested.",
+    "run": "Run test task",
+    "running": "Running…",
+    "jobId": "Job",
+    "statusLabel": "Status",
+    "queued": "Queued",
+    "in_progress": "In progress",
+    "complete": "Complete",
+    "not_found": "Not found",
+    "deferred": "Deferred",
+    "completedAt": "Completed at",
+    "failed": "Task failed"
+  },
+  "data": {
+    "title": "Database",
+    "skillsSeeded": "Skills in taxonomy",
+    "emptyNote": "Empty until Sprint 2 seeds the taxonomy."
+  },
+  "skillsPage": {
+    "title": "Skills",
+    "subtitle": "The NSQF-aligned taxonomy everything else is built on. Search in English or Hindi — typed in either script.",
+    "searchLabel": "Search skills",
+    "searchPlaceholder": "Try 'blood', 'रक्त' or 'khoon nikalna'",
+    "clear": "Clear",
+    "allTypes": "All types",
+    "allLevels": "All levels",
+    "level": "NSQF level {level}",
+    "levelShort": "Level {level}",
+    "noLevel": "No level assigned",
+    "type": {
+      "technical": "Technical",
+      "core": "Core",
+      "generic": "Generic"
+    },
+    "resultsCount": "{count, plural, =0 {No skills} one {# skill} other {# skills}}",
+    "searching": "Searching…",
+    "noResults": "Nothing matched that. Try a shorter word, or the Hindi term.",
+    "matchedVia": "matched “{term}”",
+    "matchKind": {
+      "exact": "exact",
+      "prefix": "name",
+      "alias": "alias",
+      "text": "text"
+    },
+    "aliases": "Also known as",
+    "aliasScript": {
+      "latin": "English",
+      "devanagari": "Hindi",
+      "transliteration": "Typed in Latin script"
+    },
+    "description": "Description",
+    "notFound": "That skill does not exist.",
+    "backToSkills": "All skills",
+    "loadError": "Could not reach the API. Is it running?",
+    "showingAll": "Showing all skills",
+    "showingRange": "Showing {from}–{to} of {total}",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "levelWithCount": "Level {level} ({count})",
+    "typeWithCount": "{type} ({count})",
+    "searchCapped": "Showing the {count} closest matches. Narrow the search to see fewer, better ones.",
+    "filtersOnSearch": "Filters apply to these matches only.",
+    "qualifications": "Qualifications using this unit",
+    "qualificationsIntro": "This unit declares its own NSQF level. Each qualification that includes it also places it at a level, which can differ.",
+    "qualificationsCount": "{count, plural, =0 {No qualifications} one {# qualification} other {# qualifications}}",
+    "qualificationsMore": "and {count} more",
+    "requirement": {
+      "compulsory": "Compulsory",
+      "elective": "Elective",
+      "optional": "Optional"
+    },
+    "electiveGroup": "Choose from: {group}",
+    "nosCode": "NOS code",
+    "nosVersion": "Version",
+    "curatedNotice": "This is a retired hand-written entry, superseded by the National Occupational Standards it maps to. It is kept because existing profiles reference it, and no longer appears in search.",
+    "noQualifications": "This unit is not part of any current qualification.",
+    "usedInQps": "{count, plural, one {# qualification} other {# qualifications}}",
+    "requirements": "What this standard requires",
+    "requirementsIntro": "Assessable criteria, with the marks each carries.",
+    "criteriaCount": "{count, plural, one {# criterion} other {# criteria}}",
+    "marks": "{marks} marks",
+    "knowledge": "Knowledge and understanding",
+    "genericSkills": "Generic skills",
+    "noRequirements": "The current version of this standard publishes no performance criteria.",
+    "partOf": "Part of {name}",
+    "lookalike": "Same name as another result — compare the codes"
+  },
+  "jobsPage": {
+    "title": "Jobs",
+    "subtitle": "Vocational roles, described as the skills they actually require.",
+    "searchPlaceholder": "Search job titles — English or Hindi",
+    "allStates": "All locations",
+    "allTypes": "All types",
+    "clear": "Clear",
+    "resultsCount": "{count, plural, =0 {No jobs} one {# job} other {# jobs}}",
+    "noResults": "No jobs matched. Try clearing a filter.",
+    "loadError": "Could not reach the API. Is it running?",
+    "employmentType": {
+      "full_time": "Full time",
+      "part_time": "Part time",
+      "contract": "Contract",
+      "apprenticeship": "Apprenticeship"
+    },
+    "experience": "{min}+ years",
+    "experienceRange": "{min}–{max} years",
+    "experienceNone": "No experience needed",
+    "salary": "₹{min}–{max} per year",
+    "salaryFrom": "From ₹{min} per year",
+    "salaryUndisclosed": "Salary not disclosed",
+    "requiredSkills": "Skills required",
+    "mandatory": "Must have",
+    "optional": "Useful",
+    "importance": "Importance {n} of 5",
+    "backToJobs": "All jobs",
+    "minLevel": "NSQF level {level} and above",
+    "experienceLabel": "Experience",
+    "salaryLabel": "Salary"
+  },
+  "coursesPage": {
+    "title": "Courses",
+    "subtitle": "Training mapped to the same skills employers ask for.",
+    "searchPlaceholder": "Search courses — English or Hindi",
+    "allModes": "All modes",
+    "allLanguages": "All languages",
+    "anyFee": "Any fee",
+    "under": "Under ₹{amount}",
+    "clear": "Clear",
+    "resultsCount": "{count, plural, =0 {No courses} one {# course} other {# courses}}",
+    "noResults": "No courses matched. Try clearing a filter.",
+    "loadError": "Could not reach the API. Is it running?",
+    "mode": {
+      "online": "Online",
+      "offline": "In person",
+      "hybrid": "Hybrid"
+    },
+    "language": {
+      "en": "English",
+      "hi": "Hindi",
+      "both": "English and Hindi"
+    },
+    "duration": "{hours} hours",
+    "fee": "₹{amount}",
+    "feeFree": "Free",
+    "skillsTaught": "Skills taught",
+    "teachesToLevel": "to level {level}",
+    "backToCourses": "All courses",
+    "level": "NSQF level {level}",
+    "feeLabel": "Fee",
+    "durationLabel": "Duration"
+  },
+  "skillLinks": {
+    "jobsTitle": "Jobs needing this skill",
+    "coursesTitle": "Courses teaching this skill",
+    "noJobs": "No jobs currently list this skill.",
+    "noCourses": "No courses currently teach this skill.",
+    "viewAllJobs": "See all jobs needing it",
+    "viewAllCourses": "See all courses teaching it"
+  },
+  "auth": {
+    "signInTitle": "Sign in",
+    "signInSubtitle": "Enter the mobile number or email you signed up with. We send a six-digit code — there is no password.",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "codeTitle": "Enter the code",
+    "codeSubtitle": "We sent a 6-digit code to {phone}.",
+    "codeLabel": "6-digit code",
+    "verify": "Verify and continue",
+    "verifying": "Verifying…",
+    "changeNumber": "Use a different one",
+    "resend": "Send a new code",
+    "devCodeNotice": "Development mode: your code is {code}",
+    "errorBadCode": "That code is incorrect or has expired.",
+    "errorRateLimited": "Too many attempts. Please wait a few minutes and try again.",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "signOut": "Log keluar",
+    "myProfile": "Profil saya",
+    "myMatches": "Padanan saya",
+    "identifierLabel": "Mobile number or email",
+    "identifierPlaceholder": "98765 43210 or you@example.com",
+    "errorInvalidId": "That does not look like a mobile number or an email address.",
+    "noAccount": "No account yet?",
+    "signUpInstead": "Sign up",
+    "orgProfile": "Organisation profile",
+    "myWorkspace": "My workspace",
+    "account": "Akaun",
+    "unregistered": "There is no account with this number yet. That code has been used — sign up instead; it asks you to agree to our privacy notice first.",
+    "unregisteredAction": "Create an account"
+  },
+  "profilePage": {
+    "title": "My profile",
+    "subtitle": "The more accurate this is, the better your recommendations will be.",
+    "headline": "Headline",
+    "headlinePlaceholder": "e.g. Aspiring phlebotomist",
+    "state": "State",
+    "district": "District or city",
+    "experience": "Years of experience",
+    "education": "Highest education",
+    "educationLevel": {
+      "none": "No formal schooling",
+      "primary": "Primary",
+      "secondary": "Class 10",
+      "higher_secondary": "Class 12",
+      "iti": "ITI",
+      "diploma": "Diploma",
+      "graduate": "Graduate",
+      "postgraduate": "Postgraduate"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "skillsTitle": "My skills",
+    "skillsSubtitle": "Name your job and we'll show the national standards behind it.",
+    "searchPlaceholder": "Try 'blood', 'रक्त' or 'khoon nikalna'",
+    "add": "Add",
+    "remove": "Remove",
+    "proficiency": "Level {n} of 5",
+    "proficiencyLabel": "How confident are you?",
+    "noSkills": "No skills added yet. Name your job above to add your first ones.",
+    "source": {
+      "self_declared": "Self-declared",
+      "inferred": "Inferred",
+      "assessed": "Assessed",
+      "certified": "Certified"
+    },
+    "sourceNote": "Skills you add yourself are marked self-declared. Assessment results will carry more weight once assessments are available.",
+    "signInPrompt": "Sign in to build your profile.",
+    "goToSignIn": "Sign in",
+    "completeness": "Profile {percent}% complete",
+    "completeNext": "Add {what} next",
+    "field": {
+      "full_name": "your name",
+      "headline": "a headline",
+      "location": "your location",
+      "skills": "your skills",
+      "preferred_roles": "the roles you want",
+      "experiences": "your work history",
+      "educations": "your education",
+      "languages": "the languages you speak"
+    },
+    "wizard": {
+      "title": "Set up your profile",
+      "subtitle": "A few minutes now means far better recommendations later.",
+      "step": "Step {n} of {total}",
+      "next": "Continue",
+      "back": "Back",
+      "finish": "Finish",
+      "skip": "Skip for now",
+      "s1": "About you",
+      "s2": "What you're looking for",
+      "s3": "Your skills",
+      "s4": "Work and education",
+      "s5": "Languages",
+      "doneTitle": "You're all set",
+      "doneBody": "You can change any of this later from your profile."
+    },
+    "sections": {
+      "about": "About you",
+      "preferences": "What you're looking for",
+      "experience": "Work history",
+      "education": "Education",
+      "certifications": "Certifications",
+      "languages": "Languages",
+      "addEntry": "Add",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "delete": "Remove",
+      "empty": "Nothing added yet.",
+      "saveSection": "Save"
+    },
+    "fields": {
+      "fullName": "Full name",
+      "dateOfBirth": "Date of birth",
+      "gender": "Gender",
+      "employer": "Employer",
+      "roleTitle": "Role",
+      "location": "Location",
+      "startedOn": "Started",
+      "endedOn": "Ended",
+      "current": "I work here now",
+      "description": "What you did",
+      "qualification": "Qualification",
+      "institution": "Institution",
+      "specialisation": "Specialisation",
+      "yearCompleted": "Year completed",
+      "pursuing": "Still studying",
+      "certName": "Certificate",
+      "issuingBody": "Issued by",
+      "credentialId": "Credential ID",
+      "issuedOn": "Issued on",
+      "expiresOn": "Expires on",
+      "nsqfLevel": "NSQF level",
+      "language": "Language",
+      "proficiency": "How well you speak it",
+      "canRead": "Can read",
+      "canWrite": "Can write",
+      "roleTitleWanted": "Role you want",
+      "state": "State",
+      "district": "District",
+      "relocate": "Willing to relocate",
+      "employmentType": "Preferred work type",
+      "salaryMin": "Expected salary from",
+      "salaryMax": "to",
+      "noticePeriod": "Available"
+    },
+    "gender": {
+      "female": "Female",
+      "male": "Male",
+      "other": "Other",
+      "prefer_not_to_say": "Prefer not to say"
+    },
+    "genderNote": "Optional. Used only for equal-opportunity reporting.",
+    "langProficiency": {
+      "basic": "Basic",
+      "conversational": "Conversational",
+      "fluent": "Fluent",
+      "native": "Native"
+    },
+    "notice": {
+      "immediate": "Immediately",
+      "within_15_days": "Within 15 days",
+      "within_30_days": "Within 30 days",
+      "over_30_days": "More than 30 days"
+    },
+    "present": "Present",
+    "errors": {
+      "duplicate": "That entry already exists.",
+      "generic": "Could not save. Please check the fields."
+    },
+    "roles": {
+      "prompt": "What work do you do?",
+      "placeholder": "e.g. ward boy, delivery, cashier, electrician",
+      "standardsCount": "{count, plural, one {# standard} other {# standards}}",
+      "level": "NSQF {level}",
+      "matchedVia": "Matched “{term}”",
+      "variants": "{count} versions of this qualification — showing the fullest",
+      "noRoles": "No job by that name yet. Try another word, or search the standards directly below.",
+      "changeRole": "Choose a different job",
+      "tickPrompt": "Tick what you can already do. Leave anything you haven't done yet — it will show as a gap, with courses that close it.",
+      "loading": "Loading…",
+      "loadError": "Could not load these standards. Try again.",
+      "groupCore": "Core to the job",
+      "groupElective": "Choose from: {group}",
+      "electives": "electives",
+      "groupOptional": "Optional",
+      "alreadyHeld": "Already on your profile",
+      "asPreferred": "Also save this as a job I'm looking for",
+      "confirm": "{count, plural, =0 {Tick at least one} one {Add # skill} other {Add # skills}}",
+      "adding": "Adding…",
+      "saveError": "Could not add these. Try again.",
+      "added": "{count, plural, one {# skill added} other {# skills added}}. Choose another job to add more.",
+      "fallbackTitle": "Or search the standards directly",
+      "fallbackBody": "If you know the standard you want, or your job isn't listed above."
+    }
+  },
+  "matchesPage": {
+    "title": "Your matches",
+    "subtitle": "Jobs ranked by how much of what they need you already have.",
+    "noSkills": "Add a few skills to your profile and we can show you matches.",
+    "addSkills": "Go to my profile",
+    "noMatches": "Nothing matches your skills yet. Try adding more, or widen your preferences.",
+    "matchScore": "{score}% match",
+    "youHave": "You have",
+    "youNeed": "You need",
+    "mandatory": "Required",
+    "capped": "One required standard is missing, which limits this match.",
+    "closesGap": "Closes {closed} of your {total} missing",
+    "coursesHeading": "Courses that close this gap",
+    "noCourses": "No course on the platform covers this gap yet.",
+    "entryHeading": "Getting qualified",
+    "entryVia": "This role maps to {name} ({code}).",
+    "entryRoutes": "{count, plural, one {# way in} other {# ways in}}",
+    "entryExperience": "From {years} years' experience",
+    "entryEducation": "Entry qualifications accepted",
+    "viewJob": "View the job",
+    "backToMatches": "All matches",
+    "loadError": "Could not load your matches.",
+    "hours": "{hours} hours",
+    "nearDistrict": "In your district",
+    "nearState": "In your state",
+    "experienceShort": "{years, plural, one {# year} other {# years}} short of the experience this role asks for"
+  },
+  "stats": {
+    "heading": "Built on the national framework, not a guess",
+    "sub": "Every skill, job and course on this platform speaks the same NSQF vocabulary.",
+    "standards": "National Occupational Standards",
+    "qualifications": "Qualification Packs",
+    "criteria": "Assessable criteria",
+    "awardingBodies": "Awarding bodies",
+    "sectors": "Sectors",
+    "coverage": "States and districts covered",
+    "entryRoutes": "Documented ways in",
+    "footnote": "Counted live from the platform database, not illustrative."
+  },
+  "employerConsole": {
+    "matchScore": "{score}% match",
+    "title": "Employer console",
+    "subtitle": "Rank your applicants against the national standards your vacancy actually requires — and see exactly what each of them is missing.",
+    "demoTitle": "This is a demonstration",
+    "demoBody": "There is no employer sign-in yet, so this screen acts as a seeded employer. Every score is computed by the same engine that ranks jobs for candidates, over real National Occupational Standards. Candidates are shown by reference only — no names, numbers or contact details.",
+    "actingAs": "Acting as",
+    "openRoles": "Open roles",
+    "readyTotal": "Meet every mandatory standard",
+    "nearlyTotal": "One mandatory standard short",
+    "candidatesTotal": "Candidates on the platform",
+    "rolesHeading": "Your open roles",
+    "rolesNote": "Ordered by how many candidates already hold every standard the role makes mandatory.",
+    "readyCount": "{count} eligible",
+    "nearlyCount": "{count} nearly",
+    "poolCount": "{count} in pool",
+    "levelMin": "NSQF {level} and above",
+    "viewShortlist": "See the shortlist",
+    "hideShortlist": "Hide the shortlist",
+    "viewJob": "View the posting",
+    "ready": "All mandatory held",
+    "nearly": "One mandatory short",
+    "years": "{years, plural, =0 {No experience} one {# year} other {# years}}",
+    "coverage": "Holds {held} of {total} required standards",
+    "missingMandatory": "Missing",
+    "emptyPool": "No candidate on the platform holds any standard this role requires.",
+    "loadError": "Could not load the console. Is the API running?",
+    "scarcityHeading": "What your roles need and the market cannot supply",
+    "scarcityNote": "Counted across every candidate on the platform, not only those who already matched.",
+    "standard": "National Occupational Standard",
+    "requiredBy": "Roles requiring it",
+    "heldBy": "Candidates holding it"
+  },
+  "matchViz": {
+    "coverageLabel": "{percent}% of the weighted requirements",
+    "coverageWeighted": "{percent}% of what this role requires, weighted by importance",
+    "cappedBy": "{count, plural, one {# mandatory standard missing} other {# mandatory standards missing}}",
+    "levelHeading": "NSQF level",
+    "levelLabel": "NSQF level {attained} against a required {required}",
+    "levelMet": "Meets the NSQF {required} floor this role sets",
+    "levelShort": "NSQF {attained} against the {required} this role asks for"
+  },
+  "employersPage": {
+    "title": "For employers",
+    "lede": "Post a role against the National Occupational Standards it actually requires, and see who can do the work — not who wrote the right words on a CV.",
+    "primaryCta": "Sign up to hire",
+    "secondaryCta": "See the demonstration",
+    "one": {
+      "title": "Hire against a standard, not a keyword",
+      "body": "A role is described by the standards it needs, each with an importance and a mandatory flag. Two employers using the same standard mean the same thing, because the standard is national."
+    },
+    "two": {
+      "title": "See who is nearly there",
+      "body": "Ranking shows the candidates missing exactly one mandatory standard, and names it. That is a training decision rather than a rejection — and often the difference between filling a vacancy and reposting it."
+    },
+    "three": {
+      "title": "Know what the market cannot supply",
+      "body": "Every standard your roles ask for, counted against how many candidates hold it. A standard nobody holds is a hiring plan that will not work, and it is better to learn that before the vacancy is open."
+    },
+    "status": "Employers now sign in and publish their own vacancies. Still to come: inviting colleagues, and verification so a candidate can tell a vetted employer from an unvetted one."
+  },
+  "providersPage": {
+    "title": "For training providers",
+    "lede": "Publish a course against the standards it teaches, and be recommended to the people whose specific gap it closes.",
+    "primaryCta": "Sign up to publish courses",
+    "secondaryCta": "Browse courses",
+    "one": {
+      "title": "Recommended by gap, not by advertising",
+      "body": "When a candidate is short of a role, courses are ranked by how much of that particular gap they close. A course teaching one thing they need beats a course teaching nine they already have."
+    },
+    "two": {
+      "title": "Anchored to the national framework",
+      "body": "Courses link to the same standards employers hire against, with the level each one teaches. That is what lets a course be matched to a vacancy rather than to a job title."
+    },
+    "three": {
+      "title": "Entry routes come from the source",
+      "body": "The qualification behind a role publishes its own ways in — education and experience alternatives, imported from the national corpus, not invented here."
+    },
+    "status": "Providers now sign in and publish their own courses against the national framework. Still to come: inviting colleagues, and enrolment reporting."
+  },
+  "aboutPage": {
+    "title": "About IISM",
+    "lede": "A skills marketplace built on India's national qualification framework, so that what a person can do, what a job needs, and what a course teaches are all said in the same words.",
+    "primaryCta": "Explore the taxonomy",
+    "secondaryCta": "Browse jobs",
+    "one": {
+      "title": "One vocabulary",
+      "body": "The National Occupational Standards are the shared language. A job's requirement, a candidate's claim and a course's syllabus all point at the same standard, which is what makes a gap computable at all."
+    },
+    "two": {
+      "title": "Scores you can interrogate",
+      "body": "Every match returns what was held, what is missing, which of those are mandatory, and the level shortfall. A model never decides a score here — it is deterministic, so it can be explained and measured."
+    },
+    "three": {
+      "title": "Built for a low-end phone",
+      "body": "Mobile-first, installable, in English and Hindi. The target device is an entry-level Android on mobile data, and that constraint shapes what gets built rather than being retrofitted."
+    },
+    "status": "Built in the open, sprint by sprint. The national taxonomy, matching, candidate profiles, employer sign-in and self-serve publishing for both vacancies and courses are live. Still to come: Hindi for the corpus itself — the interface is bilingual, the 21,303 standard names are not — along with verified organisations and semantic matching."
+  },
+  "employerWorkspace": {
+    "title": "Your workspace",
+    "subtitle": "Post a vacancy against the National Occupational Standards it actually requires, and see who can do the work.",
+    "yourVacancies": "Your vacancies",
+    "yourVacanciesNote": "Drafts are visible only here. A vacancy reaches candidates when you publish it.",
+    "noVacancies": "No vacancies yet. Create one and describe it with the standards it needs.",
+    "newJob": "New vacancy",
+    "editJob": "Edit vacancy",
+    "edit": "Edit",
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "published": "Published",
+    "draft": "Draft",
+    "publishRefused": "A vacancy needs at least one required standard before it can be published — without one, nobody can be matched to it.",
+    "seeCandidates": "See candidates",
+    "viewPublic": "View the public posting",
+    "standardsCount": "{count, plural, =0 {No standards required yet} one {# required standard} other {# required standards}}",
+    "mandatoryCount": "{count} mandatory",
+    "nsqfLevel": "NSQF {level} and above",
+    "shortlistNote": "{count, plural, =0 {Nobody matches yet} one {# candidate ranked} other {# candidates ranked}}, scored by the same engine that ranks jobs for candidates.",
+    "backToVacancies": "Back to your vacancies",
+    "noAccess": "You do not have access to this organisation.",
+    "signInPrompt": "Sign in with your work email to manage your vacancies.",
+    "signIn": "Employer sign-in",
+    "titleEn": "Job title (English)",
+    "titleHi": "Job title (Hindi)",
+    "titleHiHint": "Optional, and worth writing — most candidates read Hindi first.",
+    "descriptionEn": "Description",
+    "state": "State",
+    "district": "District",
+    "employmentType": "Employment type",
+    "nsqfMin": "Minimum NSQF level",
+    "nsqfMinHint": "Half-levels are real — 4.5 is a level, not a rounding error.",
+    "experienceMin": "Minimum years of experience",
+    "experienceMax": "Maximum years of experience",
+    "salaryMin": "Salary from (₹ per year)",
+    "salaryMax": "Salary to (₹ per year)",
+    "standardsTitle": "Required standards",
+    "standardsSubtitle": "Search the national taxonomy. Importance weights the match; mandatory means a candidate without it is capped, however strong they are otherwise.",
+    "standardsSearch": "Search standards in English, Hindi or transliteration",
+    "addStandard": "Add",
+    "noStandardsWarning": "This vacancy requires no standards yet, so it cannot be published and nobody can be matched to it.",
+    "importance": "Importance",
+    "mandatory": "Mandatory",
+    "mandatoryHint": "Mandatory",
+    "remove": "Remove",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "employment": {
+      "full_time": "Full time",
+      "part_time": "Part time",
+      "contract": "Contract",
+      "apprenticeship": "Apprenticeship"
+    },
+    "saveFailed": "Could not save. Check the details and try again."
+  },
+  "context": {
+    "jobSeeker": "Job seeker",
+    "jobSeekerHint": "Your matches and profile",
+    "createOrg": "Create an organisation",
+    "createOrgHint": "Added to the account you are signed in as — you keep one login and one profile.",
+    "orgName": "Organisation name",
+    "orgNamePlaceholder": "Sunrise Multispeciality Hospital",
+    "orgType": "What does it do?",
+    "typeEmployer": "Hires people",
+    "typeProvider": "Provides training",
+    "create": "Create",
+    "creating": "Creating…",
+    "cancel": "Cancel",
+    "createError": "Could not create the organisation. Try again.",
+    "whatIsThis": "What can an organisation do?",
+    "role": {
+      "owner": "Owner",
+      "admin": "Administrator",
+      "member": "Member"
+    },
+    "chooseContext": "Choose workspace",
+    "menuHeading": "Workspace"
+  },
+  "orgSettings": {
+    "title": "Organisation profile",
+    "subtitle": "What a candidate sees when they open one of your vacancies.",
+    "name": "Organisation name",
+    "description": "About the organisation",
+    "descriptionHint": "A few sentences. What you do, and what it is like to work there.",
+    "city": "City",
+    "website": "Website",
+    "logoUrl": "Logo URL",
+    "contactEmail": "Contact email",
+    "contactEmailHint": "Kept private — shown to you, never on a public listing.",
+    "verified": "Verified",
+    "unverified": "Not yet verified",
+    "slugNote": "Your address is /employer/{slug}. It does not change when you rename the organisation, because links to your vacancies depend on it.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveError": "Could not save. Only an owner can edit the organisation.",
+    "noAccess": "You do not have access to this organisation."
+  },
+  "credentials": {
+    "title": "How you sign in",
+    "subtitle": "One account, either way in. Adding the second means you never have to remember which you used.",
+    "phone": "Phone",
+    "email": "Email",
+    "notSet": "Not added",
+    "verified": "Verified",
+    "unverified": "Not verified",
+    "add": "Add",
+    "phoneLabel": "Phone number",
+    "emailLabel": "Email address",
+    "codeLabel": "Six-digit code",
+    "devCode": "Development only — your code is {code}",
+    "sendCode": "Send the code",
+    "verify": "Verify and add",
+    "cancel": "Cancel",
+    "requestError": "Could not send a code. Check the value and try again.",
+    "codeError": "That code is incorrect or has expired.",
+    "takenError": "That already belongs to another account. Sign in with it instead."
+  },
+  "signup": {
+    "seekerTitle": "Find the work you want",
+    "seekerSubtitle": "Sign up with your phone number. No password, no CV to upload — we send a six-digit code.",
+    "employerTitle": "Hire against real standards",
+    "employerSubtitle": "Sign up with your work email. We send a six-digit code — there is no password to set or reset.",
+    "providerTitle": "Publish your courses",
+    "providerSubtitle": "Sign up with your work email and start listing training anchored to the national framework.",
+    "phoneLabel": "Mobile number",
+    "phoneHint": "We send a six-digit code by SMS. It expires in five minutes.",
+    "emailLabel": "Work email",
+    "emailHint": "We send a six-digit code. It expires in five minutes.",
+    "orgNameLabel": "Organisation name",
+    "employerPlaceholder": "Sunrise Multispeciality Hospital",
+    "providerPlaceholder": "NSDC Healthcare Academy",
+    "sendCode": "Send the code",
+    "sending": "Sending…",
+    "codeSent": "We sent a code to {to}.",
+    "codeLabel": "Six-digit code",
+    "devCode": "Development only — your code is {code}",
+    "verify": "Verify and continue",
+    "verifying": "Verifying…",
+    "changeDetails": "Change these details",
+    "haveAccount": "Already have an account?",
+    "signInInstead": "Sign in",
+    "errorInvalid": "Check the details and try again.",
+    "errorBadCode": "That code is incorrect or has expired.",
+    "errorGeneric": "Something went wrong. Try again.",
+    "existingHintPhone": "Already registered with this number? We will simply sign you in — nothing is duplicated.",
+    "existingHintEmail": "Already registered with this address? Entering the code signs you in and adds the new organisation to that same account.",
+    "alreadySignedIn": "You are already signed in.",
+    "continue": "Continue",
+    "switch": {
+      "seeker": "Find work",
+      "employer": "Hire",
+      "provider": "Offer training"
+    },
+    "consent": "I have read the <privacy>privacy notice</privacy> and agree to the <terms>terms of use</terms>.",
+    "errorConsent": "Our privacy notice has changed since this page loaded. Reload the page, read it, and agree again."
+  },
+  "providerWorkspace": {
+    "yourCourses": "Your courses",
+    "yourCoursesNote": "Drafts are visible only here. A course reaches candidates when you publish it.",
+    "noCourses": "No courses yet. Create one and describe the standards it teaches.",
+    "newCourse": "New course",
+    "editCourse": "Edit course",
+    "publishRefused": "A course needs at least one standard it teaches before it can be published — without one, it can never be recommended to anyone.",
+    "saveFailed": "Could not save. Check the details, or confirm this organisation is a training provider.",
+    "signInPrompt": "Sign in with your work email to manage your courses.",
+    "signIn": "Sign in",
+    "teachesCount": "{count, plural, =0 {No standards yet} one {Teaches # standard} other {Teaches # standards}}",
+    "hours": "{hours} hours",
+    "nsqfLevelIs": "NSQF {level}",
+    "titleEn": "Course title (English)",
+    "titleHi": "Course title (Hindi)",
+    "titleHiHint": "Optional, and worth writing — most candidates read Hindi first.",
+    "descriptionEn": "Description",
+    "mode": "Mode",
+    "modes": {
+      "online": "Online",
+      "offline": "In person",
+      "hybrid": "Hybrid"
+    },
+    "language": "Language of instruction",
+    "languages": {
+      "en": "English",
+      "hi": "Hindi",
+      "both": "English and Hindi"
+    },
+    "durationHours": "Duration (hours)",
+    "fee": "Fee (₹)",
+    "feeHint": "Leave blank if the course is free.",
+    "nsqfLevel": "NSQF level",
+    "nsqfLevelHint": "Half-levels are real — 4.5 is a level, not a rounding error.",
+    "teachesTitle": "Standards this course teaches",
+    "teachesSubtitle": "Search the national taxonomy. The level taught is what tells a candidate how far this course takes them.",
+    "standardsSearch": "Search standards in English, Hindi or transliteration",
+    "addStandard": "Add",
+    "noStandardsWarning": "This course teaches no standards yet, so it cannot be published and can never be recommended.",
+    "levelTaught": "Level taught",
+    "levelUnset": "Not stated",
+    "remove": "Remove",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "title": "Your workspace",
+    "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close."
+  },
+  "chooser": {
+    "title": "I'm here to…",
+    "seekerLabel": "Find work and training",
+    "seekerMeta": "Mobile number",
+    "employerLabel": "Hire for a role",
+    "employerMeta": "Work email",
+    "providerLabel": "Publish courses",
+    "providerMeta": "Work email",
+    "note": "One account. You can add another role whenever you need it.",
+    "pageTitle": "Create your account",
+    "pageSubtitle": "Pick what you came here to do. You are not locked into it."
+  },
+  "workspace": {
+    "jobSeeker": "Job seeker",
+    "signedInAs": "Signed in as {who}",
+    "goToProfile": "My profile",
+    "goToMatches": "My matches"
+  },
+  "returning": {
+    "back": "Welcome back — you already had an account, so we signed you in."
+  },
+  "seekerOnly": {
+    "title": "This is an organisation account",
+    "body": "Matches and a candidate profile belong to accounts that signed up to look for work.",
+    "goToWorkspace": "Go to my workspace"
+  },
+  "account": {
+    "title": "Your account",
+    "subtitle": "Your data, what you agreed to, and the way out.",
+    "signedOut": "Sign in to see your account.",
+    "signIn": "Sign in",
+    "consentTitle": "Consent",
+    "consentGiven": "You agreed to the privacy notice of {version} on {date}.",
+    "consentMissing": "No consent is recorded for this account: it was created before consent was recorded. Read the notice — and if you do not agree, delete your account below.",
+    "readNotice": "Read the privacy notice",
+    "exportTitle": "Download your data",
+    "exportBody": "Everything we hold about you — your account, memberships, profile and activity — as one JSON file.",
+    "exportButton": "Download my data",
+    "exporting": "Preparing…",
+    "exportError": "The download could not be prepared. Try again.",
+    "deleteTitle": "Delete your account",
+    "deleteBody": "This removes your account, your profile and your personal workspace. It cannot be undone.",
+    "deleteButton": "Delete my account…",
+    "confirmTitle": "Before you confirm",
+    "loadingPreview": "Checking what goes with it…",
+    "nothingElse": "Nothing else goes with it: you are not the only member of any organisation.",
+    "orgsGoing": "These organisations have no other members, so they and their listings are deleted too:",
+    "orgLine": "{name} — {listings, plural, =0 {no listings} one {# listing} other {# listings}}",
+    "blocked": "You are the only owner of an organisation that others belong to. Ownership has to pass to someone else first, or it would be left with nobody able to run it — write to the grievance officer for help:",
+    "confirmButton": "Delete permanently",
+    "deleting": "Deleting…",
+    "cancel": "Cancel",
+    "deleteError": "Your account could not be deleted. Nothing was changed. Try again."
+  },
+  "errors": {
+    "badge": "Unavailable",
+    "title": "This page could not load",
+    "body": "Something on our side failed — the page may exist, but we could not reach it just now. Try again in a moment.",
+    "retry": "Try again",
+    "home": "Go to the homepage",
+    "reference": "Reference: {digest}",
+    "notFoundBadge": "404",
+    "notFoundTitle": "This page does not exist",
+    "notFoundBody": "The link may be old, or the listing may have been withdrawn.",
+    "browseJobs": "Browse jobs"
+  },
+  "legal": {
+    "draftBadge": "Draft — pending legal review",
+    "draftNote": "This text is written to be accurate about how IISM works today. It has not yet been reviewed by a lawyer and may change before public launch.",
+    "version": "Version {version}",
+    "toBeAppointed": "To be appointed",
+    "officerHeading": "Grievance officer",
+    "officerName": "Name",
+    "officerEmail": "Email",
+    "officerPhone": "Phone",
+    "officerAddress": "Address",
+    "accountLink": "Go to your Account page",
+    "privacy": {
+      "title": "Privacy notice",
+      "intro": "This notice explains what the Intelligent Integrated Skill Marketplace (IISM) holds about you, why, for how long, and how to exercise your rights under India's Digital Personal Data Protection Act, 2023.",
+      "sections": [
+        {
+          "title": "Who is responsible",
+          "body": [
+            "IISM is the data fiduciary for the personal data described here: we decide why and how it is processed. Questions and complaints go to our grievance officer — see the grievance page."
+          ]
+        },
+        {
+          "title": "What we hold",
+          "body": [
+            "Your account: the mobile number or email address you sign up with, and your name if you add one.",
+            "If you look for work: the profile you build — skills, experience, education, certifications, languages, and the roles and places you prefer.",
+            "If you represent an organisation: its name, contact email and public profile, and the vacancies or courses it publishes.",
+            "Activity: which matches, gaps and courses you open. These records carry no name, number or email.",
+            "We do not collect Aadhaar numbers, résumé files or assessment results today. If that changes, this notice changes first."
+          ]
+        },
+        {
+          "title": "Why we hold it",
+          "body": [
+            "To sign you in with a one-time code — there are no passwords.",
+            "To match job seekers with vacancies and courses against the National Occupational Standards, and to show each person the gap between them and a role.",
+            "To let employers see who could fill a vacancy. Employers see a reference, headline, district, years of experience and skill gap — never your name, number or email.",
+            "To measure, in aggregate, whether the marketplace is working."
+          ]
+        },
+        {
+          "title": "Who else sees it",
+          "body": [
+            "We do not sell personal data.",
+            "Service providers process it on our behalf and under contract: cloud hosting in India, and the SMS and email services that deliver sign-in codes."
+          ]
+        },
+        {
+          "title": "How long we keep it",
+          "body": [
+            "Your account and profile: until you delete your account.",
+            "Activity records: 12 months, then deleted automatically.",
+            "Encrypted backups: replaced on a rolling schedule, so deleted data leaves them within that cycle."
+          ]
+        },
+        {
+          "title": "Your rights",
+          "body": [
+            "Access: download everything we hold about you, as one file, from your Account page.",
+            "Correction: edit your profile at any time.",
+            "Erasure and withdrawing consent: delete your account from your Account page. It is as easy as signing up, and it removes your profile and any organisation only you belong to.",
+            "Grievance: raise a complaint with our grievance officer; if it is not resolved, you may approach the Data Protection Board of India.",
+            "Nomination: you may nominate someone to exercise these rights for you in the event of death or incapacity — write to the grievance officer."
+          ]
+        },
+        {
+          "title": "Children",
+          "body": [
+            "The marketplace is for people aged 18 and over. We do not knowingly create accounts for children."
+          ]
+        },
+        {
+          "title": "Changes to this notice",
+          "body": [
+            "Each version is dated. When the notice changes in a way that matters, we ask you to agree again before you continue."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms of use",
+      "intro": "These terms govern your use of IISM. By creating an account you agree to them.",
+      "sections": [
+        {
+          "title": "The service",
+          "body": [
+            "IISM connects job seekers, employers and training providers around the national skill standards. Matches and gaps are computed from those standards; they are guidance, not a guarantee of employment or admission."
+          ]
+        },
+        {
+          "title": "Your account",
+          "body": [
+            "One person, one account. Keep your sign-in codes to yourself — anyone holding a code can sign in as you.",
+            "Give accurate information. Skills you add are shown as self-declared until evidence verifies them."
+          ]
+        },
+        {
+          "title": "Organisations",
+          "body": [
+            "Publish only real vacancies and courses, with honest terms.",
+            "Never ask a job seeker to pay in return for a job or an interview.",
+            "Use what you see about candidates only to recruit for the vacancy it was shown against."
+          ]
+        },
+        {
+          "title": "What is not allowed",
+          "body": [
+            "Scraping, bulk downloading or automated access beyond ordinary use.",
+            "Impersonating a person or organisation, or misrepresenting a qualification.",
+            "Trying to reach data that is not yours, or to disrupt the service."
+          ]
+        },
+        {
+          "title": "Suspension and closure",
+          "body": [
+            "We may suspend an account that breaks these terms. You may close yours at any time from your Account page."
+          ]
+        },
+        {
+          "title": "Liability",
+          "body": [
+            "IISM is provided as it is. To the extent the law allows, we are not liable for decisions that employers, providers or job seekers make using it."
+          ]
+        },
+        {
+          "title": "Law and disputes",
+          "body": [
+            "These terms are governed by the laws of India."
+          ]
+        },
+        {
+          "title": "Changes",
+          "body": [
+            "Each version is dated. When the terms change in a way that matters, we ask you to agree again."
+          ]
+        }
+      ]
+    },
+    "grievance": {
+      "title": "Grievance redressal",
+      "intro": "If you have a complaint about how IISM handles your personal data, or about content on the marketplace, write to our grievance officer.",
+      "sections": [
+        {
+          "title": "How to raise a grievance",
+          "body": [
+            "Write to the grievance officer from the mobile number or email your account uses, so we can confirm it is you.",
+            "Say what happened, when, and what you would like done. Do not send sign-in codes — we will never ask for them."
+          ]
+        },
+        {
+          "title": "What happens next",
+          "body": [
+            "We acknowledge a grievance within 24 hours and aim to resolve it within 15 days.",
+            "If you are not satisfied with the outcome, you may approach the Data Protection Board of India."
+          ]
+        },
+        {
+          "title": "Things you can do yourself",
+          "body": [
+            "Some requests need no one's help: download your data or delete your account from your Account page."
+          ]
+        }
+      ]
+    }
+  },
+  "applications": {
+    "apply": "Mohon pekerjaan ini",
+    "applying": "Sending…",
+    "appliedLabel": "Applied",
+    "withdraw": "Withdraw",
+    "withdrawing": "Withdrawing…",
+    "confirmHeading": "Before you apply",
+    "confirmShare": "Applying sends your name, mobile number and email to {organisation}, for this vacancy only. No other employer sees them.",
+    "confirmWithdrawNote": "If you withdraw later, they stop seeing your contact details.",
+    "confirmCta": "Yes, apply",
+    "cancel": "Cancel",
+    "messageLabel": "Add a note (optional)",
+    "messagePlaceholder": "Why you would suit this work, in a line or two.",
+    "errorDuplicate": "You have already applied for this job.",
+    "errorCap": "You have applied to a lot of jobs today. Try again tomorrow.",
+    "errorSeeker": "This account is set up for an organisation, so it cannot apply for jobs.",
+    "errorGeneric": "Something went wrong. Try again.",
+    "signInToApply": "Sign in to apply",
+    "save": "Simpan untuk kemudian",
+    "savedLabel": "Saved",
+    "pageTitle": "My applications",
+    "pageSubtitle": "Every job you applied for, and where each one stands.",
+    "empty": "You have not applied for anything yet.",
+    "emptyCta": "See your matches",
+    "savedPageTitle": "Saved jobs",
+    "savedPageSubtitle": "Jobs you kept to look at again. Saving tells the employer nothing.",
+    "savedEmpty": "You have not saved any jobs yet.",
+    "appliedOn": "Applied on {date}",
+    "navApplications": "My applications",
+    "status": {
+      "applied": "Applied",
+      "withdrawn": "Withdrawn",
+      "shortlisted": "Shortlisted",
+      "rejected": "Not selected",
+      "hired": "Hired"
+    },
+    "statusHint": {
+      "applied": "The employer has your application.",
+      "withdrawn": "You withdrew this. The employer no longer sees your contact details.",
+      "shortlisted": "The employer shortlisted you.",
+      "rejected": "The employer is not taking this one forward.",
+      "hired": "You got the job."
+    }
+  },
+  "employerInbox": {
+    "title": "Applicants",
+    "count": "{count, plural, =0 {No applications yet} one {# application} other {# applications}}",
+    "contactHeading": "Contact",
+    "noteHeading": "Their note",
+    "withdrawnNote": "Withdrawn by the candidate. Their contact details are no longer shared.",
+    "shortlist": "Shortlist",
+    "reject": "Not suitable",
+    "hire": "Mark as hired",
+    "updating": "Saving…",
+    "empty": "Nobody has applied yet. Candidates whose skills match this vacancy can see it on their matches page.",
+    "backToConsole": "Back to the console",
+    "appliedOn": "Applied on {date}",
+    "errorGeneric": "That could not be saved. Try again.",
+    "newBadge": "New",
+    "applicantsLink": "Applicants ({count})"
+  },
+  "notices": {
+    "title": "{count, plural, one {# update} other {# updates}}",
+    "markRead": "Mark as read",
+    "statusChanged": "{organisation} moved your application for {vacancy} to: {status}.",
+    "status": {
+      "applied": "Applied",
+      "withdrawn": "Withdrawn",
+      "shortlisted": "Shortlisted",
+      "rejected": "Not selected",
+      "hired": "Hired"
+    }
+  },
+  "searchPage": {
+    "title": "Results for “{q}”",
+    "titleEmpty": "Search",
+    "label": "Search for a job, a role or a skill",
+    "placeholder": "e.g. General Duty Assistant, welding, retail sales",
+    "submit": "Search",
+    "prompt": "Type a job title or a skill above.",
+    "loading": "Loading…",
+    "jobsHeading": "Open jobs",
+    "seeAllJobs": "See all {count} jobs",
+    "noJobs": "No open vacancy matches this yet.",
+    "rolesHeading": "Job roles",
+    "rolesNote": "The national qualifications behind the work — what an employer will expect you to know.",
+    "noRoles": "No job role by that name.",
+    "standardsCount": "{count, plural, one {# standard} other {# standards}}",
+    "matchedVia": "Matched “{term}”",
+    "showStandards": "What this job involves",
+    "hideStandards": "Hide",
+    "buildProfile": "Build my profile from this job",
+    "standardsHeading": "Skill standards",
+    "seeAllStandards": "Browse all matching standards",
+    "noStandards": "No standard matches this."
+  }
+}

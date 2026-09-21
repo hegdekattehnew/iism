@@ -1,17 +1,37 @@
+# python
 __pycache__/
 *.py[cod]
-*.egg-info/
 .venv/
-venv/
-.env
 .pytest_cache/
-.mypy_cache/
 .ruff_cache/
-htmlcov/
-.coverage
-dist/
-build/
+.mypy_cache/
+*.egg-info/
+
+# env
+.env
+.env.local
+
+# runtime
+.run/
+
+# node / next
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# generated (regenerate with `make gen-api`)
+web/openapi.json
+
+# os / editor
 .DS_Store
-*.log
+*.swp
 .idea/
 .vscode/
+
+# office lock files
+~$*
+
+# Full database dumps: ~40 MB gzipped and entirely regenerable with `make db-dump`.
+# backups/schema.sql is committed; the data dumps are not.
+backups/*.sql.gz

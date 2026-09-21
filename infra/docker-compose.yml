@@ -1,0 +1,54 @@
+name: iism
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: iism
+      POSTGRES_PASSWORD: iism
+      POSTGRES_DB: iism
+    # Non-default host ports so a pre-existing local Postgres/Redis is untouched.
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iism -d iism"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Master of the raw NSQF feed (ADR-034). Postgres remains the operational
+  # store; this holds the authoritative QP/NOS documents it is projected from.
+  #
+  # Pinned to 7.0 deliberately: mongo:8.0 refuses to start on Linux kernel
+  # 6.19+ (SERVER-121912), and Docker Desktop's VM here is 7.0-linuxkit.
+  mongo:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: iism
+      MONGO_INITDB_ROOT_PASSWORD: iism
+      MONGO_INITDB_DATABASE: nsqf
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  mongodata:

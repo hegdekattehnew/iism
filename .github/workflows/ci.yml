@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # --locked: install exactly what uv.lock pins, and fail if the lock has
+      # drifted from pyproject. `uv pip install -e` resolved fresh on every run,
+      # so two CI runs a day apart could test different code.
+      - name: Install
+        run: uv sync --locked --extra dev --python 3.12
+
+      - name: Audit dependencies
+        run: |
+          uv export --format requirements-txt --extra dev --no-emit-project > "$RUNNER_TEMP/requirements.txt"
+          uvx pip-audit -r "$RUNNER_TEMP/requirements.txt" --disable-pip
+
+      - name: Lint
+        run: |
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+
+      - name: Type-check
+        run: .venv/bin/mypy api
+
+      # testcontainers starts its own Postgres/Redis against the runner's Docker.
+      - name: Test
+        run: .venv/bin/pytest -q
+
+  web:
+    name: Web — lint, types, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      # Shipped code only; a dev-tool advisory does not reach a user's phone.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      # The actor-type branches: nothing above renders a component, and every
+      # Sprint 18 defect was a .tsx conditional that compiled perfectly.
+      - run: npm test
+      - run: npm run build
+      # The target device is a low-end Android on mobile data. A ceiling, not a
+      # target: it stops the first-load JS growing unnoticed.
+      - run: npm run budget
