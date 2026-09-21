@@ -19,6 +19,7 @@ import {
   useMemberships,
   useOrgCourseMutations,
   useOrgCourses,
+  useOrgInterests,
 } from "@/lib/org";
 
 /**
@@ -42,6 +43,11 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const te = useTranslations("employerWorkspace");
   const me = useMemberships();
   const courses = useOrgCourses(orgSlug);
+  // One request for the whole list, joined by slug -- not one per card.
+  const interest = useOrgInterests(orgSlug);
+  const interestBySlug = new Map(
+    (interest.data ?? []).map((row) => [row.course_slug, row.live]),
+  );
   const { create, update, setPublished } = useOrgCourseMutations(orgSlug);
 
   // null = closed, "new" = creating, otherwise the slug being edited.
@@ -208,6 +214,14 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                       ? te("unpublish")
                       : te("publish")}
                   </button>
+                  <Link
+                    href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
+                    className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+                  >
+                    {t("interestedLearners", {
+                      count: interestBySlug.get(course.slug) ?? 0,
+                    })}
+                  </Link>
                   {course.status === "published" && (
                     <Link
                       href={`/courses/${course.slug}`}

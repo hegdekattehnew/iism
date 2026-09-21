@@ -110,6 +110,11 @@ api/                     FastAPI modular monolith
                          a candidate's contact reaches an employer because they
                          applied, and goes when they withdraw. Depends on
                          marketplace and matching; nothing depends on it.
+    interests/           Registering interest in a course, and the provider's
+                         view of who did. A **sibling** of applications/, not an
+                         extension: a course publishes what it teaches, so an
+                         interested learner cannot be scored, and a shared
+                         abstraction would need the second scorer ADR-037 forbids.
     notifications/       The outbox (ADR-006): queued inside the request, sent by the
                          worker. The row names a recipient and never holds an
                          address -- that is resolved at send time.
@@ -268,6 +273,47 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   assert on rendered links and text.
 
 ## Current state
+
+Sprint 24 (somebody is interested) is done. The product's pitch is "here is your gap, and the
+courses that close it" — and for twenty-three sprints the learner could then do **nothing**. The
+course page ended in a back link and skill chips; the provider who published it was told nothing,
+ever. This is Sprint 21's loop, closed for the third actor.
+
+- **Interest, not enrolment.** Whether somebody enrolled is a fact the provider owns in their own
+  system; a status this platform cannot verify would drift from reality in a week. What it can know
+  is that a learner said "I want this".
+- **The product's second deliberate disclosure**, and the learner makes it. Name, phone, email,
+  district and their own note reach **that** provider for **that** course, recorded as
+  `contact_shared_at` (DPDP). Withdrawing sets `contact_revoked_at`, keeps the row so the provider's
+  history is not rewritten, and takes the details back — **including the note and the district**. A
+  withdrawn interest cannot be moved along (409), or marking it "contacted" would put contact back
+  on screen by a side door.
+- **`api/modules/interests/` is a sibling of `applications/`, not an extension** (ADR-026's
+  precedent). A vacancy publishes required standards, so an applicant can be scored; a course
+  publishes what it *teaches*, so there is nothing to rank against. **The provider inbox therefore
+  has no candidate card and no score at all** — building one would be the second scorer ADR-037
+  forbids. A test asserts no `score`, `coverage`, `matched` or `missing` ever reaches a provider.
+- **`LEARNER_CONTACT` is gated by `require(..., "course")`.** `PUBLISHES["course"]` is
+  `course_provider`, so one declaration refuses an employer (403) and a non-member (404) — the exact
+  mirror of the provider being refused the candidate pool. `require()`'s 403 message now names the
+  tenant type rather than the verb, because that gate guards reads too.
+- **`course_recommended` was unattributable, and is fixed.** It recorded `subject_type="job"` and a
+  bare count, while `course_opened` has always written `{"from_job": slug}` — the join key existed
+  on one side only, so ADR-025's click-through was uncomputable from Sprint 10 to Sprint 24. It now
+  writes one row per course, subjected to the course. **Rows written before 0025 carry the same name
+  with `subject_type="job"` and are not backfilled** — an event is a fact about what happened — so
+  any query must filter on the subject type.
+- **`record_many()` exists because `record()` commits.** Five suggestions would have been five
+  commits on a hot read path. Same contract: unknown names dropped, failures swallowed, never the
+  reason a page fails.
+- **`_delete_tenant` now deletes applications explicitly.** It never did — they went by FK cascade
+  alone, against this module's own stated rule, while a comment claimed they were removed "exactly
+  like the applications above", which were not there. The cascade did the right thing and nothing
+  said so.
+- **The worker does not reload, and this sprint proved it again.** The first drain after adding a
+  template failed with `KeyError: 'course_interest_registered'` — the worker had been running since
+  before the template existed. Restarting it drained `{"sent": 1, "skipped": 0, "failed": 0}`.
+  **Restart `make worker` after any `api/` change.**
 
 Sprint 23 (say what you do, and we'll name the standards) is done. It began as "should a CV
 populate the profile?" and found something sharper: **exactly one thing on a candidate profile

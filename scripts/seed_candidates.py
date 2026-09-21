@@ -29,6 +29,7 @@ from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.applications.models import Application
 from api.modules.identity.models import User
 from api.modules.identity.service import provision_candidate
+from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateCertification,
     CandidateEducation,
@@ -38,6 +39,7 @@ from api.modules.marketplace.models import (
     CandidatePreferredRole,
     CandidateProfile,
     CandidateSkill,
+    Course,
     Job,
 )
 from api.modules.skills.models import Skill
@@ -428,6 +430,38 @@ APPLICATIONS: list[tuple[str, str, str]] = [
     ("+919000000020", "delivery-associate-nagpur", "shortlisted"),
 ]
 
+# phone -> (course slug, status). Sprint 24: a provider signing in cold must
+# find somebody in their inbox, or the feature may as well not exist (Sprint
+# 22.5's lesson). **Every one of the five seeded providers appears here**, with
+# a `withdrawn` row to prove the contact disappears and a `contacted` one to
+# prove a provider can move an interest along.
+#
+# Golden phones (…001–005) are deliberately absent: `make evaluate` asserts
+# their rankings, and while an interest changes no score, keeping them out of
+# this file means the golden set cannot be perturbed from here by accident.
+COURSE_INTERESTS: list[tuple[str, str, str]] = [
+    # NSDC Healthcare Academy
+    ("+919000000007", "infection-control-in-hospitals", "registered"),
+    ("+919000000006", "ward-shift-management", "registered"),
+    ("+919000000009", "critical-care-support-skills", "contacted"),
+    ("+919000000010", "geriatric-home-care-advanced", "registered"),
+    # SkillBridge Institute
+    ("+919000000013", "phlebotomy-refresher", "registered"),
+    ("+919000000012", "ecg-technician-advanced", "withdrawn"),
+    ("+919000000015", "oxygen-and-airway-support", "registered"),
+    ("+919000000011", "sterile-processing-essentials", "contacted"),
+    # Allied Health Skills Academy
+    ("+919000000014", "laboratory-microscopy-basics", "registered"),
+    ("+919000000017", "medical-records-and-data-entry", "registered"),
+    # Retail Skills Academy
+    ("+919000000018", "visual-merchandising-foundations", "registered"),
+    ("+919000000018", "customer-service-excellence", "contacted"),
+    # Bharat Logistics and Retail Institute
+    ("+919000000019", "warehouse-goods-handling", "registered"),
+    ("+919000000020", "first-aid-at-work", "registered"),
+    ("+919000000020", "cash-and-cod-handling", "withdrawn"),
+]
+
 GOLDEN_PAIRS: list[tuple[str, str, str]] = [
     ("+919000000001", "general-duty-assistant-chennai", "top"),
     ("+919000000002", "general-duty-assistant-chennai", "capped_missing_mandatory"),
@@ -472,6 +506,45 @@ async def _seed_applications(db) -> int:  # type: ignore[no-untyped-def]
         application.contact_revoked_at = _now() if status == "withdrawn" else None
         if existing is None:
             db.add(application)
+        count += 1
+    await db.flush()
+    return count
+
+
+async def _seed_course_interests(db) -> int:  # type: ignore[no-untyped-def]
+    """Give every provider's inbox somebody in it on a fresh machine.
+
+    Idempotent by (candidate, course), and a course that is not seeded is
+    skipped rather than failing the run -- the same rule the applications above
+    follow, for the same reason.
+    """
+    count = 0
+    for phone, course_slug, status in COURSE_INTERESTS:
+        user = await db.scalar(select(User).where(User.phone == phone))
+        course = await db.scalar(
+            select(Course).where(Course.slug == course_slug, Course.status == "published")
+        )
+        if user is None or course is None:
+            continue
+        profile = await db.scalar(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
+        if profile is None:
+            continue
+        existing = await db.scalar(
+            select(CourseInterest).where(
+                CourseInterest.course_id == course.id,
+                CourseInterest.profile_id == profile.id,
+            )
+        )
+        interest = existing or CourseInterest(course_id=course.id, profile_id=profile.id)
+        interest.status = status
+        # The consent record, exactly as the API would write it: shared when
+        # they registered, revoked if they withdrew.
+        interest.contact_shared_at = interest.contact_shared_at or _now()
+        interest.contact_revoked_at = _now() if status == "withdrawn" else None
+        if existing is None:
+            db.add(interest)
         count += 1
     await db.flush()
     return count
@@ -573,11 +646,13 @@ async def main() -> None:
             await db.flush()
 
         applied = await _seed_applications(db)
+        interested = await _seed_course_interests(db)
         await db.commit()
 
     print(
         f"candidates created: {created}  skills attached: {skills_added}  "
-        f"profile sections: {collections_added}  applications: {applied}"
+        f"profile sections: {collections_added}  applications: {applied}  "
+        f"course interests: {interested}"
     )
     await dispose_engine()
 

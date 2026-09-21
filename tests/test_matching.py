@@ -18,7 +18,14 @@ from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.geography.models import District, State
 from api.modules.identity.models import Tenant, User
-from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
+from api.modules.marketplace.models import (
+    CandidateProfile,
+    CandidateSkill,
+    Course,
+    CourseSkill,
+    Job,
+    JobSkill,
+)
 from api.modules.matching.scoring import (
     EXPERIENCE_WEIGHT,
     LEVEL_WEIGHT,
@@ -652,3 +659,98 @@ class TestLocality:
             )
         ).json()["items"]
         assert [i["job"]["title"][0] for i in only] == ["A"]
+
+
+class TestCourseRecommendationsAreAttributable:
+    """Until Sprint 24 `course_recommended` recorded `subject_type="job"` and a
+    bare count, so which course was recommended could not be recovered -- while
+    `course_opened` had always written `{"from_job": slug}`. The join key
+    existed on one side only, and ADR-025's click-through was uncomputable."""
+
+    @pytest.fixture
+    async def gap(self, db: AsyncSession) -> dict:
+        standard = Skill(
+            slug=f"rec-std-{uuid.uuid4().hex[:6]}",
+            name="Infection control",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code=f"REC/{uuid.uuid4().hex[:6]}",
+            source="nsqf",
+        )
+        held = Skill(
+            slug=f"rec-held-{uuid.uuid4().hex[:6]}",
+            name="Bed making",
+            skill_type="technical",
+            nsqf_level=Decimal("3"),
+            nos_code=f"HLD/{uuid.uuid4().hex[:6]}",
+            source="nsqf",
+        )
+        employer = Tenant(
+            slug=f"rec-emp-{uuid.uuid4().hex[:6]}", name="Rec Co", tenant_type="employer"
+        )
+        provider = Tenant(
+            slug=f"rec-prov-{uuid.uuid4().hex[:6]}",
+            name="Rec Academy",
+            tenant_type="course_provider",
+        )
+        db.add_all([standard, held, employer, provider])
+        await db.flush()
+
+        job = Job(
+            slug=f"rec-job-{uuid.uuid4().hex[:6]}",
+            tenant_id=employer.id,
+            title="Ward Attendant",
+            employment_type="full_time",
+            status="published",
+        )
+        db.add(job)
+        await db.flush()
+        db.add_all(
+            [
+                JobSkill(job_id=job.id, skill_id=held.id, importance=3, is_mandatory=False),
+                JobSkill(job_id=job.id, skill_id=standard.id, importance=5, is_mandatory=False),
+            ]
+        )
+        # Two courses, each closing the one standard the candidate lacks.
+        courses = []
+        for i in range(2):
+            course = Course(
+                slug=f"rec-course-{i}-{uuid.uuid4().hex[:6]}",
+                tenant_id=provider.id,
+                title=f"Infection Control {i}",
+                mode="online",
+                status="published",
+            )
+            db.add(course)
+            await db.flush()
+            db.add(CourseSkill(course_id=course.id, skill_id=standard.id, level_taught=4))
+            courses.append(course)
+        await db.commit()
+        return {"job": job, "held": held, "courses": courses}
+
+    async def test_one_event_per_course_subjected_to_the_course(
+        self, gap: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": gap["held"].slug, "proficiency": 4},
+        )
+        await client.get(f"/me/matches/{gap['job'].slug}", headers=headers)
+
+        rows = (
+            (
+                await db.execute(
+                    select(AnalyticsEvent).where(AnalyticsEvent.name == "course_recommended")
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        assert len(rows) == 2, "one row per recommended course, not one bare count"
+        assert {r.subject_type for r in rows} == {"course"}
+        assert {r.subject_id for r in rows} == {c.id for c in gap["courses"]}
+        # The key `course_opened` uses, spelled the same way on both sides.
+        assert {r.payload["from_job"] for r in rows} == {gap["job"].slug}

@@ -48,6 +48,12 @@ EVENT_NAMES = (
     # description of a person.
     "role_suggested",
     "skills_bulk_added",
+    # Sprint 24, the course loop. `course_interest_status_changed` carries
+    # the status in its payload, so a second provider status later costs no
+    # migration.
+    "course_interest_registered",
+    "course_interest_withdrawn",
+    "course_interest_status_changed",
 )
 
 

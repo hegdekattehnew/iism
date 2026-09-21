@@ -2,6 +2,6 @@
 
 from api.modules.analytics.models import EVENT_NAMES, AnalyticsEvent
 from api.modules.analytics.routes import router
-from api.modules.analytics.service import record
+from api.modules.analytics.service import record, record_many
 
-__all__ = ["EVENT_NAMES", "AnalyticsEvent", "record", "router"]
+__all__ = ["EVENT_NAMES", "AnalyticsEvent", "record", "record_many", "router"]

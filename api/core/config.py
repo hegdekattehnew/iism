@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     # the inbox. The per-minute write limit stops a script; this stops a day of
     # patient spraying, which is what actually ruins an inbox.
     max_applications_per_day: int = 50
+    max_course_interests_per_day: int = 50
 
     # --- database pool ---
     db_pool_size: int = 5

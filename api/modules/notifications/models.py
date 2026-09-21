@@ -33,7 +33,12 @@ CHANNELS = ("email", "in_app")
 
 # Closed, like every other set here. The template decides the words; the
 # payload carries only what the words need.
-TEMPLATES = ("application_received", "application_status_changed")
+TEMPLATES = (
+    "application_received",
+    "application_status_changed",
+    # Sprint 24. The first thing a course provider is ever told.
+    "course_interest_registered",
+)
 
 STATUSES = ("pending", "sent", "failed", "skipped")
 

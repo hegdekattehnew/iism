@@ -26,6 +26,11 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{organisation} has moved your application for {vacancy} to: {status}.\n\n"
             "See your applications:\n{link}\n",
         ),
+        "course_interest_registered": (
+            "Somebody is interested in {course}",
+            "Somebody has registered interest in {course}.\n\n"
+            "Open your interested learners to see how to reach them:\n{link}\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -38,6 +43,11 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{vacancy} के लिए आपके आवेदन पर अद्यतन",
             "{organisation} ने {vacancy} के लिए आपके आवेदन को इस स्थिति में बदला: {status}।\n\n"
             "अपने आवेदन देखें:\n{link}\n",
+        ),
+        "course_interest_registered": (
+            "{course} में किसी की रुचि है",
+            "{course} में किसी ने रुचि दर्ज की है।\n\n"
+            "उनसे कैसे संपर्क करें यह देखने के लिए अपने इच्छुक शिक्षार्थी खोलें:\n{link}\n",
         ),
     },
 }

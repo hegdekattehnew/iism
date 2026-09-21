@@ -60,6 +60,10 @@ class Permission(StrEnum):
     COURSE_PUBLISH = "course:publish"
     COURSE_DELETE = "course:delete"
     CANDIDATE_SHORTLIST = "candidate:shortlist"
+    # A provider seeing who wants their course. The mirror of
+    # CANDIDATE_SHORTLIST, and separate from it because the two disclose
+    # different things to different kinds of organisation.
+    LEARNER_CONTACT = "learner:contact"
 
 
 _MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ})
@@ -76,6 +80,7 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.COURSE_UPDATE,
     Permission.COURSE_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
+    Permission.LEARNER_CONTACT,
 }
 # Deletion is the owner's alone, and so is editing the organisation itself. An
 # admin can unpublish, which reverses; neither of these does.
@@ -214,7 +219,11 @@ def require(
                 )
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
-                    f"Only a {expected.replace('_', ' ')} can publish a {publishes}",
+                    # Names the tenant type rather than the verb: this same
+                    # gate gates reads too, and "can publish a course" is
+                    # the wrong sentence for a provider reading their own
+                    # interested learners.
+                    f"This is for a {expected.replace('_', ' ')} organisation",
                 )
         return context
 

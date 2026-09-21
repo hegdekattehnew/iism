@@ -17,7 +17,8 @@
     "vacancies": "Vacancies",
     "courses_org": "Courses",
     "skipToContent": "Langkau ke kandungan utama",
-    "language": "Bahasa"
+    "language": "Bahasa",
+    "learners": "Interested learners"
   },
   "hero": {
     "eyebrow": "NSQF-aligned skill intelligence",
@@ -821,7 +822,8 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "title": "Your workspace",
-    "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close."
+    "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close.",
+    "interestedLearners": "Interested learners ({count})"
   },
   "chooser": {
     "title": "I'm here to…",
@@ -1149,5 +1151,54 @@
     "standardsHeading": "Skill standards",
     "seeAllStandards": "Browse all matching standards",
     "noStandards": "No standard matches this."
+  },
+  "courseInterest": {
+    "pageTitle": "Courses I asked about",
+    "pageSubtitle": "The training you registered interest in, and where each stands.",
+    "register": "I'm interested in this course",
+    "signInToRegister": "Sign in to register interest",
+    "registeredLabel": "Interest registered",
+    "withdraw": "Withdraw",
+    "withdrawing": "Withdrawing…",
+    "registering": "Registering…",
+    "confirmHeading": "Before you register",
+    "confirmShare": "{organisation} will see your name, phone number, email and district, so they can tell you about this course.",
+    "confirmWithdrawNote": "You can withdraw at any time, and they stop seeing your details.",
+    "messageLabel": "Anything they should know (optional)",
+    "messagePlaceholder": "e.g. evenings only, or when you could start",
+    "confirmCta": "Register my interest",
+    "cancel": "Cancel",
+    "status": {
+      "registered": "Registered",
+      "contacted": "They got in touch",
+      "withdrawn": "Withdrawn"
+    },
+    "registeredOn": "Registered on {date}",
+    "empty": "You have not registered interest in any course yet.",
+    "emptyCta": "Browse courses",
+    "errorDuplicate": "You have already registered interest in this course.",
+    "errorCap": "You have registered interest in a lot of courses today. Try again tomorrow.",
+    "errorSeeker": "Only a job seeker account can register interest.",
+    "errorGeneric": "That did not work. Please try again."
+  },
+  "providerInbox": {
+    "summaryTitle": "Interested learners",
+    "summarySubtitle": "Who wants the courses you publish, and how to reach them.",
+    "count": "{count, plural, =0 {Nobody yet} one {# interested} other {# interested}}",
+    "liveCount": "{count, plural, =0 {Nobody yet} one {# interested} other {# interested}}",
+    "totalEver": "{count} in total",
+    "backToConsole": "Back to the console",
+    "empty": "Nobody has registered interest in this course yet. Learners see it when it closes a gap in their profile.",
+    "noCourses": "You have not published a course yet.",
+    "contactHeading": "Contact",
+    "noteHeading": "What they told you",
+    "registeredOn": "Registered on {date}",
+    "newBadge": "New",
+    "contactedBadge": "Contacted",
+    "markContacted": "Mark as contacted",
+    "saving": "Saving…",
+    "withdrawnTitle": "A learner withdrew their interest",
+    "withdrawnNote": "Withdrawn by the learner. Their contact details are no longer shared.",
+    "errorGeneric": "That could not be saved. Try again."
   }
 }

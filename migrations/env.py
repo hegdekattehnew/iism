@@ -16,6 +16,7 @@ from api.modules.analytics import models as _analytics_models  # noqa: F401
 from api.modules.applications import models as _applications_models  # noqa: F401
 from api.modules.geography import models as _geography_models  # noqa: F401
 from api.modules.identity import models as _identity_models  # noqa: F401
+from api.modules.interests import models as _interest_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401
 from api.modules.notifications import models as _notification_models  # noqa: F401
 from api.modules.skills import concepts as _skills_concepts  # noqa: F401

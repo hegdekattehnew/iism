@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
+import { InterestPanel } from "@/components/InterestPanel";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -61,6 +62,12 @@ export default async function CourseDetailPage({
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
       <p className="mt-1 text-lg text-muted">{data.tenant.name}</p>
+
+      {/* The one thing a learner can do here. Until Sprint 24 this page
+          was a dead end: the gap named, the course named, nothing to press. */}
+      <div className="mt-6">
+        <InterestPanel courseSlug={data.slug} organisation={data.tenant.name} />
+      </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-border-token bg-surface p-5 text-sm">
         <div>

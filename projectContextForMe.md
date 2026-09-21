@@ -79,6 +79,22 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
 
 ## 4. Current state
 
+**Sprint 24 (somebody is interested) — complete, 2026-09-21.** Deployment deferred; the question was
+which functionality is worth most, and a scan across all three actors found one that got nothing at
+all. A learner shown "the courses that close your gap" could not act on one — no enrol, no enquiry,
+not even the provider's website that the API already returned — and providers published into
+silence. Now a learner registers interest (sharing name, contact, district and a note with that
+provider, revoked on withdrawal), the provider gets an inbox, a roll-up of which courses people
+want, and the first notification they have ever received. `api/modules/interests/` is a sibling of
+`applications/`; the provider payload has **no score**, because a course publishes what it teaches
+and inventing a scorer for it is what ADR-037 forbids. Migration 0025. Two defects fixed alongside:
+`course_recommended` was recorded against the job with a bare count (ADR-025's click-through has
+been uncomputable since Sprint 10 — now one row per course, carrying `from_job`), and
+`_delete_tenant` never deleted applications explicitly. 527 backend and 89 web tests. **Still open:**
+teammate invitations and the sole-owner trap (agreed as the next sprint — a sole owner deleting
+their account still destroys the organisation and every application to it); a learner-facing notice
+when a provider marks "contacted"; vacancy lifecycle; `is_verified` still has no writer.
+
 **Sprint 23 (say what you do, and we'll name the standards) — complete, 2026-09-18.** Asked as "should
 a CV populate the profile?"; answered by finding that only `candidate_skills` changes a score, and
 that the only way to add one was naming a National Occupational Standard nobody can name. A CV would

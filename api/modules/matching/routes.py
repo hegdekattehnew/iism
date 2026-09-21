@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
-from api.modules.analytics import record
+from api.modules.analytics import record, record_many
 
 # Candidate routes require a candidate, not merely a signed-in account: an
 # organisation-only user used to get a CandidateProfile created on first look.
@@ -126,13 +126,34 @@ async def match_detail(
             },
         )
     if courses:
-        await record(
+        # Subjected to the **course**, not the job. It recorded
+        # `subject_type="job"` and a bare count until Sprint 24, so which
+        # course was recommended could not be recovered -- and `course_opened`
+        # has always written `{"from_job": slug}`, so the join key existed on
+        # one side only and ADR-025's click-through has been uncomputable since
+        # Sprint 10. `from_job` is spelled exactly as that handler spells it.
+        #
+        # Rows written before migration 0025 carry this name with
+        # `subject_type="job"`. They are not backfilled -- an event is a fact
+        # about what happened -- so any query must filter on the subject type.
+        await record_many(
             db,
-            "course_recommended",
-            user_id=user.id,
-            subject_type="job",
-            subject_id=scored.job.id,
-            payload={"suggested": len(courses)},
+            [
+                (
+                    "course_recommended",
+                    {
+                        "user_id": user.id,
+                        "subject_type": "course",
+                        "subject_id": suggestion.course.id,
+                        "payload": {
+                            "from_job": scored.job.slug,
+                            "closes": suggestion.closes_count,
+                            "rank": rank,
+                        },
+                    },
+                )
+                for rank, suggestion in enumerate(courses)
+            ],
         )
 
     base = _to_match(scored)

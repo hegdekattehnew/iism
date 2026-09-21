@@ -1092,6 +1092,107 @@ export interface paths {
         patch: operations["set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch"];
         trace?: never;
     };
+    "/me/course-interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Interests */
+        get: operations["my_interests_me_course_interests_get"];
+        put?: never;
+        /**
+         * Register Interest
+         * @description Tell a provider you want this course, sharing your name and contact.
+         */
+        post: operations["register_interest_me_course_interests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/course-interests/{interest_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Interest
+         * @description Take it back. The provider keeps the fact and loses the contact details.
+         */
+        post: operations["withdraw_interest_me_course_interests__interest_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{course_slug}/interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Interested Learners
+         * @description Who wants this course, with how to reach them while each interest is live.
+         */
+        get: operations["list_interested_learners_org__org_slug__courses__course_slug__interests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{course_slug}/interests/{interest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Interest Status
+         * @description Mark that you have been in touch. A withdrawn interest cannot be moved.
+         */
+        patch: operations["set_interest_status_org__org_slug__courses__course_slug__interests__interest_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interest By Course
+         * @description How much interest each of this provider's courses has attracted.
+         */
+        get: operations["interest_by_course_org__org_slug__interests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/notifications": {
         parameters: {
             query?: never;
@@ -1766,6 +1867,20 @@ export interface components {
             /** Skills */
             skills?: components["schemas"]["CourseSkillIn"][];
         };
+        /**
+         * CourseInterestCount
+         * @description How many learners want one course, for the provider's own list.
+         */
+        CourseInterestCount: {
+            /** Course Slug */
+            course_slug: string;
+            /** Course Title */
+            course_title: string;
+            /** Live */
+            live: number;
+            /** Total */
+            total: number;
+        };
         /** CourseOpenedIn */
         CourseOpenedIn: {
             /** Course Slug */
@@ -1816,6 +1931,23 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /**
+         * CourseRef
+         * @description Enough of a course to recognise it in a list of your own interests.
+         */
+        CourseRef: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Mode */
+            mode: string;
+            /** Duration Hours */
+            duration_hours?: number | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            tenant: components["schemas"]["TenantOut"];
         };
         /**
          * CourseSkillIn
@@ -2015,6 +2147,86 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InterestIn */
+        InterestIn: {
+            /** Course Slug */
+            course_slug: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * InterestOut
+         * @description The learner's own view of an interest.
+         */
+        InterestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            course: components["schemas"]["CourseRef"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted";
+            /** Message */
+            message?: string | null;
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * InterestedLearnerOut
+         * @description One interest, as the provider sees it.
+         *
+         *     **There is no candidate card here, and that is deliberate.** An employer's
+         *     applicant carries `candidate_card()` because a vacancy has required
+         *     standards to score against; a course has none, and inventing a second
+         *     scorer to fill this screen is exactly what ADR-037 forbids. So a provider
+         *     is told who wants the course, how to reach them, and where they are --
+         *     never how good they are, nor which vacancy the gap came from, which would
+         *     name a third party and the learner's job-search intent.
+         */
+        InterestedLearnerOut: {
+            /**
+             * Interest Id
+             * Format: uuid
+             */
+            interest_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted";
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /** Message */
+            message?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            contact?: components["schemas"]["LearnerContactOut"] | null;
+        };
+        /** InterestedLearnerPage */
+        InterestedLearnerPage: {
+            course: components["schemas"]["CourseRef"];
+            /** Items */
+            items?: components["schemas"]["InterestedLearnerOut"][];
+            /** Total */
+            total: number;
         };
         /** JobDetail */
         JobDetail: {
@@ -2244,6 +2456,22 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /**
+         * LearnerContactOut
+         * @description The disclosure itself.
+         *
+         *     Present only while an interest is live. Defined here rather than imported
+         *     from `applications`, which states that nothing depends on it -- and that
+         *     has to stay true.
+         */
+        LearnerContactOut: {
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
         };
         /** LevelFacet */
         LevelFacet: {
@@ -2728,6 +2956,17 @@ export interface components {
             percent: number;
             /** Missing */
             missing?: string[];
+        };
+        /**
+         * ProviderStatusIn
+         * @description What a provider may set. `registered` and `withdrawn` are the learner's.
+         */
+        ProviderStatusIn: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "contacted";
         };
         /** QualificationRefOut */
         QualificationRefOut: {
@@ -5390,6 +5629,214 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_interests_me_course_interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_interest_me_course_interests_post: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_interest_me_course_interests__interest_id__withdraw_post: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                interest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_interested_learners_org__org_slug__courses__course_slug__interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                course_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestedLearnerPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_interest_status_org__org_slug__courses__course_slug__interests__interest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_slug: string;
+                interest_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestedLearnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interest_by_course_org__org_slug__interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseInterestCount"][];
                 };
             };
             /** @description Validation Error */

@@ -200,6 +200,27 @@ export function useOrgCourses(orgSlug: string | null) {
   });
 }
 
+/**
+ * How much interest each of this provider's courses has attracted.
+ *
+ * One request for the whole workspace rather than one per card, and it comes
+ * from the interests module rather than the course itself -- `marketplace` may
+ * not read that table (ADR-014).
+ */
+export function useOrgInterests(orgSlug: string | null) {
+  return useQuery({
+    queryKey: ["org", orgSlug, "interests"],
+    enabled: Boolean(orgSlug),
+    queryFn: async () => {
+      const { data, error } = await api.GET("/org/{org_slug}/interests", {
+        params: { path: { org_slug: orgSlug as string } },
+      });
+      if (error || !data) throw new Error("interests failed");
+      return data;
+    },
+  });
+}
+
 export function useOrgCourseMutations(orgSlug: string) {
   const qc = useQueryClient();
   const refresh = () =>

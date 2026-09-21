@@ -30,6 +30,8 @@ from typing import Any, Literal, get_args, get_origin
 from api.modules.identity import schemas as identity_schemas
 from api.modules.identity.models import Membership, Tenant
 from api.modules.identity.schemas import MembershipRole, OrgTenantType, TenantType
+from api.modules.interests.models import CourseInterest
+from api.modules.interests.schemas import InterestStatus
 from api.modules.marketplace import schemas as marketplace_schemas
 from api.modules.marketplace.models import (
     CandidateLanguage,
@@ -71,6 +73,7 @@ BACKED: list[tuple[Any, Any, str]] = [
     (LanguageProficiency, CandidateLanguage, "proficiency"),
     (SkillType, Skill, "skill_type"),
     (AliasScript, SkillAlias, "script"),
+    (InterestStatus, CourseInterest, "status"),
 ]
 
 

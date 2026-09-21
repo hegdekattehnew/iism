@@ -23,6 +23,7 @@ from api.core.security import revoke_all_for_user
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import Membership, Tenant, User
+from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateProfile,
     CandidateSkill,
@@ -89,13 +90,21 @@ async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
 async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     job_ids = select(Job.id).where(Job.tenant_id == tenant_id)
     course_ids = select(Course.id).where(Course.tenant_id == tenant_id)
+    # What people did with this organisation's listings, deleted explicitly.
+    # Until Sprint 24 these two went only by the FK cascade from `jobs.id` --
+    # against this module's own rule, and against a comment below claiming they
+    # were already removed "exactly like the applications above", which were
+    # not there. The cascade did the right thing; nothing said so.
+    await db.execute(delete(Application).where(Application.job_id.in_(job_ids)))
+    await db.execute(delete(SavedJob).where(SavedJob.job_id.in_(job_ids)))
     await db.execute(delete(JobSkill).where(JobSkill.job_id.in_(job_ids)))
     await db.execute(delete(Job).where(Job.tenant_id == tenant_id))
+    await db.execute(delete(CourseInterest).where(CourseInterest.course_id.in_(course_ids)))
     await db.execute(delete(CourseSkill).where(CourseSkill.course_id.in_(course_ids)))
     await db.execute(delete(Course).where(Course.tenant_id == tenant_id))
     # No foreign key to cascade from -- the outbox names a recipient by id
     # rather than pointing at one (see its module docstring) -- so erasure
-    # removes them explicitly, exactly like the applications above.
+    # removes them explicitly, like the rows above.
     await db.execute(
         delete(Notification).where(
             Notification.recipient_kind == "tenant", Notification.recipient_id == tenant_id
@@ -131,6 +140,7 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         # applicant entirely is the point.
         await db.execute(delete(Application).where(Application.profile_id == profile.id))
         await db.execute(delete(SavedJob).where(SavedJob.profile_id == profile.id))
+        await db.execute(delete(CourseInterest).where(CourseInterest.profile_id == profile.id))
         await db.delete(profile)
         await db.flush()
 
@@ -193,6 +203,15 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         if profile is not None
         else None
     )
+    interests = (
+        await db.scalars(
+            select(CourseInterest)
+            .where(CourseInterest.profile_id == profile.id)
+            .order_by(CourseInterest.created_at)
+        )
+        if profile is not None
+        else None
+    )
 
     events = (
         await db.scalars(
@@ -249,6 +268,20 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         "saved_jobs": [
             {"vacancy": row.job.title, "saved_at": _iso(row.created_at)}
             for row in (saved.all() if saved is not None else [])
+        ],
+        # The disclosure is part of the learner's own record, not only the
+        # provider's -- the same reason applications carry their two timestamps.
+        "course_interests": [
+            {
+                "course": interest.course.title,
+                "provider": cast(Tenant, interest.course.tenant).name,
+                "status": interest.status,
+                "message": interest.message,
+                "registered_at": _iso(interest.created_at),
+                "contact_shared_at": _iso(interest.contact_shared_at),
+                "contact_revoked_at": _iso(interest.contact_revoked_at),
+            }
+            for interest in (interests.all() if interests is not None else [])
         ],
         "activity": [
             {

@@ -13,6 +13,7 @@ been committed. Every current caller is a read endpoint.
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -61,6 +62,37 @@ async def record(
         # fails. The exception is logged, not raised.
         log.exception("analytics.record_failed", event_name=name)
         # Leave the session usable for whatever the handler does next.
+        await db.rollback()
+
+
+async def record_many(
+    db: AsyncSession,
+    events: "Sequence[tuple[str, dict[str, Any]]]",
+) -> None:
+    """Record several events in **one** commit. Never raises.
+
+    `record()` commits, which is right for one event and wrong for five: a
+    match-detail view recommends up to five courses, and looping `record()`
+    would put five commits on a hot read path. Same contract otherwise --
+    unknown names are dropped with a warning, failures are swallowed, and
+    measurement is never the reason a page fails.
+
+    Each event is `(name, fields)` where `fields` holds any of `user_id`,
+    `subject_type`, `subject_id`, `payload`.
+    """
+    rows = []
+    for name, fields in events:
+        if name not in EVENT_NAMES:
+            log.warning("analytics.unknown_event", event_name=name)
+            continue
+        rows.append(AnalyticsEvent(name=name, **fields))
+    if not rows:
+        return
+    try:
+        db.add_all(rows)
+        await db.commit()
+    except Exception:  # pragma: no cover - defensive by design
+        log.exception("analytics.record_many_failed", count=len(rows))
         await db.rollback()
 
 

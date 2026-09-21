@@ -26,6 +26,19 @@ describe("Header — the whole header switches, not half of it", () => {
 
     expect(link("Vacancies")).toBeNull();
     expect(link("Courses")?.getAttribute("href")).toBe("/employer/tnt");
+    // Sprint 24: a provider reaches their inbox from the nav, because they
+    // have no vacancy to reach it through the way an employer does.
+    expect(link("Interested learners")?.getAttribute("href")).toBe(
+      "/employer/tnt/interests",
+    );
+  });
+
+  it("does not offer an employer the provider's inbox", () => {
+    world.memberships = [personal(), org("acme")];
+    world.pathname = "/employer/acme";
+    renderUi(<Header />);
+
+    expect(link("Interested learners")).toBeNull();
   });
 
   it("shows no organisation nav while it cannot yet tell what kind it is", () => {
