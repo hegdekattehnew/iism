@@ -8,8 +8,8 @@ const SHOWN = 12;
 
 const TONE: Record<string, string> = {
   compulsory: "bg-accent-soft text-brand",
-  elective: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  optional: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  elective: "bg-warning-surface text-warning-text",
+  optional: "bg-surface-muted text-foreground",
 };
 
 export async function SkillQualifications({ slug }: { slug: string }) {

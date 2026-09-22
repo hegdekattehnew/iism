@@ -110,7 +110,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
           {editing === "new" ? t("newCourse") : t("editCourse")}
         </h2>
         {saveFailed && (
-          <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+          <p className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {t("saveFailed")}
           </p>
         )}
@@ -135,7 +135,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
       </div>
 
       {refused && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+        <p className="rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-sm text-warning-text">
           {t("publishRefused")}
         </p>
       )}

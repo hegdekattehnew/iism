@@ -22,8 +22,8 @@ export const buttonVariants = cva(
           "border border-border-token bg-surface text-foreground hover:bg-surface-muted",
         ghost: "text-muted hover:bg-surface-muted hover:text-foreground",
         danger:
-          "border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 " +
-          "dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300",
+          "border border-danger-border bg-danger-surface text-danger-text " +
+          "hover:brightness-95 dark:hover:brightness-110",
       },
       size: {
         sm: "px-3 py-1.5 text-sm",

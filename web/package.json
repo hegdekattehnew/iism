@@ -12,6 +12,7 @@
     "gen:api": "curl -s ${API_URL:-http://localhost:8000}/openapi.json -o openapi.json && openapi-typescript openapi.json -o src/lib/api-schema.d.ts"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-progress": "^1.1.16",
     "@radix-ui/react-slot": "^1.3.3",
     "@tanstack/react-query": "^5.102.8",

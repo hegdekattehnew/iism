@@ -128,7 +128,7 @@ function AlreadySignedIn({ type }: { type: SignUpType }) {
         {create.isPending ? tc("creating") : tc("create")}
       </Button>
       {create.isError && (
-        <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
           {tc("createError")}
         </p>
       )}
@@ -398,7 +398,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
       )}
 
       {error && (
-        <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
           {error}
         </p>
       )}

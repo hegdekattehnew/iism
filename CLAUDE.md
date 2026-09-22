@@ -270,6 +270,25 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   English. Before Sprint 16 the hero's Search button sat below the fold at 360×640 in Hindi while
   passing in English. Measure `getBoundingClientRect().bottom` of the submit button on `/hi` at
   360×640 before adding anything above it.
+- **`backdrop-filter` on an ancestor is a containing block for `position: fixed`.** `Header` has
+  `backdrop-blur`, so the create-organisation dialog's `fixed inset-0` resolved to the header's box
+  — measured at **1280×64 against a 1280×800 window**, clamped into the strip at the top of the
+  page. No `z-index` or offset would have helped. **Anything modal goes through
+  `ui/dialog.tsx`**, which portals to the body and brings the focus trap, Escape and scroll lock
+  the hand-rolled overlay never had. `Dialog` is deliberately **not** re-exported from
+  `ui/index.ts`: almost everything imports that barrel for a Button, and Radix's dialog is ~33 KB
+  of the first-load budget.
+- **`globals.css` is the only file that may name a colour**, and `web/src/lib/tokens.test.ts` now
+  enforces it. The rule had been stated since Sprint 11 and broken **305 times across 38 files**;
+  every one of those re-derived its own light/dark pair by hand. Use the semantic tones —
+  `--success-*`, `--warning-*`, `--danger-*`, `--info-*`, each carrying surface, border and text —
+  and `Alert`/`Badge` rather than a new class string. The test caught one straggler in
+  `button-variants.ts` the migration missed, because that file is `.ts` and the sweep was `.tsx`.
+- **The Devanagari webfont is scoped to `html[lang="hi"]`, and that is not cosmetic.** **Noto Sans
+  Devanagari ships three subsets, one of which is Latin**, so merely naming it in `body`'s stack had
+  English pages fetching ~80 KB of it. Measured against a production build: an English page requests
+  **one** font file (47 KB), a Hindi page **two** (166 KB). `LocaleSwitcher` uses `font-system` for
+  the same reason — one `हिंदी` in a dropdown was enough to pull the whole face onto every page.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,
@@ -280,9 +299,56 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprint 26 is next: vacancy lifecycle and job alerts.** §11 also carries a
+> not for the queue. **Sprint 27 is next: vacancy lifecycle and job alerts.** §11 also carries a
 > standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
 > gig work — and what each actually needs.
+
+Sprint 26 (a surface you would show somebody) is done. No new product surface: the theme made
+systematic, one UI bug traced to its actual cause, and the organisation policy settled.
+
+- **The dialog bug was a containing block, not a style.** See the frontend conventions above for
+  the rule and the measurement. Three more defects sat on the same component and went with it:
+  focus never entered a thing claiming `aria-modal="true"`, the body still scrolled behind it, and
+  **there was no `keydown` handler anywhere in `web/src`** — so Escape, the first thing anybody
+  tries, did nothing in any dropdown either. `lib/use-dismiss.ts` is the small hook for menus; a
+  modal gets the Radix primitive, because a focus trap is not worth hand-rolling and a menu is not
+  worth 12 KB.
+- **The regression test asserts the DOM relationship, not a rectangle.** jsdom has no layout, so
+  every rect is 0×0 and a measurement there would prove nothing. It renders the dialog inside a
+  wrapper and asserts it escapes. The first version rendered the header and the form as *siblings*
+  and could never have failed — **a test that cannot fail is worse than no test**, so it was
+  deleted rather than kept for comfort.
+- **Typography was the single biggest reason this looked unfinished**, and Hindi was the real
+  problem rather than a cosmetic one: the system stack resolved Devanagari to Noto on Android,
+  Nirmala UI on Windows and Devanagari Sangam MN on macOS. Inter and Noto Sans Devanagari are now
+  self-hosted by `next/font/google` at build time, so no request reaches Google and
+  `font-src 'self'` needs no change.
+- **305 hardcoded colours are gone and cannot come back.** The migration is worth one warning: the
+  first attempt collapsed runs of whitespace and ate the space in `from "next-intl/server"` across
+  **624 lines**. It was reverted and redone touching only class tokens. **Never regex whitespace
+  across a tree**; extra spaces in a `className` are harmless and guessing where they belonged is
+  not.
+- **The header lost three controls.** Ten in one flat row, with "My matches" as a filled brand
+  button competing with whatever the page's own primary action was. The account items are behind
+  one trigger now — as a **disclosure, not an ARIA `menu`**: `role="menu"` promises arrow-key
+  navigation and typeahead, and `<a role="menuitem">` stops being a link to assistive technology,
+  which is also what broke three tests until it was removed.
+- **Organisations per account: no cap, and that is the decision.** One employer and one provider
+  would force a staffing agency or a multi-centre training partner into a second account — the fork
+  ADR-038 exists to prevent and Sprint 25 spent a sprint making unnecessary. What was actually
+  missing is guarded instead: a **duplicate-name refusal** (409 naming the existing organisation and
+  pointing at its slug, compared on the slug so "Apollo Care" and "apollo care." are one name), and
+  a **rolling 24-hour creation cap** — tenant creation was the only write path here with none,
+  while applications, interests and invitations all have one. Both live in
+  `provision_organisation`, because **three call sites reach it** and a check in one handler is a
+  check the other two do not make.
+- **`tenants.created_at` is a naive `TIMESTAMP`**, unlike `course_interests.created_at`. Comparing
+  it against an aware datetime makes asyncpg refuse the query outright. The cap passes a naive UTC
+  value and says why.
+- **Radix Dialog costs ~33 KB of the 684 KB budget**, which is now at 668. `next/dynamic` was tried
+  and made it *worse* (+3 KB of loader for no saving, because the header mounts the dialog on every
+  route anyway); keeping it out of the `ui/index.ts` barrel is what helped. **Headroom is 16 KB —
+  the next component added to the header will breach it.**
 
 Sprint 25 (an organisation that outlives its owner) is done. For twenty-four sprints this product
 modelled organisations and could hold exactly **one person** in one: all three writers of

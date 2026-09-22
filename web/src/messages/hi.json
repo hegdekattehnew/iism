@@ -312,7 +312,8 @@
     "myWorkspace": "मेरा कार्यक्षेत्र",
     "account": "खाता",
     "unregistered": "इस नंबर से अभी कोई खाता नहीं है। वह कोड उपयोग हो चुका है — इसके बजाय साइन अप करें; उसमें पहले हमारी गोपनीयता सूचना से सहमति माँगी जाती है।",
-    "unregisteredAction": "खाता बनाएँ"
+    "unregisteredAction": "खाता बनाएँ",
+    "accountSettings": "गोपनीयता और डेटा"
   },
   "profilePage": {
     "title": "मेरी प्रोफ़ाइल",
@@ -696,7 +697,12 @@
       "member": "सदस्य"
     },
     "chooseContext": "कार्यक्षेत्र चुनें",
-    "menuHeading": "कार्यक्षेत्र"
+    "menuHeading": "कार्यक्षेत्र",
+    "createErrorDuplicate": "उस नाम का संगठन आपके पास पहले से है।",
+    "createErrorCap": "आपने आज बहुत सारे संगठन बनाए हैं। कल फिर कोशिश करें।",
+    "switchToExisting": "उस पर जाएँ",
+    "typeEmployerShort": "नियोक्ता",
+    "typeProviderShort": "प्रशिक्षण संस्थान"
   },
   "orgSettings": {
     "title": "संगठन प्रोफ़ाइल",

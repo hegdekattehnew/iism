@@ -64,7 +64,7 @@ export function StandardOrigin({ row, lookalike }: { row: Row; lookalike: boolea
         </p>
       )}
       {lookalike && (
-        <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">{t("lookalike")}</p>
+        <p className="mt-2 text-xs text-warning-text">{t("lookalike")}</p>
       )}
     </>
   );
@@ -86,8 +86,8 @@ function TypeChip({ type }: { type: Row["skill_type"] }) {
     type === "technical"
       ? "bg-accent-soft text-brand"
       : type === "core"
-        ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
-        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        ? "bg-warning-surface text-warning-text"
+        : "bg-surface-muted text-foreground";
   return (
     <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
       {t(type)}
@@ -273,7 +273,7 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
       )}
 
       {results.isError && (
-        <p className="mt-6 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <p className="mt-6 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
           {t("loadError")}
         </p>
       )}

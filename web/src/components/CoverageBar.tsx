@@ -33,12 +33,12 @@ export function CoverageBar({
       <Progress
         value={pct}
         label={t("coverageLabel", { percent: pct })}
-        indicatorClassName={missingMandatory > 0 ? "bg-amber-500" : "bg-brand"}
+        indicatorClassName={missingMandatory > 0 ? "bg-warning-solid" : "bg-brand"}
       />
       <p className="mt-1.5 text-xs text-muted">
         {t("coverageWeighted", { percent: pct })}
         {capped && (
-          <span className="ml-2 text-amber-700 dark:text-amber-400">
+          <span className="ml-2 text-warning-text">
             {t("cappedBy", { count: missingMandatory })}
           </span>
         )}
@@ -84,7 +84,7 @@ export function LevelScale({
                 held
                   ? "bg-brand text-[var(--brand-contrast)]"
                   : beyond
-                    ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+                    ? "bg-warning-surface text-warning-text"
                     : "bg-surface-muted text-muted"
               }`}
             >

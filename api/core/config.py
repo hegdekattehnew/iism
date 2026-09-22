@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     # patient spraying, which is what actually ruins an inbox.
     max_applications_per_day: int = 50
     max_course_interests_per_day: int = 50
+    # Creating a tenant publishes a public organisation page and can
+    # publish listings, and until Sprint 26 it was the one write path
+    # here with no cap at all. Rolling 24 hours, like its siblings.
+    max_organisations_per_day: int = 5
 
     # --- database pool ---
     db_pool_size: int = 5

@@ -17,11 +17,11 @@ function useTitle() {
 }
 
 const TONE: Record<Status, string> = {
-  applied: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  shortlisted: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
-  hired: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
-  rejected: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  withdrawn: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
+  applied: "bg-surface-muted text-foreground",
+  shortlisted: "bg-success-surface text-success-text",
+  hired: "bg-success-surface text-success-text",
+  rejected: "bg-surface-muted text-muted",
+  withdrawn: "bg-warning-surface text-warning-text",
 };
 
 /** Where each application stands, in the candidate's own words. */

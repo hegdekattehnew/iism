@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.authorization import ROLE_PERMISSIONS, Permission
 from api.core.cache import get_redis
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
+from api.core.config import get_settings
 from api.modules.geography.models import State
 from api.modules.identity import Membership, Tenant
 from api.modules.marketplace.models import Job
@@ -646,3 +647,107 @@ class TestOrganisationProfile:
         assert refused.status_code == 403
         # Reading is still allowed.
         assert (await client.get(f"/org/{slug}", headers=headers)).status_code == 200
+
+
+class TestHowManyOrganisationsOneAccountMayHold:
+    """Sprint 26. There was **no limit of any kind**: `POST /me/organisations`
+    created tenants unbounded, and nothing stopped the same one twice.
+
+    The answer is deliberately **not** a cap of one per type. A staffing
+    agency, a hospital group with several registered entities and a training
+    partner running multiple centres each legitimately need more than one, and
+    their only route under a cap is a second account -- the fork ADR-038 exists
+    to prevent, and what Sprint 25 spent a sprint making unnecessary. What is
+    refused is the same organisation twice, and creating them in bulk.
+    """
+
+    async def test_a_second_organisation_of_the_same_type_is_allowed(
+        self, client: AsyncClient
+    ) -> None:
+        """The test that stops this quietly becoming the cap we rejected."""
+        headers = await _headers_for_phone(client)
+        first = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Apollo Care Chennai", "tenant_type": "employer"},
+        )
+        second = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Apollo Care Pune", "tenant_type": "employer"},
+        )
+        assert first.status_code == 201
+        assert second.status_code == 201
+        assert first.json()["slug"] != second.json()["slug"]
+
+    async def test_the_same_name_twice_is_refused(self, client: AsyncClient) -> None:
+        headers = await _headers_for_phone(client)
+        first = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Apollo Care", "tenant_type": "employer"},
+        )
+        again = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Apollo Care", "tenant_type": "employer"},
+        )
+        assert again.status_code == 409
+        # Named, and pointed at, so the client can offer to switch rather than
+        # leaving somebody to go and find it.
+        assert "Apollo Care" in again.json()["detail"]
+        assert again.headers["x-existing-organisation"] == first.json()["slug"]
+
+    async def test_the_comparison_ignores_case_and_punctuation(self, client: AsyncClient) -> None:
+        """`_unique_tenant_slug` would have produced `apollo-care-2`, and the
+        switcher would then show two rows nobody could tell apart."""
+        headers = await _headers_for_phone(client)
+        await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Apollo Care", "tenant_type": "employer"},
+        )
+        again = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "  apollo   care.  ", "tenant_type": "employer"},
+        )
+        assert again.status_code == 409
+
+    async def test_somebody_elses_organisation_of_that_name_is_not_my_duplicate(
+        self, client: AsyncClient
+    ) -> None:
+        """The guard is per account, not global. Two employers may share a
+        name, which is why `_unique_tenant_slug` exists at all."""
+        mine = await _headers_for_phone(client)
+        theirs = await _headers_for_phone(client)
+        await client.post(
+            "/me/organisations",
+            headers=mine,
+            json={"organisation_name": "City Clinic", "tenant_type": "employer"},
+        )
+        other = await client.post(
+            "/me/organisations",
+            headers=theirs,
+            json={"organisation_name": "City Clinic", "tenant_type": "employer"},
+        )
+        assert other.status_code == 201
+
+    async def test_creating_them_in_bulk_is_capped(self, client: AsyncClient) -> None:
+        """Every other write path here has a rolling 24-hour cap; tenant
+        creation, which publishes a public page, had none."""
+        headers = await _headers_for_phone(client)
+        limit = get_settings().max_organisations_per_day
+        for n in range(limit):
+            made = await client.post(
+                "/me/organisations",
+                headers=headers,
+                json={"organisation_name": f"Clinic Number {n}", "tenant_type": "employer"},
+            )
+            assert made.status_code == 201, made.text
+        refused = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "One Too Many", "tenant_type": "employer"},
+        )
+        assert refused.status_code == 429

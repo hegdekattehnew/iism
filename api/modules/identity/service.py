@@ -16,8 +16,9 @@ account:
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,8 @@ from api.core.security import (
 from api.core.text import slugify
 from api.modules.identity.invitations import PENDING_INVITE_KEY
 from api.modules.identity.models import Invitation, Membership, Tenant, User
+
+log = structlog.get_logger("iism.identity")
 
 _CODE_MESSAGE = "Your IISM verification code is {code}. It expires in 5 minutes."
 _CODE_SUBJECT = "Your IISM verification code"
@@ -340,6 +343,75 @@ async def has_personal_membership(db: AsyncSession, user_id: uuid.UUID) -> bool:
     return found is not None
 
 
+async def _refuse_duplicate_organisation(db: AsyncSession, user: User, name: str) -> None:
+    """Refuse a second organisation this person already has under that name.
+
+    **Not a cap on how many organisations one account may hold.** A staffing
+    agency, a hospital group with several registered entities and a training
+    partner running multiple centres all legitimately need more than one, and
+    the only way round a cap would be a second account -- the fork ADR-038
+    exists to prevent, and the thing Sprint 25 spent a sprint making
+    unnecessary.
+
+    What this refuses is the same organisation twice, which nothing stopped:
+    `_unique_tenant_slug` cheerfully produced `apollo-care-2` and the switcher
+    then offered two identical-looking rows. Compared on the **slug** rather
+    than the raw string, so "Apollo Care" and "apollo care." are one name.
+    """
+    wanted = slugify(name)[:60].strip("-")
+    if not wanted:
+        return  # A name that slugifies to nothing cannot collide meaningfully.
+    existing = await db.scalars(
+        select(Tenant)
+        .join(Membership, Membership.tenant_id == Tenant.id)
+        .where(Membership.user_id == user.id, Tenant.tenant_type != "personal")
+    )
+    for tenant in existing:
+        if slugify(tenant.name)[:60].strip("-") == wanted:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"You already have an organisation called {tenant.name}",
+                # The slug, so the client can offer to switch to it rather
+                # than leaving somebody to find it themselves.
+                headers={"x-existing-organisation": tenant.slug},
+            )
+
+
+async def _within_organisation_cap(db: AsyncSession, user: User) -> None:
+    """Refuse an account creating organisations in bulk.
+
+    Counted over a rolling 24 hours rather than a calendar day, so the limit
+    cannot be doubled by waiting for midnight -- the same shape as
+    `applications` and `interests`, which is the point: this was the only write
+    path in the product that could publish a public page with no limit at all.
+    """
+    limit = get_settings().max_organisations_per_day
+    # **Naive, deliberately.** `tenants.created_at` is a bare `TIMESTAMP`, not
+    # `timestamptz` -- unlike `course_interests.created_at`, which the sibling
+    # cap in `interests/service.py` compares against with an aware value. Pass
+    # an aware datetime here and asyncpg refuses the query outright
+    # ("can't subtract offset-naive and offset-aware datetimes"), which is how
+    # this was found. The column stores UTC; this is the same instant.
+    since = (datetime.now(UTC) - timedelta(days=1)).replace(tzinfo=None)
+    made = await db.scalar(
+        select(func.count())
+        .select_from(Tenant)
+        .join(Membership, Membership.tenant_id == Tenant.id)
+        .where(
+            Membership.user_id == user.id,
+            Tenant.tenant_type != "personal",
+            Tenant.created_at >= since,
+        )
+    )
+    if (made or 0) >= limit:
+        log.warning("organisation.daily_cap_reached", limit=limit)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "You have created a lot of organisations today. Try again tomorrow.",
+            headers={"retry-after": "3600"},
+        )
+
+
 async def provision_organisation(
     db: AsyncSession, user: User, name: str, tenant_type: str
 ) -> Tenant:
@@ -348,7 +420,15 @@ async def provision_organisation(
     Taking the user rather than creating one is what makes the multi-role case
     work: a candidate asked to start hiring gets a second membership, not a
     second account.
+
+    The two guards are here rather than in the route because **three call sites
+    reach this function** -- `POST /me/organisations`, the signed-in branch of
+    `/auth/org/register`, and the pending-organisation hand-off inside
+    `verify_email_and_sign_in`. A check in one handler is a check the other two
+    do not make (Sprint 15).
     """
+    await _refuse_duplicate_organisation(db, user, name)
+    await _within_organisation_cap(db, user)
     tenant = Tenant(
         slug=await _unique_tenant_slug(db, name),
         name=name.strip(),

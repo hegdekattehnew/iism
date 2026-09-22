@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Text } from "@/components/profile/fields";
-import { Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { Alert, Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens, useIsSignedIn } from "@/lib/auth";
@@ -29,9 +29,6 @@ import { PRIVACY_NOTICE_VERSION } from "@/lib/legal";
  * afterwards (Sprint 20).
  */
 
-const ALERT =
-  "mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 " +
-  "dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300";
 
 export function InvitePanel({ token }: { token: string }) {
   const t = useTranslations("invite");
@@ -179,9 +176,9 @@ export function InvitePanel({ token }: { token: string }) {
         )}
 
         {error && (
-          <p role="alert" className={ALERT}>
+          <Alert className="mt-3">
             {error}
-          </p>
+          </Alert>
         )}
       </CardBody>
     </Card>

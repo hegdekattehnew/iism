@@ -127,7 +127,7 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
           {saveDetails.isPending ? t("saving") : t("save")}
         </Button>
         {saveDetails.isSuccess && (
-          <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("saved")}</span>
+          <span className="text-sm text-success-text">{t("saved")}</span>
         )}
       </div>
     </form>

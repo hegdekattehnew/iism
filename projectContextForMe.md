@@ -24,10 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 25 — the organisation that outlives its owner; teammate invitations (`8959790`) |
-| **Next sprint** | 26 — vacancy lifecycle + job alerts (scoped in §11) |
-| **Tests** | 559 backend (`make check`), 104 web (`cd web && npm test`) |
-| **Migrations** | head `0026`; 41 ADRs |
+| **Last sprint** | 26 — a surface you would show somebody: theme, the dialog bug, org policy |
+| **Next sprint** | 27 — vacancy lifecycle + job alerts (scoped in §11) |
+| **Tests** | 564 backend (`make check`), 114 web (`cd web && npm test`) |
+| **Migrations** | head `0026` (Sprint 26 added none); 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -547,9 +547,9 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-22 (after Sprint 25).* Authored code: `api/` 104 files / 16,316 lines ·
-`scripts/` 8 / 3,653 · `tests/` 29 / 8,910 · `migrations/` 27 / 2,621 · `web/src/` 147 / 14,155
-(excluding the generated client, which is another 6,975 lines and is never counted here).
+*Refreshed 2026-09-22 (after Sprint 26).* Authored code: `api/` 104 files / 16,400 lines ·
+`scripts/` 8 / 3,653 · `tests/` 29 / 9,015 · `migrations/` 27 / 2,621 · `web/src/` 152 / 14,710
+(excluding the generated client, which is another ~7,000 lines and is never counted here).
 
 ```
 api/                    FastAPI modular monolith
@@ -935,10 +935,10 @@ shipped in Sprints 12–14. **Delete an item here when it ships; do not let it d
 **Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
 and it stays out of the sprint queue until they say otherwise.
 
-### Sprint 26 — vacancy lifecycle, and reaching people between visits (next)
+### Sprint 27 — vacancy lifecycle, and reaching people between visits (next)
 
-Sprint 25 closed the queue's oldest structural hole. This is the next one, and it is the cheapest
-remaining work on the pillar that is furthest along.
+Sprint 25 closed the queue's oldest structural hole and Sprint 26 made the surface presentable.
+This is the next one, and it is the cheapest remaining work on the pillar that is furthest along.
 
 - **"Hired" does nothing to the vacancy.** It stays published, keeps ranking in candidates'
   matches, and keeps taking applications. There is no close, no fill, no expiry, and deleting a
@@ -1018,6 +1018,21 @@ does), then course checkout, then gig as its own module.
   or stop citing a number for it.
 - Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist), typed `SkillRelation`
   edges, observability (ADR-019), the ADR-023 encryption path, caching as caching (ADR-020).
+
+### Left behind by Sprint 26, worth knowing
+
+- **The first-load budget has 16 KB of headroom** (668 KB against 684). Radix Dialog took ~33 KB
+  and `next/dynamic` made it *worse* rather than better, because the header mounts the dialog on
+  every route anyway. **The next component added to the header will breach it**, and the answer
+  then is either a hand-rolled portal (~2 KB, but a focus trap is genuinely hard) or raising the
+  budget deliberately with a reason.
+- **Fonts cost 47 KB on an English page and 166 KB on a Hindi one**, measured against a production
+  build. That is the price of Hindi rendering the same on every platform; it is worth it, and it
+  should be said out loud rather than discovered.
+- **`is_verified` still has no writer**, so anybody may create an organisation under any name. The
+  duplicate guard added this sprint is per account, not global — two accounts may still both
+  create "Apollo Care", which is correct (two employers may share a name) and is *not* a substitute
+  for verification.
 
 ### In flight, not on the branch
 

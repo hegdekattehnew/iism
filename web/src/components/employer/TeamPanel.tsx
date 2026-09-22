@@ -5,7 +5,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Select, Text } from "@/components/profile/fields";
-import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 
@@ -26,9 +26,6 @@ import { useRouter } from "@/i18n/navigation";
  * that 403, which is the Sprint 14 defect.
  */
 
-const ALERT =
-  "mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 " +
-  "dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300";
 
 type Role = "owner" | "admin" | "member";
 
@@ -312,7 +309,7 @@ export function TeamPanel({ org }: { org: string }) {
             {role === "admin" ? t("roleHintAdmin") : t("roleHintMember")}
           </p>
           {sentTo && (
-            <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="mt-3 text-sm text-success-text">
               {t("sent", { email: sentTo })}
             </p>
           )}
@@ -380,9 +377,9 @@ export function TeamPanel({ org }: { org: string }) {
       )}
 
       {error && (
-        <p role="alert" className={ALERT}>
+        <Alert className="mt-3">
           {error}
-        </p>
+        </Alert>
       )}
     </div>
   );

@@ -5,7 +5,11 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Field, Select, Text } from "@/components/profile/fields";
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
+// Imported directly, not through the barrel: `ui/index.ts` is pulled in by
+// nearly every component, and re-exporting the modal there put it on every
+// route's first load.
+import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 
 /**
@@ -18,6 +22,15 @@ import { api } from "@/lib/api";
  * seen, that creates a brand-new `User`. A phone-signed-in candidate following
  * the one affordance available to them therefore ended up with two separate
  * identities, which is the exact outcome ADR-038 exists to prevent.
+ *
+ * **This used to render its own `fixed inset-0` overlay, and that was the bug.**
+ * It is mounted inside `ContextSwitcher`, which is inside `Header`, which
+ * carries `backdrop-blur` — and an ancestor with `backdrop-filter` becomes the
+ * containing block for `position: fixed` descendants. `inset-0` therefore
+ * resolved to the header's box: measured at 1280×64 against a 1280×800 window,
+ * so the dialog was clamped into the strip at the top of the page. No z-index
+ * or offset would have helped. `ui/dialog` portals out of it, and brings the
+ * focus trap, Escape and scroll lock this component never had.
  */
 export function CreateOrgForm({
   onClose,
@@ -31,14 +44,23 @@ export function CreateOrgForm({
   const [name, setName] = useState("");
   const [type, setType] = useState<"employer" | "course_provider">("employer");
   const [error, setError] = useState<string | null>(null);
+  // The slug of the organisation a 409 pointed at, so the refusal can offer
+  // to take them there instead of leaving them to go and find it.
+  const [existing, setExisting] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: async () => {
       setError(null);
-      const { data, error: err } = await api.POST("/me/organisations", {
+      setExisting(null);
+      const { data, error: err, response } = await api.POST("/me/organisations", {
         body: { organisation_name: name, tenant_type: type },
       });
-      if (err || !data) throw new Error("create failed");
+      if (err || !data) {
+        // The server names the organisation it already found, so the client
+        // can offer to switch rather than repeating "that failed".
+        setExisting(response.headers.get("x-existing-organisation"));
+        throw new Error(String(response.status));
+      }
       return data;
     },
     onSuccess: async (tenant) => {
@@ -47,67 +69,79 @@ export function CreateOrgForm({
       await qc.invalidateQueries({ queryKey: ["me"] });
       onCreated(tenant.slug);
     },
-    onError: () => setError(t("createError")),
+    onError: (e: Error) => {
+      const status = Number(e.message);
+      setError(
+        status === 409
+          ? t("createErrorDuplicate")
+          : status === 429
+            ? t("createErrorCap")
+            : t("createError"),
+      );
+    },
   });
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("createOrg")}
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={t("createOrg")}
+      description={t("createOrgHint")}
     >
-      <div
-        className="w-full max-w-sm rounded-xl border border-border-token bg-surface p-6"
-        onClick={(e) => e.stopPropagation()}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          create.mutate();
+        }}
       >
-        <h2 className="text-base font-semibold">{t("createOrg")}</h2>
-        <p className="mt-1 text-sm text-muted">{t("createOrgHint")}</p>
+        <Field label={t("orgName")} className="mt-4">
+          <Text
+            required
+            minLength={2}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("orgNamePlaceholder")}
+          />
+        </Field>
+        <Field label={t("orgType")} className="mt-4">
+          <Select
+            value={type}
+            onChange={(e) => setType(e.target.value as "employer" | "course_provider")}
+          >
+            <option value="employer">{t("typeEmployer")}</option>
+            <option value="course_provider">{t("typeProvider")}</option>
+          </Select>
+        </Field>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate();
-          }}
-        >
-          <Field label={t("orgName")} className="mt-4">
-            <Text
-              required
-              minLength={2}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("orgNamePlaceholder")}
-            />
-          </Field>
-          <Field label={t("orgType")} className="mt-4">
-            <Select
-              value={type}
-              onChange={(e) =>
-                setType(e.target.value as "employer" | "course_provider")
-              }
-            >
-              <option value="employer">{t("typeEmployer")}</option>
-              <option value="course_provider">{t("typeProvider")}</option>
-            </Select>
-          </Field>
+        {error && (
+          <Alert className="mt-3">
+            {error}
+            {existing && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => onCreated(existing)}
+                >
+                  {t("switchToExisting")}
+                </button>
+              </>
+            )}
+          </Alert>
+        )}
 
-          {error && (
-            <p className="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-6 flex gap-3">
-            <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? t("creating") : t("create")}
-            </Button>
-            <Button type="button" variant="secondary" onClick={onClose}>
-              {t("cancel")}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="mt-6 flex gap-3">
+          <Button type="submit" disabled={create.isPending}>
+            {create.isPending ? t("creating") : t("create")}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("cancel")}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

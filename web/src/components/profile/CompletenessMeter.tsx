@@ -11,7 +11,7 @@ export function CompletenessMeter({
 }) {
   const t = useTranslations("profilePage");
   const tone =
-    percent >= 80 ? "bg-emerald-500" : percent >= 40 ? "bg-brand" : "bg-amber-500";
+    percent >= 80 ? "bg-success-solid" : percent >= 40 ? "bg-brand" : "bg-warning-solid";
 
   return (
     <div className="rounded-xl border border-border-token bg-surface p-5">

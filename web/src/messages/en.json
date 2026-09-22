@@ -312,7 +312,8 @@
     "myWorkspace": "My workspace",
     "account": "Account",
     "unregistered": "There is no account with this number yet. That code has been used — sign up instead; it asks you to agree to our privacy notice first.",
-    "unregisteredAction": "Create an account"
+    "unregisteredAction": "Create an account",
+    "accountSettings": "Privacy and data"
   },
   "profilePage": {
     "title": "My profile",
@@ -696,7 +697,12 @@
       "member": "Member"
     },
     "chooseContext": "Choose workspace",
-    "menuHeading": "Workspace"
+    "menuHeading": "Workspace",
+    "createErrorDuplicate": "You already have an organisation with that name.",
+    "createErrorCap": "You have created a lot of organisations today. Try again tomorrow.",
+    "switchToExisting": "Switch to it",
+    "typeEmployerShort": "Employer",
+    "typeProviderShort": "Training provider"
   },
   "orgSettings": {
     "title": "Organisation profile",

@@ -87,7 +87,7 @@ export function TagSection({
       </div>
 
       {error && (
-        <p role="alert" className="mt-2 text-sm text-rose-600">
+        <p role="alert" className="mt-2 text-sm text-danger-text">
           {error}
         </p>
       )}
@@ -106,7 +106,7 @@ export function TagSection({
                 type="button"
                 aria-label={t("delete")}
                 onClick={() => removeEntry.mutate({ collection, id: e.id })}
-                className="text-muted hover:text-rose-600"
+                className="text-muted hover:text-danger-text"
               >
                 ×
               </button>

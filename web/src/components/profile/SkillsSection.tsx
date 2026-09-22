@@ -81,7 +81,7 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
             <button
               type="button"
               onClick={() => removeSkill.mutate(s.skill.slug)}
-              className="ml-auto text-xs text-muted hover:text-rose-600 hover:underline"
+              className="ml-auto text-xs text-muted hover:text-danger-text hover:underline"
             >
               {t("remove")}
             </button>

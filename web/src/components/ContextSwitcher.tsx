@@ -1,12 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { CreateOrgForm } from "@/components/CreateOrgForm";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useIsSignedIn } from "@/lib/auth";
 import { useMemberships } from "@/lib/org";
+import { useDismiss } from "@/lib/use-dismiss";
 
 /**
  * Which hat the person is wearing, and how to change it.
@@ -38,6 +39,15 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   const active = useActiveOrg();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  // Escape and click-away. Until Sprint 26 this menu closed only when its own
+  // toggle was pressed again -- there was no keydown handler anywhere in
+  // `web/src`, and Escape is the first thing anybody tries.
+  useDismiss(
+    root,
+    open,
+    useCallback(() => setOpen(false), []),
+  );
 
   // Nothing to switch between until there is a second context to offer. The
   // "create an organisation" entry below is why this is not simply hidden for
@@ -80,7 +90,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
   };
 
   return (
-    <div className={stacked ? "" : "relative"}>
+    <div className={stacked ? "" : "relative"} ref={root}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -150,7 +160,15 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
               }`}
             >
               {m.tenant.name}
+              {/* The **type**, not just the role. One account may now hold
+                  several organisations (Sprint 26 deliberately did not cap
+                  that), and two with similar names were indistinguishable in
+                  the one control whose whole job is telling them apart. */}
               <span className="block text-xs text-muted">
+                {m.tenant.tenant_type === "course_provider"
+                  ? t("typeProviderShort")
+                  : t("typeEmployerShort")}
+                {" · "}
                 {t(`role.${m.role}`)}
               </span>
             </button>

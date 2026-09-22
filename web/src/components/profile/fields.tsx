@@ -83,7 +83,7 @@ export function EntryRow({
         <button
           type="button"
           onClick={onRemove}
-          className="text-muted hover:text-rose-600 hover:underline"
+          className="text-muted hover:text-danger-text hover:underline"
         >
           {removeLabel}
         </button>

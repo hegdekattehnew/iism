@@ -147,7 +147,7 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
             </Button>
             {saved && <span className="text-sm text-brand">{t("saved")}</span>}
             {save.isError && (
-              <span className="text-sm text-rose-600">{t("saveError")}</span>
+              <span className="text-sm text-danger-text">{t("saveError")}</span>
             )}
           </div>
         </form>

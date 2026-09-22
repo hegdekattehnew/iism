@@ -30,7 +30,7 @@ export async function LegalPage({ doc }: { doc: Doc }) {
 
   return (
     <article className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
-      <p className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      <p className="inline-flex items-center rounded-full border border-warning-border bg-warning-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warning-text">
         {t("draftBadge")}
       </p>
       <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">

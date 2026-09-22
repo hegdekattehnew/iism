@@ -100,7 +100,7 @@ export function CandidateShortlist({
                   </div>
 
                   {mandatoryGaps.length > 0 && (
-                    <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="mt-2 text-xs text-warning-text">
                       {te("missingMandatory")}:{" "}
                       {mandatoryGaps.map((m) => m.name).join(" · ")}
                     </p>

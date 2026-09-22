@@ -10,9 +10,9 @@ import { api } from "@/lib/api";
 type Status = "registered" | "withdrawn" | "contacted";
 
 const TONE: Record<Status, string> = {
-  registered: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  contacted: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
-  withdrawn: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
+  registered: "bg-surface-muted text-foreground",
+  contacted: "bg-success-surface text-success-text",
+  withdrawn: "bg-warning-surface text-warning-text",
 };
 
 /** Which courses the learner has asked about, and where each stands. */

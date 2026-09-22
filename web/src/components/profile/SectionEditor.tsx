@@ -135,7 +135,7 @@ export function SectionEditor({
         >
           {renderForm(draft, set)}
           {error && (
-            <p role="alert" className="text-sm text-rose-600 sm:col-span-2">
+            <p role="alert" className="text-sm text-danger-text sm:col-span-2">
               {error}
             </p>
           )}
