@@ -24,7 +24,7 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 25 — teammate invitations, and the organisation that outlives its owner |
+| **Last sprint** | 25 — the organisation that outlives its owner; teammate invitations (`8959790`) |
 | **Next sprint** | 26 — vacancy lifecycle + job alerts (scoped in §11) |
 | **Tests** | 559 backend (`make check`), 104 web (`cd web && npm test`) |
 | **Migrations** | head `0026`; 41 ADRs |
