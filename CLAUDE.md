@@ -274,6 +274,11 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 
 ## Current state
 
+> **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
+> the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
+> record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
+> not for the queue. **Sprint 25 is agreed: teammate invitations and the sole-owner trap.**
+
 Sprint 24 (somebody is interested) is done. The product's pitch is "here is your gap, and the
 courses that close it" — and for twenty-three sprints the learner could then do **nothing**. The
 course page ended in a back link and skill chips; the provider who published it was told nothing,
@@ -979,11 +984,11 @@ The public homepage template is also in place: header with nav and CTAs, hero wi
 how-it-works, audience cards, browse panels, CTA band, footer, and the dev/status panel last.
 All 13 routes exist in both locales; content is placeholder where the feature is not built.
 
-Still to come: matching (Sprint 6) — which needs analytics instrumentation and a golden-set
-evaluation harness alongside it. Also outstanding: organisation/email login and self-serve
-publishing, a real SMS provider, the NSQF hierarchy above Skill (SSC → Sector → Occupation → QP → NOS), typed
-SkillRelation edges, embeddings, and analytics instrumentation. Do not assume every module listed
-above ships in v1; confirm scope before building out a module's business logic.
+*(This paragraph listed what was still to come as of Sprint 1. Matching, analytics, the golden-set
+harness, organisation/email sign-in, self-serve publishing for both actor types and the whole NSQF
+hierarchy above Skill have all since shipped — Sprints 6–14. **Typed `SkillRelation` edges and
+embeddings remain unbuilt**, with an ADR each and no code. Do not assume every module named above
+ships in v1; confirm scope before building out a module's business logic.)*
 
 ## Local development
 

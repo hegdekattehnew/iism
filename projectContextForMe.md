@@ -4,13 +4,50 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-17 · Sprints 1–22 built and pushed. Sprint 20 ("safe to deploy") closed the
-non-functional gaps that need no outside account; Sprint 21 is the first deployment.
+**Last updated:** 2026-09-22 · **Sprints 1–24 built, merged to `main` via PR #1, CI green.**
+Sprint 23 made a profile buildable by someone who cannot name a National Occupational Standard;
+Sprint 24 closed the course loop for training providers. **Sprint 25 is agreed: teammate
+invitations and the sole-owner trap** (§11). Deployment is deferred by the owner, deliberately.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
 > "Sprints 1–5" through nine further sprints, which is how §10 came to assert the branch was
 > pushed while four sprints sat on one laptop.
+
+---
+
+## 0. Status at a glance
+
+*Everything here is checkable in under two minutes. Check it rather than trusting it — this file
+has been wrong before, and §10 explains how.*
+
+| | |
+|---|---|
+| **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
+| **Last sprint** | 24 — "somebody is interested", the course loop (`97f1263`) |
+| **Next sprint** | 25 — teammate invitations + the sole-owner trap (scoped in §11) |
+| **Tests** | 527 backend (`make check`), 89 web (`cd web && npm test`) |
+| **Migrations** | head `0025`; 41 ADRs |
+| **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
+| **Deployment** | deferred by the owner; nothing is deployed anywhere |
+
+**To get running** (Docker must be up; ports are non-default — 5433 / 6380 / 27018):
+
+```
+make up && make migrate && make import-nsqf && make seed    # first time, ~2 minutes
+make api        # :8000   — reloads on change
+make worker     # does NOT reload: restart it after any api/ change
+make web        # :3000
+```
+
+**Demo logins** (all seeded, `OTP_EXPOSE_IN_RESPONSE=true` returns the code in the response):
+`hiring@apollo-care.example` (employer, 5 applicants), `admin@skillbridge-institute.example`
+(provider, interested learners), `+919000000001` (candidate with matches and a gap).
+Never sign in as the owner's real number, `+919880663641`.
+
+**The three things most likely to waste an hour**, all in §8: the worker not reloading, a stale
+API process serving old code, and `make check | grep` reporting grep's exit status rather than
+the suite's.
 
 ---
 
@@ -508,8 +545,8 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-15.* Authored code: `api/` 78 files / 11,579 lines · `scripts/` 8 / 2,553 ·
-`tests/` 23 / 5,751 · `migrations/` 19 / 1,750 · `web/src/` 117 / 10,234 (excluding the generated
+*Refreshed 2026-09-22.* Authored code: `api/` 102 files / 15,107 lines · `scripts/` 8 / 3,564 ·
+`tests/` 28 / 8,268 · `migrations/` 26 / 2,434 · `web/src/` 141 / 13,168 (excluding the generated
 client).
 
 ```
@@ -544,8 +581,17 @@ api/                    FastAPI modular monolith
   modules/privacy/      DPDP export, deletion preview and erasure. Depends on every module;
                         nothing depends on it.
   modules/applications/ Applying, withdrawing, saving, and the employer's inbox. Holds the
-                        product's one deliberate disclosure: contact reaches an employer
+                        product's first deliberate disclosure: contact reaches an employer
                         because the candidate applied, and goes when they withdraw.
+  modules/interests/    Registering interest in a course, and the provider's view of who did.
+                        The **second** disclosure, on the same terms. A sibling of
+                        applications/, never an extension: a course publishes what it teaches,
+                        so a learner cannot be scored against it, and the provider inbox
+                        therefore carries no card and no score at all (ADR-037).
+  modules/notifications/  The outbox (ADR-006): queued in the request, sent by the worker.
+                        The row names a recipient by id and never holds an address --
+                        that is resolved at send time, so contact stays out of a dumped
+                        table and out of every log line (ADR-023).
   adapters/notifications/  NotificationProvider protocol + console impl
   adapters/nsqf/        base.py       NsqfSource port (6 iterators)
                         documents.py  ALL document parsing, shared by every source
@@ -579,7 +625,8 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0018 (user consent), 0019 (applications + saved jobs),
                         0020 (application analytics events),
                         0021 (content translations), 0022 (locale base columns),
-                        0023 (notification outbox)
+                        0023 (notification outbox), 0024 (job_role trigram index +
+                        role analytics names), 0025 (course interests + two widened CHECKs)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
                         retire_legacy_skills.py, seed_candidates.py (demo profiles +
@@ -811,7 +858,9 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Pushed 2026-09-11**, at the end of Sprint 20 — verified with the command below, not assumed.
+**Merged 2026-09-21.** `v2/foundations` reached `origin`, PR #1 was opened and merged into `main`
+(merge commit `7b6337a`), and **CI ran green on it** — the first time CI had ever run on this work.
+Verified with the API, not assumed.
 
 This section was wrong in the most expensive possible way, and the shape of the mistake is worth
 keeping. It said "Pushed 2026-09-07 … that risk is closed", because the last commit to actually
@@ -820,13 +869,22 @@ reach the remote was one called *"Correct the git section: the branch is pushed"
 went on asserting they were safe. **A claim about the remote is only true at the moment it is
 checked**; re-check it, do not read it here.
 
-- Branch **`v2/foundations`**, tracking `origin/v2/foundations`.
+- Branch **`v2/foundations`**, tracking `origin/v2/foundations`. Work continues on it; `main` now
+  contains everything through Sprint 24.
 - Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
   branch tip against the document is what failed for four sprints.
-- **No pull request is open yet, so CI has never run on this branch** — it triggers on `main`
-  and on pull requests. Sprint 20's audit steps and bundle budget are untested in CI until it is.
-  `gh` is not installed on this machine, so the PR has to be opened in the browser:
-  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`
+- **CI runs on pull requests and on `main`.** Both jobs — *API: lint, types, tests* and *Web: lint,
+  types, build* — passed on the merge commit, which is what finally exercised Sprint 20's
+  dependency audits and the first-load budget outside this laptop.
+- **`gh` is still not installed**, so PRs are opened in the browser at
+  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`, and their title and
+  description have to be pasted by the owner. Two consequences worth knowing: the session cannot
+  read CI itself without the GitHub API (unauthenticated reads work for this public repo), and
+  **pasting a rendered Markdown file loses its formatting** — send raw text, not a `.md` the
+  client will render.
+- **Dependabot is live on `main`** and opened 5 PRs the moment it merged (16 web updates, 4 Python,
+  three GitHub Actions bumps). Its `uv` update job fails; the npm and actions jobs succeed. That is
+  Dependabot's own infrastructure, not this repo's CI.
 - Two things a reviewer needs telling: it is a 211-file, +35,107-line change spanning eight
   sprints and is not reviewable as a single unit, and it **contains a deliberate rollback**
   (`c10829f` discards `a62d964`), so reading commit-by-commit means passing through work that was
@@ -859,57 +917,77 @@ checked**; re-check it, do not read it here.
 
 ## 11. What comes next
 
-**Sprint 22 — first deployment** (moved from Sprint 21, which closed the loop instead: deploying a
-product that could not produce an outcome would have bought nothing, and job-seeker sign-in is
-blocked on DLT registration regardless). AWS **Mumbai (ap-south-1)** for data residency: Dockerfiles, ECS
-Fargate for api and worker, RDS Postgres with encryption at rest and automated backups,
-ElastiCache, CloudWatch with a set log retention, secrets in Secrets Manager. Organisation sign-in
-works on day one through **Amazon SES**; job-seeker sign-in waits for a **DLT-registered SMS
-sender**, which takes weeks — start it now. Deployment settings that must not be forgotten:
-`RATE_LIMIT_TRUST_FORWARDED=true` behind the ALB (and never without it), `PYTHONUNBUFFERED=1`,
-`IISM_BACKUP_PASSPHRASE` in Secrets Manager, and the CSP header switched from report-only to
-enforced once a production build runs clean. Field-level encryption (ADR-023) lands before résumés
-or Aadhaar are collected; neither is today.
+*Rewritten 2026-09-22. The previous version had gone stale in the way that misleads rather than
+merely ages: it called deployment "Sprint 22" (Sprint 22 was languages and notifications), and
+listed course-provider self-serve publishing and organisation email sign-in as upcoming when both
+shipped in Sprints 12–14. **Delete an item here when it ships; do not let it drift.***
 
-**Before any real user:** a named grievance officer, legal review of the privacy notice and terms,
-and the pull request opened so CI — including the new audit steps — actually runs on this branch.
+**Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
+and it stays out of the sprint queue until they say otherwise.
 
-Matching works, is measured, and is now visible from both sides. What is missing is mostly
-**evidence and reach**, not mechanism.
+### Sprint 25 — teammate invitations, and the sole-owner trap (agreed)
 
-**Confirm the PWA installs on a real device.** The manifest, icons and service worker are in place
-and tested for existence and correctness, but the in-app browser pane will not register a worker,
-so nothing has yet proved Chrome offers "Install". One phone, five minutes — and until it is done,
-say "installable" with that caveat rather than as a fact.
+The scope was chosen with the owner and then deferred one sprint to keep Sprint 24 shippable. It is
+the next thing to pick up, and a plan already exists in the session archive.
 
-**Tune against the golden set, and grow it.** Five labelled pairs is enough to catch a regression
-and nowhere near enough to trust a weighting. The plan called for 50–100. Growing it is the
-cheapest way to make every later scoring change safe.
+- **One person per organisation, in a product about organisations.** All three `Membership` writers
+  hard-code `role="owner"`, so `admin` and `member` are dead branches with permissions mapped and
+  nothing able to reach them. Zero endpoints touch `Membership`; zero hits for "invite" in `api/`.
+- **The trap is data loss, not inconvenience.** A sole owner deleting their account hard-deletes the
+  tenant, its vacancies and courses, and — by FK cascade — **every application to them**, notifying
+  nobody. The 409 that should stop it (`privacy/service.py`) is unreachable, because it requires a
+  second member to exist, and its instruction ("pass ownership to someone else") names an action the
+  product cannot perform.
+- Shape: an `Invitation` row (hashed token, expiry, single use, revocable — state derived, never
+  stored), invite/list/revoke/accept, members list, role change, remove, leave. **Both acceptance
+  cases**: an address that already has an account, and one that does not, the second reusing the
+  Sprint 18 pending-in-Redis hand-off at `verify_email_and_sign_in` with consent recorded on the
+  create branch. Enumeration-safe: the response must be identical whether or not the address is
+  known (Sprint 12's lesson). Escalation: an admin may invite a `member` only; nothing may remove
+  the last owner — enforced in **one** service function, not three handlers.
+- Riskiest edit in the repo: `verify_email_and_sign_in` gains an account-creating branch. Its
+  401-on-unknown-address is load-bearing.
 
-**Semantic similarity** is the deliberate omission from Sprint 10 (ADR-007 names it; ADR-036 says
-deterministic overlap ships first so there is a baseline). Embeddings over performance criteria
-rather than titles — titles like `OJT` and `Project` embed to noise — with sentence-transformers
-self-hosted, so no per-request cost.
+### Then, in rough order of value
 
-**Hindi for the corpus** (Sprint 13): ~$5 for the navigable surface, blocked on credentials rather
-than design. Worth stating plainly in any demo: the interface is fully bilingual today, the *corpus*
-is not — standard names and descriptions are still English.
+- **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting; the
+  plan called for 50–100. Sprint 23 added a scoring component and had to lean on unit tests instead.
+  This is the cheapest way to make every later scoring change safe.
+- **Vacancy lifecycle.** "Hired" does nothing to the vacancy: it stays published, keeps ranking in
+  candidates' matches and keeps taking applications. No close, no fill, no expiry; deleting a job
+  silently deletes its applications.
+- **`is_verified` has no writer** — a marketplace whose verified badge nobody can grant has no
+  verified organisations. There is no operator surface of any kind: no admin module, no staff flag,
+  no back-office route.
+- **Job alerts.** The largest reach gap — `match_jobs` is called only from a request handler, so a
+  vacancy published today reaches a matched candidate only if they happen to open `/matches`. But it
+  **cannot deliver yet**: 39 of 40 candidates are phone-only, SMS waits on DLT registration, and an
+  in-app notice is only seen by somebody already on the site. Do this after a sender exists.
+- **CV upload and LLM extraction.** Deferred in Sprint 23 after establishing that it fills
+  experiences and education, which no scorer reads, and needs multipart, object storage, a documents
+  table, PDF/DOCX extraction, AES-256-GCM with KMS (ADR-023) and an `LLMProvider` adapter (ADR-031)
+  before one skill reaches a profile. Revisit once role-led suggestion shows what gap remains.
+- **Semantic similarity** — the deliberate omission from Sprint 10 (ADR-007 names it; ADR-036 says
+  deterministic overlap ships first so there is a baseline). Embeddings over performance criteria,
+  never titles: `OJT` and `Project` embed to noise. Also the answer if role search proves too weak.
+- **Hindi for the corpus.** The interface is fully bilingual; the *corpus* is not. Say that plainly
+  in any demo. ~$5 for the navigable surface, blocked on credentials rather than design.
+- **Confirm the PWA installs on a real device.** Manifest, icons and worker are in place and tested
+  for correctness, but the in-app browser pane will not register a worker, so nothing has proved
+  Chrome offers "Install". One phone, five minutes — until then say "installable" with the caveat.
+- **A learner-facing notice when a provider marks "contacted"**, and **notifying applicants when a
+  tenant deletes itself**. Both found in Sprint 24 and deliberately not built.
+- Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist), typed `SkillRelation`
+  edges, observability (ADR-019), the ADR-023 encryption path, caching as caching (ADR-020).
 
-**Teammate invitations.** One owner per organisation today. The model already allows many
-memberships per tenant, so this is an invitation token, an email and an acceptance path — no
-restructuring, which is exactly why the context model was built for many memberships from the start.
+### In flight, not on the branch
 
-**Course-provider self-serve publishing**, on the same rails as jobs. `publishing.py` and the
-authorization dependency generalise; `Course` has no geography, which is the only real difference.
-
-**The parked résumé builder and extractor**, deferred because correct Devanagari in PDF needs
-complex-script shaping and therefore Pango/HarfBuzz. Still the best answer to profile-completion
-friction, which is now the binding constraint on matching: a candidate with no declared skills
-gets no matches, correctly, and nothing yet makes declaring them easy.
-
-Also outstanding: career paths (ADR-008, and the NCO codes for it now exist), typed `SkillRelation`
-edges, organisation/email login and self-serve publishing, a real SMS provider, observability, and
-the ADR-023 encryption path.
+**The geography fix** is uncommitted in a worktree at `.claude/worktrees/angry-jackson-46292c`
+(branch `claude/angry-jackson-46292c`): six modified files that constrain an ambiguous district name
+to its resolved state and stop every NSQF import rewriting every profile's `updated_at`. Three
+district names exist in two states each (Pratapgarh, Hamirpur, Bilaspur), and Sprint 23's locality
+tie-break can therefore call a Himachal vacancy "in your district" for somebody in Chhattisgarh.
+Either finish it there or carry the diff onto a fresh branch.
 
 ## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 
@@ -984,23 +1062,30 @@ the logs. CORS is restricted to one origin.
 - ~~The work exists in one place.~~ **Re-closed 2026-09-09** — and it had quietly re-opened:
   this line said "Closed 2026-09-07" while Sprints 11–14 sat unpushed. See §10. MongoDB,
   which it named as unbacked, gained encrypted dumps and a passed restore drill in Sprint 20 — but
-  the dumps are on this laptop, so a lost laptop still loses both copies until Sprint 21 puts them
-  somewhere else.
+  **the dumps are still on this laptop**, so a lost laptop loses both copies. Off-machine storage
+  has not been scheduled; it was assigned to Sprint 21 and that sprint closed the application loop
+  instead.
 
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.
 - Multi-sector dilutes GTM focus — a knowing trade, reversible by narrowing GTM only.
-- Recommendation quality is **unproven and unmeasured**. Every claim about it is a hypothesis
-  until the golden-set harness exists.
-- Self-declared skills are unreliable until assessment integration lands.
+- Recommendation quality is **measured but barely**. `make evaluate` exists and runs five labelled
+  pairs on every change (Sprint 10); five pairs catch a regression and cannot defend a weighting.
+  Until the set reaches the planned 50–100, every claim about match *quality* — as opposed to match
+  *stability* — remains a hypothesis.
+- Self-declared skills are unreliable until assessment integration lands. Three of the four
+  `SKILL_SOURCES` have no writer at all: every real candidate scores the 0.6 evidence floor, and
+  `assessed`/`certified` appear only in seeded fixtures. There is no assessment module or adapter.
 - Employer-side supply is the weakest link in Indian vocational markets.
 - ~~Two vocabularies coexist.~~ **Closed in Sprint 9.** The 52 curated skills are retired and
   every link points at a National Occupational Standard. What replaced it is a smaller, honest
   debt: the curated→NOS map is hand-authored, so some anchors are judgement calls. The uncertain
   ones are marked in `scripts/legacy_skill_map.py`.
-- **The national taxonomy is English-only.** The carried aliases (298 rows as of 2026-09-09)
-  are the only Hindi reaching it, covering a few dozen standards out of 21,355. Say this
-  plainly.
+- **The national taxonomy is English-only.** The carried aliases (298 rows as of 2026-09-09) are
+  the only Hindi reaching it, covering a few dozen standards out of 21,355. Sprint 23's role search
+  narrows the practical damage — a learner types "ward boy" or "ड्राइवर" and the alias map bridges
+  to the English role name — but the standards, course titles and role names a provider publishes
+  are still English on a Hindi page. Say this plainly.
 - ~~4,784 imported skills are unreachable by sector navigation.~~ **Resolved in Sprint 8** — every
   standard states its own sector, so the hierarchy no longer depends on the qualification side.
   They still belong to no current qualification, which is a fact about the corpus, not a defect.
@@ -1012,10 +1097,18 @@ the logs. CORS is restricted to one origin.
 - **Only 45 of 21,303 titles are section-numbered course fragments** ("10.1. Case Studies") but
   they are indistinguishable from real units in the schema. Prominence ordering hides them; it
   does not fix them.
+- **A quarter of the corpus shares a name.** 1,778 standard names are borne by 4,838 rows, and some
+  twins are near-identical reissues differing only by code and level. Sprint 24's search cards name
+  the qualification, body and code and flag lookalikes; nothing can make two identically-named
+  standards meaningfully distinguishable when the source itself does not distinguish them.
+- **Three district names exist in two states each** (Pratapgarh, Hamirpur, Bilaspur) and resolve
+  arbitrarily, so Sprint 23's locality tie-break can call a Himachal vacancy "in your district" for
+  somebody in Chhattisgarh. A fix is written but uncommitted — see §11, "In flight".
 
 ## 13. What it would take to run this for a real customer
 
-Written down on 2026-09-09 so the answer exists before it is asked in a meeting. **Nothing here
+Written down on 2026-09-09, re-checked 2026-09-22, so the answer exists before it is asked in a
+meeting. **Nothing here
 is a defect** — every item is a deliberate stage-appropriate choice, and each one is load-bearing
 for a demo precisely because it is absent. But a live pilot needs all of it, and the first three
 are hard blockers rather than gaps.
@@ -1032,8 +1125,8 @@ are hard blockers rather than gaps.
    Postgres, Redis and Mongo. There is no application image, no Terraform (ADR-028 defers it), and
    CI runs lint, typecheck, tests and the web build with nothing to ship them to.
 3. ~~MongoDB is backed up by nothing.~~ **Closed in Sprint 20**: encrypted dumps of both
-   databases and a passed restore drill (§10a). What remains is off-machine storage, which is
-   Sprint 21's.
+   databases and a passed restore drill (§10a). **What remains is off-machine storage** — the dumps
+   are still on this laptop, so a lost laptop loses both copies. Not yet scheduled.
 
 Also closed in Sprint 20, and would have been blockers: consent, export and erasure (DPDP Act
 2023), privacy notice / terms / grievance pages — **still drafts pending legal review, and the
@@ -1052,12 +1145,18 @@ grievance officer is not yet named** — rate limiting, and security headers.
    `OrganisationIn` so no request shape can set it — but "deliberate seam" and "shipped feature"
    are different things, and a marketplace whose verified badge nobody can grant has no verified
    organisations.
-7. **No teammate invitations.** `Membership.role` supports owner/admin/member and the permission
-   model reads it (ADR-039), but the only way to gain a membership is to create the organisation.
-   One person per organisation, in a product about organisations.
+7. **No teammate invitations — now Sprint 25 (§11).** `Membership.role` supports owner/admin/member
+   and the permission model reads it (ADR-039), but the only way to gain a membership is to create
+   the organisation, so `admin` and `member` are unreachable. One person per organisation, in a
+   product about organisations — and the sole owner deleting their account destroys every
+   application to that organisation's vacancies, silently.
 
 **Would embarrass in a pilot, cheap to fix.**
 
-8. Five of six rich-profile collections are empty (§4) — no seeded candidate has a work history.
-9. The golden set is five pairs. Every claim about match quality rests on them (§12).
-10. The corpus is English-only (§12), in a product whose thesis is Hindi-first.
+8. ~~Five of six rich-profile collections are empty.~~ **Closed in Sprint 21** — the seed now
+   writes work histories, education, languages, certifications and preferences (21/20/40/20/21/20
+   rows as of 2026-09-22).
+9. The golden set is five pairs. Every claim about match quality rests on them (§12), and Sprint 23
+   changed the scoring weights with only those five to defend the change.
+10. The corpus is English-only (§12), in a product whose thesis is Hindi-first. The *interface* is
+   fully bilingual, including everything Sprints 23–24 added; the standards themselves are not.
