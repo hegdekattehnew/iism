@@ -11,9 +11,10 @@ invisible to matching and the failure would not surface until Sprint 5.
 """
 
 import asyncio
+import secrets
 import sys
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 # Sibling import: `scripts/` is not an installed package, but Python puts a
 # script's own directory on sys.path, so this resolves when run as
@@ -24,6 +25,7 @@ from sqlalchemy import delete, select
 from api.core import localisation
 from api.core.config import PRIVACY_NOTICE_VERSION
 from api.core.database import dispose_engine, get_sessionmaker
+from api.core.security import hash_secret
 from api.modules.geography import resolve_location
 from api.modules.identity.models import Membership, Tenant, User
 from api.modules.marketplace.models import Course, CourseSkill, Job, JobSkill
@@ -1521,6 +1523,88 @@ async def _owner_for(db, tenant: Tenant, email: str) -> bool:  # type: ignore[no
     return created
 
 
+# One organisation with a real team, so the screen demonstrates from a cold
+# start (Sprint 22.5's lesson: a feature nobody can reach in a demo may as well
+# not have shipped). Apollo Care gets a second **owner** and a pending
+# invitation, which is what makes both sides of the sole-owner rule visible:
+# the deletion guard can be seen refusing, and seen relenting.
+TEAM = [
+    ("apollo-care-hospitals", "coordinator@apollo-care.example", "owner", "Hiring coordinator"),
+    ("apollo-care-hospitals", "recruiter@apollo-care.example", "admin", "Recruiter"),
+]
+
+# Sent, never accepted -- so the Team screen has a pending row to show and to
+# revoke. Its token is random and **deliberately not recoverable**: a fixture
+# with a known invitation token is a working key sitting in a seed script, and
+# demonstrating acceptance is better done by sending a fresh invitation from
+# the interface, which is the flow worth showing anyway.
+PENDING_INVITES = [("apollo-care-hospitals", "newjoiner@apollo-care.example", "member")]
+
+
+async def _seed_team(db, tenants: dict[str, Tenant]) -> tuple[int, int]:  # type: ignore[no-untyped-def]
+    """Second members and one open invitation. Idempotent, like everything here.
+
+    Until Sprint 25 every `Membership` in this file and in `api/` alike was
+    written with `role="owner"`, so a seeded organisation could only ever
+    contain one person -- and the console's team screen would have had nothing
+    to render on a fresh database.
+    """
+    from api.modules.identity.models import INVITE_TTL_DAYS, Invitation
+
+    members = 0
+    for tenant_slug, email, role, full_name in TEAM:
+        tenant = tenants.get(tenant_slug)
+        if tenant is None:
+            continue
+        user = await db.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(email=email)
+            db.add(user)
+        user.full_name = full_name
+        # The verified, consented state a real account reaches by signing in --
+        # a fixture that behaves differently from a registered account is not a
+        # demonstration.
+        user.email_verified_at = user.email_verified_at or _now()
+        user.consent_version = PRIVACY_NOTICE_VERSION
+        user.consented_at = user.consented_at or _now()
+        await db.flush()
+
+        membership = await db.scalar(
+            select(Membership).where(
+                Membership.user_id == user.id, Membership.tenant_id == tenant.id
+            )
+        )
+        if membership is None:
+            db.add(Membership(user_id=user.id, tenant_id=tenant.id, role=role))
+            members += 1
+        else:
+            membership.role = role
+        await db.flush()
+
+    invites = 0
+    for tenant_slug, email, role in PENDING_INVITES:
+        tenant = tenants.get(tenant_slug)
+        if tenant is None:
+            continue
+        existing = await db.scalar(
+            select(Invitation).where(Invitation.tenant_id == tenant.id, Invitation.email == email)
+        )
+        if existing is not None:
+            continue
+        db.add(
+            Invitation(
+                tenant_id=tenant.id,
+                email=email,
+                role=role,
+                token_hash=hash_secret(secrets.token_urlsafe(32)),
+                expires_at=_now() + timedelta(days=INVITE_TTL_DAYS),
+            )
+        )
+        invites += 1
+    await db.flush()
+    return members, invites
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -1541,6 +1625,8 @@ async def seed() -> dict[str, int]:
     stats = {
         "tenants": 0,
         "owners": 0,
+        "teammates": 0,
+        "invitations": 0,
         "jobs": 0,
         "courses": 0,
         "job_skills": 0,
@@ -1606,6 +1692,8 @@ async def seed() -> dict[str, int]:
             if await _owner_for(db, t, owner_email):
                 stats["owners"] += 1
             tenants[slug] = t
+
+        stats["teammates"], stats["invitations"] = await _seed_team(db, tenants)
 
         for (
             slug,
@@ -1732,6 +1820,7 @@ if __name__ == "__main__":
     r = asyncio.run(seed())
     print(
         f"tenants created: {r['tenants']}  owner accounts created: {r['owners']}  "
+        f"teammates added: {r['teammates']}  invitations pending: {r['invitations']}  "
         f"jobs created: {r['jobs']}  "
         f"courses created: {r['courses']}  "
         f"job-skill links: {r['job_skills']}  course-skill links: {r['course_skills']}"

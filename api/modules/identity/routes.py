@@ -81,7 +81,7 @@ async def verify_email_otp(
     payload: schemas.EmailOtpVerify, db: AsyncSession = Depends(get_db_session)
 ) -> schemas.SignInOut:
     _, tokens, created, organisation_slug = await service.verify_email_and_sign_in(
-        db, payload.email, payload.code
+        db, payload.email, payload.code, payload.consent_version
     )
     return _signed_in(tokens, created=created, organisation_slug=organisation_slug)
 

@@ -50,6 +50,11 @@ MANUALLY_MANAGED_INDEXES = {
     "ix_jobs_search_vector",
     "ix_courses_search_vector",
     "ix_qualification_packs_job_role_trgm",
+    # Partial (WHERE accepted_at IS NULL AND revoked_at IS NULL), created with
+    # op.execute() in 0026. Autogenerate cannot see the predicate and would
+    # propose dropping the index that stops one address holding two live
+    # invitations to the same organisation.
+    "uq_invitations_live",
 }
 
 

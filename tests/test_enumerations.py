@@ -28,8 +28,14 @@ import re
 from typing import Any, Literal, get_args, get_origin
 
 from api.modules.identity import schemas as identity_schemas
-from api.modules.identity.models import Membership, Tenant
-from api.modules.identity.schemas import MembershipRole, OrgTenantType, TenantType
+from api.modules.identity.models import Invitation, Membership, Tenant
+from api.modules.identity.schemas import (
+    InvitableRole,
+    InvitationState,
+    MembershipRole,
+    OrgTenantType,
+    TenantType,
+)
 from api.modules.interests.models import CourseInterest
 from api.modules.interests.schemas import InterestStatus
 from api.modules.marketplace import schemas as marketplace_schemas
@@ -74,6 +80,7 @@ BACKED: list[tuple[Any, Any, str]] = [
     (SkillType, Skill, "skill_type"),
     (AliasScript, SkillAlias, "script"),
     (InterestStatus, CourseInterest, "status"),
+    (InvitableRole, Invitation, "role"),
 ]
 
 
@@ -123,5 +130,12 @@ class TestEachUnionMatchesItsConstraint:
             if not name.startswith("_") and get_origin(alias) is Literal
         }
         # `OrgTenantType` is a narrowing of a column, not a column of its own;
-        # `QpRequirement` is checked by the test above.
-        assert declared - {u for u, _, _ in BACKED} == {OrgTenantType, QpRequirement}
+        # `QpRequirement` is checked by the test above; `InvitationState` is
+        # **derived from three timestamps** by `Invitation.state` and stored
+        # nowhere, so there is no CHECK for it to agree with -- which is the
+        # point of storing it nowhere.
+        assert declared - {u for u, _, _ in BACKED} == {
+            OrgTenantType,
+            QpRequirement,
+            InvitationState,
+        }

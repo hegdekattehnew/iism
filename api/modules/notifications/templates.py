@@ -31,6 +31,15 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "Somebody has registered interest in {course}.\n\n"
             "Open your interested learners to see how to reach them:\n{link}\n",
         ),
+        "organisation_invitation": (
+            "You have been invited to join {organisation} on IISM",
+            "You have been invited to join {organisation} on IISM as a "
+            "{role}.\n\n"
+            "Open this link to accept. It expires in seven days, and it works "
+            "only once:\n{link}\n\n"
+            "If you were not expecting this, you can ignore it -- nothing "
+            "happens until you open the link.\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -48,6 +57,15 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{course} में किसी की रुचि है",
             "{course} में किसी ने रुचि दर्ज की है।\n\n"
             "उनसे कैसे संपर्क करें यह देखने के लिए अपने इच्छुक शिक्षार्थी खोलें:\n{link}\n",
+        ),
+        "organisation_invitation": (
+            "आपको IISM पर {organisation} में शामिल होने का निमंत्रण मिला है",
+            "आपको IISM पर {organisation} में {role} के रूप में शामिल होने का "
+            "निमंत्रण मिला है।\n\n"
+            "स्वीकार करने के लिए यह लिंक खोलें। यह सात दिन में समाप्त हो जाएगा, और "
+            "केवल एक बार काम करता है:\n{link}\n\n"
+            "यदि आपको इसकी अपेक्षा नहीं थी, तो इसे अनदेखा कर सकते हैं — लिंक खोलने "
+            "तक कुछ नहीं होता।\n",
         ),
     },
 }

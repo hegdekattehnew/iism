@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base, one_of
@@ -13,6 +22,16 @@ TENANT_TYPES = ("employer", "course_provider", "personal")
 # Membership roles within a tenant. RBAC now, designed so ABAC can be layered
 # on later without restructuring (ADR-012, ADR-022).
 MEMBERSHIP_ROLES = ("owner", "admin", "member")
+
+# What an invitation may offer. **`owner` is deliberately absent**: ownership is
+# transferred between people who are already here, which is a different act with
+# a different guard. An invitation that could mint an owner would also be a way
+# to hand the organisation to a stranger who never accepted anything else.
+INVITABLE_ROLES = ("admin", "member")
+
+# How long an unaccepted invitation stays good for. Short enough that a
+# forwarded mail from a departed colleague is not a standing key.
+INVITE_TTL_DAYS = 7
 
 
 class Tenant(Base):
@@ -128,3 +147,96 @@ class Membership(Base):
 
     user: Mapped["User"] = relationship(back_populates="memberships")
     tenant: Mapped["Tenant"] = relationship(lazy="selectin")
+
+
+class Invitation(Base):
+    """An offer of membership, to an address that may not have an account yet.
+
+    **A row here is not a `Membership`.** Writing the membership at invitation
+    time and marking it pending would have been fewer moving parts and one
+    serious defect: an unaccepted invitation would count everywhere members are
+    counted -- including the sole-owner guard in `privacy/`, which would then
+    pass while the organisation still has exactly one actual human. An
+    invitation is a claim about the future; a membership is a fact.
+
+    **State is derived, never stored.** `pending`, `accepted`, `revoked` and
+    `expired` are a function of three timestamps, so there is no status column
+    to drift from them the first time a write path forgets one. The same
+    reasoning `CourseInterest.contact_is_visible` uses.
+
+    **This row holds an email address, and it has to.** Every other table here
+    names a person by id and resolves their address at send time (see
+    `notifications/models.py`); an invitee may have no account at all, so there
+    is no id to name. The outbox still never stores the address: a notification
+    for an invitation points at *this row*, and resolves through it -- which is
+    also what makes a revoked invitation stop sending.
+    """
+
+    __tablename__ = "invitations"
+    __table_args__ = (
+        CheckConstraint(one_of("role", INVITABLE_ROLES), name="ck_invitation_role"),
+        # The token is the capability, so it is looked up on every acceptance.
+        Index("ix_invitations_token_hash", "token_hash", unique=True),
+        Index("ix_invitations_tenant_id", "tenant_id"),
+        # Accepting reaches this table by address, from the sign-in path.
+        Index("ix_invitations_email", "email"),
+        # One *live* invitation per address per organisation, enforced in the
+        # database rather than by a read-then-write the second request loses.
+        # Partial, so a revoked or accepted invitation does not block a new one
+        # -- created with op.execute() in 0026 and therefore listed in
+        # `MANUALLY_MANAGED_INDEXES`, or the next autogenerate drops it.
+        Index(
+            "uq_invitations_live",
+            "tenant_id",
+            "email",
+            unique=True,
+            postgresql_where=text("accepted_at IS NULL AND revoked_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+    )
+    # Lowercased by the service before it ever reaches here, as every other
+    # email lookup in this module is -- `Admin@clinic.in` and `admin@clinic.in`
+    # are one mailbox, and two rows for them is two invitations to one person.
+    email: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(default="member")
+
+    # Hashed exactly as an OTP is (`hash_secret`, HMAC-SHA256 with the app
+    # secret). It is a short-lived bearer secret, not a password: `hash_secret`
+    # has no work factor and must never be repurposed as though it did.
+    token_hash: Mapped[str] = mapped_column(Text)
+
+    # Who to blame, and who to name in the email. Nullable because the inviter
+    # may later delete their account, and an invitation outliving them is
+    # better than one that vanishes mid-flight.
+    invited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tenant: Mapped["Tenant"] = relationship(lazy="selectin")
+
+    def state(self, now: datetime) -> str:
+        """Derived, in one place, in the order that matters.
+
+        Revocation beats expiry and acceptance beats both: an invitation
+        revoked after it was accepted did not un-happen, and the membership it
+        created is what `revoke` deliberately leaves alone.
+        """
+        if self.accepted_at is not None:
+            return "accepted"
+        if self.revoked_at is not None:
+            return "revoked"
+        if self.expires_at <= now:
+            return "expired"
+        return "pending"
+
+    def is_open(self, now: datetime) -> bool:
+        return self.state(now) == "pending"

@@ -54,6 +54,15 @@ EVENT_NAMES = (
     "course_interest_registered",
     "course_interest_withdrawn",
     "course_interest_status_changed",
+    # Sprint 25, the team. The subject is the **organisation**, never the
+    # person invited: an address is an identity, and this table carries none.
+    # `member_role_changed` carries the new role in its payload, so a fourth
+    # role later costs no migration -- the `course_interest_status_changed`
+    # move.
+    "member_invited",
+    "member_invitation_accepted",
+    "member_removed",
+    "member_role_changed",
 )
 
 

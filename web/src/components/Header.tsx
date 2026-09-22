@@ -30,12 +30,16 @@ const SEEKER_NAV = [
  *  (`AuthNav`), in the slot "My profile" occupies for a job seeker, so the same
  *  place means the same thing in every context. */
 const ORG_NAV = {
-  employer: [{ key: "vacancies", href: "" }],
-  // A provider gains a second item because their inbox is not reachable
+  employer: [
+    { key: "vacancies", href: "" },
+    { key: "team", href: "/team" },
+  ],
+  // A provider gains a third item because their inbox is not reachable
   // through a vacancy the way an employer's is -- they have no vacancies.
   course_provider: [
     { key: "courses_org", href: "" },
     { key: "learners", href: "/interests" },
+    { key: "team", href: "/team" },
   ],
 } as const;
 

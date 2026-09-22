@@ -24,10 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 24 — "somebody is interested", the course loop (`97f1263`) |
-| **Next sprint** | 25 — teammate invitations + the sole-owner trap (scoped in §11) |
-| **Tests** | 527 backend (`make check`), 89 web (`cd web && npm test`) |
-| **Migrations** | head `0025`; 41 ADRs |
+| **Last sprint** | 25 — teammate invitations, and the organisation that outlives its owner |
+| **Next sprint** | 26 — vacancy lifecycle + job alerts (scoped in §11) |
+| **Tests** | 559 backend (`make check`), 104 web (`cd web && npm test`) |
+| **Migrations** | head `0026`; 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -41,9 +41,11 @@ make web        # :3000
 ```
 
 **Demo logins** (all seeded, `OTP_EXPOSE_IN_RESPONSE=true` returns the code in the response):
-`hiring@apollo-care.example` (employer, 5 applicants), `admin@skillbridge-institute.example`
-(provider, interested learners), `+919000000001` (candidate with matches and a gap).
-Never sign in as the owner's real number, `+919880663641`.
+`hiring@apollo-care.example` (employer, 5 applicants, **and a three-person team**),
+`admin@skillbridge-institute.example` (provider, interested learners), `+919000000001`
+(candidate with matches and a gap). Never sign in as the owner's real number, `+919880663641`.
+Apollo Care is the only seeded organisation with more than one member — a second owner, an admin
+and one pending invitation — so `/employer/apollo-care-hospitals/team` is where Sprint 25 demos.
 
 **The three things most likely to waste an hour**, all in §8: the worker not reloading, a stale
 API process serving old code, and `make check | grep` reporting grep's exit status rather than
@@ -545,9 +547,9 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-22.* Authored code: `api/` 102 files / 15,107 lines · `scripts/` 8 / 3,564 ·
-`tests/` 28 / 8,268 · `migrations/` 26 / 2,434 · `web/src/` 141 / 13,168 (excluding the generated
-client).
+*Refreshed 2026-09-22 (after Sprint 25).* Authored code: `api/` 104 files / 16,316 lines ·
+`scripts/` 8 / 3,653 · `tests/` 29 / 8,910 · `migrations/` 27 / 2,621 · `web/src/` 147 / 14,155
+(excluding the generated client, which is another 6,975 lines and is never counted here).
 
 ```
 api/                    FastAPI modular monolith
@@ -576,8 +578,16 @@ api/                    FastAPI modular monolith
   modules/marketplace/  Job, JobSkill, Course, CourseSkill, CandidateProfile + collections;
                         publishing.py (jobs) and course_publishing.py (courses) are siblings,
                         listings.py their shared policy
-  modules/identity/     User, Tenant, Membership, OTP sign-in by phone or email, credential
-                        linking, organisations and their profile, consent record
+  modules/identity/     User, Tenant, Membership, Invitation. OTP sign-in by phone or email,
+                        credential linking, organisations and their profile, consent record.
+                        invitations.py holds the **three rules about who may do what to a
+                        team** -- escalation, the last owner, and enumeration-safety -- each
+                        in one function, because Sprint 15's finding was that a guard every
+                        handler must remember is one that eventually is not there.
+                        member_routes.py carries two routers: the org-scoped one, and a
+                        public one keyed on the invitation token, because somebody accepting
+                        is not yet a member and `require()` would 404 them out of their own
+                        invitation.
   modules/privacy/      DPDP export, deletion preview and erasure. Depends on every module;
                         nothing depends on it.
   modules/applications/ Applying, withdrawing, saving, and the employer's inbox. Holds the
@@ -925,44 +935,65 @@ shipped in Sprints 12–14. **Delete an item here when it ships; do not let it d
 **Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
 and it stays out of the sprint queue until they say otherwise.
 
-### Sprint 25 — teammate invitations, and the sole-owner trap (agreed)
+### Sprint 26 — vacancy lifecycle, and reaching people between visits (next)
 
-The scope was chosen with the owner and then deferred one sprint to keep Sprint 24 shippable. It is
-the next thing to pick up, and a plan already exists in the session archive.
+Sprint 25 closed the queue's oldest structural hole. This is the next one, and it is the cheapest
+remaining work on the pillar that is furthest along.
 
-- **One person per organisation, in a product about organisations.** All three `Membership` writers
-  hard-code `role="owner"`, so `admin` and `member` are dead branches with permissions mapped and
-  nothing able to reach them. Zero endpoints touch `Membership`; zero hits for "invite" in `api/`.
-- **The trap is data loss, not inconvenience.** A sole owner deleting their account hard-deletes the
-  tenant, its vacancies and courses, and — by FK cascade — **every application to them**, notifying
-  nobody. The 409 that should stop it (`privacy/service.py`) is unreachable, because it requires a
-  second member to exist, and its instruction ("pass ownership to someone else") names an action the
-  product cannot perform.
-- Shape: an `Invitation` row (hashed token, expiry, single use, revocable — state derived, never
-  stored), invite/list/revoke/accept, members list, role change, remove, leave. **Both acceptance
-  cases**: an address that already has an account, and one that does not, the second reusing the
-  Sprint 18 pending-in-Redis hand-off at `verify_email_and_sign_in` with consent recorded on the
-  create branch. Enumeration-safe: the response must be identical whether or not the address is
-  known (Sprint 12's lesson). Escalation: an admin may invite a `member` only; nothing may remove
-  the last owner — enforced in **one** service function, not three handlers.
-- Riskiest edit in the repo: `verify_email_and_sign_in` gains an account-creating branch. Its
-  401-on-unknown-address is load-bearing.
+- **"Hired" does nothing to the vacancy.** It stays published, keeps ranking in candidates'
+  matches, and keeps taking applications. There is no close, no fill, no expiry, and deleting a
+  job silently deletes its applications. `Job` has no `closes_at` and no head-count.
+- **Job alerts are the largest reach gap.** `match_jobs` is called only from a request handler, so
+  a vacancy published today reaches a matched candidate only if they happen to open `/matches`.
+  The outbox and the worker both exist now, so the machinery is there — but **39 of 40 candidates
+  are phone-only**, SMS waits on DLT registration, and an in-app notice is only seen by somebody
+  already on the site. Scope this honestly or do the in-app half and say so.
+- Both are small next to what they unlock: a vacancy with a lifecycle is what makes the employer
+  console trustworthy, and an alert is what makes the product worth returning to.
+
+**Then, and this is the owner's stated direction (2026-09-22): courses that can be *sold*, and
+gig work.** Neither is a sprint. See the three-pillar assessment below.
+
+### The three pillars, and where each actually stands
+
+*Assessed 2026-09-22 against the tree, not from memory. The owner's stated goal is a marketplace
+that sells courses, connects jobs, and carries gig work.*
+
+- **Job connect — built, end to end**, and ahead of the other two. Publish → NSQF-scored match →
+  apply → employer inbox → contact disclosed. What remains is Sprint 26's lifecycle and reach.
+- **Selling courses — listed and demanded, never sold.** `Course.fee_inr` exists and renders, and
+  **nothing downstream reads it as money**: no payment adapter (`api/adapters/` holds
+  `notifications/` and `nsqf/` and nothing else), and no order, entitlement, enrolment, refund,
+  payout or invoice table in any of 26 migrations. **ADR-025 forbids writing billing code** until
+  a successor ADR cites precision@5 on the golden set (5 pairs), candidate-to-course click-through
+  (only *joinable* since Sprint 24, with no volume behind it) and provider-reported enrolment
+  conversion (no surface at all). That gate has not been passed. Note also that Sprint 24's
+  "interest, not enrolment" reasoning **inverts** the moment money moves through the platform: if
+  we take the payment, we are the system of record for the enrolment.
+- **Gig work — does not exist.** Zero hits for "gig" or "freelanc" across `api/`, `web/src`,
+  `docs/` and `scripts/`. It is not a feature but a third marketplace with different physics:
+  `Job` encodes a permanent salaried vacancy (monthly salary bands, years of experience,
+  `notice_period` on the profile), there is no availability model, no proximity ranking beyond
+  Sprint 23's tie-break, no reputation layer and no completion record for a payment to settle
+  against. Downstream of the money layer by necessity, and it should get an ADR before code.
+
+**Nothing built so far has to be undone for any of it**, which is the important finding. The
+expensive assets — 21,303 NSQF standards with role search, one pure deterministic scorer, one
+identity many roles, two working consent-and-revocation disclosure loops, geography to
+sub-district — are exactly what all three pillars need.
+
+Suggested order after Sprint 26: the monetisation ADR and a **payment adapter port only** (an
+interface with a console implementation that refuses production, as `ConsoleNotificationProvider`
+does), then course checkout, then gig as its own module.
 
 ### Then, in rough order of value
 
 - **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting; the
   plan called for 50–100. Sprint 23 added a scoring component and had to lean on unit tests instead.
   This is the cheapest way to make every later scoring change safe.
-- **Vacancy lifecycle.** "Hired" does nothing to the vacancy: it stays published, keeps ranking in
-  candidates' matches and keeps taking applications. No close, no fill, no expiry; deleting a job
-  silently deletes its applications.
 - **`is_verified` has no writer** — a marketplace whose verified badge nobody can grant has no
   verified organisations. There is no operator surface of any kind: no admin module, no staff flag,
   no back-office route.
-- **Job alerts.** The largest reach gap — `match_jobs` is called only from a request handler, so a
-  vacancy published today reaches a matched candidate only if they happen to open `/matches`. But it
-  **cannot deliver yet**: 39 of 40 candidates are phone-only, SMS waits on DLT registration, and an
-  in-app notice is only seen by somebody already on the site. Do this after a sender exists.
 - **CV upload and LLM extraction.** Deferred in Sprint 23 after establishing that it fills
   experiences and education, which no scorer reads, and needs multipart, object storage, a documents
   table, PDF/DOCX extraction, AES-256-GCM with KMS (ADR-023) and an `LLMProvider` adapter (ADR-031)
@@ -976,7 +1007,15 @@ the next thing to pick up, and a plan already exists in the session archive.
   for correctness, but the in-app browser pane will not register a worker, so nothing has proved
   Chrome offers "Install". One phone, five minutes — until then say "installable" with the caveat.
 - **A learner-facing notice when a provider marks "contacted"**, and **notifying applicants when a
-  tenant deletes itself**. Both found in Sprint 24 and deliberately not built.
+  tenant deletes itself**. Both found in Sprint 24 and deliberately not built. The second is
+  smaller now than it was: Sprint 25 means a sole owner can no longer take an organisation down
+  by accident, but an organisation that genuinely deletes itself still tells its applicants
+  nothing.
+- **Ownership transfer as one act.** Sprint 25 makes it possible — promote, then leave — but it is
+  two steps and the second can fail on its own. A single "hand over and leave" would be safer.
+- **`CLAUDE.md` cites ADR-026 for the siblings-not-generalisations rule.** ADR-026 is *Supply
+  Acquisition Strategy*; that rule has no ADR and lives only in `CLAUDE.md`. Either write it as one
+  or stop citing a number for it.
 - Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist), typed `SkillRelation`
   edges, observability (ADR-019), the ADR-023 encryption path, caching as caching (ADR-020).
 

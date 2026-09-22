@@ -639,6 +639,253 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description Everybody in this organisation. Any member may see this.
+         *
+         *     It names colleagues, not candidates: nothing here crosses the line
+         *     ADR-037 draws around the people outside the organisation.
+         */
+        get: operations["list_members_org__org_slug__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Member
+         * @description Owner only. The last owner cannot be removed (409).
+         */
+        delete: operations["remove_member_org__org_slug__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Set Member Role
+         * @description Owner only. Refuses to demote the organisation's last owner (409).
+         */
+        patch: operations["set_member_role_org__org_slug__members__user_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Organisation
+         * @description Show yourself out.
+         *
+         *     Gated on `MEMBER_READ` -- the weakest thing every member holds -- because
+         *     leaving is not a management act. It runs through the **same** last-owner
+         *     guard as removal: the question "would this leave nobody in charge?" does
+         *     not change depending on who is asking it.
+         */
+        post: operations["leave_organisation_org__org_slug__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invitations
+         * @description Every invitation this organisation has sent, spent ones included.
+         *
+         *     Spent ones are kept on screen because "did we ever invite her, and what
+         *     happened?" is the question this list exists to answer, and a filter that
+         *     hides the answer makes it useless on the one day somebody needs it.
+         */
+        get: operations["list_invitations_org__org_slug__invitations_get"];
+        put?: never;
+        /**
+         * Create Invitation
+         * @description Invite somebody by email.
+         *
+         *     **The response is identical whether or not that address already has an
+         *     account** -- Sprint 12's lesson, which was learned by shipping the
+         *     opposite. The difference between the two cases reaches the mailbox, not the
+         *     caller: an existing account is asked to sign in and accept, a stranger is
+         *     walked through creating one.
+         *
+         *     An admin may invite a `member` only; asking for more is a 403.
+         */
+        post: operations["create_invitation_org__org_slug__invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invitation
+         * @description Withdraw an offer. An already-accepted one is a 409: that membership is
+         *     a separate fact with its own guard, and undoing it here would be a way past
+         *     the last-owner check.
+         */
+        delete: operations["revoke_invitation_org__org_slug__invitations__invitation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Invitation
+         * @description What am I being asked to join?
+         *
+         *     Unauthenticated: the holder of the token has not signed in yet, and may
+         *     have no account at all. It returns the organisation and the role and
+         *     **nothing else** -- not who invited them, not who else is a member, not
+         *     what the organisation has published.
+         */
+        get: operations["preview_invitation_invitations__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Invitation
+         * @description I hold this invitation and have no account. Send me a code.
+         *
+         *     This is the path for an address with no account at all, and it is the
+         *     **only** thing that permits `verify_email_and_sign_in` to create one --
+         *     which is the riskiest seam in the product, so it is worth being explicit
+         *     about what makes it safe:
+         *
+         *     * the address is taken from the invitation, never from the request, so a
+         *       forwarded link cannot mint an account at an address of the holder's
+         *       choosing;
+         *     * the invitation was written by somebody who holds `MEMBER_INVITE` at a
+         *       real organisation, so the account is not the caller's own idea;
+         *     * they still have to read the code out of that mailbox.
+         *
+         *     An address that already has an account may use this too -- it simply signs
+         *     them in and accepts. One flow, both cases, which also means the response
+         *     does not say which this was.
+         */
+        post: operations["claim_invitation_invitations__token__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Invitation Code
+         * @description Finish the stranger's path: code in, signed-in account out.
+         *
+         *     **The address is never in the request.** It is read off the invitation,
+         *     which is why this route exists at all rather than the client calling
+         *     `/auth/email/otp/verify` directly -- the preview deliberately does not
+         *     disclose the address, and a form that asked for one would let a forwarded
+         *     link mint an account at an address of the holder's choosing.
+         *
+         *     It delegates to `verify_email_and_sign_in` rather than reimplementing it:
+         *     the `PENDING_INVITE_KEY` that `claim` wrote is what permits that function
+         *     to create an account, and the acceptance happens inside it. One creation
+         *     path, one acceptance path, both already tested.
+         */
+        post: operations["verify_invitation_code_invitations__token__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Invitation
+         * @description Join, as the signed-in identity. One more membership, never a second
+         *     account (ADR-038).
+         *
+         *     The **other** acceptance path -- an address with no account at all -- runs
+         *     through `verify_email_and_sign_in`, because creating the account is what
+         *     that endpoint does and forking a second one here is what ADR-038 forbids.
+         */
+        post: operations["accept_invitation_invitations__token__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/profile": {
         parameters: {
             query?: never;
@@ -2084,6 +2331,8 @@ export interface components {
             email: string;
             /** Code */
             code: string;
+            /** Consent Version */
+            consent_version?: string | null;
         };
         /** EmployerOut */
         EmployerOut: {
@@ -2227,6 +2476,129 @@ export interface components {
             items?: components["schemas"]["InterestedLearnerOut"][];
             /** Total */
             total: number;
+        };
+        /** InvitationAccepted */
+        InvitationAccepted: {
+            /** Organisation Slug */
+            organisation_slug: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
+        };
+        /**
+         * InvitationClaimed
+         * @description A code has been sent to the address the invitation was written to.
+         *
+         *     The address is **masked**. The person holding the token got it from that
+         *     mailbox and already knows it; a forwarded link should not hand it to
+         *     somebody else in full, and the hint is enough to recognise your own.
+         */
+        InvitationClaimed: {
+            /** Sent */
+            sent: boolean;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Email Hint */
+            email_hint: string;
+            /** Debug Code */
+            debug_code?: string | null;
+        };
+        /**
+         * InvitationOut
+         * @description An invitation, as the organisation that sent it sees it.
+         *
+         *     Carries the address, because the people reading this screen are the ones
+         *     who typed it and need to see whether they typed it right. It does **not**
+         *     carry the token: that reached one mailbox, and a member list is not a place
+         *     to hand it to everybody else with `MEMBER_INVITE`.
+         */
+        InvitationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "accepted" | "revoked" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Invited By */
+            invited_by?: string | null;
+        };
+        /**
+         * InvitationPreview
+         * @description What the holder of a token is told **before** they accept.
+         *
+         *     The organisation and the role, and nothing else. The token is a capability
+         *     to *join*, not a capability to read: who else is a member, who sent it and
+         *     what the organisation has published all stay behind the acceptance.
+         */
+        InvitationPreview: {
+            /** Organisation */
+            organisation: string;
+            /** Organisation Slug */
+            organisation_slug: string;
+            /**
+             * Tenant Type
+             * @enum {string}
+             */
+            tenant_type: "employer" | "course_provider";
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+        };
+        /**
+         * InvitationVerify
+         * @description The code, and consent. **No address** -- it comes off the invitation.
+         */
+        InvitationVerify: {
+            /** Code */
+            code: string;
+            /** Consent Version */
+            consent_version?: string | null;
+        };
+        /**
+         * InviteIn
+         * @description Offer somebody membership.
+         *
+         *     `EmailStr`, and lowercased, for the reason every other address here is:
+         *     `Admin@clinic.in` and `admin@clinic.in` are one mailbox, and two
+         *     invitations to one person is a confusing thing to receive.
+         */
+        InviteIn: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Role
+             * @default member
+             * @enum {string}
+             */
+            role: "admin" | "member";
         };
         /** JobDetail */
         JobDetail: {
@@ -2497,6 +2869,8 @@ export interface components {
             email: string;
             /** Code */
             code: string;
+            /** Consent Version */
+            consent_version?: string | null;
         };
         /** LinkPhoneRequest */
         LinkPhoneRequest: {
@@ -2611,6 +2985,48 @@ export interface components {
             evidence: string;
             /** Proficiency */
             proficiency: number;
+        };
+        /**
+         * MemberOut
+         * @description A colleague.
+         *
+         *     The address is here and the phone is not: an organisation's members need to
+         *     reach each other by mail, and a personal mobile number is a different
+         *     disclosure that nobody made by accepting an invitation.
+         */
+        MemberOut: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
+            /** Full Name */
+            full_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Is You
+             * @default false
+             */
+            is_you: boolean;
+        };
+        /** MemberRoleIn */
+        MemberRoleIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
         };
         /** MembershipOut */
         MembershipOut: {
@@ -4542,6 +4958,356 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_org__org_slug__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_org__org_slug__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_role_org__org_slug__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_organisation_org__org_slug__leave_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invitations_org__org_slug__invitations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invitation_org__org_slug__invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invitation_org__org_slug__invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_invitation_invitations__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_invitation_invitations__token__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationClaimed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_invitation_code_invitations__token__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invitation_invitations__token__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAccepted"];
                 };
             };
             /** @description Validation Error */

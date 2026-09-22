@@ -1,9 +1,13 @@
 """Public interface of the identity module (ADR-009, ADR-010, ADR-032)."""
 
 from api.modules.identity.dependencies import get_current_candidate
+from api.modules.identity.member_routes import public_router as invitation_router
+from api.modules.identity.member_routes import router as team_router
 from api.modules.identity.models import (
+    INVITABLE_ROLES,
     MEMBERSHIP_ROLES,
     TENANT_TYPES,
+    Invitation,
     Membership,
     Tenant,
     User,
@@ -16,6 +20,9 @@ from api.modules.identity.tenant_routes import router as organisation_router
 __all__ = [
     "account_router",
     "get_current_candidate",
+    "INVITABLE_ROLES",
+    "Invitation",
+    "invitation_router",
     "MEMBERSHIP_ROLES",
     "TENANT_TYPES",
     "Membership",
@@ -28,5 +35,6 @@ __all__ = [
     "organisation_router",
     "request_otp",
     "router",
+    "team_router",
     "verify_otp_and_sign_in",
 ]

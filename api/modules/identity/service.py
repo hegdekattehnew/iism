@@ -35,7 +35,8 @@ from api.core.security import (
     store_otp,
 )
 from api.core.text import slugify
-from api.modules.identity.models import Membership, Tenant, User
+from api.modules.identity.invitations import PENDING_INVITE_KEY
+from api.modules.identity.models import Invitation, Membership, Tenant, User
 
 _CODE_MESSAGE = "Your IISM verification code is {code}. It expires in 5 minutes."
 _CODE_SUBJECT = "Your IISM verification code"
@@ -201,27 +202,63 @@ async def verify_otp_and_sign_in(
 
 
 async def verify_email_and_sign_in(
-    db: AsyncSession, address: str, code: str
+    db: AsyncSession, address: str, code: str, consent_version: str | None = None
 ) -> tuple[User, TokenPair, bool, str | None]:
     """Sign in with an email code.
 
-    Unlike the phone path this does **not** create an account on first success.
-    A candidate signing in by phone is self-service by design; an organisation
-    account carries a tenant and a name, which has to be asked for. An unknown
-    address that somehow held a valid code gets 401, not a blank organisation.
+    **The 401 on an unknown address is load-bearing, and it stays.** This path
+    does not create an account merely because somebody held a valid code: a
+    candidate signing in by phone is self-service by design, but an
+    organisation account carries a tenant and a name that have to be asked for,
+    and a blank organisation minted from a code is worse than a refusal.
+
+    There are exactly **two** exceptions, and both are the same mechanism: a
+    key written into Redis by an earlier, authenticated-enough act, read here
+    with `getdel` so it is consumed once.
+
+    * `_PENDING_ORG_KEY` -- Sprint 18. They registered an organisation against
+      an address that already had an account; it is provisioned now that the
+      code proves the address is theirs, never at request time, which would let
+      anyone who knows an address attach an organisation to somebody else.
+    * `PENDING_INVITE_KEY` -- Sprint 25. Somebody with `MEMBER_INVITE` at a real
+      organisation offered this address membership. **That** is what makes
+      creating the account safe here: it was not the caller's idea, and the
+      invitation is a row this product can point at.
+
+    An address with neither key and no account still gets 401. That case is
+    tested first, because everything else in this function is written around
+    keeping it true.
     """
     if not await check_otp("email", address, code):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
 
     user = await db.scalar(select(User).where(func.lower(User.email) == address.lower()))
-    if user is None:
+    invitation_id = await get_redis().getdel(PENDING_INVITE_KEY.format(address=address.lower()))
+    if user is None and invitation_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
+    minted = False
+    if user is None:
+        # An invited stranger. The account is created here and nowhere else on
+        # this path, and consent is recorded on it -- forget that and every
+        # request the new account makes afterwards is a 428 (Sprint 20).
+        require_current_consent(consent_version, status_code=status.HTTP_428_PRECONDITION_REQUIRED)
+        assert consent_version is not None  # noqa: S101 - narrowed by the check above
+        user = User(email=address.lower(), email_verified_at=datetime.now(UTC))
+        record_consent(user, consent_version)
+        db.add(user)
+        await db.flush()
+        minted = True
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
 
-    # "Created" on this path means *first sign-in*: the account row is written
-    # at registration, but nobody has proved they hold the mailbox until now.
-    created = user.email_verified_at is None
+    # "Created" on this path means *first sign-in*, which for a registered
+    # organisation is not the same moment as the row being written: the account
+    # exists from registration, but nobody has proved they hold the mailbox
+    # until now. `minted` is tracked separately rather than folded into the
+    # check below, because the invited-stranger branch verifies the address in
+    # the same breath as creating the row -- so `email_verified_at is None`
+    # would read False and send a brand-new account past its own onboarding.
+    created = minted or user.email_verified_at is None
     if created:
         user.email_verified_at = datetime.now(UTC)
 
@@ -233,6 +270,14 @@ async def verify_email_and_sign_in(
         wanted = json.loads(pending)
         tenant = await provision_organisation(db, user, wanted["name"], wanted["tenant_type"])
         organisation_slug = tenant.slug
+
+    if invitation_id is not None:
+        accepted = await _accept_pending_invitation(db, user, uuid.UUID(invitation_id))
+        # An invitation that expired or was revoked between the mail and the
+        # code returns None: the account still exists and they are still signed
+        # in, because refusing the sign-in over a stale invitation would strand
+        # somebody who now has an account and no way into it.
+        organisation_slug = accepted or organisation_slug
 
     await db.commit()
     await db.refresh(user)
@@ -257,6 +302,26 @@ async def _only_organisation_slug(db: AsyncSession, user_id: uuid.UUID) -> str |
         )
     ).all()
     return slugs[0] if len(slugs) == 1 else None
+
+
+async def _accept_pending_invitation(
+    db: AsyncSession, user: User, invitation_id: uuid.UUID
+) -> str | None:
+    """Turn the invitation this sign-in was for into a membership.
+
+    Re-checked here rather than trusted from Redis: the key says only which
+    invitation was offered, and between the mail arriving and the code coming
+    back it may have been revoked or run out. `invitations.accept` is the one
+    function that writes a `Membership` from an invitation, so this goes
+    through it rather than adding a second writer.
+    """
+    from api.modules.identity.invitations import accept  # local: see invitations.py
+
+    invitation = await db.get(Invitation, invitation_id)
+    if invitation is None or not invitation.is_open(datetime.now(UTC)):
+        return None
+    await accept(db, invitation=invitation, user=user)
+    return invitation.tenant.slug
 
 
 async def has_personal_membership(db: AsyncSession, user_id: uuid.UUID) -> bool:

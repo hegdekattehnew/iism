@@ -22,7 +22,7 @@ from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, SavedJob
-from api.modules.identity import Membership, Tenant, User
+from api.modules.identity import Invitation, Membership, Tenant, User
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateProfile,
@@ -110,6 +110,12 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
             Notification.recipient_kind == "tenant", Notification.recipient_id == tenant_id
         )
     )
+    # Explicitly, like everything above: the FK cascades, and "everything went"
+    # is the one claim an erasure path must never make on assumption. An
+    # invitation is also the single row in this product that stores somebody
+    # else's address, so leaving one behind would leave a stranger's mailbox in
+    # a table belonging to an organisation that no longer exists.
+    await db.execute(delete(Invitation).where(Invitation.tenant_id == tenant_id))
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
 
@@ -121,7 +127,14 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         names = ", ".join(o.name for o in preview.blocked_by)
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"Pass ownership of {names} to someone else before deleting your account",
+            # Until Sprint 25 this sentence named something the product could
+            # not do: there was no way to make anybody else an owner, because
+            # there was no way to have a second member at all. Worse, the guard
+            # itself was unreachable -- it needs another member to exist -- so
+            # a sole owner deleting their account destroyed the organisation,
+            # its listings and every application to them, silently. Now the
+            # instruction is an action: `PATCH /org/{slug}/members/{user_id}`.
+            f"Make somebody else an owner of {names} before deleting your account",
         )
 
     doomed = {o.slug for o in preview.organisations_deleted}
@@ -154,6 +167,17 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
             Notification.recipient_kind == "user", Notification.recipient_id == user.id
         )
     )
+    # An invitation addressed to an account being erased is withdrawn rather
+    # than left live: accepting it later would recreate a membership for a
+    # person who asked to be forgotten.
+    if user.email:
+        await db.execute(
+            delete(Invitation).where(func.lower(Invitation.email) == user.email.lower())
+        )
+    # Invitations this person *sent* survive -- they belong to the organisation,
+    # which still exists and may still be expecting the people it invited.
+    # `invited_by_user_id` is ON DELETE SET NULL for exactly this, so the row
+    # stops naming them without the offer evaporating mid-flight.
     await db.execute(delete(Membership).where(Membership.user_id == user.id))
     user_id = user.id
     db.expunge(user)
@@ -221,6 +245,19 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         )
     ).all()
 
+    # Invitations this person sent. Theirs to see, because they are the act --
+    # and the addresses are ones they typed themselves. Invitations sent *to*
+    # them are deliberately absent: those are the sending organisation's
+    # record, and listing them here would tell somebody every organisation that
+    # ever considered them.
+    sent_invitations = (
+        await db.scalars(
+            select(Invitation)
+            .where(Invitation.invited_by_user_id == user.id)
+            .order_by(Invitation.created_at)
+        )
+    ).all()
+
     log.info("account.exported")
     return {
         "exported_at": datetime.now(UTC).isoformat(),
@@ -282,6 +319,22 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
                 "contact_revoked_at": _iso(interest.contact_revoked_at),
             }
             for interest in (interests.all() if interests is not None else [])
+        ],
+        # Invitations this person sent, with what became of each. The state is
+        # derived from the timestamps by the model, so this export cannot
+        # disagree with what the organisation's own screen shows.
+        "invitations_sent": [
+            {
+                "organisation": invitation.tenant.name,
+                "email": invitation.email,
+                "role": invitation.role,
+                "state": invitation.state(datetime.now(UTC)),
+                "sent_at": _iso(invitation.created_at),
+                "expires_at": _iso(invitation.expires_at),
+                "accepted_at": _iso(invitation.accepted_at),
+                "revoked_at": _iso(invitation.revoked_at),
+            }
+            for invitation in sent_invitations
         ],
         "activity": [
             {

@@ -24,7 +24,12 @@ from api.modules.analytics import router as analytics_router
 from api.modules.applications import employer_router as applications_employer_router
 from api.modules.applications import router as applications_router
 from api.modules.geography import router as geography_router
-from api.modules.identity import account_router, organisation_router
+from api.modules.identity import (
+    account_router,
+    invitation_router,
+    organisation_router,
+    team_router,
+)
 from api.modules.identity import router as auth_router
 from api.modules.interests import provider_router as interests_provider_router
 from api.modules.interests import router as interests_router
@@ -128,6 +133,8 @@ app.include_router(marketplace_router)
 app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(organisation_router)
+app.include_router(team_router)
+app.include_router(invitation_router)
 app.include_router(profile_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)

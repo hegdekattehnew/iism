@@ -64,9 +64,18 @@ class Permission(StrEnum):
     # CANDIDATE_SHORTLIST, and separate from it because the two disclose
     # different things to different kinds of organisation.
     LEARNER_CONTACT = "learner:contact"
+    # Sprint 25, the team. Declared **without** a `publishes` argument at every
+    # call site: who works here is orthogonal to what the organisation may
+    # publish, so unlike LEARNER_CONTACT these ask no tenant-type question.
+    MEMBER_READ = "member:read"
+    MEMBER_INVITE = "member:invite"
+    MEMBER_MANAGE = "member:manage"
 
 
-_MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ})
+# Seeing who else works here is the one thing every member may do. It names
+# colleagues, not candidates: no contact detail, no listing, nothing about
+# anybody outside the organisation.
+_MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ, Permission.MEMBER_READ})
 # Roles stay type-agnostic: an admin of any organisation holds both publishing
 # sets, and the `publishes` half of `require()` decides which one their tenant
 # may actually use. Splitting the role map by tenant type instead would mean two
@@ -81,6 +90,11 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.COURSE_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
     Permission.LEARNER_CONTACT,
+    # An admin may bring someone in, and `invite()` decides at what role: a
+    # `member` only. That ceiling is enforced in the service, once, rather
+    # than by a fourth permission -- it is a rule about the *argument*, and a
+    # permission set cannot express one.
+    Permission.MEMBER_INVITE,
 }
 # Deletion is the owner's alone, and so is editing the organisation itself. An
 # admin can unpublish, which reverses; neither of these does.
@@ -88,6 +102,9 @@ _OWNER: frozenset[Permission] = _ADMIN | {
     Permission.JOB_DELETE,
     Permission.COURSE_DELETE,
     Permission.ORG_UPDATE,
+    # Changing somebody's role or removing them outright is the owner's, for
+    # the reason the two above are: neither reverses by itself.
+    Permission.MEMBER_MANAGE,
 }
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {

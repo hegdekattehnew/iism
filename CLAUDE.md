@@ -84,9 +84,12 @@ api/                     FastAPI modular monolith
     middleware.py        Pure ASGI request context: request_id, the access log.
     text.py              slugify, shared by identity and the NSQF importer
   modules/
-    identity/            Users, tenants, memberships, OTP sign-in by phone *or* email,
-                         credential linking, organisation creation and the organisation
-                         profile (ADR-009/010/011/032/038)
+    identity/            Users, tenants, memberships, invitations. OTP sign-in by phone *or*
+                         email, credential linking, organisation creation and the organisation
+                         profile (ADR-009/010/011/032/038). invitations.py holds the three
+                         rules about teams -- escalation, the last owner, enumeration-safety --
+                         each in one function. member_routes.py has two routers, because
+                         somebody accepting an invitation is not yet a member.
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
@@ -277,7 +280,55 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprint 25 is agreed: teammate invitations and the sole-owner trap.**
+> not for the queue. **Sprint 26 is next: vacancy lifecycle and job alerts.** §11 also carries a
+> standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
+> gig work — and what each actually needs.
+
+Sprint 25 (an organisation that outlives its owner) is done. For twenty-four sprints this product
+modelled organisations and could hold exactly **one person** in one: all three writers of
+`Membership` hard-coded `role="owner"`, so `admin` and `member` were fully mapped permission sets
+that nothing on earth could reach, and no endpoint anywhere touched the table.
+
+- **The bug was data loss, not inconvenience.** A sole owner deleting their account hard-deleted
+  the tenant, its vacancies and courses, and by cascade **every application to them**, telling
+  nobody. The 409 in `privacy/service.py` that should have stopped it was **unreachable** -- it
+  needs a second owner to exist -- and its instruction, "pass ownership to someone else", named an
+  act the product could not perform. Verified live after the fix: the seeded owner of Apollo Care
+  deleted their account and the organisation survived with all 5 vacancies and all 5 applications.
+- **An `Invitation` is a row, not a pending `Membership`.** Writing the membership up front would
+  have been fewer moving parts and one serious defect: an unaccepted invitation would count
+  everywhere members are counted, including the sole-owner guard, which would then pass while the
+  organisation still held one actual human.
+- **State is derived, never stored.** `pending`/`accepted`/`revoked`/`expired` is a function of
+  three timestamps, so no status column can drift from them. `CourseInterest.contact_is_visible`'s
+  reasoning, one table over.
+- **Three rules, each in exactly one function** (Sprint 15's finding). *Escalation* -- an admin may
+  invite a `member` only, or `MEMBER_INVITE` becomes a route to promoting yourself by proxy. *The
+  last owner* -- nobody may be removed, demoted **or** leave if they are the only one, asked once
+  and reached by three routes. *Enumeration* -- the invite response is byte-identical for a known
+  and an unknown address, which is Sprint 12's oracle restated.
+- **`verify_email_and_sign_in` gained an account-creating branch, and its 401 is still
+  load-bearing.** An unknown address with a valid code and no invitation still gets 401; the only
+  thing that permits creation is a `PENDING_INVITE_KEY` in Redis, written by `claim` and consumed
+  with `getdel` -- the **same mechanism** Sprint 18 built for pending organisations, not a new one.
+  Proved non-vacuous: neutering the check fails exactly one test, and that test is why the function
+  is shaped the way it is. **Consent is recorded on the create branch**, or every later request
+  from the new account 428s.
+- **The claim endpoint does not take an address.** It reads it off the invitation, so a forwarded
+  link cannot mint an account at an address of the holder's choosing, and the invitee still has to
+  read the code out of that mailbox. `GET /invitations/{token}` returns the organisation and the
+  role and nothing else: the token is a capability to *join*, never one to read.
+- **The outbox keeps its rule by gaining a third recipient kind, not an exception.** An invitee may
+  have no account, so `recipient_kind="invitation"` points at the row that legitimately stores the
+  address, and `_address_for` resolves it at send time. That buys something storing it would not:
+  **revoking an invitation stops its mail**. Verified in a drain -- `sent: 1, skipped: 1`.
+- **`accept()` records the analytics event, not the route.** The first version recorded it in the
+  route only, so the *other* acceptance path -- the invited stranger, inside
+  `verify_email_and_sign_in` -- went unmeasured, and that is the half the sprint is about. One
+  writer of a `Membership` from an invitation, one place to measure it.
+- **`uq_invitations_live` is a partial index** (`WHERE accepted_at IS NULL AND revoked_at IS NULL`)
+  created with `op.execute()`, so it is in `MANUALLY_MANAGED_INDEXES`. Confirmed by autogenerating
+  against a live database: no drift, and no proposal to drop it.
 
 Sprint 24 (somebody is interested) is done. The product's pitch is "here is your gap, and the
 courses that close it" — and for twenty-three sprints the learner could then do **nothing**. The

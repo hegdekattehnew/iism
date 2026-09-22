@@ -7,6 +7,17 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 TenantType = Literal["employer", "course_provider", "personal"]
 MembershipRole = Literal["owner", "admin", "member"]
 
+# What an invitation may offer -- `owner` deliberately absent, because
+# ownership is transferred rather than invited. Closed on the way out so the
+# generated TypeScript client types a role as a union rather than `string`;
+# `tests/test_enumerations.py` holds both of these to their CHECKs.
+InvitableRole = Literal["admin", "member"]
+
+# Derived from three timestamps by `Invitation.state`, never stored, so there
+# is no column for this union to disagree with -- and therefore deliberately
+# **not** in `test_enumerations.py`'s table.
+InvitationState = Literal["pending", "accepted", "revoked", "expired"]
+
 # E.164-ish. Deliberately permissive on country code but strict on shape, so
 # the same person cannot end up with two accounts through formatting variance.
 PhoneStr = Annotated[str, Field(min_length=8, max_length=16)]
@@ -81,6 +92,11 @@ class EmailOtpRequest(BaseModel):
 class EmailOtpVerify(BaseModel):
     email: EmailStr
     code: Annotated[str, Field(min_length=4, max_length=8)]
+    # Required only when this verification *creates* an account, which on the
+    # email path happens in exactly one case: an invited address that had none
+    # (Sprint 25). Signing in to an account that already exists needs no fresh
+    # consent, and an unknown address with no invitation still gets 401.
+    consent_version: str | None = Field(default=None, max_length=32)
 
     @field_validator("email", mode="after")
     @classmethod
@@ -260,3 +276,104 @@ class UserOut(BaseModel):
     consented_at: datetime | None = None
     preferred_locale: str
     memberships: list[MembershipOut] = Field(default_factory=list)
+
+
+# ------------------------------------------------------------ the team (S25)
+
+
+class InviteIn(BaseModel):
+    """Offer somebody membership.
+
+    `EmailStr`, and lowercased, for the reason every other address here is:
+    `Admin@clinic.in` and `admin@clinic.in` are one mailbox, and two
+    invitations to one person is a confusing thing to receive.
+    """
+
+    email: EmailStr
+    role: InvitableRole = "member"
+
+    @field_validator("email")
+    @classmethod
+    def _lower(cls, v: str) -> str:
+        return normalise_email(v)
+
+
+class InvitationOut(BaseModel):
+    """An invitation, as the organisation that sent it sees it.
+
+    Carries the address, because the people reading this screen are the ones
+    who typed it and need to see whether they typed it right. It does **not**
+    carry the token: that reached one mailbox, and a member list is not a place
+    to hand it to everybody else with `MEMBER_INVITE`.
+    """
+
+    id: uuid.UUID
+    email: str
+    role: InvitableRole
+    state: InvitationState
+    expires_at: datetime
+    created_at: datetime
+    invited_by: str | None = None
+
+
+class InvitationPreview(BaseModel):
+    """What the holder of a token is told **before** they accept.
+
+    The organisation and the role, and nothing else. The token is a capability
+    to *join*, not a capability to read: who else is a member, who sent it and
+    what the organisation has published all stay behind the acceptance.
+    """
+
+    organisation: str
+    organisation_slug: str
+    tenant_type: OrgTenantType
+    role: InvitableRole
+
+
+class InvitationClaimed(BaseModel):
+    """A code has been sent to the address the invitation was written to.
+
+    The address is **masked**. The person holding the token got it from that
+    mailbox and already knows it; a forwarded link should not hand it to
+    somebody else in full, and the hint is enough to recognise your own.
+    """
+
+    sent: bool
+    expires_in_seconds: int
+    email_hint: str
+    # Development only, exactly as `OtpRequestResponse.debug_code` is.
+    debug_code: str | None = None
+
+
+class InvitationVerify(BaseModel):
+    """The code, and consent. **No address** -- it comes off the invitation."""
+
+    code: Annotated[str, Field(min_length=4, max_length=8)]
+    consent_version: str | None = Field(default=None, max_length=32)
+
+
+class InvitationAccepted(BaseModel):
+    organisation_slug: str
+    role: MembershipRole
+
+
+class MemberOut(BaseModel):
+    """A colleague.
+
+    The address is here and the phone is not: an organisation's members need to
+    reach each other by mail, and a personal mobile number is a different
+    disclosure that nobody made by accepting an invitation.
+    """
+
+    user_id: uuid.UUID
+    role: MembershipRole
+    full_name: str | None = None
+    email: str | None = None
+    since: datetime
+    # Whether this row is the caller's own, so the interface can say "you" and
+    # refuse to offer somebody a button that removes themselves by surprise.
+    is_you: bool = False
+
+
+class MemberRoleIn(BaseModel):
+    role: MembershipRole
