@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Text } from "@/components/profile/fields";
 import { Button } from "@/components/ui";
 import { type Collection, useProfileMutations } from "@/lib/profile";
+import { detailOf, statusOf } from "@/lib/http";
 
 type Entry = { id: string } & Record<string, unknown>;
 
@@ -23,6 +24,8 @@ export function TagSection({
   render,
   secondLabel,
   toSecond,
+  maxLength,
+  secondMaxLength,
 }: {
   collection: Collection;
   title: string;
@@ -33,6 +36,11 @@ export function TagSection({
   render: (e: Entry) => string;
   secondLabel?: string;
   toSecond?: boolean;
+  /** The server's own limits, per collection: a preferred role's title is
+   *  capped at 120 and a location's state at 80, and a form that does not know
+   *  that produces a refusal naming nothing. */
+  maxLength?: number;
+  secondMaxLength?: number;
 }) {
   const t = useTranslations("profilePage.sections");
   const te = useTranslations("profilePage.errors");
@@ -49,7 +57,9 @@ export function TagSection({
       setA("");
       setB("");
     } catch (e) {
-      setError((e as Error).message === "409" ? te("duplicate") : te("generic"));
+      setError(
+        statusOf(e) === 409 ? te("duplicate") : (detailOf(e) ?? te("generic")),
+      );
     }
   };
 
@@ -62,6 +72,7 @@ export function TagSection({
         <Text
           value={a}
           onChange={(e) => setA(e.target.value)}
+          maxLength={maxLength}
           placeholder={label}
           aria-label={label}
           className="mt-0 flex-1"
@@ -76,6 +87,7 @@ export function TagSection({
           <Text
             value={b}
             onChange={(e) => setB(e.target.value)}
+            maxLength={secondMaxLength}
             placeholder={secondLabel}
             aria-label={secondLabel}
             className="mt-0 flex-1"

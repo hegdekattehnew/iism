@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { ApiError, readDetail } from "@/lib/http";
 import type { paths } from "@/lib/api-schema";
 
 export type Collection =
@@ -84,7 +85,10 @@ export function useProfileMutations() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: v.body as any,
       });
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -104,7 +108,10 @@ export function useProfileMutations() {
           body: v.body as any,
         },
       );
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -140,7 +147,10 @@ export function useProfileMutations() {
       const { data, error, response } = await api.POST("/me/profile/skills/bulk", {
         body: v,
       });
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,

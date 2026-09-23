@@ -12,6 +12,7 @@ import {
   type Profile,
   useProfileMutations,
 } from "@/lib/profile";
+import { detailOf, statusOf } from "@/lib/http";
 
 type Entry = Record<string, unknown> & { id: string };
 
@@ -70,7 +71,13 @@ export function SectionEditor({
       }
       close();
     } catch (e) {
-      setError(String((e as Error).message) === "409" ? te("duplicate") : te("generic"));
+      // 409 keeps its own sentence -- "that entry already exists" is clearer
+      // than the server's phrasing. Everything else shows what the server
+      // actually said: this one editor drives six collections with thirteen
+      // length limits between them, and "check the fields" names none of them.
+      setError(
+        statusOf(e) === 409 ? te("duplicate") : (detailOf(e) ?? te("generic")),
+      );
     }
   };
 
@@ -174,13 +181,13 @@ export function useSectionDefs(profile: Profile | null) {
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
         <>
           <Field label={f("employer")}>
-            <Text required value={str(d, "employer_name")} onChange={(e) => set({ employer_name: e.target.value })} />
+            <Text required value={str(d, "employer_name")} maxLength={120} onChange={(e) => set({ employer_name: e.target.value })} />
           </Field>
           <Field label={f("roleTitle")}>
-            <Text required value={str(d, "role_title")} onChange={(e) => set({ role_title: e.target.value })} />
+            <Text required value={str(d, "role_title")} maxLength={120} onChange={(e) => set({ role_title: e.target.value })} />
           </Field>
           <Field label={f("location")}>
-            <Text value={str(d, "location")} onChange={(e) => set({ location: e.target.value })} />
+            <Text value={str(d, "location")} maxLength={120} onChange={(e) => set({ location: e.target.value })} />
           </Field>
           <Field label={f("startedOn")}>
             <Text type="date" required value={str(d, "started_on")} onChange={(e) => set({ started_on: e.target.value })} />
@@ -198,7 +205,7 @@ export function useSectionDefs(profile: Profile | null) {
             />
           </div>
           <Field label={f("description")} className="sm:col-span-2">
-            <Area value={str(d, "description")} onChange={(e) => set({ description: e.target.value })} />
+            <Area value={str(d, "description")} maxLength={1000} onChange={(e) => set({ description: e.target.value })} />
           </Field>
         </>
       ),
@@ -216,13 +223,13 @@ export function useSectionDefs(profile: Profile | null) {
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
         <>
           <Field label={f("qualification")}>
-            <Text required value={str(d, "qualification")} onChange={(e) => set({ qualification: e.target.value })} />
+            <Text required value={str(d, "qualification")} maxLength={160} onChange={(e) => set({ qualification: e.target.value })} />
           </Field>
           <Field label={f("institution")}>
-            <Text value={str(d, "institution")} onChange={(e) => set({ institution: e.target.value })} />
+            <Text value={str(d, "institution")} maxLength={160} onChange={(e) => set({ institution: e.target.value })} />
           </Field>
           <Field label={f("specialisation")}>
-            <Text value={str(d, "specialisation")} onChange={(e) => set({ specialisation: e.target.value })} />
+            <Text value={str(d, "specialisation")} maxLength={120} onChange={(e) => set({ specialisation: e.target.value })} />
           </Field>
           <Field label={f("yearCompleted")}>
             <Text type="number" min={1950} max={2100} value={str(d, "year_completed")} onChange={(e) => set({ year_completed: e.target.value ? Number(e.target.value) : null })} />
@@ -254,13 +261,13 @@ export function useSectionDefs(profile: Profile | null) {
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
         <>
           <Field label={f("certName")}>
-            <Text required value={str(d, "name")} onChange={(e) => set({ name: e.target.value })} />
+            <Text required value={str(d, "name")} maxLength={160} onChange={(e) => set({ name: e.target.value })} />
           </Field>
           <Field label={f("issuingBody")}>
-            <Text value={str(d, "issuing_body")} onChange={(e) => set({ issuing_body: e.target.value })} />
+            <Text value={str(d, "issuing_body")} maxLength={160} onChange={(e) => set({ issuing_body: e.target.value })} />
           </Field>
           <Field label={f("credentialId")}>
-            <Text value={str(d, "credential_id")} onChange={(e) => set({ credential_id: e.target.value })} />
+            <Text value={str(d, "credential_id")} maxLength={80} onChange={(e) => set({ credential_id: e.target.value })} />
           </Field>
           <Field label={f("nsqfLevel")}>
             <Text type="number" min={1} max={10} value={str(d, "nsqf_level")} onChange={(e) => set({ nsqf_level: e.target.value ? Number(e.target.value) : null })} />
@@ -287,7 +294,7 @@ export function useSectionDefs(profile: Profile | null) {
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
         <>
           <Field label={f("language")}>
-            <Text required value={str(d, "language")} onChange={(e) => set({ language: e.target.value })} />
+            <Text required value={str(d, "language")} minLength={2} maxLength={40} onChange={(e) => set({ language: e.target.value })} />
           </Field>
           <Field label={f("proficiency")}>
             <Select value={str(d, "proficiency")} onChange={(e) => set({ proficiency: e.target.value })}>

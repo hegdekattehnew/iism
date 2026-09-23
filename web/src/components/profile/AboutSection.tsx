@@ -65,10 +65,10 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
             <Text name="headline" defaultValue={profile?.headline ?? ""} placeholder={t("headlinePlaceholder")} maxLength={160} />
           </Field>
           <Field label={t("state")}>
-            <Text name="location_state" defaultValue={profile?.location_state ?? ""} />
+            <Text name="location_state" maxLength={80} defaultValue={profile?.location_state ?? ""} />
           </Field>
           <Field label={t("district")}>
-            <Text name="location_district" defaultValue={profile?.location_district ?? ""} />
+            <Text name="location_district" maxLength={80} defaultValue={profile?.location_district ?? ""} />
           </Field>
           <Field label={t("experience")}>
             <Text type="number" name="years_experience" min={0} max={60} defaultValue={profile?.years_experience ?? 0} />

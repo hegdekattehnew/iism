@@ -143,6 +143,7 @@ export function JobEditor({
             <Field label={t("district")}>
               <Text
                 name="location_district"
+                maxLength={120}
                 defaultValue={job?.location_district ?? ""}
               />
             </Field>

@@ -122,7 +122,8 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
               />
             </Field>
             <Field label={t("city")}>
-              <Text name="city" defaultValue={d?.city ?? ""} />
+              <Text name="city"
+                maxLength={120} defaultValue={d?.city ?? ""} />
             </Field>
             <Field label={t("website")}>
               <Text name="website"
@@ -131,6 +132,7 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
             <Field label={t("logoUrl")}>
               <Text
                 name="logo_url"
+                maxLength={500}
                 type="url"
                 defaultValue={d?.logo_url ?? ""}
               />

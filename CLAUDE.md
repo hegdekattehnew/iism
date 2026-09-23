@@ -318,6 +318,11 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   had named the standard. Write failures throw `ApiError(status, readDetail(error))` from
   `lib/http.ts`, and the screen shows `detailOf(...)` with the generic line as the **fallback for a
   failure that carried nothing**, not the default.
+- **`web/src/lib/constraints.test.ts` is the guard, not a memory.** It reads each form's source and
+  asserts every server limit is mirrored on the input that can break it. Writing it found three
+  more the hand patch had missed, and the seeker side had thirteen: the six profile collections
+  share one editor and it enforced no length at all. **Add a `min_length`/`max_length` to a schema
+  and add it to that table in the same change.**
 - **A constraint the form does not know about is one the person finds out the hard way.** `JobIn`
   and `CourseIn` set `min_length=3` on `title`; neither form had `minLength`, so the browser
   accepted two characters and the server refused them. Mirror every server limit on the input
