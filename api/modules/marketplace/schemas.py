@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -61,6 +61,27 @@ class JobOut(BaseModel):
     nsqf_level_min: NsqfLevel | None = None
     tenant: TenantOut
 
+    # The lifecycle, on the public payload because the public page renders it.
+    # `is_open` rather than the raw timestamps as the thing clients branch on:
+    # it is one question with one answer, and three components each deriving
+    # "published and not closed" is three chances to derive it differently.
+    is_open: bool = True
+    positions: int = 1
+    closes_at: datetime | None = None
+    closed_at: datetime | None = None
+    # Permissive `str`, not a Literal: this is an output model, and a closed
+    # reason the schema has not heard of should render oddly rather than 500
+    # the whole listing. The CHECK on the column is what keeps it closed.
+    close_reason: str | None = None
+
+
+class JobCloseIn(BaseModel):
+    """Why a vacancy is closing. `expired` is absent: that one is the worker's,
+    written when a closing date passes, and an employer claiming it would make
+    the reason a vacancy closed untrue."""
+
+    reason: Literal["filled", "withdrawn"] = "filled"
+
 
 class JobDetail(JobOut):
     skills: list[JobSkillOut] = Field(default_factory=list)
@@ -102,6 +123,14 @@ class JobIn(BaseModel):
     salary_min_inr: int | None = Field(None, ge=0)
     salary_max_inr: int | None = Field(None, ge=0)
     nsqf_level_min: NsqfLevelIn | None = None
+    # How many people are being hired. Constrained here, on the way in, and by
+    # `ck_jobs_positions` in the database -- a vacancy for zero people would
+    # close the moment it was published.
+    positions: Annotated[int, Field(ge=1, le=999)] = 1
+    # Optional, and in the future. A closing date already past would be closed
+    # by the worker within the hour, so accepting one is accepting a vacancy
+    # that vanishes for no visible reason.
+    closes_at: datetime | None = None
     skills: list[JobSkillIn] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
@@ -376,6 +405,10 @@ class CandidateProfileFull(BaseModel):
     expected_salary_min_inr: int | None = None
     expected_salary_max_inr: int | None = None
     notice_period: NoticePeriod | None = None
+    # On by default, and the one thing in this product that sends somebody a
+    # message they did not ask for in the moment -- so it is on the profile
+    # where they can find it, not buried in an account screen.
+    job_alerts_enabled: bool = True
     onboarding_completed_at: datetime | None = None
 
     skills: list[CandidateSkillOut] = Field(default_factory=list)
@@ -408,6 +441,7 @@ class CandidateProfileUpdateFull(BaseModel):
     expected_salary_min_inr: int | None = Field(default=None, ge=0)
     expected_salary_max_inr: int | None = Field(default=None, ge=0)
     notice_period: NoticePeriod | None = None
+    job_alerts_enabled: bool | None = None
 
     @model_validator(mode="after")
     def _check_salary_range(self) -> "CandidateProfileUpdateFull":

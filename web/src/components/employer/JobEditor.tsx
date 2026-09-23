@@ -95,6 +95,10 @@ export function JobEditor({
       salary_min_inr: n("salary_min_inr"),
       salary_max_inr: n("salary_max_inr"),
       nsqf_level_min: n("nsqf_level_min"),
+      positions: n("positions") ?? 1,
+      // An empty date input is "", which the API would reject as a datetime.
+      // Null means "no closing date", which is most vacancies.
+      closes_at: s("closes_at") ? `${s("closes_at")}T23:59:59Z` : null,
       skills: requirements.map((r) => ({
         skill_slug: r.skill_slug,
         importance: r.importance,
@@ -157,6 +161,22 @@ export function JobEditor({
                 max={10}
                 step={0.5}
                 defaultValue={job?.nsqf_level_min ?? ""}
+              />
+            </Field>
+            <Field label={t("positions")} hint={t("positionsHint")}>
+              <Text
+                name="positions"
+                type="number"
+                min={1}
+                max={999}
+                defaultValue={job?.positions ?? 1}
+              />
+            </Field>
+            <Field label={t("closesAt")} hint={t("closesAtHint")}>
+              <Text
+                name="closes_at"
+                type="date"
+                defaultValue={job?.closes_at ? job.closes_at.slice(0, 10) : ""}
               />
             </Field>
             <Field label={t("experienceMin")}>

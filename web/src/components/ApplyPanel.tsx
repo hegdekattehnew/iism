@@ -53,9 +53,14 @@ function useMySavedJobs(enabled: boolean) {
 export function ApplyPanel({
   jobSlug,
   organisation,
+  isOpen = true,
 }: {
   jobSlug: string;
   organisation: string;
+  /** Whether the vacancy still takes applications (Sprint 27). The page is
+   *  still here when it does not -- people have it bookmarked and it is in
+   *  their application list -- so this says so rather than 404ing. */
+  isOpen?: boolean;
 }) {
   const t = useTranslations("applications");
   const signedIn = useIsSignedIn();
@@ -136,6 +141,12 @@ export function ApplyPanel({
     onError: () => setError(t("errorGeneric")),
   });
 
+  // **Before the sign-in prompt.** A closed vacancy takes nobody's
+  // application, so asking a signed-out visitor to sign in first would walk
+  // them through an account to reach a 409.
+  if (!isOpen && !live) {
+    return <Alert tone="warning">{t("vacancyClosed")}</Alert>;
+  }
   if (!signedIn) {
     return (
       <ButtonLink href="/signin" size="lg">

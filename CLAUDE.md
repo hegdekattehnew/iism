@@ -121,6 +121,12 @@ api/                     FastAPI modular monolith
     notifications/       The outbox (ADR-006): queued inside the request, sent by the
                          worker. The row names a recipient and never holds an
                          address -- that is resolved at send time.
+    alerts/              Telling a candidate about a vacancy they did not go
+                         looking for, and closing one whose date has passed.
+                         Both run in the **worker**, never in a request. Uses
+                         the one scorer through `matching.candidates_for_job`
+                         (ADR-037) -- there is no second, looser "close enough
+                         to email about" rule. Nothing depends on it.
     privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
                          Spans every module; nothing depends on it.
     analytics/           analytics_events (ADR-025). record() COMMITS.
@@ -299,9 +305,57 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprint 27 is next: vacancy lifecycle and job alerts.** §11 also carries a
+> not for the queue. **Sprint 28 is next: the monetisation ADR and the payment adapter port.**
+> §11 also carries a
 > standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
 > gig work — and what each actually needs.
+
+Sprint 27 (a vacancy that ends, and alerts that reach people) is done. Two things this product
+could compute and would not act on: **"hired" did nothing to the vacancy** -- it stayed published,
+kept ranking in strangers' matches and kept taking applications nobody would read -- and
+**`match_jobs` ran only inside a request handler**, so a vacancy published on Monday reached a
+matched candidate only if they happened to open `/matches`.
+
+- **Closing is not unpublishing, and it is not a third `status`.** Fourteen queries compared
+  `status == "published"`, so folding closure into that column would have left a closed vacancy
+  visible in whichever one was missed. `closed_at` + `close_reason` are separate columns and
+  **`open_job()` in `marketplace/models.py` is the one predicate every public listing uses** --
+  browse, the homepage count, matching retrieval, the match detail. `ck_jobs_closed` refuses a row
+  carrying one without the other.
+- **A closed vacancy keeps its page and its inbox.** Its detail route deliberately does *not* use
+  `open_job()`: people have it bookmarked and it is in their application list, and a 404 on a row
+  we kept on purpose would be a broken link of our own making -- the rule retired skills already
+  follow. Applying is a **409, not a 404**, because "closed" is a state worth naming and the
+  candidate can disprove a 404 by pressing Back.
+- **`positions` is what makes "hired" mean something.** `_close_if_filled` counts hired rows rather
+  than incrementing a counter, so it stays correct after an un-hire or two hires landing together,
+  and closes at the head-count with reason `filled`. Hiring a sixth against five positions is not
+  refused -- the vacancy simply closes at five and the employer reopens it if they meant more.
+- **Expiry belongs to the worker.** A closing date enforced only when somebody loads the page is
+  not a closing date: the vacancy would sit in browse until a visitor arrived, and two people a
+  second apart would see different answers. `close_expired_jobs` runs hourly; `expired` is the one
+  reason an employer cannot claim, because claiming it would make the record untrue.
+- **Reopening clears a `closes_at` already in the past**, or the worker closes the vacancy again
+  within the hour and the employer watches their own action be undone.
+- **The alert sweep claims a job before it queues anything.** `alerted_at` is stamped first, so a
+  crash halfway costs the rest of that vacancy's alerts rather than re-sending the first few:
+  under-alerting is recoverable by hand, double-alerting is not. `JobAlert`'s unique
+  `(job_id, profile_id)` makes "told once, ever" a constraint rather than an intention.
+- **Migration 0027 backfills `alerted_at = now()` on every existing vacancy**, and the seed does
+  the same. Without it the first sweep treats the entire back catalogue as new and mails every
+  candidate about every job ever published — the difference between switching a feature on and an
+  incident.
+- **In-app is the channel that lands, and the docstring says so.** 39 of 40 seeded candidates are
+  phone-only and SMS waits on DLT registration, so email is queued only where an address exists.
+  Two caps keep a busy Monday from being the reason somebody stops reading: `max_alerts_per_job`
+  and `max_alerts_per_candidate_per_day`. `job_alerts_enabled` on the profile is the opt-out, and
+  it is the only message this product sends that somebody did not ask for in the moment.
+- **`candidates_for_job` is exported from `matching` so the sweep cannot grow its own scorer.**
+  "Close enough to write to" is the same question as "close enough to rank" (ADR-037).
+- **`tenants.created_at` is a naive `TIMESTAMP`** while `course_interests.created_at` is
+  `timestamptz`. Comparing the naive one against an aware datetime makes asyncpg refuse the query
+  outright — found by Sprint 26's organisation cap and worth remembering before writing the next
+  rolling-window query.
 
 Sprint 26 (a surface you would show somebody) is done. No new product surface: the theme made
 systematic, one UI bug traced to its actual cause, and the organisation policy settled.

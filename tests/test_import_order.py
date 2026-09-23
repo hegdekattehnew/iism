@@ -24,6 +24,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 ENTRY_POINTS = [
+    "api.modules.alerts",
     "api.modules.analytics",
     "api.modules.applications",
     "api.modules.identity",

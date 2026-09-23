@@ -40,7 +40,7 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("employerWorkspace");
   const me = useMemberships();
   const jobs = useOrgJobs(orgSlug);
-  const { create, update, setPublished } = useOrgJobMutations(orgSlug);
+  const { create, update, setPublished, setOpen } = useOrgJobMutations(orgSlug);
 
   // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
@@ -161,10 +161,15 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                         ` · ${t("nsqfLevel", { level: job.nsqf_level_min })}`}
                     </p>
                   </div>
-                  {job.status === "published" ? (
+                  {/* Three states, not two. A closed vacancy is published --
+                      its page is still there -- so a published/draft badge
+                      would call it open when it is not. */}
+                  {job.status !== "published" ? (
+                    <Badge tone="warn">{t("draft")}</Badge>
+                  ) : job.is_open ? (
                     <Badge tone="good">{t("published")}</Badge>
                   ) : (
-                    <Badge tone="warn">{t("draft")}</Badge>
+                    <Badge>{t(`closed_${job.close_reason ?? "filled"}`)}</Badge>
                   )}
                 </div>
 
@@ -202,6 +207,23 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                   >
                     {job.status === "published" ? t("unpublish") : t("publish")}
                   </button>
+                  {job.status === "published" && (
+                    <button
+                      type="button"
+                      disabled={setOpen.isPending}
+                      onClick={() => {
+                        if (
+                          job.is_open &&
+                          !confirm(t("confirmClose", { title: job.title }))
+                        )
+                          return;
+                        setOpen.mutate({ slug: job.slug, open: !job.is_open });
+                      }}
+                      className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    >
+                      {job.is_open ? t("close") : t("reopen")}
+                    </button>
+                  )}
                   {job.status === "published" && (
                     <>
                       <Link

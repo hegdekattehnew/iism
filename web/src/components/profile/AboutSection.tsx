@@ -35,6 +35,10 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
       date_of_birth: s("date_of_birth"),
       gender: s("gender"),
       willing_to_relocate: form.get("willing_to_relocate") === "on",
+      // An unchecked box sends nothing, so `=== "on"` is the whole read. The
+      // preference is here rather than in an account screen because it is
+      // about the profile: the alerts use the standards on it.
+      job_alerts_enabled: form.get("job_alerts_enabled") === "on",
       preferred_employment_type: s("preferred_employment_type"),
       expected_salary_min_inr: n("expected_salary_min_inr"),
       expected_salary_max_inr: n("expected_salary_max_inr"),
@@ -118,6 +122,11 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
           </Field>
           <div className="sm:col-span-2">
             <Check name="willing_to_relocate" label={f("relocate")} defaultChecked={profile?.willing_to_relocate ?? false} />
+            <Check
+              name="job_alerts_enabled"
+              label={f("alertsOn")}
+              defaultChecked={profile?.job_alerts_enabled ?? true}
+            />
           </div>
         </div>
       </section>

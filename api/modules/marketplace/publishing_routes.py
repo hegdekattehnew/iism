@@ -90,6 +90,62 @@ async def unpublish_job(
     return schemas.OrgJobOut.model_validate(job)
 
 
+@router.post("/{slug}/close", response_model=schemas.OrgJobOut)
+async def close_job(
+    slug: str,
+    payload: schemas.JobCloseIn | None = None,
+    context: TenantContext = CanPublish,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.OrgJobOut:
+    """Stop taking applications, and keep the page and the inbox.
+
+    Distinct from unpublish, which hides the vacancy entirely: people who
+    already applied still need to see what they applied to, and the employer
+    still has to work through them. Applicants still waiting are told.
+    """
+    reason = payload.reason if payload else "filled"
+    job = await publishing.close_job(db, context.tenant.id, slug, reason)
+    await _record(db, "job_closed", context, job, {"reason": reason, "automatic": False})
+    return schemas.OrgJobOut.model_validate(job)
+
+
+@router.post("/{slug}/reopen", response_model=schemas.OrgJobOut)
+async def reopen_job(
+    slug: str,
+    context: TenantContext = CanPublish,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.OrgJobOut:
+    """Take applications again. Clears a closing date already in the past."""
+    job = await publishing.reopen_job(db, context.tenant.id, slug)
+    await _record(db, "job_reopened", context, job, None)
+    return schemas.OrgJobOut.model_validate(job)
+
+
+async def _record(
+    db: AsyncSession,
+    name: str,
+    context: TenantContext,
+    job: object,
+    payload: dict | None,
+) -> None:
+    """Measurement, subjected to the vacancy and never to a person.
+
+    Imported inside the function: `analytics` loads routes that load
+    `marketplace.models`, so a module-level import here is an ImportError at
+    boot -- the cycle `tests/test_import_order.py` exists to catch.
+    """
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        name,
+        user_id=context.user.id,
+        subject_type="job",
+        subject_id=job.id,  # type: ignore[attr-defined]
+        payload=payload,
+    )
+
+
 @router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(
     slug: str,

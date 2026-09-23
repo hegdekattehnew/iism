@@ -1605,6 +1605,33 @@ async def _seed_team(db, tenants: dict[str, Tenant]) -> tuple[int, int]:  # type
     return members, invites
 
 
+# One seeded vacancy is closed, so the state a demo needs to show exists
+# without anybody first having to hire two people. Chosen by slug rather than
+# by position in the list: "the fourth job" stops being the same job the moment
+# somebody reorders JOBS.
+#
+# **Deliberately not a golden-set vacancy.** `general-duty-assistant-chennai`
+# and `cashier-bengaluru` are what `make evaluate` ranks against, and a closed
+# vacancy leaves `match_jobs` -- so closing either would turn the golden set
+# red for a reason that has nothing to do with scoring.
+CLOSED_VACANCY_SLUG = "inventory-clerk-nagpur"
+
+
+async def _seed_closed_vacancy(db) -> int:  # type: ignore[no-untyped-def]
+    """Close one vacancy as "filled", idempotently.
+
+    Sprint 27 gave a vacancy three states where it had two, and the third is
+    the one nothing on a fresh database would otherwise show.
+    """
+    job = await db.scalar(select(Job).where(Job.slug == CLOSED_VACANCY_SLUG))
+    if job is None or job.closed_at is not None:
+        return 0
+    job.closed_at = _now()
+    job.close_reason = "filled"
+    await db.flush()
+    return 1
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -1627,6 +1654,7 @@ async def seed() -> dict[str, int]:
         "owners": 0,
         "teammates": 0,
         "invitations": 0,
+        "closed_jobs": 0,
         "jobs": 0,
         "courses": 0,
         "job_skills": 0,
@@ -1694,6 +1722,7 @@ async def seed() -> dict[str, int]:
             tenants[slug] = t
 
         stats["teammates"], stats["invitations"] = await _seed_team(db, tenants)
+        stats["closed_jobs"] = await _seed_closed_vacancy(db)
 
         for (
             slug,
@@ -1742,6 +1771,11 @@ async def seed() -> dict[str, int]:
             job.salary_min_inr, job.salary_max_inr = smin, smax
             job.nsqf_level_min = nsqf
             job.status = "published"
+            # Seeded as already-swept. Without this the first alert run after a
+            # fresh seed treats all twenty vacancies as new and mails every
+            # matched candidate about every one of them -- the same reason
+            # migration 0027 backfills `alerted_at` rather than leaving it null.
+            job.alerted_at = job.alerted_at or _now()
             await db.flush()
 
             await db.execute(delete(JobSkill).where(JobSkill.job_id == job.id))
@@ -1821,6 +1855,7 @@ if __name__ == "__main__":
     print(
         f"tenants created: {r['tenants']}  owner accounts created: {r['owners']}  "
         f"teammates added: {r['teammates']}  invitations pending: {r['invitations']}  "
+        f"closed vacancies: {r['closed_jobs']}  "
         f"jobs created: {r['jobs']}  "
         f"courses created: {r['courses']}  "
         f"job-skill links: {r['job_skills']}  course-skill links: {r['course_skills']}"

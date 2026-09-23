@@ -48,6 +48,12 @@ TEMPLATES = (
     # Sprint 25. The only message this product sends to somebody who may not
     # be a user yet.
     "organisation_invitation",
+    # Sprint 27. The first message this product sends to somebody who did not
+    # ask for it in the moment -- which is why it is the only one with an
+    # opt-out (`CandidateProfile.job_alerts_enabled`).
+    "job_alert",
+    # Told to the applicants still waiting, never to the ones already answered.
+    "vacancy_closed",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

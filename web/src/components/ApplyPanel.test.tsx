@@ -65,3 +65,24 @@ describe("ApplyPanel — the confirm step is the consent moment", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
 });
+
+describe("ApplyPanel — a closed vacancy", () => {
+  const closed = () => (
+    <ApplyPanel jobSlug="cashier-bengaluru" organisation="Apply Co" isOpen={false} />
+  );
+
+  it("says it is closed rather than offering a button that would 409", () => {
+    world.memberships = [personal()];
+    renderUi(closed());
+    expect(screen.getByRole("alert").textContent).toMatch(/no longer taking applications/);
+    expect(screen.queryByRole("button", { name: "Apply for this job" })).toBeNull();
+  });
+
+  it("says so to a signed-out visitor too, before asking them to sign in", () => {
+    // Otherwise somebody is walked through creating an account to reach a 409.
+    world.signedIn = false;
+    renderUi(closed());
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Sign in to apply" })).toBeNull();
+  });
+});

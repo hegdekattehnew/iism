@@ -63,6 +63,15 @@ EVENT_NAMES = (
     "member_invitation_accepted",
     "member_removed",
     "member_role_changed",
+    # Sprint 27, the vacancy lifecycle. `job_closed` carries its reason in the
+    # payload -- and whether a human or the worker did it -- so a fourth reason
+    # later costs no migration.
+    "job_closed",
+    "job_reopened",
+    # One row per sweep, not per person told: the subject is the vacancy, and
+    # counting recipients here would be a headcount of candidates on an event
+    # that must name none.
+    "job_alerts_sent",
 )
 
 

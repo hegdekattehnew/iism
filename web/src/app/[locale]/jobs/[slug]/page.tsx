@@ -67,7 +67,11 @@ export default async function JobDetailPage({
       {/* Client-side: whether someone is signed in, and whether they are a job
           seeker, is only knowable in the browser. */}
       <div className="mt-6">
-        <ApplyPanel jobSlug={data.slug} organisation={data.tenant.name} />
+        <ApplyPanel
+          jobSlug={data.slug}
+          organisation={data.tenant.name}
+          isOpen={data.is_open}
+        />
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">

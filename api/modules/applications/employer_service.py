@@ -7,12 +7,12 @@ own history, and the contact details go.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
@@ -95,6 +95,7 @@ async def set_status(
         )
 
     application.status = new_status
+    filled = await _close_if_filled(db, job)
 
     # The candidate hears about it. In-app always -- most signed up with a
     # phone and have no email, and SMS waits on DLT registration -- plus email
@@ -128,7 +129,47 @@ async def set_status(
         # candidate, the same rule the console's own events follow.
         payload={"status": new_status},
     )
+    if filled:
+        await record(
+            db,
+            "job_closed",
+            subject_type="job",
+            subject_id=job.id,
+            payload={"reason": "filled", "automatic": True},
+        )
     return application
+
+
+async def _close_if_filled(db: AsyncSession, job: Job) -> bool:
+    """Close the vacancy once every position is taken. Returns whether it did.
+
+    **This is what "hired" means.** For twenty-six sprints marking somebody
+    hired changed one row and nothing else: the vacancy stayed published, kept
+    ranking in strangers' matches and kept taking applications nobody would
+    ever read. An employer said how many people they were hiring; when that
+    many are hired, the vacancy is done.
+
+    Counted from the rows rather than incremented, so it is correct after an
+    un-hire, a withdrawal, or two hires landing at once. **Not** a 409 path:
+    an employer may still hire a sixth person against five positions -- the
+    vacancy simply closes at five and they reopen it if they meant more.
+    """
+    if job.closed_at is not None:
+        return False
+    hired = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(Application.job_id == job.id, Application.status == "hired")
+        )
+    ) or 0
+    if hired < job.positions:
+        return False
+
+    job.closed_at = datetime.now(UTC)
+    job.close_reason = "filled"
+    log.info("marketplace.job_closed", slug=job.slug, reason="filled", automatic=True)
+    return True
 
 
 def contact_for(user: User, application: Application) -> dict[str, str | None] | None:

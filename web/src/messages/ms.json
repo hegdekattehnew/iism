@@ -429,7 +429,8 @@
       "employmentType": "Preferred work type",
       "salaryMin": "Expected salary from",
       "salaryMax": "to",
-      "noticePeriod": "Available"
+      "noticePeriod": "Available",
+      "alertsOn": "Tell me when a matching vacancy is published"
     },
     "gender": {
       "female": "Female",
@@ -674,7 +675,17 @@
       "contract": "Contract",
       "apprenticeship": "Apprenticeship"
     },
-    "saveFailed": "Could not save. Check the details and try again."
+    "saveFailed": "Could not save. Check the details and try again.",
+    "positions": "How many people",
+    "positionsHint": "The vacancy closes itself when this many are hired.",
+    "closesAt": "Closing date",
+    "closesAtHint": "Optional. Applications stop at the end of this day.",
+    "close": "Close vacancy",
+    "reopen": "Reopen",
+    "confirmClose": "Close {title}? It stops taking applications and leaves browse. You can reopen it.",
+    "closed_filled": "Filled",
+    "closed_withdrawn": "Closed",
+    "closed_expired": "Expired"
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -1105,7 +1116,8 @@
       "shortlisted": "The employer shortlisted you.",
       "rejected": "The employer is not taking this one forward.",
       "hired": "You got the job."
-    }
+    },
+    "vacancyClosed": "This vacancy is closed and is no longer taking applications."
   },
   "employerInbox": {
     "title": "Applicants",

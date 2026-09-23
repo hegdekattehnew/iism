@@ -44,6 +44,22 @@ async def _published_job(db: AsyncSession, job_slug: str) -> Job:
     return job
 
 
+async def _open_job(db: AsyncSession, job_slug: str) -> Job:
+    """The vacancy, if it is still taking applications.
+
+    **409, not 404.** A closed vacancy is not missing -- its page is still
+    there, the candidate very likely arrived from it, and telling them it does
+    not exist would be a lie they can disprove by pressing Back. Closed is a
+    state worth naming, so the interface can say which.
+    """
+    job = await _published_job(db, job_slug)
+    if not job.is_open:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This vacancy is closed and is no longer taking applications"
+        )
+    return job
+
+
 async def apply(
     db: AsyncSession, user: User, *, job_slug: str, message: str | None = None
 ) -> Application:
@@ -55,7 +71,7 @@ async def apply(
     something they took back.
     """
     profile = await ensure_profile(db, user.id)
-    job = await _published_job(db, job_slug)
+    job = await _open_job(db, job_slug)
     await _within_daily_cap(db, profile.id)
 
     existing = await db.scalar(

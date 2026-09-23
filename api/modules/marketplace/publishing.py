@@ -24,6 +24,7 @@ importer: **geography resolves on write.** `state_id` is what
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import cast
 
 import structlog
@@ -38,7 +39,12 @@ from api.modules.marketplace.listings import (
     resolve_standards,
     unique_slug,
 )
-from api.modules.marketplace.models import Job, JobSkill
+from api.modules.marketplace.models import (
+    CLOSE_REASONS,
+    CandidateProfile,
+    Job,
+    JobSkill,
+)
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
 
 log = structlog.get_logger("iism.marketplace")
@@ -188,6 +194,95 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
         slug=slug,
     )
     return await _load(db, job.id)
+
+
+async def close_job(
+    db: AsyncSession, tenant_id: uuid.UUID, slug: str, reason: str = "filled"
+) -> Job:
+    """Stop taking applications, without taking the vacancy down.
+
+    **Closing is not unpublishing.** An unpublished job was never visible; a
+    closed one was, people applied to it, and those applications still have to
+    be worked through. So a closed vacancy keeps its page, keeps its inbox, and
+    simply stops appearing in browse and in anybody's matches.
+
+    Closing an already-closed vacancy is a no-op rather than a 409: the
+    employer's intent is already satisfied, and a double-click on "close" is
+    not an error worth a red box.
+    """
+    job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    if reason not in CLOSE_REASONS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown reason")
+    if job.closed_at is not None:
+        return await _load(db, job.id)
+
+    job.closed_at = datetime.now(UTC)
+    job.close_reason = reason
+    await _tell_live_applicants(db, job)
+    await db.commit()
+    log.info("marketplace.job_closed", slug=slug, reason=reason)
+    return await _load(db, job.id)
+
+
+async def reopen_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
+    """Take applications again.
+
+    **Clears `closes_at` if it is in the past**, which is not tidiness: leaving
+    a stale expiry behind means the worker closes the vacancy again within the
+    minute, and the employer sees their own action silently undone.
+    """
+    job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+
+    job.closed_at = None
+    job.close_reason = None
+    if job.closes_at is not None and job.closes_at <= datetime.now(UTC):
+        job.closes_at = None
+    await db.commit()
+    log.info("marketplace.job_reopened", slug=slug)
+    return await _load(db, job.id)
+
+
+async def _tell_live_applicants(db: AsyncSession, job: Job) -> None:
+    """Let the people still waiting know the vacancy is closed.
+
+    **Only the ones still in flight** -- `applied` and `shortlisted`. Somebody
+    already rejected has been told, and somebody hired does not need to hear
+    that the job they got is closed. Withdrawn applicants took themselves out.
+
+    Queued inside the caller's transaction, never sent here (ADR-006): the
+    close must not fail because an SMTP server is slow.
+
+    Imported inside the function because `applications` imports this module's
+    package for `get_job_by_slug`; at module level this is a cycle, which is
+    an ImportError at boot rather than a wrong answer.
+    """
+    from api.modules.applications.models import Application
+    from api.modules.notifications import enqueue
+
+    rows = await db.execute(
+        select(Application.profile_id, CandidateProfile.user_id)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(
+            Application.job_id == job.id,
+            Application.status.in_(("applied", "shortlisted")),
+        )
+    )
+    for _profile_id, user_id in rows.all():
+        await enqueue(
+            db,
+            recipient_kind="user",
+            recipient_id=user_id,
+            channel="in_app",
+            template="vacancy_closed",
+            # The vacancy and a path. Never the reason: "filled" tells an
+            # applicant somebody else got it, which is the employer's business
+            # to say and not ours to announce on their behalf.
+            payload={"vacancy": job.title, "path": "/applications"},
+        )
 
 
 async def delete_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> None:

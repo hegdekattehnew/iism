@@ -26,6 +26,7 @@ from arq import cron
 from api.core.logging import configure_logging, dict_config
 from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
+from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
 from api.modules.notifications.tasks import drain_notifications
 
@@ -74,6 +75,15 @@ class WorkerSettings:
         # announced at 09:59. Cheap when the queue is empty -- one indexed
         # query returning nothing.
         cron(drain_notifications, minute=set(range(60)), run_at_startup=False),
+        # Every five minutes. A vacancy published at 09:00 should reach the
+        # people it matches that morning, not the next day -- and the sweep is
+        # cheap when there is nothing new: one indexed query on `alerted_at`
+        # returning no rows.
+        cron(send_job_alerts, minute=set(range(0, 60, 5)), run_at_startup=False),
+        # Hourly, on the hour. A closing date is a date, so being up to an hour
+        # late costs nothing, and checking every minute would be a query per
+        # minute forever to catch something that happens rarely.
+        cron(close_expired_jobs, minute={0}, run_at_startup=False),
     ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings

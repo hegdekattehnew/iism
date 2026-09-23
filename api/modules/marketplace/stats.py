@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.geography.models import District, State
-from api.modules.marketplace.models import Course, Job
+from api.modules.marketplace.models import Course, Job, open_job
 from api.modules.skills.content import PerformanceCriterion
 from api.modules.skills.hierarchy import AwardingBody, QpEntryRoute, QualificationPack, Sector
 from api.modules.skills.models import Skill
@@ -52,6 +52,6 @@ async def corpus_stats(db: AsyncSession) -> CorpusStats:
         states=await count(State),
         districts=await count(District),
         entry_routes=await count(QpEntryRoute),
-        jobs=await count(Job, Job.status == "published"),
+        jobs=await count(Job, open_job()),
         courses=await count(Course, Course.status == "published"),
     )

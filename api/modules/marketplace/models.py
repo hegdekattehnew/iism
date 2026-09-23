@@ -12,10 +12,12 @@ from sqlalchemy import (
     Integer,
     Numeric,
     UniqueConstraint,
+    and_,
     func,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql.elements import ColumnElement
 
 from api.core.database import Base, one_of
 
@@ -30,6 +32,22 @@ EMPLOYMENT_TYPES = ("full_time", "part_time", "contract", "apprenticeship")
 COURSE_MODES = ("online", "offline", "hybrid")
 COURSE_LANGUAGES = ("en", "hi", "both")
 STATUSES = ("draft", "published")
+
+# Why a vacancy stopped taking applications. **Separate from `status`**, which
+# is the *publication* state: draft and published are about whether anybody can
+# see it, and closing is about whether it is still open to apply to. Folding
+# closure into `status` as a third value would have meant revisiting all
+# fourteen places that compare `status == "published"`, and a closed vacancy
+# would stay visible wherever one was missed.
+CLOSE_REASONS = (
+    # Every position filled -- set automatically when the last hire lands, and
+    # by the employer when they say so.
+    "filled",
+    # Taken down: the role changed, the budget went, the team reorganised.
+    "withdrawn",
+    # `closes_at` came and went. Written by the worker, never by a request.
+    "expired",
+)
 
 # How a claimed skill was evidenced. This is the column that later lets verified
 # evidence outrank a candidate's own claim in scoring, without discarding the
@@ -70,6 +88,19 @@ class Job(Base):
             one_of("employment_type", EMPLOYMENT_TYPES), name="ck_jobs_employment_type"
         ),
         CheckConstraint(one_of("status", STATUSES), name="ck_jobs_status"),
+        CheckConstraint(
+            one_of("close_reason", CLOSE_REASONS, nullable=True), name="ck_jobs_close_reason"
+        ),
+        # The two closure columns move together or not at all. Without this a
+        # job could carry a reason and still be open, or be closed for no
+        # stated reason -- and every screen that explains *why* a vacancy is
+        # closed would have a blank to render.
+        CheckConstraint("(closed_at IS NULL) = (close_reason IS NULL)", name="ck_jobs_closed"),
+        CheckConstraint("positions >= 1", name="ck_jobs_positions"),
+        # The alert sweep's own query: unalerted, published, open, oldest first.
+        Index("ix_jobs_alerted_at", "alerted_at"),
+        # Browse and matching both filter on this pair now.
+        Index("ix_jobs_status_closed", "status", "closed_at"),
         CheckConstraint(
             "nsqf_level_min IS NULL OR (nsqf_level_min >= 1 AND nsqf_level_min <= 10)",
             name="ck_jobs_nsqf_level",
@@ -115,6 +146,28 @@ class Job(Base):
     nsqf_level_min: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
 
     status: Mapped[str] = mapped_column(default="published")
+
+    # How many people are being hired. The reason this is a column rather than
+    # an assumption of one: "hired" did nothing to the vacancy for twenty-six
+    # sprints, and it cannot do the right thing without knowing when the last
+    # position is gone.
+    positions: Mapped[int] = mapped_column(default=1, server_default="1")
+
+    # When the employer intends to stop taking applications. Optional -- plenty
+    # of vacancies genuinely have no end date -- and enforced by the worker,
+    # never by a request: a date that only takes effect when somebody happens
+    # to load the page is not a closing date.
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When it actually closed, and why. Both null on an open vacancy; a row
+    # with one and not the other is a bug, which `ck_jobs_closed` refuses.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    close_reason: Mapped[str | None] = mapped_column(default=None)
+
+    # When the alert sweep last considered this vacancy. Null means "never",
+    # which is what makes the sweep idempotent: it claims jobs by setting this,
+    # so a second run in the same minute finds nothing to do.
+    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR, Computed(_TSV, persisted=True), nullable=True
     )
@@ -125,6 +178,31 @@ class Job(Base):
     skills: Mapped[list["JobSkill"]] = relationship(
         back_populates="job", lazy="selectin", cascade="all, delete-orphan"
     )
+
+    @property
+    def is_open(self) -> bool:
+        """Whether this vacancy is still taking applications.
+
+        Published *and* not closed. The two are different questions: an
+        unpublished job was never visible, a closed one was and is now done.
+        """
+        return self.status == "published" and self.closed_at is None
+
+
+def open_job() -> ColumnElement[bool]:
+    """The SQL twin of `Job.is_open`, for every query that lists vacancies.
+
+    **One expression, used by all of them.** Adding closure as a third value of
+    `status` would have been fewer columns and a worse idea: fourteen separate
+    places compare `status == "published"`, and a closed vacancy would have
+    stayed visible in whichever one was missed. Here the predicate has a name,
+    and `tests/test_job_lifecycle.py` asserts that every public listing uses
+    it -- so the next reader of `jobs` either uses this or fails a test.
+
+    Deliberately **not** applied to the employer's own console: an employer
+    still has to manage the people already in a vacancy they have closed.
+    """
+    return and_(Job.status == "published", Job.closed_at.is_(None))
 
 
 class JobSkill(Base):
@@ -294,6 +372,11 @@ class CandidateProfile(Base):
     # Without these the matching engine knows what someone can do but not what
     # they are aiming for, and the core loop starts with a target.
     willing_to_relocate: Mapped[bool] = mapped_column(default=False)
+    # Whether to be told when a matching vacancy is published. On by default:
+    # it is the reason somebody built a profile, and a job board that never
+    # tells you about a job is a page you visit once. Off is one request away,
+    # and the sweep honours it without exception -- see `alerts/service.py`.
+    job_alerts_enabled: Mapped[bool] = mapped_column(default=True, server_default="true")
     preferred_employment_type: Mapped[str | None] = mapped_column(default=None)
     expected_salary_min_inr: Mapped[int | None] = mapped_column(default=None)
     expected_salary_max_inr: Mapped[int | None] = mapped_column(default=None)

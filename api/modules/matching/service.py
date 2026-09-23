@@ -22,6 +22,7 @@ from api.modules.marketplace.models import (
     CourseSkill,
     Job,
     JobSkill,
+    open_job,
 )
 from api.modules.matching.scoring import (
     HeldSkill,
@@ -219,7 +220,7 @@ async def match_jobs(
         select(Job.id)
         .join(JobSkill, JobSkill.job_id == Job.id)
         .join(Skill, Skill.id == JobSkill.skill_id)
-        .where(Job.status == "published")
+        .where(open_job())
         .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
     )
     if state_id is not None:
@@ -410,7 +411,9 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
     A candidate who follows a link to a job sharing nothing with their profile
     should see an honest zero and the full gap, not a 404.
     """
-    job = await db.scalar(select(Job).where(Job.slug == slug, Job.status == "published"))
+    # `open_job()`: a closed vacancy must not keep producing a gap
+    # analysis and a course plan for a job nobody can apply to.
+    job = await db.scalar(select(Job).where(Job.slug == slug, open_job()))
     if job is None:
         return None
     held = await _held_skills(db, profile_id)

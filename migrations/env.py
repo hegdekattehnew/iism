@@ -12,6 +12,7 @@ from api.core.localisation import ContentTranslation as _ContentTranslation  # n
 
 # Importing every module's models registers them on Base.metadata so that
 # autogenerate sees them. New modules must be added here.
+from api.modules.alerts import models as _alerts_models  # noqa: F401
 from api.modules.analytics import models as _analytics_models  # noqa: F401
 from api.modules.applications import models as _applications_models  # noqa: F401
 from api.modules.geography import models as _geography_models  # noqa: F401

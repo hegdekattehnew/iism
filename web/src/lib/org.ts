@@ -142,6 +142,33 @@ export function useOrgJobMutations(orgSlug: string) {
     onSuccess: refresh,
   });
 
+  // Closing is not unpublishing, and the two buttons sit next to each other,
+  // so the distinction is worth stating where somebody will read it:
+  // unpublishing hides the vacancy entirely, closing leaves its page and its
+  // inbox and simply stops it taking applications.
+  const setOpen = useMutation({
+    mutationFn: async ({
+      slug,
+      open,
+      reason,
+    }: {
+      slug: string;
+      open: boolean;
+      reason?: "filled" | "withdrawn";
+    }) => {
+      const path = open
+        ? "/org/{org_slug}/jobs/{slug}/reopen"
+        : "/org/{org_slug}/jobs/{slug}/close";
+      const { data, error } = await api.POST(path, {
+        params: { path: { org_slug: orgSlug, slug } },
+        ...(open ? {} : { body: { reason: reason ?? "filled" } }),
+      });
+      if (error || !data) throw new Error("close-failed");
+      return data;
+    },
+    onSuccess: refresh,
+  });
+
   const remove = useMutation({
     mutationFn: async (slug: string) => {
       const { error } = await api.DELETE("/org/{org_slug}/jobs/{slug}", {
@@ -152,7 +179,7 @@ export function useOrgJobMutations(orgSlug: string) {
     onSuccess: refresh,
   });
 
-  return { create, update, setPublished, remove };
+  return { create, update, setPublished, setOpen, remove };
 }
 
 export function useOrgCandidates(

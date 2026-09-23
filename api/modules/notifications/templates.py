@@ -31,6 +31,18 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "Somebody has registered interest in {course}.\n\n"
             "Open your interested learners to see how to reach them:\n{link}\n",
         ),
+        "job_alert": (
+            "A new vacancy that matches you: {vacancy}",
+            "{organisation} has published {vacancy}, and it matches the "
+            "standards on your profile.\n\n"
+            "See it and apply:\n{link}\n\n"
+            "You can turn these off on your profile.\n",
+        ),
+        "vacancy_closed": (
+            "{vacancy} is no longer taking applications",
+            "The vacancy you applied for, {vacancy}, has been closed.\n\n"
+            "See your applications:\n{link}\n",
+        ),
         "organisation_invitation": (
             "You have been invited to join {organisation} on IISM",
             "You have been invited to join {organisation} on IISM as a "
@@ -57,6 +69,18 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{course} में किसी की रुचि है",
             "{course} में किसी ने रुचि दर्ज की है।\n\n"
             "उनसे कैसे संपर्क करें यह देखने के लिए अपने इच्छुक शिक्षार्थी खोलें:\n{link}\n",
+        ),
+        "job_alert": (
+            "आपसे मेल खाती एक नई रिक्ति: {vacancy}",
+            "{organisation} ने {vacancy} प्रकाशित की है, और यह आपकी प्रोफ़ाइल के "
+            "मानकों से मेल खाती है।\n\n"
+            "इसे देखें और आवेदन करें:\n{link}\n\n"
+            "आप इन्हें अपनी प्रोफ़ाइल पर बंद कर सकते हैं।\n",
+        ),
+        "vacancy_closed": (
+            "{vacancy} अब आवेदन नहीं ले रही",
+            "जिस रिक्ति {vacancy} के लिए आपने आवेदन किया था, वह बंद कर दी गई है।\n\n"
+            "अपने आवेदन देखें:\n{link}\n",
         ),
         "organisation_invitation": (
             "आपको IISM पर {organisation} में शामिल होने का निमंत्रण मिला है",

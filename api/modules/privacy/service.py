@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
+from api.modules.alerts.models import JobAlert
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import Invitation, Membership, Tenant, User
@@ -97,6 +98,10 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     # not there. The cascade did the right thing; nothing said so.
     await db.execute(delete(Application).where(Application.job_id.in_(job_ids)))
     await db.execute(delete(SavedJob).where(SavedJob.job_id.in_(job_ids)))
+    # Who was told about this organisation's vacancies. Explicitly, like
+    # everything else here -- the FK cascades, and "everything went" is the one
+    # claim an erasure path must never make on assumption.
+    await db.execute(delete(JobAlert).where(JobAlert.job_id.in_(job_ids)))
     await db.execute(delete(JobSkill).where(JobSkill.job_id.in_(job_ids)))
     await db.execute(delete(Job).where(Job.tenant_id == tenant_id))
     await db.execute(delete(CourseInterest).where(CourseInterest.course_id.in_(course_ids)))
@@ -154,6 +159,7 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         await db.execute(delete(Application).where(Application.profile_id == profile.id))
         await db.execute(delete(SavedJob).where(SavedJob.profile_id == profile.id))
         await db.execute(delete(CourseInterest).where(CourseInterest.profile_id == profile.id))
+        await db.execute(delete(JobAlert).where(JobAlert.profile_id == profile.id))
         await db.delete(profile)
         await db.flush()
 

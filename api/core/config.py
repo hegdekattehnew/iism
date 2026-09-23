@@ -95,6 +95,12 @@ class Settings(BaseSettings):
     # publish listings, and until Sprint 26 it was the one write path
     # here with no cap at all. Rolling 24 hours, like its siblings.
     max_organisations_per_day: int = 5
+    # Job alerts (Sprint 27). Both caps exist so a busy Monday does not
+    # become the reason somebody stops reading their notifications: at
+    # most this many people hear about any one vacancy, and at most this
+    # many vacancies reach any one person in a rolling day.
+    max_alerts_per_job: int = 25
+    max_alerts_per_candidate_per_day: int = 5
 
     # --- database pool ---
     db_pool_size: int = 5

@@ -24,10 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 26 — a surface you would show somebody: theme, the dialog bug, org policy |
-| **Next sprint** | 27 — vacancy lifecycle + job alerts (scoped in §11) |
-| **Tests** | 564 backend (`make check`), 114 web (`cd web && npm test`) |
-| **Migrations** | head `0026` (Sprint 26 added none); 41 ADRs |
+| **Last sprint** | 27 — a vacancy that ends, and alerts that reach people |
+| **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
+| **Tests** | 586 backend (`make check`), 123 web (`cd web && npm test`) |
+| **Migrations** | head `0027`; 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -547,8 +547,8 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-22 (after Sprint 26).* Authored code: `api/` 104 files / 16,400 lines ·
-`scripts/` 8 / 3,653 · `tests/` 29 / 9,015 · `migrations/` 27 / 2,621 · `web/src/` 152 / 14,710
+*Refreshed 2026-09-23 (after Sprint 27).* Authored code: `api/` 108 files / 17,152 lines ·
+`scripts/` 8 / 3,690 · `tests/` 30 / 9,544 · `migrations/` 28 / 2,800 · `web/src/` 153 / 14,961
 (excluding the generated client, which is another ~7,000 lines and is never counted here).
 
 ```
@@ -935,24 +935,34 @@ shipped in Sprints 12–14. **Delete an item here when it ships; do not let it d
 **Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
 and it stays out of the sprint queue until they say otherwise.
 
-### Sprint 27 — vacancy lifecycle, and reaching people between visits (next)
+### Sprint 28 — the monetisation ADR, and a payment adapter port (next)
 
-Sprint 25 closed the queue's oldest structural hole and Sprint 26 made the surface presentable.
-This is the next one, and it is the cheapest remaining work on the pillar that is furthest along.
+Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
+marketplace that also **sells courses** and carries **gig work**, and the honest next step is the
+decision, not the code.
 
-- **"Hired" does nothing to the vacancy.** It stays published, keeps ranking in candidates'
-  matches, and keeps taking applications. There is no close, no fill, no expiry, and deleting a
-  job silently deletes its applications. `Job` has no `closes_at` and no head-count.
-- **Job alerts are the largest reach gap.** `match_jobs` is called only from a request handler, so
-  a vacancy published today reaches a matched candidate only if they happen to open `/matches`.
-  The outbox and the worker both exist now, so the machinery is there — but **39 of 40 candidates
-  are phone-only**, SMS waits on DLT registration, and an in-app notice is only seen by somebody
-  already on the site. Scope this honestly or do the in-app half and say so.
-- Both are small next to what they unlock: a vacancy with a lifecycle is what makes the employer
-  console trustworthy, and an alert is what makes the product worth returning to.
+- **Write ADR-042 first, superseding ADR-025.** ADR-025 says "free v1, no billing implementation…
+  a successor ADR is required before any billing code is written, **and must cite those metrics**"
+  — precision@5 on the golden set, candidate-to-course click-through, provider-reported enrolment
+  conversion. Two of the three are still thin (5 golden pairs; click-through joinable only since
+  Sprint 24). **The ADR should say so rather than pretend the gate was passed** — deciding to
+  proceed with weak data is a legitimate call, and recording it as weak is what makes it honest.
+- **Then the port, and only the port.** `api/adapters/payments/` as an interface with a console
+  implementation that refuses production, exactly as `ConsoleNotificationProvider` and
+  `ConsoleEmailProvider` do. No gateway, no orders, no entitlements. ADR-017 has listed payment
+  providers as a future adapter since the beginning and nothing was ever written.
+- Sequencing after that is in the pillar assessment below: course checkout (~2 sprints), then gig
+  as its own module with its own ADR.
 
-**Then, and this is the owner's stated direction (2026-09-22): courses that can be *sold*, and
-gig work.** Neither is a sprint. See the three-pillar assessment below.
+### Also outstanding, in rough order
+
+- **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting.
+  It is the cheapest way to make every later scoring change safe, and Sprint 28's ADR has to cite
+  it, so doing it first would make that citation mean something.
+- **SMS, which is what job alerts actually need.** Sprint 27 shipped in-app plus email; 39 of 40
+  candidates are phone-only, so most alerts land only when somebody opens the site. This is
+  blocked on DLT registration, not on design.
+- **`is_verified` still has no writer** — no admin module, no staff flag, no back-office route.
 
 ### The three pillars, and where each actually stands
 
@@ -1018,6 +1028,23 @@ does), then course checkout, then gig as its own module.
   or stop citing a number for it.
 - Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist), typed `SkillRelation`
   edges, observability (ADR-019), the ADR-023 encryption path, caching as caching (ADR-020).
+
+### Measured in Sprint 27 (performance and security)
+
+- **The lifecycle predicate costs nothing.** A/B of the same queries with and without
+  `closed_at IS NULL`, 200 iterations each: browse `+0.001ms`, homepage count `-0.001ms`, matching
+  retrieval `-0.001ms`. The homepage count uses an index-only scan on the new
+  `ix_jobs_status_closed`. All five new query shapes plan sub-millisecond.
+- **Do not compare raw throughput against §12a without checking the box.** A re-run measured
+  `/skills?limit=24` at 72 rps against §12a's 350 — but `/skills` is **untouched** by Sprint 27
+  and degraded 4.9×, while `/jobs`, which the sprint *did* change, degraded only 2×. Docker
+  Desktop was at 56% CPU, Spotlight at 34%, load 3.38 on 8 cores, and the API was running with
+  `--reload`. The database is ~0.1ms of a ~126ms request, which is §12a's own conclusion intact:
+  **the bottleneck is Python CPU, not the database.**
+- **Security spot-checks all held**: the new close/reopen endpoints answer 401 anonymous and
+  **404 (never 403)** to a non-member; the public job payload still carries no `contact_email`;
+  the rate limiter still returns 429 under a burst; nothing in `api/` reads the `ssc` collection;
+  and the alert sweep logs four integers and no identity. 103 security-focused tests pass.
 
 ### Left behind by Sprint 26, worth knowing
 

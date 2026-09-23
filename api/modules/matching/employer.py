@@ -193,6 +193,21 @@ async def _candidates_for(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
     return (await _candidates_for_jobs(db, [job]))[job.id]
 
 
+async def candidates_for_job(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
+    """The scored pool for one vacancy, ranked best first.
+
+    Exported for the alert sweep (Sprint 27), which needs exactly this and must
+    not grow its own idea of "close enough to tell somebody about" -- that
+    would be the second scorer ADR-037 forbids, and the first time the two
+    disagreed neither number could be defended.
+
+    Still de-identified in the sense that matters: it returns profiles, and
+    what reaches an employer is `candidate_card()`. The sweep uses it to decide
+    who to write to, and writes to them through the outbox by user id.
+    """
+    return await _candidates_for(db, job)
+
+
 async def score_profiles(
     db: AsyncSession, job: Job, profile_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, MatchResult]:

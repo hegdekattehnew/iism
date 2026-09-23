@@ -1088,6 +1088,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/jobs/{slug}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Job
+         * @description Stop taking applications, and keep the page and the inbox.
+         *
+         *     Distinct from unpublish, which hides the vacancy entirely: people who
+         *     already applied still need to see what they applied to, and the employer
+         *     still has to work through them. Applicants still waiting are told.
+         */
+        post: operations["close_job_org__org_slug__jobs__slug__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{slug}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen Job
+         * @description Take applications again. Clears a closing date already in the past.
+         */
+        post: operations["reopen_job_org__org_slug__jobs__slug__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/courses": {
         parameters: {
             query?: never;
@@ -1874,6 +1918,11 @@ export interface components {
             expected_salary_max_inr?: number | null;
             /** Notice Period */
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
+            /**
+             * Job Alerts Enabled
+             * @default true
+             */
+            job_alerts_enabled: boolean;
             /** Onboarding Completed At */
             onboarding_completed_at?: string | null;
             /** Skills */
@@ -1924,6 +1973,8 @@ export interface components {
             expected_salary_max_inr?: number | null;
             /** Notice Period */
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
+            /** Job Alerts Enabled */
+            job_alerts_enabled?: boolean | null;
         };
         /** CandidateRanking */
         CandidateRanking: {
@@ -2600,6 +2651,20 @@ export interface components {
              */
             role: "admin" | "member";
         };
+        /**
+         * JobCloseIn
+         * @description Why a vacancy is closing. `expired` is absent: that one is the worker's,
+         *     written when a closing date passes, and an employer claiming it would make
+         *     the reason a vacancy closed untrue.
+         */
+        JobCloseIn: {
+            /**
+             * Reason
+             * @default filled
+             * @enum {string}
+             */
+            reason: "filled" | "withdrawn";
+        };
         /** JobDetail */
         JobDetail: {
             /**
@@ -2633,6 +2698,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillOut"][];
         };
@@ -2673,6 +2754,13 @@ export interface components {
             salary_max_inr?: number | null;
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillIn"][];
         };
@@ -2709,6 +2797,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
         };
         /** JobPage */
         JobPage: {
@@ -3187,6 +3291,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillOut"][];
             /**
@@ -5795,6 +5915,74 @@ export interface operations {
         };
     };
     unpublish_job_org__org_slug__jobs__slug__unpublish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_job_org__org_slug__jobs__slug__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JobCloseIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_job_org__org_slug__jobs__slug__reopen_post: {
         parameters: {
             query?: never;
             header?: never;
