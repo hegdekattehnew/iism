@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
+import { ApiError, readDetail } from "./http";
 
 /**
  * The employer workspace's data layer.
@@ -102,11 +103,14 @@ export function useOrgJobMutations(orgSlug: string) {
 
   const create = useMutation({
     mutationFn: async (body: JobPayload) => {
-      const { data, error } = await api.POST("/org/{org_slug}/jobs", {
+      const { data, error, response } = await api.POST("/org/{org_slug}/jobs", {
         params: { path: { org_slug: orgSlug } },
         body,
       });
-      if (error || !data) throw new Error(String(error ?? "create failed"));
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -114,11 +118,14 @@ export function useOrgJobMutations(orgSlug: string) {
 
   const update = useMutation({
     mutationFn: async ({ slug, body }: { slug: string; body: JobPayload }) => {
-      const { data, error } = await api.PUT("/org/{org_slug}/jobs/{slug}", {
+      const { data, error, response } = await api.PUT("/org/{org_slug}/jobs/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
         body,
       });
-      if (error || !data) throw new Error(String(error ?? "update failed"));
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -175,10 +182,13 @@ export function useOrgJobMutations(orgSlug: string) {
 
   const remove = useMutation({
     mutationFn: async (slug: string) => {
-      const { error } = await api.DELETE("/org/{org_slug}/jobs/{slug}", {
+      const { error, response } = await api.DELETE("/org/{org_slug}/jobs/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
       });
-      if (error) throw new Error("delete failed");
+      if (error)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
     },
     onSuccess: refresh,
   });
@@ -259,11 +269,14 @@ export function useOrgCourseMutations(orgSlug: string) {
 
   const create = useMutation({
     mutationFn: async (body: CoursePayload) => {
-      const { data, error } = await api.POST("/org/{org_slug}/courses", {
+      const { data, error, response } = await api.POST("/org/{org_slug}/courses", {
         params: { path: { org_slug: orgSlug } },
         body,
       });
-      if (error || !data) throw new Error("create failed");
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -277,11 +290,14 @@ export function useOrgCourseMutations(orgSlug: string) {
       slug: string;
       body: CoursePayload;
     }) => {
-      const { data, error } = await api.PUT("/org/{org_slug}/courses/{slug}", {
+      const { data, error, response } = await api.PUT("/org/{org_slug}/courses/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
         body,
       });
-      if (error || !data) throw new Error("update failed");
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,

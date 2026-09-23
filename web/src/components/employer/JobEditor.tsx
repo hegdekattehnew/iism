@@ -113,21 +113,30 @@ export function JobEditor({
         <form onSubmit={submit} key={job?.slug ?? "new"}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("titleEn")} className="sm:col-span-2">
+              {/* `minLength` mirrors `JobIn.title`'s `min_length=3`. Without
+                  it the browser accepted a two-character title, the server
+                  refused it, and the only thing on screen was "Could not
+                  save". A constraint the form does not know about is one the
+                  person finds out about the hard way. */}
               <Text
                 name="title"
                 required
+                minLength={3}
+                maxLength={200}
                 defaultValue={job?.title ?? ""}
               />
             </Field>
             <Field label={t("descriptionEn")} className="sm:col-span-2">
               <Area
                 name="description"
+                maxLength={10000}
                 defaultValue={job?.description ?? ""}
               />
             </Field>
             <Field label={t("state")}>
               <Text
                 name="location_state"
+                maxLength={120}
                 defaultValue={job?.location_state ?? ""}
               />
             </Field>

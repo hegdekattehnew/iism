@@ -5,8 +5,9 @@ import { useState } from "react";
 
 import { JobEditor } from "@/components/employer/JobEditor";
 import { SessionExpired } from "@/components/SessionExpired";
-import { isSignedOut } from "@/lib/http";
+import { detailOf, isSignedOut } from "@/lib/http";
 import {
+  Alert,
   Badge,
   Button,
   ButtonLink,
@@ -47,7 +48,10 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
+  // The server's own words when it has any. `saveFailed` alone produced
+  // "Could not save. Check the details and try again." for a two-character
+  // title, which names neither the field nor the rule.
+  const [saveFailed, setSaveFailed] = useState<string | true | null>(null);
 
   if (me.isError) {
     return (
@@ -81,11 +85,11 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
     editing && editing !== "new" ? items.find((j) => j.slug === editing) : null;
 
   const save = (payload: JobPayload) => {
-    setSaveFailed(false);
+    setSaveFailed(null);
     const done = () => setEditing(null);
     // Without an `onError` a 403 -- which is exactly what a non-employer used to
     // get here -- left the form sitting there having silently done nothing.
-    const onError = () => setSaveFailed(true);
+    const onError = (e: unknown) => setSaveFailed(detailOf(e) ?? true);
     if (editing === "new") create.mutate(payload, { onSuccess: done, onError });
     else if (current)
       update.mutate(
@@ -101,9 +105,12 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
           {editing === "new" ? t("newJob") : t("editJob")}
         </h2>
         {saveFailed && (
-          <p className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
-            {t("saveFailed")}
-          </p>
+          <Alert role="alert">
+            {/* What the server actually said, when it said anything. The
+                generic line is the fallback for a failure that carried no
+                explanation -- a network drop, a 500 -- not the default. */}
+            {typeof saveFailed === "string" ? saveFailed : t("saveFailed")}
+          </Alert>
         )}
         <JobEditor
           job={current ?? null}

@@ -95,12 +95,18 @@ export function CourseEditor({
               <Text
                 name="title"
                 required
+                // Mirrors `CourseIn.title`'s `min_length=3`, for the reason the
+                // job editor does: a rule the form does not know about becomes
+                // "Could not save" with nothing to act on.
+                minLength={3}
+                maxLength={200}
                 defaultValue={course?.title ?? ""}
               />
             </Field>
             <Field label={t("descriptionEn")} className="sm:col-span-2">
               <Area
                 name="description"
+                maxLength={10000}
                 defaultValue={course?.description ?? ""}
               />
             </Field>
@@ -125,6 +131,7 @@ export function CourseEditor({
             <Field label={t("durationHours")}>
               <Text
                 name="duration_hours"
+                max={10000}
                 type="number"
                 min={1}
                 defaultValue={course?.duration_hours ?? ""}

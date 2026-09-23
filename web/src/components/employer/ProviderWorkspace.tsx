@@ -4,14 +4,8 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
-import {
-  Badge,
-  Button,
-  ButtonLink,
-  Card,
-  CardBody,
-  Skeleton,
-} from "@/components/ui";
+import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { detailOf } from "@/lib/http";
 import { Link } from "@/i18n/navigation";
 import {
   type CoursePayload,
@@ -55,7 +49,8 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   // Two states, not one: they are shown on different screens and mean
   // different things.
   const [refused, setRefused] = useState<string | null>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
+  // The server's own words, like the employer's workspace.
+  const [saveFailed, setSaveFailed] = useState<string | true | null>(null);
 
   if (me.isError) {
     return (
@@ -92,9 +87,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
     editing && editing !== "new" ? items.find((c) => c.slug === editing) : null;
 
   const save = (payload: CoursePayload) => {
-    setSaveFailed(false);
+    setSaveFailed(null);
     const done = () => setEditing(null);
-    const onError = () => setSaveFailed(true);
+    const onError = (e: unknown) => setSaveFailed(detailOf(e) ?? true);
     if (editing === "new") create.mutate(payload, { onSuccess: done, onError });
     else if (current)
       update.mutate(
@@ -110,9 +105,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
           {editing === "new" ? t("newCourse") : t("editCourse")}
         </h2>
         {saveFailed && (
-          <p className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
-            {t("saveFailed")}
-          </p>
+          <Alert role="alert">
+            {typeof saveFailed === "string" ? saveFailed : t("saveFailed")}
+          </Alert>
         )}
         <CourseEditor
           course={current ?? null}

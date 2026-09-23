@@ -310,6 +310,19 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   written instructions to delete their own organisation found the control simply absent, because a
   fifteen-minute token had expired. Use `isSignedOut()` from `lib/http.ts` and the `SessionExpired`
   panel; queries carry the status by throwing `new Error(String(response.status))`.
+- **Never throw away what the server said.** The job editor threw
+  `new Error(String(error ?? "create failed"))` — `String()` of a parsed body is `"[object Object]"`
+  — and the workspace then rendered a fixed "Could not save. Check the details and try again." for
+  every failure. A two-character title produced that sentence while the API had said
+  *"String should have at least 3 characters"*, and an unknown standard produced it while the API
+  had named the standard. Write failures throw `ApiError(status, readDetail(error))` from
+  `lib/http.ts`, and the screen shows `detailOf(...)` with the generic line as the **fallback for a
+  failure that carried nothing**, not the default.
+- **A constraint the form does not know about is one the person finds out the hard way.** `JobIn`
+  and `CourseIn` set `min_length=3` on `title`; neither form had `minLength`, so the browser
+  accepted two characters and the server refused them. Mirror every server limit on the input
+  (`minLength`, `maxLength`, `min`, `max`) — the browser then says *"Please lengthen this text to 3
+  characters or more"* before a request is ever made.
 - **Never match an endpoint by substring.** `api.ts` skipped refreshing on
   `request.url.includes("/auth/")` to avoid looping on `/auth/refresh` — and caught **`/auth/me`**,
   the one call every signed-in screen depends on. So a 401 there was handed straight back, the app

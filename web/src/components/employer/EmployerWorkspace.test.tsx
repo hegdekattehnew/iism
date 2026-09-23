@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmployerWorkspace } from "@/components/employer/EmployerWorkspace";
 import { renderUi, resetWorld } from "@/test/harness";
+import { ApiError } from "@/lib/http";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
 // The **real** `@/lib/org`, with only the harness's `world`-driven pieces
@@ -133,5 +134,53 @@ describe("EmployerWorkspace — the three states of a vacancy", () => {
 
     expect(POST).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+});
+
+describe("EmployerWorkspace — saying why a save failed", () => {
+  /**
+   * The reported bug: adding a vacancy failed with "Could not save. Check the
+   * details and try again." and no way forward. The server had said exactly
+   * what was wrong; the client threw it away.
+   */
+  const openEditor = async () =>
+    fireEvent.click(await screen.findByRole("button", { name: "New vacancy" }));
+
+  it("shows the field and the rule the server named", async () => {
+    POST.mockRejectedValue(
+      new ApiError(422, "Title: String should have at least 3 characters"),
+    );
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    await openEditor();
+
+    fireEvent.change(screen.getByLabelText(/Job title/i), { target: { value: "ab" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+
+    expect(
+      await screen.findByText("Title: String should have at least 3 characters"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Could not save\./)).toBeNull();
+  });
+
+  it("names an unknown standard, rather than blaming the whole form", async () => {
+    POST.mockRejectedValue(new ApiError(422, "Unknown standards: welding-x"));
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    await openEditor();
+    fireEvent.change(screen.getByLabelText(/Job title/i), { target: { value: "Welder" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+
+    expect(await screen.findByText("Unknown standards: welding-x")).toBeTruthy();
+  });
+
+  it("falls back to the generic line when the failure carried nothing", async () => {
+    // A network drop or a 500 says nothing useful; the old sentence is right
+    // *there* and only there.
+    POST.mockRejectedValue(new ApiError(500, null));
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    await openEditor();
+    fireEvent.change(screen.getByLabelText(/Job title/i), { target: { value: "Welder" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+
+    expect(await screen.findByText(/Could not save\./)).toBeTruthy();
   });
 });
