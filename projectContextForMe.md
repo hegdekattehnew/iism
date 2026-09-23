@@ -25,10 +25,10 @@ has been wrong before, and §10 explains how.*
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
 | **Last sprint** | 27 — a vacancy that ends, and alerts that reach people
-  (+ deleting one organisation and a switcher that survives ten, reported
-  and fixed 2026-09-23) |
+  (+ deleting one organisation, a switcher that survives ten, and the homepage
+  counts — reported and fixed 2026-09-23) |
 | **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
-| **Tests** | 596 backend (`make check`), 202 web (`cd web && npm test`) |
+| **Tests** | 598 backend (`make check`), 217 web (`cd web && npm test`) |
 | **Migrations** | head `0027`; 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -940,6 +940,42 @@ shipped in Sprints 12–14. **Delete an item here when it ships; do not let it d
 
 **Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
 and it stays out of the sprint queue until they say otherwise.
+
+### The homepage counts (reported twice, 2026-09-23, fixed the same day)
+
+"I added a job listing and the numbers under the marketplace section are not updated." Two
+distinct causes, a day apart, and the second is the more interesting one.
+
+**First: two caches, neither invalidated.** The figures are computed live, but
+`useOrgJobMutations` refreshed `["org-jobs", slug]` and nothing else, and `sw.js` served
+`/marketplace/` stale-while-revalidate — so on a production build the number was permanently one
+visit behind. Probed against the committed worker: all three count endpoints answered from cache
+while online. `web/src/lib/counts.ts` now holds the keys and `LIVE_DATA` in `sw.js` makes the
+counts network-first.
+
+**Second: the number was right and its definition was not the reader's.** The panel counted
+**open** vacancies, and `scripts/seed_marketplace.py` closes `inventory-clerk-nagpur` on every run
+— so publishing a twenty-first vacancy moved the figure 19 → 20. Nothing was broken and nothing a
+cache fix could reach. The panel now leads with `jobs_posted` and names `jobs_open` underneath
+when they differ.
+
+- `posted_job()` is the count's predicate, `open_job()` stays the listings'. A bare
+  `status == "published"` in a count is deliberate; the docstring says so, because the rule beside
+  it says every public listing must use `open_job()` and the next reader would file this as the
+  one that was missed.
+- **Both payloads carry both names.** `jobs` meaning "open" in one response and "posted" in
+  another is the trap; the rename made `tsc` fail on the one stale reader, which is the whole
+  reason it was a rename and not a redefinition.
+- **Not monotonic, and that is the honest shape.** Unpublishing removes the page and removes the
+  row, so the figure never names a vacancy a visitor cannot open. A true lifetime tally needs
+  `first_published_at` and would advertise vacancies that exist nowhere on the site. Walked
+  through every state against the live API: draft 21/20 → published 22/21 → closed 22/20 →
+  reopened 22/21 → unpublished 21/20.
+- **The second line hides when the two figures converge** — the branch a seeded database never
+  shows, because the seed always closes one. It has its own test for exactly that reason.
+
+No migration: `ix_jobs_status_closed` is on `(status, closed_at)`, so the posted count uses the
+leading column and gets the same index-only scan.
 
 ### Sprint 28 — the monetisation ADR, and a payment adapter port (next)
 

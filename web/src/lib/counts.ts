@@ -6,11 +6,18 @@
  * counts is not a slow refresh -- it is the page saying something untrue.
  *
  * Publishing a vacancy, unpublishing one, closing it, deleting it, the same
- * four for a course, and deleting the organisation that holds any of them all
+ * for a course, and deleting the organisation that holds any of them all
  * change these numbers. None of them invalidated anything: the mutations
  * refreshed `["org-jobs", slug]` and stopped there, so an employer who
  * published a vacancy and clicked back to the homepage was shown the count
  * fetched before they did it.
+ *
+ * The panel now carries two job figures, and they do not move together:
+ * create, publish, unpublish and delete move both, while **close and reopen
+ * move `jobs_open` alone** -- `posted_job()` keeps a closed vacancy because it
+ * still has a page. That is a difference in what changes, never in whether to
+ * invalidate. All six do, and "close only moves one of them" is one careless
+ * inference away from "close matters less".
  *
  * The keys are exported rather than spelled out at each site because four
  * files read them and three write them. A renamed string would still compile,

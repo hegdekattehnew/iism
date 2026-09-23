@@ -7,9 +7,9 @@
  * front page painted the figure fetched before the publish.
  *
  * Asserted per mutation rather than once, because the miss is always a single
- * forgotten call site: `close` and `reopen` change the count exactly as much
- * as `create` does, since `open_job()` excludes a closed vacancy, and nothing
- * about either of those reads like a catalogue write.
+ * forgotten call site: `close` and `reopen` move `jobs_open` while leaving
+ * `jobs_posted` alone, so they change what the panel shows without reading
+ * like a catalogue write at all.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -41,8 +41,8 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // A cached answer is the precondition: with nothing cached the next mount
   // fetches anyway and the bug cannot occur.
-  qc.setQueryData(MARKETPLACE_COUNTS, { jobs: 19, courses: 50 });
-  qc.setQueryData(CORPUS_STATS, { jobs: 19, courses: 50 });
+  qc.setQueryData(MARKETPLACE_COUNTS, { jobs_posted: 20, jobs_open: 19, courses: 50 });
+  qc.setQueryData(CORPUS_STATS, { jobs_posted: 20, jobs_open: 19, courses: 50 });
 });
 
 const stale = (key: readonly unknown[]) =>
@@ -69,8 +69,9 @@ describe("a vacancy that changes the catalogue", () => {
   });
 
   it("marks the counts stale when one is closed", async () => {
-    // `open_job()` excludes it from the moment it closes, so the public
-    // number drops -- the case least likely to be remembered.
+    // `open_job()` excludes it from the moment it closes, so `jobs_open`
+    // drops while `jobs_posted` holds. Only one figure moves, which is
+    // exactly why this is the call site least likely to be remembered.
     await run((m) => m.setOpen.mutateAsync({ slug: "a", open: false, reason: "filled" }));
     expect(stale(MARKETPLACE_COUNTS)).toBe(true);
   });

@@ -11,7 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from api.core.localisation import ContentTranslation
-from api.modules.marketplace.models import Course, CourseSkill, Job, JobSkill, open_job
+from api.modules.marketplace.models import (
+    Course,
+    CourseSkill,
+    Job,
+    JobSkill,
+    open_job,
+    posted_job,
+)
 from api.modules.skills.models import Skill
 
 PUBLISHED = "published"
@@ -110,7 +117,23 @@ async def get_job_by_slug(db: AsyncSession, slug: str) -> Job | None:
     return await db.scalar(select(Job).where(Job.slug == slug, Job.status == PUBLISHED))
 
 
-async def count_jobs(db: AsyncSession) -> int:
+async def count_jobs_posted(db: AsyncSession) -> int:
+    """How many vacancies have been posted -- the homepage's headline figure.
+
+    Two functions rather than one taking a flag, and **renamed** rather than
+    redefined, so nothing that used to mean "open" quietly starts meaning
+    "posted": every caller had to be revisited to compile.
+
+    Two index-only counts where there was one. Both use the leading column of
+    `ix_jobs_status_closed`, so the cost is the same shape as before. A single
+    `count(*) FILTER (WHERE closed_at IS NULL)` would collapse them into one
+    query -- and into one name, which is the thing being split here.
+    """
+    return await db.scalar(select(func.count()).select_from(Job).where(posted_job())) or 0
+
+
+async def count_jobs_open(db: AsyncSession) -> int:
+    """How many are still taking applications -- what `/jobs` will list."""
     return await db.scalar(select(func.count()).select_from(Job).where(open_job())) or 0
 
 

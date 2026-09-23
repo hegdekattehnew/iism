@@ -62,12 +62,15 @@
     "subtitle": "नीचे दिया गया हर आंकड़ा मंच के डेटाबेस से सीधे गिना गया है।",
     "jobsTitle": "नौकरियाँ",
     "jobsBody": "सत्यापित नियोक्ताओं से व्यावसायिक भूमिकाएँ।",
+    "jobsCountLabel": "प्रकाशित नौकरियाँ",
+    "jobsOpenNow": "{count} अभी खुली हैं",
     "coursesTitle": "पाठ्यक्रम",
     "coursesBody": "राष्ट्रीय योग्यता मानकों से जुड़ा प्रशिक्षण।",
+    "coursesCountLabel": "सूची में",
     "skillsTitle": "कौशल",
     "skillsBody": "वह NSQF-संरेखित वर्गीकरण जिस पर सब कुछ आधारित है।",
+    "skillsCountLabel": "सूची में",
     "browseCta": "देखें",
-    "countLabel": "सूची में",
     "empty": "अभी कुछ नहीं है"
   },
   "cta": {

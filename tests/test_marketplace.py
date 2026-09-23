@@ -1,6 +1,7 @@
 """Sprint 3: jobs, courses, and the edges that connect them to the taxonomy."""
 
 from dataclasses import fields
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -14,7 +15,8 @@ from api.modules.marketplace import (
     CourseSkill,
     Job,
     JobSkill,
-    count_jobs,
+    count_jobs_open,
+    count_jobs_posted,
     courses_teaching_skill,
     jobs_requiring_skill,
 )
@@ -132,7 +134,9 @@ async def test_listing_excludes_drafts(seeded: dict, client: AsyncClient) -> Non
 
 
 async def test_count_excludes_drafts(seeded: dict) -> None:
-    assert await count_jobs(seeded["db"]) == 2
+    """Neither figure counts a draft: it was never posted and is not open."""
+    assert await count_jobs_posted(seeded["db"]) == 2
+    assert await count_jobs_open(seeded["db"]) == 2
 
 
 async def test_job_list_filters_by_skill(seeded: dict, client: AsyncClient) -> None:
@@ -260,7 +264,11 @@ async def test_skill_edges_404_for_unknown_skill(client: AsyncClient) -> None:
 
 
 async def test_marketplace_counts(seeded: dict, client: AsyncClient) -> None:
-    assert (await client.get("/marketplace/counts")).json() == {"jobs": 2, "courses": 2}
+    assert (await client.get("/marketplace/counts")).json() == {
+        "jobs_posted": 2,
+        "jobs_open": 2,
+        "courses": 2,
+    }
 
 
 async def test_skills_routes_still_work(seeded: dict, client: AsyncClient) -> None:
@@ -288,8 +296,33 @@ class TestCorpusStats:
         """The fixture holds three jobs, one of them a draft. Counting it would
         put a number on the homepage that `/jobs` then contradicts."""
         body = (await client.get("/marketplace/stats")).json()
-        assert body["jobs"] == 2
+        assert body["jobs_posted"] == 2
+        assert body["jobs_open"] == 2
         assert body["courses"] == 2
+
+    async def test_closing_keeps_a_vacancy_posted_and_unpublishing_does_not(
+        self, seeded: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The two ways a vacancy stops being open are not the same fact.
+
+        **Closed**: it happened, the page is still there, it stays in
+        `jobs_posted`. **Unpublished**: the employer withdrew it, there is no
+        page, it goes. The homepage label "vacancies posted" is honest only
+        because of the second half -- the figure never names a vacancy a
+        visitor cannot open -- so it is asserted rather than left to a reading
+        of `posted_job()`.
+        """
+        job = seeded["gda"]
+        job.closed_at = datetime.now(UTC)
+        job.close_reason = "filled"
+        await db.flush()
+        body = (await client.get("/marketplace/stats")).json()
+        assert (body["jobs_posted"], body["jobs_open"]) == (2, 1)
+
+        job.status = "draft"
+        await db.flush()
+        body = (await client.get("/marketplace/stats")).json()
+        assert (body["jobs_posted"], body["jobs_open"]) == (1, 1)
 
     async def test_only_nsqf_rows_count_as_standards(
         self, seeded: dict, client: AsyncClient
@@ -303,7 +336,7 @@ class TestCorpusStats:
         self, seeded: dict, client: AsyncClient
     ) -> None:
         """`CorpusStatsOut` and `CorpusStats` are two hand-maintained lists of
-        the same ten names; a field added to one and not the other is a
+        the same eleven names; a field added to one and not the other is a
         `ValidationError` at request time, on the landing page."""
         body = (await client.get("/marketplace/stats")).json()
         assert set(body) == {f.name for f in fields(CorpusStats)}

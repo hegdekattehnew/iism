@@ -2121,8 +2121,10 @@ export interface components {
             districts: number;
             /** Entry Routes */
             entry_routes: number;
-            /** Jobs */
-            jobs: number;
+            /** Jobs Posted */
+            jobs_posted: number;
+            /** Jobs Open */
+            jobs_open: number;
             /** Courses */
             courses: number;
         };
@@ -3017,10 +3019,20 @@ export interface components {
             /** Code */
             code: string;
         };
-        /** MarketplaceCounts */
+        /**
+         * MarketplaceCounts
+         * @description The homepage panels' figures.
+         *
+         *     Jobs is two numbers and courses is one, and the asymmetry is the honest
+         *     shape rather than an oversight: a course has no closed state -- `status`
+         *     is its whole lifecycle -- so "published" and "still on offer" are the same
+         *     question there and two different ones for a vacancy.
+         */
         MarketplaceCounts: {
-            /** Jobs */
-            jobs: number;
+            /** Jobs Posted */
+            jobs_posted: number;
+            /** Jobs Open */
+            jobs_open: number;
             /** Courses */
             courses: number;
         };

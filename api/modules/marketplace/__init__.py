@@ -38,7 +38,8 @@ from api.modules.marketplace.routes import (
 )
 from api.modules.marketplace.service import (
     count_courses,
-    count_jobs,
+    count_jobs_open,
+    count_jobs_posted,
     courses_teaching_skill,
     get_course_by_slug,
     get_job_by_slug,
@@ -61,7 +62,8 @@ __all__ = [
     "Job",
     "JobSkill",
     "count_courses",
-    "count_jobs",
+    "count_jobs_open",
+    "count_jobs_posted",
     "courses_router",
     "courses_teaching_skill",
     "get_course_by_slug",

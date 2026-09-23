@@ -201,8 +201,47 @@ def open_job() -> ColumnElement[bool]:
 
     Deliberately **not** applied to the employer's own console: an employer
     still has to manage the people already in a vacancy they have closed.
+
+    Nor to the two places that count what has been *posted*: see
+    `posted_job()` below for the division, which is listings on this side and
+    the homepage headline plus the detail page on the other.
     """
     return and_(Job.status == "published", Job.closed_at.is_(None))
+
+
+def posted_job() -> ColumnElement[bool]:
+    """Every vacancy that has a public page -- open or closed.
+
+    A count's predicate, never a listing's. **A bare `status == "published"`
+    here is not a bug**, which is the whole reason this has a name: the rule
+    beside it says every public listing must use `open_job()`, and the next
+    reader would otherwise file this as the one that was missed.
+
+    The homepage leads with this figure and names `open_job()`'s underneath
+    when the two differ. It was reported as "I added a job and the number did
+    not move": the figure went 19 -> 20 rather than 20 -> 21, because the seed
+    closes one vacancy on every run (`scripts/seed_marketplace.py`), and an
+    employer who has just published cannot reconcile "open right now" with
+    what they did. The number was right and its definition was not theirs.
+
+    **Everything counted here is reachable.** `service.get_job_by_slug`
+    filters on exactly this and deliberately not on `open_job()`, because a
+    closed vacancy keeps its page -- so "posted" names a set a visitor can
+    still open one by one, which is what keeps this module's rule intact: the
+    number on the homepage must be a number a visitor can then find.
+
+    **It is not monotonic**, and the label has to survive that. Unpublishing
+    or deleting a vacancy takes its page away and takes it out of here. A true
+    lifetime tally would need `first_published_at` and would go on advertising
+    vacancies that exist nowhere on the site, which is the worse lie of the
+    two -- and unpublish is the undo for a mistake, where *close* is the
+    routine terminal state and is exactly what this preserves.
+
+    Not written in terms of `open_job()`, and `get_job_by_slug` is not written
+    in terms of this: coupling them means one helpful edit here 404s every
+    bookmarked closed vacancy.
+    """
+    return Job.status == "published"
 
 
 class JobSkill(Base):

@@ -356,9 +356,15 @@ class TestExpiry:
 class TestAClosedVacancyIsGoneFromEveryListing:
     """`open_job()` exists because fourteen queries compared
     `status == "published"`, and a closed vacancy would have stayed visible in
-    whichever one was missed. These are the three that matter."""
+    whichever one was missed. These are the three that matter.
 
-    async def test_it_leaves_browse_the_count_and_matching(
+    **One figure deliberately keeps it**, and that assertion is the one here
+    easiest to delete as a contradiction: the homepage's headline counts
+    vacancies *posted*, so closing one must not move it. Closing is not
+    un-posting, and the panel exists to say so.
+    """
+
+    async def test_it_leaves_browse_and_matching_but_not_the_posted_figure(
         self, world: dict, client: AsyncClient, db: AsyncSession
     ) -> None:
         job, skill = world["job"], world["skill"]
@@ -368,7 +374,7 @@ class TestAClosedVacancyIsGoneFromEveryListing:
             "/me/profile/skills", headers=seeker, json={"skill_slug": skill.slug, "level": 4}
         )
 
-        before_count = (await client.get("/marketplace/stats")).json()["jobs"]
+        before = (await client.get("/marketplace/stats")).json()
         before_matches = (await client.get("/me/matches", headers=seeker)).json()
         assert any(m["job"]["slug"] == "two-cashiers" for m in before_matches["items"])
 
@@ -376,10 +382,20 @@ class TestAClosedVacancyIsGoneFromEveryListing:
         job.close_reason = "filled"
         await db.commit()
 
-        after_count = (await client.get("/marketplace/stats")).json()["jobs"]
+        after = (await client.get("/marketplace/stats")).json()
         after_matches = (await client.get("/me/matches", headers=seeker)).json()
 
-        assert after_count == before_count - 1, "the homepage count must drop"
+        # The live figure drops: `open_job()` excludes a closed vacancy.
+        assert after["jobs_open"] == before["jobs_open"] - 1, "the open figure must drop"
+        # The headline does not. It was reported as "I added a job and the
+        # number did not move" -- the figure went 19 -> 20 rather than
+        # 20 -> 21, because the seed closes one vacancy on every run.
+        assert after["jobs_posted"] == before["jobs_posted"], (
+            "closing a vacancy must not change how many were posted"
+        )
+        # And the two must genuinely be telling the reader different things,
+        # or the panel's second line is decoration.
+        assert after["jobs_open"] < after["jobs_posted"]
         assert not any(m["job"]["slug"] == "two-cashiers" for m in after_matches["items"])
         assert not any(
             j["slug"] == "two-cashiers" for j in (await client.get("/jobs")).json()["items"]

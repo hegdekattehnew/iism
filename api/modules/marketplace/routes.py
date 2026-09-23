@@ -18,7 +18,9 @@ async def marketplace_counts(
 ) -> schemas.MarketplaceCounts:
     """Backs the homepage browse panels in one round trip."""
     return schemas.MarketplaceCounts(
-        jobs=await service.count_jobs(db), courses=await service.count_courses(db)
+        jobs_posted=await service.count_jobs_posted(db),
+        jobs_open=await service.count_jobs_open(db),
+        courses=await service.count_courses(db),
     )
 
 

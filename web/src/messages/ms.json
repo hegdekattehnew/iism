@@ -62,12 +62,15 @@
     "subtitle": "Every number below is counted live from the platform database.",
     "jobsTitle": "Jobs",
     "jobsBody": "Vocational roles from verified employers.",
+    "jobsCountLabel": "vacancies posted",
+    "jobsOpenNow": "{count} open right now",
     "coursesTitle": "Courses",
     "coursesBody": "Training mapped to national qualification standards.",
+    "coursesCountLabel": "in the catalogue",
     "skillsTitle": "Skills",
     "skillsBody": "The NSQF-aligned taxonomy everything is built on.",
+    "skillsCountLabel": "in the catalogue",
     "browseCta": "Browse",
-    "countLabel": "in the catalogue",
     "empty": "Nothing here yet"
   },
   "cta": {

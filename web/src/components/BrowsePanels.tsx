@@ -36,10 +36,11 @@ export async function BrowsePanels() {
                 {t(`${key}Body`)}
               </p>
 
-              <div className="mt-6 flex items-baseline gap-2">
-                <LiveCount kind={key} />
-                <span className="text-xs text-muted">{t("countLabel")}</span>
-              </div>
+              {/* The label lives inside `LiveCount` now. The jobs panel says
+                  how many vacancies are still open under its headline figure,
+                  and whether that line appears depends on the numbers -- which
+                  this server component never sees. */}
+              <LiveCount kind={key} />
 
               <div className="mt-5">
                 <ButtonLink href={href} variant="secondary" size="sm">

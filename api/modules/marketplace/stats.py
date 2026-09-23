@@ -5,8 +5,8 @@ holds. Every number here is counted live from the database rather than written
 into a template, because a marketing figure that drifts from reality is worse
 than no figure -- and these are impressive enough without embellishment.
 
-One query, ten counts. It backs a page a first-time visitor sees, so it must be
-cheap: all of these are index-only or small-table counts, and the page renders
+Eleven counts, one round trip. It backs a page a first-time visitor sees, so it
+must be cheap: all of these are index-only or small-table counts, and the page renders
 without them if the API is unreachable.
 """
 
@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.geography.models import District, State
-from api.modules.marketplace.models import Course, Job, open_job
+from api.modules.marketplace.models import Course, Job, open_job, posted_job
 from api.modules.skills.content import PerformanceCriterion
 from api.modules.skills.hierarchy import AwardingBody, QpEntryRoute, QualificationPack, Sector
 from api.modules.skills.models import Skill
@@ -33,7 +33,8 @@ class CorpusStats:
     states: int
     districts: int
     entry_routes: int
-    jobs: int
+    jobs_posted: int
+    jobs_open: int
     courses: int
 
 
@@ -42,8 +43,11 @@ async def corpus_stats(db: AsyncSession) -> CorpusStats:
         return (await db.scalar(select(func.count()).select_from(model).where(*where))) or 0
 
     return CorpusStats(
-        # Retired rows are excluded, exactly as they are from search and browse:
-        # the number on the homepage must be the number a visitor can then find.
+        # **Every number here names rows a visitor can reach.** Retired
+        # standards are excluded exactly as they are from search and browse;
+        # `posted_job()` includes closed vacancies because each one still has
+        # a page, while `open_job()` is the narrower set that browse lists.
+        # The homepage shows both and says which is which.
         standards=await count(Skill, Skill.source == "nsqf"),
         qualifications=await count(QualificationPack, QualificationPack.is_current.is_(True)),
         criteria=await count(PerformanceCriterion),
@@ -52,6 +56,7 @@ async def corpus_stats(db: AsyncSession) -> CorpusStats:
         states=await count(State),
         districts=await count(District),
         entry_routes=await count(QpEntryRoute),
-        jobs=await count(Job, open_job()),
+        jobs_posted=await count(Job, posted_job()),
+        jobs_open=await count(Job, open_job()),
         courses=await count(Course, Course.status == "published"),
     )

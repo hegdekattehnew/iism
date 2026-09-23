@@ -323,6 +323,19 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   more the hand patch had missed, and the seeker side had thirteen: the six profile collections
   share one editor and it enforced no length at all. **Add a `min_length`/`max_length` to a schema
   and add it to that table in the same change.**
+- **A count is a claim, and a claim nobody shares reads as a fault.** The *same* report arrived a
+  second time against a correct number and an empty cache. The panel counted **open** vacancies,
+  and `scripts/seed_marketplace.py` closes one on every run, so publishing a twenty-first moved the
+  figure 19 → 20 — right, and irreconcilable with what the employer had just done. The fix was not
+  arithmetic: the panel leads with `jobs_posted` and names `jobs_open` underneath **when they
+  differ**, so the number and its definition arrive together. `posted_job()` is the count's
+  predicate and `open_job()` stays the listings'; **both payloads carry both names**, because
+  `jobs` meaning two different things in two responses is the trap. The second line is gated on the
+  payload, not on the comparison alone — two `undefined`s compare equal and would hide it while
+  loading for a reason nobody chose — and that hidden branch is the one a seeded database never
+  shows, so it has its own test. `posted_job()` is **not monotonic**: unpublishing removes the
+  page and removes the row from the figure, which is what keeps it from ever naming a vacancy a
+  visitor cannot open.
 - **A constraint the form does not know about is one the person finds out the hard way.** `JobIn`
   and `CourseIn` set `min_length=3` on `title`; neither form had `minLength`, so the browser
   accepted two characters and the server refused them. Mirror every server limit on the input
@@ -330,17 +343,15 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   characters or more"* before a request is ever made.
 - **A live number has to be invalidated by the thing that changes it, and a count is not a
   catalogue.** The homepage's "Explore the marketplace" panels read `/marketplace/counts` and the
-  band above them `/marketplace/stats`; both are computed live from `open_job()` and
-  `status = 'published'`. Reported as "I added a job and the number did not move" — and the count
-  was right. **Two caches in front of it were not.** `useOrgJobMutations` and
+  band above them `/marketplace/stats`; both are computed live. Reported as "I added a job and the
+  number did not move" — and the count was right. **Two caches in front of it were not.** `useOrgJobMutations` and
   `useOrgCourseMutations` refreshed `["org-jobs", slug]` and stopped, so publishing a vacancy and
   clicking back to the front page painted the figure fetched *before* the publish; and the service
   worker served everything under `/marketplace/` with **stale-while-revalidate**, so on a
   production build the number was permanently one visit behind and corrected only on the *next*
   load. The keys live in `web/src/lib/counts.ts` and every catalogue mutation calls
-  `invalidatePublicCounts` — **including close and reopen**, which change the public count exactly
-  as much as create does because `open_job()` excludes a closed vacancy, and which read like
-  nothing to do with a catalogue. The three count endpoints are `LIVE_DATA` in `sw.js`: network
+  `invalidatePublicCounts` — **including close and reopen**, which move `jobs_open` while leaving
+  `jobs_posted` alone and therefore read like nothing to do with a catalogue. The three count endpoints are `LIVE_DATA` in `sw.js`: network
   first, cache only as the offline answer. `/skills/count` must be matched **before**
   `CACHEABLE_DATA`, whose `/skills` prefix would otherwise swallow it.
 - **Never match an endpoint by substring.** `api.ts` skipped refreshing on
@@ -398,8 +409,9 @@ matched candidate only if they happened to open `/matches`.
   `status == "published"`, so folding closure into that column would have left a closed vacancy
   visible in whichever one was missed. `closed_at` + `close_reason` are separate columns and
   **`open_job()` in `marketplace/models.py` is the one predicate every public listing uses** --
-  browse, the homepage count, matching retrieval, the match detail. `ck_jobs_closed` refuses a row
-  carrying one without the other.
+  browse, the homepage's *open* figure, matching retrieval, the match detail. **Its sibling
+  `posted_job()` is the count's**, and a bare `status == "published"` there is deliberate rather
+  than a listing that was missed. `ck_jobs_closed` refuses a row carrying one without the other.
 - **A closed vacancy keeps its page and its inbox.** Its detail route deliberately does *not* use
   `open_job()`: people have it bookmarked and it is in their application list, and a 404 on a row
   we kept on purpose would be a broken link of our own making -- the rule retired skills already

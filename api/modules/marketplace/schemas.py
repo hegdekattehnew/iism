@@ -237,7 +237,16 @@ class CoursePage(BaseModel):
 
 
 class MarketplaceCounts(BaseModel):
-    jobs: int
+    """The homepage panels' figures.
+
+    Jobs is two numbers and courses is one, and the asymmetry is the honest
+    shape rather than an oversight: a course has no closed state -- `status`
+    is its whole lifecycle -- so "published" and "still on offer" are the same
+    question there and two different ones for a vacancy.
+    """
+
+    jobs_posted: int
+    jobs_open: int
     courses: int
 
 
@@ -464,5 +473,6 @@ class CorpusStatsOut(BaseModel):
     states: int
     districts: int
     entry_routes: int
-    jobs: int
+    jobs_posted: int
+    jobs_open: int
     courses: int
