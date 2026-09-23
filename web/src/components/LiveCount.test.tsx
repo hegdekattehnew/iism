@@ -48,7 +48,7 @@ describe("the jobs panel", () => {
   it("leads with how many have been posted, not with how many are open", async () => {
     renderUi(<LiveCount kind="jobs" />);
     expect(await screen.findByText("21")).toBeTruthy();
-    expect(screen.getByText("vacancies posted")).toBeTruthy();
+    expect(screen.getByText("vacancies listed")).toBeTruthy();
   });
 
   it("names the live figure underneath when some have closed", async () => {
@@ -102,7 +102,7 @@ describe("the other two panels", () => {
     async (kind) => {
       renderUi(<LiveCount kind={kind} />);
       expect(
-        await screen.findByText(/in the catalogue|vacancies posted/),
+        await screen.findByText(/in the catalogue|vacancies listed/),
       ).toBeTruthy();
     },
   );

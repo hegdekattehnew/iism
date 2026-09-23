@@ -307,7 +307,7 @@ class TestCorpusStats:
 
         **Closed**: it happened, the page is still there, it stays in
         `jobs_posted`. **Unpublished**: the employer withdrew it, there is no
-        page, it goes. The homepage label "vacancies posted" is honest only
+        page, it goes. The homepage label "vacancies listed" is honest only
         because of the second half -- the figure never names a vacancy a
         visitor cannot open -- so it is asserted rather than left to a reading
         of `posted_job()`.
