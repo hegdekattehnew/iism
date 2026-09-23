@@ -313,7 +313,9 @@
     "account": "Account",
     "unregistered": "There is no account with this number yet. That code has been used — sign up instead; it asks you to agree to our privacy notice first.",
     "unregisteredAction": "Create an account",
-    "accountSettings": "Privacy and data"
+    "accountSettings": "Privacy and data",
+    "sessionExpired": "Your session has expired. Sign in again to continue.",
+    "signInAgain": "Sign in again"
   },
   "profilePage": {
     "title": "My profile",

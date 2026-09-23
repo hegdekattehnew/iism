@@ -303,6 +303,19 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   **the list scrolls inside a bounded box, the things that must never be pushed away sit outside
   it**, a filter appears once there are enough to be worth filtering, and the order is current →
   recently used → alphabetical. It had **no test file at all**, which is how it got there.
+- **401 and 403 are opposite answers, and a panel must not collapse them.** 403 is "this is not
+  yours" and the right response is silence — a control that always fails is worse than none.
+  **401 is "you are signed out"**, which is not a permission problem and has to say so. Every
+  organisation screen used to render "no access", or nothing at all, for both: an owner following
+  written instructions to delete their own organisation found the control simply absent, because a
+  fifteen-minute token had expired. Use `isSignedOut()` from `lib/http.ts` and the `SessionExpired`
+  panel; queries carry the status by throwing `new Error(String(response.status))`.
+- **Never match an endpoint by substring.** `api.ts` skipped refreshing on
+  `request.url.includes("/auth/")` to avoid looping on `/auth/refresh` — and caught **`/auth/me`**,
+  the one call every signed-in screen depends on. So a 401 there was handed straight back, the app
+  decided the person was signed out, and a thirty-day refresh token sat unused: a whole day of API
+  logs contained **zero** calls to `/auth/refresh`. `shouldTryRefresh()` now compares exact
+  pathnames against a named list, and `lib/api.test.ts` pins it.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,

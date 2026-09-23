@@ -5,9 +5,11 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Text } from "@/components/profile/fields";
+import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, Card, CardBody } from "@/components/ui";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { isSignedOut } from "@/lib/http";
 
 /**
  * Delete this organisation, and nothing else.
@@ -39,10 +41,12 @@ export function DeleteOrganisation({ orgSlug }: { orgSlug: string }) {
     queryKey: ["org", orgSlug, "deletion"],
     retry: false,
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/deletion", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/deletion", {
         params: { path: { org_slug: orgSlug } },
       });
-      if (error || !data) throw new Error("preview failed");
+      // The status, not a message: 401 and 403 mean opposite things here and
+      // the render below has to tell them apart.
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
   });
@@ -63,9 +67,15 @@ export function DeleteOrganisation({ orgSlug }: { orgSlug: string }) {
     onError: () => setFailed(true),
   });
 
-  // An admin gets a 403 on the preview. Say nothing rather than offering a
-  // control that cannot work -- the Sprint 14 rule.
-  if (preview.isPending || preview.isError) return null;
+  if (preview.isPending) return null;
+  // **401 and 403 are not the same refusal, and conflating them is what sent
+  // an owner looking for a control that was not on the page.** A 403 means
+  // this is not yours -- an admin is a member but not an owner -- and the
+  // right answer is silence, because a button that always fails is worse than
+  // no button (Sprint 14). A 401 means the fifteen-minute access token ran
+  // out, which is not a permission problem at all and must say so.
+  if (isSignedOut(preview.error)) return <SessionExpired variant="inline" />;
+  if (preview.isError) return null;
 
   const counts = preview.data;
   const confirmed = typed.trim() === counts.name;

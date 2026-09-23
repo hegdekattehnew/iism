@@ -109,11 +109,31 @@ describe("DeleteOrganisation — the confirmation", () => {
 });
 
 describe("DeleteOrganisation — who sees it", () => {
-  it("renders nothing for somebody the API refuses the preview to", async () => {
-    // An admin is a member but not an owner, so the preview 403s. A button
-    // that always fails is worse than no button (Sprint 14).
-    GET.mockResolvedValue({ data: undefined, error: { detail: "forbidden" } });
+  it("renders nothing for an admin, who is a member but not an owner", async () => {
+    // A button that always fails is worse than no button (Sprint 14).
+    GET.mockResolvedValue({
+      data: undefined,
+      error: { detail: "forbidden" },
+      response: { status: 403 },
+    });
     const { container } = renderUi(panel());
     await waitFor(() => expect(container.textContent).toBe(""));
+  });
+
+  it("tells a signed-out owner their session expired, rather than hiding", async () => {
+    // **The reported bug.** An owner was told to scroll to the delete card and
+    // found nothing there: their fifteen-minute token had expired half an hour
+    // earlier, and 401 was being treated exactly like 403.
+    GET.mockResolvedValue({
+      data: undefined,
+      error: { detail: "Not authenticated" },
+      response: { status: 401 },
+    });
+    renderUi(panel());
+
+    expect(await screen.findByText(/session has expired/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign in again" }).getAttribute("href")).toBe(
+      "/signin",
+    );
   });
 });

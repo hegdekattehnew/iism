@@ -5,7 +5,9 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Select, Text } from "@/components/profile/fields";
+import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { isSignedOut } from "@/lib/http";
 import { api } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 
@@ -169,6 +171,7 @@ export function TeamPanel({ org }: { org: string }) {
   });
 
   if (members.isPending) return <Skeleton className="mt-8 h-40 w-full" />;
+  if (isSignedOut(members.error)) return <SessionExpired variant="inline" />;
   if (members.isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
 
   const roleLabel = (r: string) =>

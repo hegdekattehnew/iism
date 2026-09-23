@@ -5,7 +5,9 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Area, Field, Text } from "@/components/profile/fields";
+import { SessionExpired } from "@/components/SessionExpired";
 import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { isSignedOut } from "@/lib/http";
 import { api } from "@/lib/api";
 
 /**
@@ -60,6 +62,9 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
   });
 
   if (org.isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
+  // 401 is not "no access" -- it is "your session ran out", and saying the
+  // former sends an owner looking for a permission they never lost.
+  if (isSignedOut(org.error)) return <SessionExpired />;
   if (org.isError) return <p className="text-sm text-muted">{t("noAccess")}</p>;
 
   const d = org.data;

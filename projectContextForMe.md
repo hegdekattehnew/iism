@@ -28,7 +28,7 @@ has been wrong before, and §10 explains how.*
   (+ deleting one organisation and a switcher that survives ten, reported
   and fixed 2026-09-23) |
 | **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
-| **Tests** | 596 backend (`make check`), 143 web (`cd web && npm test`) |
+| **Tests** | 596 backend (`make check`), 155 web (`cd web && npm test`) |
 | **Migrations** | head `0027`; 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -48,6 +48,10 @@ make web        # :3000
 (candidate with matches and a gap). Never sign in as the owner's real number, `+919880663641`.
 Apollo Care is the only seeded organisation with more than one member — a second owner, an admin
 and one pending invitation — so `/employer/apollo-care-hospitals/team` is where Sprint 25 demos.
+
+**Sessions last 15 minutes and now refresh silently** — before 2026-09-23 they did not, because
+the refresh guard matched `/auth/me` by substring. If a signed-in screen ever looks like it has
+revoked your rights, check `/auth/refresh` is being called before believing it.
 
 **The three things most likely to waste an hour**, all in §8: the worker not reloading, a stale
 API process serving old code, and `make check | grep` reporting grep's exit status rather than

@@ -37,9 +37,13 @@ export function useMemberships() {
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/auth/me");
-      if (error || !data) throw new Error("not signed in");
-      return data;
+      // The status is read *before* the check, not inside it: `/auth/me`
+      // declares no error response, so on the failure branch openapi-fetch
+      // narrows the whole result to `never` and `response` is unreachable.
+      const result = await api.GET("/auth/me");
+      const status = result.response.status;
+      if (result.error || !result.data) throw new Error(String(status));
+      return result.data;
     },
     retry: false,
   });
@@ -76,13 +80,13 @@ export function useOrgJobs(orgSlug: string | null) {
     queryKey: ["org-jobs", orgSlug],
     enabled: orgSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/jobs", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/jobs", {
         params: { path: { org_slug: orgSlug as string } },
       });
       // openapi-fetch resolves rather than throws on a non-2xx, so an
       // unchecked 404 would render as "you have no vacancies" for an
       // organisation the caller simply is not a member of.
-      if (error || !data) throw new Error("could not load listings");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -190,7 +194,7 @@ export function useOrgCandidates(
     queryKey: ["org-candidates", orgSlug, jobSlug],
     enabled: orgSlug !== null && jobSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET(
+      const { data, error, response } = await api.GET(
         "/org/{org_slug}/candidates/{job_slug}",
         {
           params: {
@@ -199,7 +203,7 @@ export function useOrgCandidates(
           },
         },
       );
-      if (error || !data) throw new Error("could not rank candidates");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -217,10 +221,10 @@ export function useOrgCourses(orgSlug: string | null) {
     queryKey: ["org-courses", orgSlug],
     enabled: orgSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/courses", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/courses", {
         params: { path: { org_slug: orgSlug as string } },
       });
-      if (error || !data) throw new Error("could not load courses");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -239,10 +243,10 @@ export function useOrgInterests(orgSlug: string | null) {
     queryKey: ["org", orgSlug, "interests"],
     enabled: Boolean(orgSlug),
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/interests", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/interests", {
         params: { path: { org_slug: orgSlug as string } },
       });
-      if (error || !data) throw new Error("interests failed");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
   });

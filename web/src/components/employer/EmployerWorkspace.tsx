@@ -4,6 +4,8 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { JobEditor } from "@/components/employer/JobEditor";
+import { SessionExpired } from "@/components/SessionExpired";
+import { isSignedOut } from "@/lib/http";
 import {
   Badge,
   Button,
@@ -60,9 +62,11 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
     );
   }
 
+  if (isSignedOut(jobs.error) || isSignedOut(me.error)) return <SessionExpired />;
   if (jobs.isError) {
     // A 404 here means "not a member of this organisation", which is
-    // deliberately indistinguishable from "no such organisation".
+    // deliberately indistinguishable from "no such organisation". A 401
+    // is handled above: it means signed out, not unwelcome.
     return (
       <Card>
         <CardBody>
