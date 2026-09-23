@@ -35,7 +35,11 @@ from api.modules.marketplace.models import (
 )
 from api.modules.marketplace.schemas import CandidateProfileFull
 from api.modules.notifications.models import Notification
-from api.modules.privacy.schemas import DeletionPreview, OrganisationFate
+from api.modules.privacy.schemas import (
+    DeletionPreview,
+    OrganisationDeletionPreview,
+    OrganisationFate,
+)
 
 log = structlog.get_logger("iism.privacy")
 
@@ -123,6 +127,95 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     await db.execute(delete(Invitation).where(Invitation.tenant_id == tenant_id))
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+
+
+async def organisation_deletion_preview(
+    db: AsyncSession, tenant: Tenant, viewer: User
+) -> OrganisationDeletionPreview:
+    """What deleting this one organisation would take with it. Changes nothing."""
+    job_ids = select(Job.id).where(Job.tenant_id == tenant.id)
+    course_ids = select(Course.id).where(Course.tenant_id == tenant.id)
+
+    async def count(model, *where) -> int:  # type: ignore[no-untyped-def]
+        return (await db.scalar(select(func.count()).select_from(model).where(*where))) or 0
+
+    return OrganisationDeletionPreview(
+        slug=tenant.slug,
+        name=tenant.name,
+        tenant_type=tenant.tenant_type,
+        jobs=await count(Job, Job.tenant_id == tenant.id),
+        courses=await count(Course, Course.tenant_id == tenant.id),
+        applications=await count(Application, Application.job_id.in_(job_ids)),
+        course_interests=await count(CourseInterest, CourseInterest.course_id.in_(course_ids)),
+        # **Excluding the caller.** They are about to delete it; counting
+        # themselves among the people who lose access would tell a sole owner
+        # that one other person is affected, which is nobody.
+        other_members=await count(
+            Membership, Membership.tenant_id == tenant.id, Membership.user_id != viewer.id
+        ),
+    )
+
+
+async def delete_organisation(db: AsyncSession, user: User, tenant: Tenant) -> None:
+    """Delete one organisation, and leave the account and its others alone.
+
+    **This route did not exist until it was reported missing**, and its absence
+    was a trap rather than an omission: `POST /org/{slug}/leave` refuses the
+    only owner (Sprint 25, correctly -- an organisation must not be left with
+    nobody in charge), so somebody who created an organisation by mistake had
+    exactly one way out, `DELETE /me/account`, which takes the account and
+    every *other* organisation with it. Creating was one request; undoing it
+    was impossible.
+
+    **Through `_delete_tenant`, not beside it.** That function is the one place
+    that knows everything a tenant owns -- listings, applications, interests,
+    invitations, notifications, memberships, job alerts -- and a second copy
+    here is how one of them starts being missed.
+
+    Live applicants are told, which closes a gap recorded since Sprint 24:
+    until now an organisation could vanish and the people waiting on it heard
+    nothing at all.
+    """
+    await _tell_applicants_the_organisation_is_gone(db, tenant)
+    await _delete_tenant(db, tenant.id)
+    await db.commit()
+    # WARNING, not INFO: irreversible, owner-only, and it is what somebody goes
+    # looking for after "our organisation disappeared".
+    log.warning("organisation.deleted", org_slug=tenant.slug, by_user=str(user.id))
+
+
+async def _tell_applicants_the_organisation_is_gone(db: AsyncSession, tenant: Tenant) -> None:
+    """Tell the people still waiting on this organisation's vacancies.
+
+    Only `applied` and `shortlisted`: somebody rejected has been told, somebody
+    hired does not need this, and a withdrawn applicant took themselves out.
+
+    **Queued before the delete, in the same transaction.** The notification
+    names a *user*, not the tenant, so it survives the organisation it is about
+    -- which is the point. `vacancy_closed` is reused rather than given a
+    near-identical sibling: what the applicant needs to know is the same in
+    both cases, which is that the vacancy is not coming back.
+    """
+    from api.modules.notifications import enqueue
+
+    rows = await db.execute(
+        select(Job.title, CandidateProfile.user_id)
+        .join(Application, Application.job_id == Job.id)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(
+            Job.tenant_id == tenant.id,
+            Application.status.in_(("applied", "shortlisted")),
+        )
+    )
+    for title, user_id in rows.all():
+        await enqueue(
+            db,
+            recipient_kind="user",
+            recipient_id=user_id,
+            channel="in_app",
+            template="vacancy_closed",
+            payload={"vacancy": title, "path": "/applications"},
+        )
 
 
 async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:

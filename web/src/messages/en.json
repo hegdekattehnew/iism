@@ -733,7 +733,19 @@
     "saving": "Saving…",
     "saved": "Saved",
     "saveError": "Could not save. Only an owner can edit the organisation.",
-    "noAccess": "You do not have access to this organisation."
+    "noAccess": "You do not have access to this organisation.",
+    "deleteHeading": "Delete this organisation",
+    "deleteIntro": "This removes the organisation and everything it owns. It cannot be undone.",
+    "deleteJobs": "{count} vacancies",
+    "deleteCourses": "{count} courses",
+    "deleteApplications": "{count} applications people made to it",
+    "deleteInterests": "{count} course interests people registered",
+    "deleteMembers": "{count} other members lose their access",
+    "deleteKeeps": "Your account, your job-seeker profile and your other organisations are not affected.",
+    "deleteConfirmLabel": "Type {name} to confirm",
+    "deleteCta": "Delete organisation",
+    "deleting": "Deleting…",
+    "deleteError": "Could not delete the organisation. Try again."
   },
   "credentials": {
     "title": "How you sign in",

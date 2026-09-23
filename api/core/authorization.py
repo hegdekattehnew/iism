@@ -51,6 +51,10 @@ class Permission(StrEnum):
 
     ORG_READ = "org:read"
     ORG_UPDATE = "org:update"
+    # Deleting the organisation itself. Owner only, and separate from
+    # ORG_UPDATE for the reason JOB_DELETE is separate from JOB_UPDATE: an
+    # update reverses and this does not.
+    ORG_DELETE = "org:delete"
     JOB_CREATE = "job:create"
     JOB_UPDATE = "job:update"
     JOB_PUBLISH = "job:publish"
@@ -102,6 +106,7 @@ _OWNER: frozenset[Permission] = _ADMIN | {
     Permission.JOB_DELETE,
     Permission.COURSE_DELETE,
     Permission.ORG_UPDATE,
+    Permission.ORG_DELETE,
     # Changing somebody's role or removing them outright is the owner's, for
     # the reason the two above are: neither reverses by itself.
     Permission.MEMBER_MANAGE,

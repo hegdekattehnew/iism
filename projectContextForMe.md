@@ -24,9 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 27 — a vacancy that ends, and alerts that reach people |
+| **Last sprint** | 27 — a vacancy that ends, and alerts that reach people
+  (+ deleting one organisation, reported and fixed 2026-09-23) |
 | **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
-| **Tests** | 586 backend (`make check`), 123 web (`cd web && npm test`) |
+| **Tests** | 596 backend (`make check`), 131 web (`cd web && npm test`) |
 | **Migrations** | head `0027`; 41 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -1016,11 +1017,9 @@ does), then course checkout, then gig as its own module.
 - **Confirm the PWA installs on a real device.** Manifest, icons and worker are in place and tested
   for correctness, but the in-app browser pane will not register a worker, so nothing has proved
   Chrome offers "Install". One phone, five minutes — until then say "installable" with the caveat.
-- **A learner-facing notice when a provider marks "contacted"**, and **notifying applicants when a
-  tenant deletes itself**. Both found in Sprint 24 and deliberately not built. The second is
-  smaller now than it was: Sprint 25 means a sole owner can no longer take an organisation down
-  by accident, but an organisation that genuinely deletes itself still tells its applicants
-  nothing.
+- **A learner-facing notice when a provider marks "contacted"**. Found in Sprint 24 and
+  deliberately not built. *(Its sibling — notifying applicants when an organisation deletes itself
+  — was closed on 2026-09-23 along with the organisation-deletion route.)*
 - **Ownership transfer as one act.** Sprint 25 makes it possible — promote, then leave — but it is
   two steps and the second can fail on its own. A single "hand over and leave" would be safer.
 - **`CLAUDE.md` cites ADR-026 for the siblings-not-generalisations rule.** ADR-026 is *Supply

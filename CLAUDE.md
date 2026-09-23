@@ -310,6 +310,30 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
 > gig work — and what each actually needs.
 
+**Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
+created an employer *and* a training provider wanted rid of only the first, and found that the one
+control on offer deleted their whole account. The reproduction was worse than the report:
+`DELETE /org/{slug}` was **405** — no such route — and `POST /org/{slug}/leave` is **409** for the
+only owner, which Sprint 25 added on purpose. **Creating an organisation was one request; undoing
+it was impossible.**
+
+- **`DELETE /org/{org_slug}` and its preview live in `privacy/`, not `identity/`.** `_delete_tenant`
+  is the single function that knows all eleven tables a tenant owns, and a second copy is how one of
+  them starts being missed. It also keeps ADR-014 intact — privacy depends on every module and
+  nothing depends on privacy — so the module gained an `org_router` rather than an outward import.
+- **`ORG_DELETE` is the owner's alone**, separate from `ORG_UPDATE` for the reason `JOB_DELETE` is
+  separate from `JOB_UPDATE`: an update reverses and this does not. An admin is a member, so they
+  get **403**; a stranger still gets **404** (ADR-038). A personal workspace is unreachable through
+  this route because `_context_for` filters to `ORGANISATION_TYPES`.
+- **The preview excludes the caller from `other_members`.** Counting yourself tells a sole owner
+  that one other person is affected, which is nobody.
+- **Live applicants are told**, which closes a gap recorded since Sprint 24: an organisation could
+  vanish and the people waiting on it heard nothing. `vacancy_closed` is reused rather than given a
+  near-identical sibling — what the applicant needs to know is the same either way.
+- **The UI requires the name typed, not a `confirm()`.** This is the only irreversible control in
+  the product that destroys *other people's* records, and a dialog is one stray Enter from doing it.
+  It also states what survives, because not knowing that was the actual complaint.
+
 Sprint 27 (a vacancy that ends, and alerts that reach people) is done. Two things this product
 could compute and would not act on: **"hired" did nothing to the vacancy** -- it stayed published,
 kept ranking in strangers' matches and kept taking applications nobody would read -- and

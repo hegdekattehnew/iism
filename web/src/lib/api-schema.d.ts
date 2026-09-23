@@ -633,7 +633,16 @@ export interface paths {
          */
         put: operations["update_organisation_org__org_slug__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Organisation
+         * @description Delete this organisation. **The account and its other organisations are
+         *     untouched.**
+         *
+         *     Owner only, and irreversible. The client shows the preview first, because
+         *     the part an owner does not think of is the applications -- those belong to
+         *     somebody else, and the people still waiting are told.
+         */
+        delete: operations["delete_organisation_org__org_slug__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1578,6 +1587,26 @@ export interface paths {
          * @description Erase the account. Irreversible; the client shows the preview first.
          */
         delete: operations["delete_my_account_me_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Organisation Deletion
+         * @description What deleting this organisation would take with it. Changes nothing.
+         */
+        get: operations["preview_organisation_deletion_org__org_slug__deletion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3360,6 +3389,34 @@ export interface components {
             /** Organisation Slug */
             organisation_slug?: string | null;
         };
+        /**
+         * OrganisationDeletionPreview
+         * @description What deleting **one organisation** takes with it.
+         *
+         *     Distinct from `DeletionPreview`, which is about an account. This one is
+         *     the answer to "I made an organisation by mistake, how do I get rid of just
+         *     that?" -- a question the product had no answer to at all until now: there
+         *     was no delete route, and `leave` refuses the only owner, so the sole escape
+         *     was deleting the entire account and every other organisation with it.
+         */
+        OrganisationDeletionPreview: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Tenant Type */
+            tenant_type: string;
+            /** Jobs */
+            jobs: number;
+            /** Courses */
+            courses: number;
+            /** Applications */
+            applications: number;
+            /** Course Interests */
+            course_interests: number;
+            /** Other Members */
+            other_members: number;
+        };
         /** OrganisationFate */
         OrganisationFate: {
             /** Slug */
@@ -5079,6 +5136,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OrganisationOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_organisation_org__org_slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -6903,6 +6989,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    preview_organisation_deletion_org__org_slug__deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationDeletionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
