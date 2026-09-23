@@ -328,6 +328,21 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   accepted two characters and the server refused them. Mirror every server limit on the input
   (`minLength`, `maxLength`, `min`, `max`) — the browser then says *"Please lengthen this text to 3
   characters or more"* before a request is ever made.
+- **A live number has to be invalidated by the thing that changes it, and a count is not a
+  catalogue.** The homepage's "Explore the marketplace" panels read `/marketplace/counts` and the
+  band above them `/marketplace/stats`; both are computed live from `open_job()` and
+  `status = 'published'`. Reported as "I added a job and the number did not move" — and the count
+  was right. **Two caches in front of it were not.** `useOrgJobMutations` and
+  `useOrgCourseMutations` refreshed `["org-jobs", slug]` and stopped, so publishing a vacancy and
+  clicking back to the front page painted the figure fetched *before* the publish; and the service
+  worker served everything under `/marketplace/` with **stale-while-revalidate**, so on a
+  production build the number was permanently one visit behind and corrected only on the *next*
+  load. The keys live in `web/src/lib/counts.ts` and every catalogue mutation calls
+  `invalidatePublicCounts` — **including close and reopen**, which change the public count exactly
+  as much as create does because `open_job()` excludes a closed vacancy, and which read like
+  nothing to do with a catalogue. The three count endpoints are `LIVE_DATA` in `sw.js`: network
+  first, cache only as the offline answer. `/skills/count` must be matched **before**
+  `CACHEABLE_DATA`, whose `/skills` prefix would otherwise swallow it.
 - **Never match an endpoint by substring.** `api.ts` skipped refreshing on
   `request.url.includes("/auth/")` to avoid looping on `/auth/refresh` — and caught **`/auth/me`**,
   the one call every signed-in screen depends on. So a 401 there was handed straight back, the app

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
+import { invalidatePublicCounts } from "./counts";
 import { ApiError, readDetail } from "./http";
 
 /**
@@ -98,8 +99,17 @@ export function useOrgJobMutations(orgSlug: string) {
   const qc = useQueryClient();
   // Jobs are a list, not one aggregate, so invalidate rather than replace: a
   // publish changes `status` on one row and nothing else on the page.
-  const refresh = () =>
-    qc.invalidateQueries({ queryKey: ["org-jobs", orgSlug] });
+  //
+  // The public counts go with it. Every mutation here can change how many
+  // vacancies the catalogue holds -- create and delete obviously, publish and
+  // unpublish because the count is of published rows, close and reopen because
+  // `open_job()` excludes a closed one -- and until this line none of them told
+  // the homepage. An employer published a vacancy, went back to the front page
+  // and was shown the figure fetched before they did it.
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["org-jobs", orgSlug] });
+    invalidatePublicCounts(qc);
+  };
 
   const create = useMutation({
     mutationFn: async (body: JobPayload) => {
@@ -264,8 +274,11 @@ export function useOrgInterests(orgSlug: string | null) {
 
 export function useOrgCourseMutations(orgSlug: string) {
   const qc = useQueryClient();
-  const refresh = () =>
-    qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+  // The public counts go with it, for the reason the job mutations above give.
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+    invalidatePublicCounts(qc);
+  };
 
   const create = useMutation({
     mutationFn: async (body: CoursePayload) => {

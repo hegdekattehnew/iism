@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui";
 import { api, type ComponentHealth } from "@/lib/api";
+import { SKILL_COUNT } from "@/lib/counts";
 
 const POLL_MS = 5000;
 const SETTLED = ["complete", "not_found"];
@@ -76,7 +77,7 @@ export function SystemStatus() {
   });
 
   const skills = useQuery({
-    queryKey: ["skill-count"],
+    queryKey: SKILL_COUNT,
     queryFn: async () => (await api.GET("/skills/count")).data ?? null,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 
 import { api } from "@/lib/api";
+import { MARKETPLACE_COUNTS, SKILL_COUNT } from "@/lib/counts";
 
 type Kind = "skills" | "jobs" | "courses";
 
@@ -12,13 +13,13 @@ type Kind = "skills" | "jobs" | "courses";
 export function LiveCount({ kind }: { kind: Kind }) {
   const locale = useLocale();
   const skills = useQuery({
-    queryKey: ["skill-count"],
+    queryKey: SKILL_COUNT,
     queryFn: async () => (await api.GET("/skills/count")).data ?? null,
     enabled: kind === "skills",
   });
 
   const marketplace = useQuery({
-    queryKey: ["marketplace-counts"],
+    queryKey: MARKETPLACE_COUNTS,
     queryFn: async () => (await api.GET("/marketplace/counts")).data ?? null,
     enabled: kind !== "skills",
   });
