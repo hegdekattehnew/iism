@@ -595,12 +595,22 @@ class TestOrganisationProfile:
         a candidate reads it as ours."""
         headers, slug = await _register_org(client, "Unverified Clinic")
 
+        # Every shape the badge now has. `is_verified` is derived from
+        # `verified_at` since Sprint 28, so a test naming only the old boolean
+        # would guard a column that no longer exists.
         await client.put(
             f"/org/{slug}",
             headers=headers,
-            json={"name": "Unverified Clinic", "is_verified": True},
+            json={
+                "name": "Unverified Clinic",
+                "is_verified": True,
+                "verified_at": "2026-01-01T00:00:00Z",
+                "verified_by": str(uuid.uuid4()),
+                "verification_note": "we verified ourselves, thank you",
+            },
         )
-        assert (await client.get(f"/org/{slug}", headers=headers)).json()["is_verified"] is False
+        body = (await client.get(f"/org/{slug}", headers=headers)).json()
+        assert body["is_verified"] is False
 
     async def test_the_contact_address_stays_off_the_public_listing(
         self, client: AsyncClient, seeded_skill_slug: str

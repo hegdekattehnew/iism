@@ -18,6 +18,8 @@
 > - **ADR-005, ADR-007** — extended by ADR-036 (skill-based versus behavioural, and when a
 >   model may be called).
 > - **ADR-021** — qualified by ADR-033 for Hindi-language search.
+> - **ADR-039** — extended by ADR-042. Role-derived permission stands for everything scoped to a
+>   tenant; ADR-042 adds a second authority that no membership can grant.
 > - **ADR-003** — qualified by ADR-034. Its rejection of a second store for *vector search* stands
 >   and pgvector is unchanged; ADR-034 adds a document store for *source data* only.
 
@@ -1415,3 +1417,95 @@ somebody translates something, and the sparse case is the case.
   Indian framework (ADR-004/024) and the matching engine scores against it. A market outside India
   needs its own qualification framework mapped in; a translated interface is not that, and must not
   be mistaken for it.
+
+## ADR-042: Operator Authority — global, flag-granted, outside the tenant model
+
+**Status:** Accepted (September 2026). **Extends ADR-039**, which stands unchanged for everything
+scoped to a tenant.
+
+**Context:** ADR-039 answers *where does authority come from* with one answer — membership role —
+and every mechanism it describes is scoped to one organisation. `require()` reads an `{org_slug}`
+from the path, `_context_for` resolves a `Membership`, and `TenantContext` carries a tenant that
+every org-scoped query filters on. There is no expression in that model for authority that belongs
+to nobody's organisation.
+
+`tenants.is_verified` has existed since Sprint 12 carrying a comment that it is *"set by an
+operator, never by the organisation"*, and **has had no writer for sixteen sprints**. Verified
+against the tree before this was written: a column definition, a read on `TenantOut`, a read in the
+interface, migration 0016's DDL, and a test asserting it cannot be written through `OrganisationIn`.
+A marketplace whose verified badge nobody can grant has no verified organisations — and a
+self-asserted badge would be worse than none, because a candidate reads it as ours.
+
+There is no operator concept of any kind in the product. No `is_staff`, no admin router, and
+"admin" in this codebase means a tenant membership role. That absence is what ends here, and how it
+ends determines whether the product acquires a privilege-escalation path along with a back office.
+
+**Decision:**
+
+1. **A second authority, in the same vocabulary.** Callers ask for a `Permission`, never for a flag
+   — ADR-022's rule kept verbatim, for the reason it gives: when operator authority stops being a
+   boolean, the change is to how the set is computed and not to any route. Operator permissions are
+   members of the same closed `StrEnum`, prefixed `OPS_`, granted by `users.is_staff` and by nothing
+   else. **`ROLE_PERMISSIONS` never contains one** — an organisation's owner must never be able to
+   verify their own organisation — and a test asserts the two sets are disjoint.
+
+2. **Two dependencies, not one.** `require()` resolves a tenant from the path;
+   `require_operator()` resolves only the caller and returns an `OperatorContext` with no tenant on
+   it. Widening `TenantContext` with a nullable tenant would make "every org-scoped query filters on
+   `context.tenant.id`" conditional at every existing call site, and a `None` there aims a footgun
+   at exactly the queries that must never be unfiltered.
+
+3. **The flag has no writer over HTTP, in this or any later revision.** It is set by
+   `scripts/grant_staff.py`, which needs database credentials — a capability strictly greater than
+   anything the API grants — and which refuses to create an account it cannot find. There is no
+   "manage operators" endpoint and no operator-only route that grants operator status. **A back
+   office whose first feature is its own escalation path is the failure this clause prevents.**
+
+4. **404 to a non-operator, and the body is byte-identical to an unrouted path.** ADR-039's
+   enumeration argument does not carry — there is one back office and its path is not guessable —
+   but its second half generalises. The rule covering both: **403 only where the caller has already
+   established standing in the thing they are being refused; 404 otherwise.** A non-member of an
+   organisation has proved no standing, and neither has a non-operator. A different `detail` string
+   is an oracle, and this product has shipped one of those already (ADR-038).
+
+5. **The operator routes mount in every environment.** The demonstration console is guarded because
+   it is *unauthenticated*, not because it is non-production. Verification is a production activity,
+   and a badge grantable only on a laptop is the absent writer in a new costume.
+
+6. **Provenance is not optional, and the badge is derived from it.** `tenants.is_verified` is
+   dropped; `is_verified` becomes `verified_at IS NOT NULL`. A CHECK pairs `verified_at` with an
+   actor and a non-blank note, so a badge without evidence is **not representable** rather than
+   merely constrained. Every decision appends a row to `tenant_verification_events`, and
+   **revocation is a new row, never a mutation**.
+
+**Consequences:**
+
+- **The audit trail is not in analytics, and cannot be.** `purge_expired` deletes events past a
+  retention age and `record()` swallows its own failures — both correct for measurement, both
+  disqualifying for a record that must survive and must fail loudly.
+- **Dropping the boolean is free only in the sprint that adds the writer.** Nothing had ever written
+  it, so no row could disagree with the timestamp and the migration could not lose information.
+  Every later sprint would have made the same refactor a data audit.
+- **Deleting an organisation deletes its verification history**, explicitly in
+  `privacy/_delete_tenant` rather than by cascade alone — that module's own rule. The organisation is
+  the *subject* of the record, so once it is gone the row identifies nobody and holding it is data
+  kept without a purpose. The consequence is real and is not solved here: an organisation can be
+  verified, misbehave, delete itself and re-register under the same name, because the duplicate-name
+  guard is per account. Closing that needs a tombstone surviving erasure, which is a fresh
+  data-protection decision.
+- **An operator's own erasure nulls `verified_by`** and the history then reads "a former operator".
+  Copying the address into the log to keep the name would recreate the one row in this product that
+  stores somebody else's address.
+- **`is_staff` appears on `/auth/me` and in the operator's own data-subject export. A verification
+  decision appears in nobody's.** It is a record about an organisation; putting it in an operator's
+  export would export the organisation's file, not theirs. The invitation precedent — your own act
+  is yours to see — does not transfer, because an invitation's other party is a person you named.
+- **Nothing tells an organisation its badge changed until a notification template lands.**
+  Revocation is silent in the first slice. That is a gap, recorded as one, not a design.
+- **The enum grows by need.** A second operator action is two members and a route, not a new model.
+  When authority stops being a boolean — an operator who may verify but not suspend —
+  `OPERATOR_PERMISSIONS` becomes a function of the user and no route changes. That is ADR-012's ABAC
+  promise, kept on the operator side too.
+- **A route that forgets the dependency is the residual risk**, exactly as three of eight publishing
+  writes once shipped without their second guard (ADR-039). It is pinned by reading the app's own
+  route table, not by remembering.

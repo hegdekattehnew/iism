@@ -28,8 +28,8 @@ has been wrong before, and §10 explains how.*
   (+ deleting one organisation, a switcher that survives ten, and the homepage
   counts — reported and fixed 2026-09-23) |
 | **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
-| **Tests** | 598 backend (`make check`), 217 web (`cd web && npm test`) |
-| **Migrations** | head `0027`; 41 ADRs |
+| **Tests** | 628 backend (`make check`), 217 web (`cd web && npm test`) |
+| **Migrations** | head `0028`; 42 ADRs |
 | **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -1006,8 +1006,42 @@ pages and the golden-set expansion.
 - 606 backend tests (was 598). Non-vacuity: neutering the state filter fails six of the seven new
   tests; reverting the change-guard fails the seventh on `assert 1 == 0`.
 
-**Still to do in Sprint 28:** ADR-042 (operator authority), migration 0028, `api/modules/operations/`
-and its three routes, `scripts/grant_staff.py`.
+**The operator surface — done 2026-09-23.** `tenants.is_verified` had existed since Sprint 12 with
+**no writer of any kind**. A marketplace whose verified badge nobody can grant has no verified
+organisations.
+
+- **ADR-042** records a second authority beside ADR-039's: global, granted by `users.is_staff`
+  alone, expressed as `OPS_*` members of the same closed `Permission` enum. `require_operator()`
+  sits beside `require()` and returns an `OperatorContext` with **no tenant on it**.
+  `ROLE_PERMISSIONS` may never hold an `OPS_` member — `owner` is the widest role there is.
+- **No HTTP writer for `is_staff`, ever.** `scripts/grant_staff.py` (`make grant-staff`) is the only
+  one; it needs database credentials, refuses to create an account, and prints the full roster after
+  every run including the dry one.
+- **Migration 0028 dropped `is_verified`** and derives it from `verified_at`. Free only in this
+  sprint: nothing had ever written the boolean, so no row could disagree. `verified_at` +
+  `verified_by` + a ≥10-character `verification_note`, with a CHECK making an unevidenced badge
+  **unrepresentable**. Down-and-up rehearsed; `alembic check` clean.
+- **`tenant_verification_events` is append-only** and revocation is a new row. On revoke the
+  tenant's three columns go NULL, so a revocation's reason survives only in the log — which is why
+  both exist. `_delete_tenant` went from eleven tables to twelve.
+- **Exercised live, not inferred**: granted MedLife through the API and watched `is_verified` flip
+  to true on the public `/jobs` payload for both its vacancies; granted Apollo Care and read
+  **"Verified"** on `/en/employer/apollo-care-hospitals/settings` in the browser; revoked it and
+  read **"Not yet verified"**. Anonymous 401, non-staff 404 with a body byte-identical to
+  `/ops/nonsense`, operator 200 on the same URL.
+- **`hiring@apollo-care.example` is now an operator** on the dev database, and the verification
+  events from those demonstrations are still there — they are append-only by design, so deleting
+  them to tidy up would contradict the thing being demonstrated.
+- 628 backend tests (was 606). Four probes: removing a route's guard fails four tests including the
+  route walk; letting `_OWNER` reach `OPS_ORG_VERIFY` fails the disjointness test; removing the
+  CHECK **from migration 0028** fails the database test (removing it from the model does not — the
+  test database is built from migrations, which is the point).
+- **A finding worth keeping**: this FastAPI keeps included routers nested, so `app.routes` holds
+  `_IncludedRouter` objects and exactly two bare `APIRoute`s. The first route-guard test found zero
+  `/ops` routes and **failed on its own anti-vacuity assertion** rather than passing against an
+  unguarded back office.
+
+**Still to do in Sprint 28:** nothing. Sprint 29 carries the `/admin` pages and the golden set.
 
 ### Sprint 28 — the monetisation ADR, and a payment adapter port (next)
 
@@ -1036,7 +1070,7 @@ decision, not the code.
 - **SMS, which is what job alerts actually need.** Sprint 27 shipped in-app plus email; 39 of 40
   candidates are phone-only, so most alerts land only when somebody opens the site. This is
   blocked on DLT registration, not on design.
-- **`is_verified` still has no writer** — no admin module, no staff flag, no back-office route.
+- ~~**`is_verified` still has no writer.**~~ **Closed 2026-09-23 (Sprint 28)**: `users.is_staff`, `/ops/*` and `make grant-staff`. See the Sprint 28 entry above.
 
 ### The three pillars, and where each actually stands
 
@@ -1075,9 +1109,10 @@ does), then course checkout, then gig as its own module.
 - **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting; the
   plan called for 50–100. Sprint 23 added a scoring component and had to lean on unit tests instead.
   This is the cheapest way to make every later scoring change safe.
-- **`is_verified` has no writer** — a marketplace whose verified badge nobody can grant has no
-  verified organisations. There is no operator surface of any kind: no admin module, no staff flag,
-  no back-office route.
+- ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** The API half is done —
+  `users.is_staff`, `/ops/*`, `make grant-staff`, ADR-042. **The `/admin` pages are Sprint 29**;
+  until they land an operator uses `/docs` or `curl`, which is fine for a handful of internal
+  people and is why the UI was the half that could be cut.
 - **CV upload and LLM extraction.** Deferred in Sprint 23 after establishing that it fills
   experiences and education, which no scorer reads, and needs multipart, object storage, a documents
   table, PDF/DOCX extraction, AES-256-GCM with KMS (ADR-023) and an `LLMProvider` adapter (ADR-031)
@@ -1128,8 +1163,9 @@ does), then course checkout, then gig as its own module.
 - **Fonts cost 47 KB on an English page and 166 KB on a Hindi one**, measured against a production
   build. That is the price of Hindi rendering the same on every platform; it is worth it, and it
   should be said out loud rather than discovered.
-- **`is_verified` still has no writer**, so anybody may create an organisation under any name. The
-  duplicate guard added this sprint is per account, not global — two accounts may still both
+- **`is_verified` had no writer until Sprint 28**, so anybody may create an organisation under any
+  name and nothing vouched for it. The duplicate guard added this sprint is per account, not
+  global — two accounts may still both
   create "Apollo Care", which is correct (two employers may share a name) and is *not* a substitute
   for verification.
 
@@ -1293,10 +1329,11 @@ grievance officer is not yet named** — rate limiting, and security headers.
 5. **ADR-019 observability is unbuilt.** No OpenTelemetry, no Prometheus, no Grafana; structlog
    and `/health/deep` are the whole story. Adequate for one laptop, not for diagnosing a customer's
    report.
-6. **`is_verified` has no writer.** Deliberate — it is an operator decision and absent from
-   `OrganisationIn` so no request shape can set it — but "deliberate seam" and "shipped feature"
-   are different things, and a marketplace whose verified badge nobody can grant has no verified
-   organisations.
+6. ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** `users.is_staff`,
+   `/ops/*` and `make grant-staff` (ADR-042). It is still absent from `OrganisationIn` — no request
+   shape can set it, and none can set `is_staff` either. What remains for a pilot is the `/admin`
+   pages (Sprint 29) and a notification when a badge changes, **so a revocation is currently
+   silent**.
 7. **No teammate invitations — now Sprint 25 (§11).** `Membership.role` supports owner/admin/member
    and the permission model reads it (ADR-039), but the only way to gain a membership is to create
    the organisation, so `admin` and `member` are unreachable. One person per organisation, in a

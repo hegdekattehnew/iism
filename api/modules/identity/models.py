@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    ColumnElement,
     DateTime,
     ForeignKey,
     Index,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base, one_of
@@ -48,6 +50,13 @@ class Tenant(Base):
         # added to the database by hand while this copy lagged, and Alembic does
         # not diff CHECK bodies, so nothing flagged the drift.
         CheckConstraint(one_of("tenant_type", TENANT_TYPES), name="ck_tenants_type"),
+        # A badge carries its evidence or it does not exist. Hand-written in
+        # 0028 as well as here: Alembic does not diff CHECK bodies.
+        CheckConstraint(
+            "verified_at IS NULL OR ("
+            "verified_by IS NOT NULL AND length(btrim(verification_note)) >= 10)",
+            name="ck_tenants_verified_has_evidence",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -65,10 +74,33 @@ class Tenant(Base):
     # not something a job listing should broadcast to scrapers.
     contact_email: Mapped[str | None] = mapped_column(Text, default=None)
 
-    # Set by an operator, never by the organisation. A self-asserted badge is
-    # worse than none, because a candidate reads it as ours. No endpoint writes
-    # it yet; the column exists so the seam is there before anyone needs it.
-    is_verified: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Set by an operator, never by the organisation (ADR-042). A self-asserted
+    # badge is worse than none, because a candidate reads it as ours.
+    #
+    # **`is_verified` is derived, not stored.** It was a bare boolean from
+    # Sprint 12 to Sprint 28 with no writer anywhere, so dropping it lost
+    # nothing -- and a badge whose provenance can be NULL is exactly what the
+    # operator surface exists to prevent. `ck_tenants_verified_has_evidence`
+    # makes the unevidenced badge unrepresentable rather than merely wrong.
+    # timestamptz, not naive: written from application code as UTC, and
+    # `updated_at` below is naive only because 0016 made it so.
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    verified_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    # The operator's evidence, and the reason a candidate can be told the badge
+    # means something. Cleared on revoke -- the *reason* for a revocation lives
+    # in `tenant_verification_events`, which is why both exist.
+    verification_note: Mapped[str | None] = mapped_column(Text, default=None)
+
+    @hybrid_property
+    def is_verified(self) -> bool:
+        return self.verified_at is not None
+
+    @is_verified.inplace.expression
+    @classmethod
+    def _is_verified_expression(cls) -> ColumnElement[bool]:
+        return cls.verified_at.isnot(None)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -112,6 +144,14 @@ class User(Base):
     consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     is_active: Mapped[bool] = mapped_column(default=True)
+
+    # Operator authority (ADR-042). Global, not scoped to any organisation, and
+    # **written by no HTTP route in this product** -- only by
+    # `scripts/grant_staff.py`, which needs database credentials. A back office
+    # whose first feature is its own escalation path is the thing that rule
+    # exists to prevent. A test scans the OpenAPI schema for any request body
+    # carrying this name.
+    is_staff: Mapped[bool] = mapped_column(default=False, server_default="false")
     preferred_locale: Mapped[str] = mapped_column(default="en")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

@@ -75,6 +75,13 @@ class Permission(StrEnum):
     MEMBER_INVITE = "member:invite"
     MEMBER_MANAGE = "member:manage"
 
+    # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
+    # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
+    # thing a role can widen, and an organisation's owner must not be able to
+    # verify their own organisation. A test asserts the two sets are disjoint.
+    OPS_ORG_READ = "ops:org:read"
+    OPS_ORG_VERIFY = "ops:org:verify"
+
 
 # Seeing who else works here is the one thing every member may do. It names
 # colleagues, not candidates: no contact detail, no listing, nothing about
@@ -117,6 +124,15 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "admin": _ADMIN,
     "owner": _OWNER,
 }
+
+# What `users.is_staff` grants, and the only route to an `OPS_` permission
+# (ADR-042). A frozenset rather than a function today; when operator authority
+# stops being a boolean -- somebody who may verify but not suspend -- this
+# becomes a function of the user and **no route changes**, which is the whole
+# reason callers ask for a Permission rather than for the flag (ADR-022).
+OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
+    {Permission.OPS_ORG_READ, Permission.OPS_ORG_VERIFY}
+)
 
 
 @dataclass(frozen=True)
@@ -248,5 +264,67 @@ def require(
                     f"This is for a {expected.replace('_', ' ')} organisation",
                 )
         return context
+
+    return dependency
+
+
+@dataclass(frozen=True)
+class OperatorContext:
+    """Who is acting, and what they may do. **There is no tenant.**
+
+    Frozen for the reason `TenantContext` is, and separate from it for a
+    different one: `require()`'s contract is that every org-scoped query filters
+    on `context.tenant.id`. A nullable tenant there would make that invariant
+    conditional at every existing call site, and a `None` would be aimed at
+    exactly the queries that must never be unfiltered.
+    """
+
+    user: "User"
+    permissions: frozenset[Permission]
+
+    def allows(self, permission: Permission) -> bool:
+        return permission in self.permissions
+
+
+def require_operator(
+    permission: Permission,
+) -> Callable[..., Coroutine[Any, Any, OperatorContext]]:
+    """A dependency granting one operator permission. No path parameter (ADR-042).
+
+    Operator authority belongs to nobody's organisation, so there is no slug to
+    resolve and no membership to read -- only `users.is_staff`, which **no HTTP
+    route anywhere in this product writes**. It is set by
+    `scripts/grant_staff.py`, which needs database credentials: a capability
+    strictly greater than anything the API grants.
+
+    **404, not 403**, and with FastAPI's own wording. ADR-039's enumeration
+    argument does not carry here -- there is one back office and its path is not
+    guessable -- but its other half does: a 403 acknowledges standing the caller
+    has already proved, and a non-operator has proved none. A 403 would tell
+    somebody poking at `/ops` that they had found the back office and that one
+    flag on their row was all that stood in the way. A *different* detail string
+    would be just as good an oracle, so the body matches an unrouted path
+    exactly and a test compares the two.
+    """
+    if permission not in OPERATOR_PERMISSIONS:
+        # At import time, not per request. A route asking for JOB_PUBLISH here
+        # would otherwise 404 for ever and read as a missing route rather than
+        # as a mistake; the app refusing to boot is the honest answer.
+        raise ValueError(f"{permission.value} is not an operator permission")
+
+    async def dependency(user: "User" = Depends(get_current_user)) -> OperatorContext:
+        if not user.is_staff:
+            # Anonymous never reaches here: `get_current_user` has already
+            # answered 401, which is the opposite question and must stay
+            # distinguishable from this one.
+            log.warning("authz.operator_denied", permission=permission.value)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+        if permission not in OPERATOR_PERMISSIONS:  # pragma: no cover - seam for tiers
+            log.warning("authz.operator_permission_denied", permission=permission.value)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+        # Opaque and non-personal, like `tenant_id` above. `user_id` is already
+        # bound by `get_current_user`, so the access line says who acted.
+        structlog.contextvars.bind_contextvars(operator=True)
+        return OperatorContext(user=user, permissions=OPERATOR_PERMISSIONS)
 
     return dependency

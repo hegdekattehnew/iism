@@ -35,6 +35,7 @@ from api.modules.marketplace.models import (
 )
 from api.modules.marketplace.schemas import CandidateProfileFull
 from api.modules.notifications.models import Notification
+from api.modules.operations.models import TenantVerificationEvent
 from api.modules.privacy.schemas import (
     DeletionPreview,
     OrganisationDeletionPreview,
@@ -125,6 +126,18 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     # else's address, so leaving one behind would leave a stranger's mailbox in
     # a table belonging to an organisation that no longer exists.
     await db.execute(delete(Invitation).where(Invitation.tenant_id == tenant_id))
+    # The twelfth table (Sprint 28). **The organisation is the subject of these
+    # rows, not a third party**: once it is gone, "an organisation that no
+    # longer exists was verified on a date" identifies nobody, defends nothing,
+    # and is data kept without a purpose. Explicitly, like everything above.
+    #
+    # The consequence is real and is not solved here: a verified organisation
+    # can misbehave, delete itself and register again under the same name,
+    # because the duplicate-name guard is per account. Closing that needs a
+    # tombstone that survives erasure, which is a fresh DPDP decision.
+    await db.execute(
+        delete(TenantVerificationEvent).where(TenantVerificationEvent.tenant_id == tenant_id)
+    )
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
 

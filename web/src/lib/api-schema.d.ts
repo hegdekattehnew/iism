@@ -1612,6 +1612,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/organisations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verification Queue
+         * @description Organisations awaiting a verification decision, oldest first.
+         */
+        get: operations["verification_queue_ops_organisations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/organisations/{org_slug}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verification Detail
+         * @description The current badge and every decision behind it.
+         */
+        get: operations["verification_detail_ops_organisations__org_slug__verification_get"];
+        put?: never;
+        /**
+         * Decide Verification
+         * @description Grant or revoke, with the evidence.
+         *
+         *     One route rather than two, because they are one decision with two values:
+         *     a second endpoint would carry a second copy of the note and a second way to
+         *     forget it.
+         */
+        post: operations["decide_verification_ops_organisations__org_slug__verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates": {
         parameters: {
             query?: never;
@@ -3495,6 +3543,24 @@ export interface components {
             /** Contact Email */
             contact_email?: string | null;
         };
+        /**
+         * OrganisationVerificationOut
+         * @description The organisation's current badge, and every decision behind it.
+         */
+        OrganisationVerificationOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Is Verified */
+            is_verified: boolean;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Verification Note */
+            verification_note?: string | null;
+            /** History */
+            history: components["schemas"]["VerificationEventOut"][];
+        };
         /** OtpRequest */
         OtpRequest: {
             /** Phone */
@@ -4035,6 +4101,33 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * UnverifiedOrganisation
+         * @description One row of the queue: enough to decide without opening anything else.
+         */
+        UnverifiedOrganisation: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Tenant Type */
+            tenant_type: string;
+            /** City */
+            city?: string | null;
+            /** Website */
+            website?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Jobs */
+            jobs: number;
+            /** Courses */
+            courses: number;
+            /** Members */
+            members: number;
+        };
         /** UserOut */
         UserOut: {
             /**
@@ -4058,6 +4151,11 @@ export interface components {
             consented_at?: string | null;
             /** Preferred Locale */
             preferred_locale: string;
+            /**
+             * Is Staff
+             * @default false
+             */
+            is_staff: boolean;
             /** Memberships */
             memberships?: components["schemas"]["MembershipOut"][];
         };
@@ -4073,6 +4171,42 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerificationEventOut */
+        VerificationEventOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "granted" | "revoked";
+            /** Note */
+            note: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Actor Name */
+            actor_name?: string | null;
+        };
+        /**
+         * VerificationIn
+         * @description Grant or revoke, with the evidence. One route, because they are one
+         *     decision with two values and a second endpoint would duplicate the note.
+         */
+        VerificationIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "granted" | "revoked";
+            /** Note */
+            note: string;
         };
     };
     responses: never;
@@ -7022,6 +7156,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationDeletionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verification_queue_ops_organisations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnverifiedOrganisation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verification_detail_ops_organisations__org_slug__verification_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_verification_ops_organisations__org_slug__verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationVerificationOut"];
                 };
             };
             /** @description Validation Error */

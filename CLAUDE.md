@@ -1036,8 +1036,38 @@ links a second credential, and edits the organisation's public profile.
 - **`contact_email` is deliberately absent from `TenantOut`**, which is embedded in every public
   `JobOut` and `CourseOut`. Anything added to that model is published to whatever scrapes `/jobs`;
   `OrganisationOut` is the members-only view.
-- **`is_verified` is set by an operator, never the organisation.** It is absent from
-  `OrganisationIn`, so no request shape can set it — as are `slug` (a published URL) and
+- **`is_verified` is derived from `verified_at`, and an operator is not a role** (ADR-042).
+  `api/core/authorization.py` now answers two questions, not one: `require()` resolves a tenant from
+  the path, `require_operator()` resolves only the caller and returns an `OperatorContext` **with no
+  tenant on it**. Widening `TenantContext` with a nullable tenant would have made "every org-scoped
+  query filters on `context.tenant.id`" conditional at forty call sites. `OPS_*` permissions are
+  members of the same closed enum — ask for a Permission, never for the flag — and
+  **`ROLE_PERMISSIONS` may never contain one**, because `owner` is the widest role there is and an
+  organisation's owner must not be able to verify their own organisation. A test asserts the two
+  sets are disjoint, and asserts both are non-empty first.
+- **`users.is_staff` has no writer over HTTP, in this or any later revision.** `scripts/grant_staff.py`
+  is the only one, it needs database credentials, and it **refuses to create an account** — a script
+  that can mint a user *and* make them staff is a one-command account takeover. A test scans the
+  OpenAPI schema for any request body carrying the name, and asserts it **finds** `is_staff` on
+  `UserOut` first, so a rename cannot make it pass by finding nothing anywhere. **A back office
+  whose first feature is its own escalation path is what that rule prevents.**
+- **403 only where the caller has already established standing in the thing they are refused; 404
+  otherwise.** That generalises ADR-038's tenant rule rather than contradicting it. A non-operator
+  gets a 404 whose body is **byte-identical** to an unrouted path — a different `detail` string is
+  as good an oracle as a 403, and this product has shipped one of those before. The test compares
+  the refusal against `/ops/definitely-not-a-route`, and a sibling asserts an operator gets **200 on
+  the same URL**, without which a typo in the path would make every 404 assertion pass for ever.
+- **The back office mounts in every environment.** The *demonstration* console is guarded because it
+  is **unauthenticated**, not because it is non-production. Verifying an organisation is a
+  production activity, and a badge grantable only on a laptop is the absent writer in a new costume.
+- **This FastAPI keeps an included router nested**: `app.routes` holds `_IncludedRouter` objects and
+  only two bare `APIRoute`s, so walking it for `APIRoute` finds almost nothing. Recurse through
+  `route.original_router.routes`. The route-guard test found this the moment it ran, because it
+  asserts the list it walked is **non-empty** before asserting every member is guarded — an empty
+  list satisfies `all()`.
+- **`is_verified` was set by an operator and written by nobody** — for sixteen sprints, until
+  Sprint 28 gave it a writer. It and its three provenance columns are absent from
+  `OrganisationIn`, so no request shape can set them — as are `slug` (a published URL) and
   `tenant_type` (changing it would strand listings already published under it).
 - **`api/core/authorization.py` imports identity's models lazily**, inside `_context_for`, because
   `api/modules/identity/` now imports it back for the organisation routes. Same cycle

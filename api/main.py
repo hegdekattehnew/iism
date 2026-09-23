@@ -44,6 +44,7 @@ from api.modules.marketplace import (
 from api.modules.matching import employer_org_router, mount_employer_console
 from api.modules.matching import router as matching_router
 from api.modules.notifications import router as notifications_router
+from api.modules.operations import router as operations_router
 from api.modules.privacy import org_router as privacy_org_router
 from api.modules.privacy import router as privacy_router
 from api.modules.skills import roles_router
@@ -148,6 +149,12 @@ app.include_router(interests_provider_router)
 app.include_router(notifications_router)
 app.include_router(privacy_router)
 app.include_router(privacy_org_router)
+
+# The back office, and it mounts **everywhere** (ADR-042). The demonstration
+# console below is guarded because it is *unauthenticated*, not because it is
+# non-production -- verifying an organisation is a production activity, and a
+# badge grantable only on a laptop is the absent writer in a new costume.
+app.include_router(operations_router)
 
 app.include_router(employer_org_router)
 

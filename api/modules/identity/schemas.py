@@ -275,6 +275,12 @@ class UserOut(BaseModel):
     consent_version: str | None = None
     consented_at: datetime | None = None
     preferred_locale: str
+    # Operator authority (ADR-042). Read-only and read-only for ever: no
+    # request shape in this product carries this name, and a test scans the
+    # OpenAPI schema to keep it that way. It is here so the interface can offer
+    # the back office to somebody who holds it, and a fact about them that they
+    # are entitled to see in their own export.
+    is_staff: bool = False
     memberships: list[MembershipOut] = Field(default_factory=list)
 
 

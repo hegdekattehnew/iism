@@ -32,6 +32,7 @@ ENTRY_POINTS = [
     "api.modules.marketplace",
     "api.modules.matching",
     "api.modules.notifications",
+    "api.modules.operations",
     "api.modules.privacy",
     "api.modules.skills",
     "api.core.authorization",

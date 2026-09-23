@@ -57,6 +57,10 @@ seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempoten
 	$(NO_TIMEOUT) $(PY) scripts/seed_marketplace.py
 	$(NO_TIMEOUT) $(PY) scripts/seed_candidates.py
 
+.PHONY: grant-staff
+grant-staff: ## Grant operator authority: make grant-staff ADDRESS=ops@example.com [APPLY=1] [REVOKE=1]
+	$(NO_TIMEOUT) $(PY) scripts/grant_staff.py $(ADDRESS) $(if $(REVOKE),--revoke,) $(if $(APPLY),--apply,)
+
 .PHONY: evaluate
 evaluate: ## Score the matcher against the hand-labelled golden set
 	$(NO_TIMEOUT) $(PY) scripts/evaluate_matching.py
