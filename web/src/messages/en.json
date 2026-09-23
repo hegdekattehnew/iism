@@ -713,7 +713,10 @@
     "createErrorCap": "You have created a lot of organisations today. Try again tomorrow.",
     "switchToExisting": "Switch to it",
     "typeEmployerShort": "Employer",
-    "typeProviderShort": "Training provider"
+    "typeProviderShort": "Training provider",
+    "filterPlaceholder": "Filter organisations",
+    "filterLabel": "Filter your organisations",
+    "filterEmpty": "Nothing matched that."
   },
   "orgSettings": {
     "title": "Organisation profile",

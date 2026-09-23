@@ -295,6 +295,14 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   English pages fetching ~80 KB of it. Measured against a production build: an English page requests
   **one** font file (47 KB), a Hindi page **two** (166 KB). `LocaleSwitcher` uses `font-system` for
   the same reason — one `हिंदी` in a dropdown was enough to pull the whole face onto every page.
+- **A control that lists what an account owns has to survive the account that owns a lot.** The
+  context switcher rendered every organisation with no bound: measured at ten, **656px of a 720px
+  laptop screen**, and on the 360x640 phone the open mobile nav came to **1311px — more than twice
+  the screen**, with "Create an organisation" below all of it. Sprint 26 deliberately refused to cap
+  how many organisations one account may hold, so the *control* has to cope. The shape that works:
+  **the list scrolls inside a bounded box, the things that must never be pushed away sit outside
+  it**, a filter appears once there are enough to be worth filtering, and the order is current →
+  recently used → alphabetical. It had **no test file at all**, which is how it got there.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,

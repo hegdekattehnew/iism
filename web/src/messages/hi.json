@@ -713,7 +713,10 @@
     "createErrorCap": "आपने आज बहुत सारे संगठन बनाए हैं। कल फिर कोशिश करें।",
     "switchToExisting": "उस पर जाएँ",
     "typeEmployerShort": "नियोक्ता",
-    "typeProviderShort": "प्रशिक्षण संस्थान"
+    "typeProviderShort": "प्रशिक्षण संस्थान",
+    "filterPlaceholder": "संगठन छाँटें",
+    "filterLabel": "अपने संगठन छाँटें",
+    "filterEmpty": "उससे कुछ मेल नहीं खाया।"
   },
   "orgSettings": {
     "title": "संगठन प्रोफ़ाइल",
