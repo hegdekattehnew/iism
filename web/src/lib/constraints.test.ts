@@ -40,6 +40,17 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/ops/OrganisationReview.tsx",
+    label: "VerificationIn",
+    expect: {
+      // The note is the only record of why a candidate should believe the
+      // badge, so "ok" is not a reason. Written through the shared constants
+      // rather than as literals, because the server's floor and the browser's
+      // must be one number.
+      note: ["minLength={NOTE_MIN}", "maxLength={NOTE_MAX}"],
+    },
+  },
+  {
     file: "components/employer/CourseEditor.tsx",
     label: "CourseIn",
     expect: {

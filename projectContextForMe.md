@@ -27,10 +27,10 @@ has been wrong before, and §10 explains how.*
 | **Last sprint** | 27 — a vacancy that ends, and alerts that reach people
   (+ deleting one organisation, a switcher that survives ten, and the homepage
   counts — reported and fixed 2026-09-23) |
-| **Next sprint** | 28 — the monetisation ADR + payment adapter port (scoped in §11) |
-| **Tests** | 628 backend (`make check`), 217 web (`cd web && npm test`) |
+| **Next sprint** | 30 — the monetisation ADR (now 043) + payment adapter port |
+| **Tests** | 647 backend (`make check`), 234 web (`cd web && npm test`) |
 | **Migrations** | head `0028`; 42 ADRs |
-| **Golden set** | `make evaluate` must print **88 / 45 CAPPED / 86 / 100 / 0** |
+| **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
 **To get running** (Docker must be up; ports are non-default — 5433 / 6380 / 27018):
@@ -1043,13 +1043,57 @@ organisations.
 
 **Still to do in Sprint 28:** nothing. Sprint 29 carries the `/admin` pages and the golden set.
 
-### Sprint 28 — the monetisation ADR, and a payment adapter port (next)
+### Sprint 29 — a back office you can see, and a matcher you can defend (done 2026-09-23)
+
+**The `/admin` pages.** `OperatorOnly` keeps three answers apart that a permission gate usually
+collapses: not-found for a signed-in non-operator (the same answer the API gives), a sign-in prompt
+for somebody signed out, and **nothing at all while the answer is in flight** — the branch that
+rots, because it is invisible on a fast connection and 404s every operator on a slow one. It has
+its own test, and the first version of that test passed against the bug: it asserted the children
+were absent, which is also true when the signed-out prompt is showing. It now asserts the prompt is
+absent too.
+
+- `is_staff` rides on `/auth/me`, so the gate costs no extra request.
+- **The harness was lying about signed-out.** `derived()` returned a populated account regardless of
+  `world.signedIn`, so every signed-out branch was untestable through that seam. Fixed; the whole
+  suite still passed, which says the old behaviour was never load-bearing.
+- Budget unchanged at **672/684 KB** — admin routes are route-local, not in the header or the barrel.
+- Exercised in a browser: granted MedLife through the UI and watched the badge reach the public
+  `/jobs` payload, then withdrew it. **The withdrawal note corrects the grant**: the note I typed
+  when granting claimed a lab licence had been checked and nothing had been, and a false evidence
+  note undermines the one field the whole feature exists for. Both decisions are in the history.
+- `/hi/admin/...` at 360×640: no overflow, dates localised, the operator's own note left in the
+  language they wrote it in.
+
+**The golden set: 5 pairs → 34 pairs, 7 orderings, 16 course expectations.**
+
+- **Nine labels failed on the first run and all nine were mine.** Three claimed
+  `capped_missing_mandatory` for candidates already scoring below 45 (`capped` is
+  `raw > MANDATORY_GAP_CAP`, so it was correctly False — they get `missing_mandatory` now); four
+  named `inventory-clerk-nagpur`, which the seed closes as filled; one ordering was written
+  backwards. The scorer was right every time.
+- **`below_assessed_peer` is gone as a per-pair label**, and the reason is structural rather than an
+  oversight: "ranks below that other candidate" names a *pair*, and a per-pair label has nowhere to
+  put the peer. It lives in `GOLDEN_ORDERINGS` now. The `if/elif` chain gained the `else` it never
+  had, so an unrecognised label fails instead of asserting nothing.
+- **Course recommendation has labelled data for the first time** — ADR-025's precision@5 is about
+  course recommendation, and `courses_closing_gap` had none of any kind. That is one third of
+  Sprint 28's uncitable gate now citable.
+- **`make evaluate` is still not in CI and should not be.** It needs the corpus, which is not in the
+  repository, so a scheduled workflow would be red every morning for a reason nobody could fix.
+  `tests/test_golden_set.py` (19 tests) runs in CI instead and catches both classes of mistake above
+  **statically** — probed by re-introducing each and watching the named test fail.
+- Probes on the scoring run itself: making `self_declared` score like `certified` fails the evidence
+  ordering by name; removing the mandatory cap fails fourteen expectations by name.
+
+### Sprint 30 — the monetisation ADR, and a payment adapter port (next)
 
 Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
 marketplace that also **sells courses** and carries **gig work**, and the honest next step is the
 decision, not the code.
 
-- **Write ADR-042 first, superseding ADR-025.** ADR-025 says "free v1, no billing implementation…
+- **Write ADR-043 first, superseding ADR-025** (042 went to operator authority, which
+  landed first). ADR-025 says "free v1, no billing implementation…
   a successor ADR is required before any billing code is written, **and must cite those metrics**"
   — precision@5 on the golden set, candidate-to-course click-through, provider-reported enrolment
   conversion. Two of the three are still thin (5 golden pairs; click-through joinable only since
@@ -1064,9 +1108,10 @@ decision, not the code.
 
 ### Also outstanding, in rough order
 
-- **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting.
-  It is the cheapest way to make every later scoring change safe, and Sprint 28's ADR has to cite
-  it, so doing it first would make that citation mean something.
+- ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
+  expectations, including the first labelled data course recommendation has ever had. The
+  monetisation ADR can now cite one of ADR-025's three metrics honestly; the other two still need
+  users rather than code.
 - **SMS, which is what job alerts actually need.** Sprint 27 shipped in-app plus email; 39 of 40
   candidates are phone-only, so most alerts land only when somebody opens the site. This is
   blocked on DLT registration, not on design.
@@ -1106,9 +1151,9 @@ does), then course checkout, then gig as its own module.
 
 ### Then, in rough order of value
 
-- **Grow the golden set.** Five labelled pairs catch a regression and cannot defend a weighting; the
-  plan called for 50–100. Sprint 23 added a scoring component and had to lean on unit tests instead.
-  This is the cheapest way to make every later scoring change safe.
+- ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29).** 34 pairs against 20 vacancies, plus
+  orderings and course expectations. Still short of the 50–100 the original plan named, and the
+  remaining gap is labelling effort rather than machinery.
 - ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** The API half is done —
   `users.is_staff`, `/ops/*`, `make grant-staff`, ADR-042. **The `/admin` pages are Sprint 29**;
   until they land an operator uses `/docs` or `curl`, which is fine for a handful of internal
@@ -1331,9 +1376,8 @@ grievance officer is not yet named** — rate limiting, and security headers.
    report.
 6. ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** `users.is_staff`,
    `/ops/*` and `make grant-staff` (ADR-042). It is still absent from `OrganisationIn` — no request
-   shape can set it, and none can set `is_staff` either. What remains for a pilot is the `/admin`
-   pages (Sprint 29) and a notification when a badge changes, **so a revocation is currently
-   silent**.
+   shape can set it, and none can set `is_staff` either. The `/admin` pages landed in Sprint 29. What remains
+   for a pilot is a notification when a badge changes, **so a revocation is currently silent**.
 7. **No teammate invitations — now Sprint 25 (§11).** `Membership.role` supports owner/admin/member
    and the permission model reads it (ADR-039), but the only way to gain a membership is to create
    the organisation, so `admin` and `member` are unreachable. One person per organisation, in a

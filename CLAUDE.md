@@ -384,6 +384,26 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   decided the person was signed out, and a thirty-day refresh token sat unused: a whole day of API
   logs contained **zero** calls to `/auth/refresh`. `shouldTryRefresh()` now compares exact
   pathnames against a named list, and `lib/api.test.ts` pins it.
+- **A golden set's labels must be derivable from the inputs, never from what the scorer answers.**
+  Sprint 29 took it from five pairs to 34 pairs, 7 orderings and 16 course expectations, and every
+  label is either a coverage fact computable from `CANDIDATES` and `JOBS` without scoring anything,
+  or an ordering the scorer's own documentation promises. Recording the scorer's output would
+  measure the tuning and would agree with a broken scorer. **Nine labels failed on the first run and
+  all nine were wrong, not the scorer** — which is the outcome to want.
+- **`capped_missing_mandatory` and `missing_mandatory` are not the same claim.** `capped` is
+  `raw > MANDATORY_GAP_CAP` in `scoring.py`, so it is true only for somebody who would otherwise
+  have scored *above* 45. A candidate already at 39 is missing a mandatory standard and was never
+  capped; asserting the flag there asserts the wrong thing.
+- **Never label a vacancy the seed closes.** `scripts/seed_marketplace.py` closes
+  `inventory-clerk-nagpur` as filled on every run and `match_job_by_slug` filters on `open_job()`,
+  so four labels naming it could not be evaluated at all — they reported "job not found" rather
+  than failing on their own terms.
+- **`make evaluate` cannot run in CI, and a nightly workflow would be worse than none.** It needs
+  the 21,303-standard corpus, which lives in MongoDB and is not in the repository;
+  `tests/fixtures/nsqf_sample.json` holds nine invented codes and none of the thirty-five the seed
+  maps onto. A build that is red every morning for a reason nobody can fix from CI teaches people
+  to ignore red builds. **`tests/test_golden_set.py` runs instead** — it checks everything about the
+  set that is true without a scorer, and it catches both mistakes above statically.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,

@@ -463,15 +463,160 @@ COURSE_INTERESTS: list[tuple[str, str, str]] = [
     ("+919000000020", "cash-and-cod-handling", "withdrawn"),
 ]
 
+# ----------------------------------------------------------- the golden set
+#
+# Expanded from five pairs in Sprint 29. Five caught a regression and could not
+# defend a weighting: seventeen of the twenty seeded vacancies were unlabelled,
+# and `courses_closing_gap` -- which is what ADR-025's precision@5 is actually
+# about -- had no labelled data of any kind.
+#
+# **Every label is derived from the inputs and a stated rule, never from what
+# the scorer currently answers.** A golden set written by recording the
+# scorer's output measures the tuning rather than the behaviour, and would
+# agree with a broken scorer. What is asserted here is either (a) a fact about
+# coverage that can be computed from `CANDIDATES` and `JOBS` without scoring
+# anything, or (b) an ordering the scorer's own documentation promises.
+#
+# `below_assessed_peer` is gone as a per-pair label. It never had a handler in
+# `evaluate_matching.py` -- three arms, no `else` -- and the reason is
+# structural rather than an oversight: "ranks below that other candidate" is a
+# claim about a *pair of candidates*, and a per-pair label has nowhere to name
+# the peer. It lives in `GOLDEN_ORDERINGS` now, where it can.
+
 GOLDEN_PAIRS: list[tuple[str, str, str]] = [
+    # --- the original five, unchanged in meaning -----------------------------
     ("+919000000001", "general-duty-assistant-chennai", "top"),
     ("+919000000002", "general-duty-assistant-chennai", "capped_missing_mandatory"),
-    ("+919000000003", "general-duty-assistant-chennai", "below_assessed_peer"),
     ("+919000000004", "cashier-bengaluru", "top"),
     # Holds only a laboratory standard. Genuinely matches the lab technician
     # job -- so the expectation is not "no matches", it is that a job sharing
     # nothing with the profile never appears.
     ("+919000000005", "general-duty-assistant-chennai", "not_ranked"),
+    ("+919000000005", "cashier-bengaluru", "not_ranked"),
+    # --- holds every mandatory standard, and by a clear margin over their own
+    #     second-best vacancy. `top` is only claimed where the coverage gap is
+    #     wide enough that no plausible weighting reorders them.
+    ("+919000000006", "ward-boy-chennai", "top"),
+    ("+919000000008", "icu-attendant-pune", "top"),
+    ("+919000000010", "home-care-attendant-pune", "top"),
+    ("+919000000011", "cssd-technician-chennai", "top"),
+    ("+919000000012", "phlebotomist-hyderabad", "top"),
+    ("+919000000014", "lab-technician-hyderabad", "top"),
+    ("+919000000015", "staff-nurse-pune", "top"),
+    ("+919000000016", "emergency-room-assistant-pune", "top"),
+    ("+919000000018", "store-supervisor-bengaluru", "top"),
+    ("+919000000020", "delivery-associate-nagpur", "top"),
+    # --- fully covered, but their two best vacancies are genuinely close, so
+    #     the defensible claim is that it ranks at all, not that it ranks first.
+    #     Over-claiming here is how a golden set starts failing on improvements.
+    ("+919000000017", "hospital-receptionist-pune", "ranked"),
+    ("+919000000017", "telecaller-bengaluru", "ranked"),
+    ("+919000000003", "general-duty-assistant-chennai", "ranked"),
+    # --- missing at least one mandatory standard. Two labels, because the
+    #     rule has two halves. `capped_missing_mandatory` says the cap **bound**
+    #     -- `capped = raw > MANDATORY_GAP_CAP` in `scoring.py`, so it is only
+    #     true for somebody who would otherwise have scored above 45.
+    #     `missing_mandatory` says only that the ceiling holds, which is the
+    #     claim that survives for a candidate already below it. Three of these
+    #     were labelled `capped_missing_mandatory` on the first run and the
+    #     suite correctly refused them.
+    ("+919000000001", "icu-attendant-pune", "capped_missing_mandatory"),
+    ("+919000000003", "icu-attendant-pune", "capped_missing_mandatory"),
+    ("+919000000005", "lab-technician-hyderabad", "missing_mandatory"),
+    ("+919000000007", "ward-boy-chennai", "capped_missing_mandatory"),
+    ("+919000000009", "icu-attendant-pune", "capped_missing_mandatory"),
+    ("+919000000010", "general-duty-assistant-chennai", "capped_missing_mandatory"),
+    ("+919000000011", "ward-boy-chennai", "capped_missing_mandatory"),
+    ("+919000000012", "lab-technician-hyderabad", "capped_missing_mandatory"),
+    ("+919000000013", "phlebotomist-hyderabad", "capped_missing_mandatory"),
+    ("+919000000014", "phlebotomist-hyderabad", "capped_missing_mandatory"),
+    ("+919000000015", "ecg-technician-chennai", "missing_mandatory"),
+    ("+919000000016", "ward-boy-chennai", "missing_mandatory"),
+    ("+919000000019", "warehouse-assistant-nagpur", "capped_missing_mandatory"),
+    ("+919000000002", "home-care-attendant-pune", "capped_missing_mandatory"),
+    ("+919000000006", "nursing-apprentice-chennai", "capped_missing_mandatory"),
+    ("+919000000007", "visual-merchandiser-mumbai", "capped_missing_mandatory"),
+]
+
+# (better, worse, job, why). **This is what a golden set can actually defend**:
+# an ordering survives a weighting change, an absolute score does not.
+GOLDEN_ORDERINGS: list[tuple[str, str, str, str]] = [
+    (
+        "+919000000001",
+        "+919000000002",
+        "general-duty-assistant-chennai",
+        "holding every mandatory standard must outrank missing one",
+    ),
+    (
+        "+919000000001",
+        "+919000000003",
+        "general-duty-assistant-chennai",
+        "assessed and certified evidence must outrank the same standards self-declared",
+    ),
+    (
+        "+919000000008",
+        "+919000000009",
+        "icu-attendant-pune",
+        "holding every mandatory standard must outrank missing one",
+    ),
+    (
+        "+919000000006",
+        "+919000000007",
+        "ward-boy-chennai",
+        "holding every mandatory standard must outrank missing one",
+    ),
+    (
+        "+919000000012",
+        "+919000000013",
+        "phlebotomist-hyderabad",
+        "holding every mandatory standard must outrank missing one",
+    ),
+    (
+        "+919000000014",
+        "+919000000012",
+        "lab-technician-hyderabad",
+        "full coverage must outrank two missing mandatory standards",
+    ),
+    (
+        "+919000000011",
+        "+919000000016",
+        "ward-boy-chennai",
+        "two candidates both short of the same vacancy still order by coverage",
+    ),
+]
+
+# (phone, job, expectation) for `courses_closing_gap` -- the first labelled
+# data this product has ever had for course recommendation, which is the metric
+# ADR-025 names and Sprint 28 found uncitable.
+#
+# `closes_mandatory` is the rule the function's own sort promises: "a course
+# that unblocks an application beats one that merely improves a score". It is
+# checkable because Sprint 22.5 made every mandatory standard across the twenty
+# vacancies teachable by at least one seeded course.
+GOLDEN_COURSE_PAIRS: list[tuple[str, str, str]] = [
+    ("+919000000002", "general-duty-assistant-chennai", "closes_mandatory"),
+    ("+919000000002", "general-duty-assistant-chennai", "suggests:infection-control-in-hospitals"),
+    ("+919000000007", "ward-boy-chennai", "closes_mandatory"),
+    ("+919000000007", "ward-boy-chennai", "suggests:biomedical-waste-management"),
+    ("+919000000009", "icu-attendant-pune", "closes_mandatory"),
+    ("+919000000009", "icu-attendant-pune", "suggests:critical-care-support-skills"),
+    ("+919000000013", "phlebotomist-hyderabad", "closes_mandatory"),
+    ("+919000000019", "warehouse-assistant-nagpur", "closes_mandatory"),
+    ("+919000000019", "warehouse-assistant-nagpur", "suggests:warehouse-goods-handling"),
+    ("+919000000010", "general-duty-assistant-chennai", "closes_mandatory"),
+    ("+919000000011", "ward-boy-chennai", "closes_mandatory"),
+    ("+919000000012", "lab-technician-hyderabad", "closes_mandatory"),
+    ("+919000000015", "ecg-technician-chennai", "closes_mandatory"),
+    ("+919000000016", "ward-boy-chennai", "closes_mandatory"),
+    # `inventory-clerk-nagpur` is deliberately absent from all three tables:
+    # the seed closes it as filled on every run, and `match_job_by_slug` uses
+    # `open_job()`, so a label against it can never be evaluated. A golden set
+    # must not name a vacancy the product has retired.
+    #
+    # No gap at all, so there is nothing to suggest. The case a recommender
+    # gets wrong by recommending something anyway.
+    ("+919000000008", "icu-attendant-pune", "no_suggestions"),
+    ("+919000000012", "phlebotomist-hyderabad", "no_suggestions"),
 ]
 
 

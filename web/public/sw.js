@@ -41,6 +41,12 @@ const DENY = [
   "/signin",
   // Sprint 20: the account page shows consent and deletion state.
   "/account",
+  // Sprint 29: the back office. `/ops` is the API and `/admin` the pages.
+  // A cached verification queue on a shared laptop is a list of organisations
+  // under review, and a cached decision is one an operator cannot see they
+  // have already made.
+  "/ops/",
+  "/admin",
 ];
 
 // Public taxonomy and marketplace reads. Slow-moving, identical for everyone,
