@@ -27,6 +27,7 @@ from sqlalchemy import delete, select
 
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.applications.models import Application
+from api.modules.geography import resolve_location
 from api.modules.identity.models import User
 from api.modules.identity.service import provision_candidate
 from api.modules.interests.models import CourseInterest
@@ -601,6 +602,13 @@ async def main() -> None:
             profile.headline = headline
             profile.location_state = state
             profile.location_district = district
+            # Sprint 15 taught this to `seed_marketplace.py` and not to this
+            # file. Nothing here resolved geography, so a seeded candidate's
+            # `state_id`/`district_id` came only from `_backfill_geography`
+            # inside `make import-nsqf` -- which the documented order runs
+            # *before* the seed, so the sweep fired before these rows existed.
+            located = await resolve_location(db, state, district)
+            profile.state_id, profile.district_id = located.state_id, located.district_id
             profile.years_experience = years
             await db.flush()
 
@@ -641,7 +649,21 @@ async def main() -> None:
             for title in history["roles"]:
                 db.add(CandidatePreferredRole(profile_id=profile.id, title=title))
             for place in history["locations"]:
-                db.add(CandidatePreferredLocation(profile_id=profile.id, **place))
+                # Resolved here too, and this is the half that was wholly dead:
+                # every one of the twenty seeded preferred locations carried
+                # NULL on both FKs, so `candidate_facts` -- which reads exactly
+                # these two columns -- saw nothing. Sprint 23 gave
+                # `CandidatePreferredLocation` its first reader and the reader
+                # had nothing to read.
+                located = await resolve_location(db, place["state"], place["district"])
+                db.add(
+                    CandidatePreferredLocation(
+                        profile_id=profile.id,
+                        state_id=located.state_id,
+                        district_id=located.district_id,
+                        **place,
+                    )
+                )
             collections_added += 6
             await db.flush()
 

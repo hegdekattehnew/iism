@@ -227,6 +227,30 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   fails. Twelve appeared across 0011 and 0012.
 - **`make check` passing does not mean the import is right.** It passed while `occupations` held
   529 rows instead of 1,811. Compare the import report against independently computed expectations.
+- **A district name is not unique, and `.limit(1)` with no ORDER BY is how that becomes a wrong
+  answer.** Three names in the NSQF master belong to two districts each — Bilaspur (Chhattisgarh /
+  Himachal Pradesh), Hamirpur (Himachal / Uttar Pradesh), Pratapgarh (Rajasthan / Uttar Pradesh) —
+  and `resolve_location` looked one up by name alone while computing, and ignoring, the state
+  beside it. `matching._locality` compares ids and nothing else, so a Himachal vacancy scored 2,
+  "in your district", for somebody in Chhattisgarh. **`PlaceIndex` in
+  `api/modules/geography/service.py` is the one rule**: a resolved state constrains the district, an
+  unconstrained ambiguous name resolves to **nothing**, and the alias is applied *inside* the state
+  filter so it cannot reach across a border either. **No id is better than a wrong one** — the free
+  text sits beside the key and still reads correctly, while a wrong id is a factual claim the data
+  does not support. `("Karnataka", "Pune")` therefore resolves the state and not the district: a
+  contradiction is not a Pune.
+- **A backfill must test whether anything changed, not whether anything resolved.**
+  `_backfill_geography`'s only guard asked "did either half resolve", so every `make import-nsqf`
+  rewrote every job and profile with identical ids — and `updated_at` is an `onupdate` column, so
+  the whole catalogue looked freshly edited after a read-only operation. It reports `(resolved,
+  updated)` now, and the second number is the only way to see the fix hold: two consecutive imports
+  give `updated=20` then `updated=0`, with digests over `(id, state_id, district_id, updated_at)`
+  identical.
+- **`scripts/seed_candidates.py` resolves geography too, and did not until Sprint 28.** Sprint 15
+  taught this to `seed_marketplace.py` and stopped there, so all twenty seeded preferred locations
+  carried NULL on both foreign keys — and `candidate_facts` reads exactly those two columns, which
+  means half of Sprint 23's locality tie-break had **no input at all**. The same probe proves it:
+  clear the twenty and run the seed alone — 20 unresolved before, 0 after.
 - **A model with a cross-module foreign key must import the target module.** SQLAlchemy resolves
   `ForeignKey("districts.id")` against the metadata, so a script importing `marketplace.models`
   without `geography.models` fails at mapper configuration. This bit twice in one sprint —
@@ -931,8 +955,11 @@ it found is more useful than what it deleted.
   needed to fix existed**. A clean `make import-nsqf && make seed` left every seeded job findable
   at `/jobs` and invisible to `match_jobs(state_id=…)`. Proved by clearing the FKs on 11 seeded
   jobs and re-running the seed alone: 11 unresolved before, 1 after.
-- **`DISTRICT_ALIASES` exists twice and now has a test saying so.** The geography service's copy
-  and the importer's, with a comment admitting the duplication and nothing enforcing it.
+- **`DISTRICT_ALIASES` existed twice; there is one copy now.** A test asserted the two maps were
+  identical, which kept the *letters* in step and not the algorithm: the service tried the literal
+  name then the alias, the importer tried both in one expression, and neither constrained by state.
+  Sprint 28 deleted the importer's copy and routed both through `PlaceIndex`. **Duplicating a rule
+  and testing that the data agrees is not the same as having one rule.**
 - **The dev panel moved to `/status`**, which `notFound()`s in production and is linked from
   nowhere. It was rendering unconditionally below the fold on the landing page, captioned "Not part
   of the product surface", over a live Postgres/Redis/worker grid.

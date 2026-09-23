@@ -977,6 +977,38 @@ when they differ.
 No migration: `ix_jobs_status_closed` is on `(status, closed_at)`, so the posted count uses the
 leading column and gets the same index-only scan.
 
+### Sprint 28 — clear the decks (in progress)
+
+The monetisation ADR and payment port are **deferred by the owner**; the gate ADR-025 sets cannot be
+cited honestly yet (five golden pairs, all candidate→job where ADR-025 means course; click-through
+computable since Sprint 24 and computed nowhere; enrolment conversion at zero and deliberately not
+modelled). Scoped as one sprint this came to ~44 files, so it is two — Sprint 29 carries the admin
+pages and the golden-set expansion.
+
+**Geography — done 2026-09-23.**
+
+- **`PlaceIndex` is the one resolution rule**, pure and session-free, with two loaders:
+  `resolve_location` narrows to the names one write could reach, `load_place_index` loads the master
+  for the import sweep. `resolve_location`'s signature is unchanged, so none of its six callers moved.
+- **The importer's private alias map and private lookup are gone.** A test asserting the two maps
+  were identical had kept the letters in step and not the algorithm.
+- **The churn is fixed and measured.** Two consecutive `make import-nsqf` runs:
+  `locations_updated=20` then `locations_updated=0`, with sha256 digests over
+  `(id, state_id, district_id, updated_at)` on `jobs` and `candidate_profiles` **identical before
+  and after both**.
+- **A second defect found while measuring**: `scripts/seed_candidates.py` never resolved geography
+  at all, so all twenty seeded preferred locations carried NULL on both FKs and `candidate_facts` —
+  which reads exactly those columns — saw nothing. Half of Sprint 23's locality tie-break had no
+  input. Fixed the way Sprint 15 fixed the marketplace seed; probed by clearing the twenty and
+  running the seed alone, 20 unresolved before and 0 after.
+- `make evaluate` still prints **88 / 45 CAPPED / 86 / 100 / 0**, bit-identical, which matters
+  because resolving preferred locations changes what the tie-break sees.
+- 606 backend tests (was 598). Non-vacuity: neutering the state filter fails six of the seven new
+  tests; reverting the change-guard fails the seventh on `assert 1 == 0`.
+
+**Still to do in Sprint 28:** ADR-042 (operator authority), migration 0028, `api/modules/operations/`
+and its three routes, `scripts/grant_staff.py`.
+
 ### Sprint 28 — the monetisation ADR, and a payment adapter port (next)
 
 Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
@@ -1103,12 +1135,9 @@ does), then course checkout, then gig as its own module.
 
 ### In flight, not on the branch
 
-**The geography fix** is uncommitted in a worktree at `.claude/worktrees/angry-jackson-46292c`
-(branch `claude/angry-jackson-46292c`): six modified files that constrain an ambiguous district name
-to its resolved state and stop every NSQF import rewriting every profile's `updated_at`. Three
-district names exist in two states each (Pratapgarh, Hamirpur, Bilaspur), and Sprint 23's locality
-tie-break can therefore call a Himachal vacancy "in your district" for somebody in Chhattisgarh.
-Either finish it there or carry the diff onto a fresh branch.
+*Nothing. The geography fix that sat here for five sprints landed in Sprint 28, rewritten against
+current code rather than carried from the stale worktree — see the Sprint 28 entry above. The
+`claude/angry-jackson-46292c` worktree and branch are deleted.*
 
 ## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 
@@ -1222,9 +1251,11 @@ the logs. CORS is restricted to one origin.
   twins are near-identical reissues differing only by code and level. Sprint 24's search cards name
   the qualification, body and code and flag lookalikes; nothing can make two identically-named
   standards meaningfully distinguishable when the source itself does not distinguish them.
-- **Three district names exist in two states each** (Pratapgarh, Hamirpur, Bilaspur) and resolve
-  arbitrarily, so Sprint 23's locality tie-break can call a Himachal vacancy "in your district" for
-  somebody in Chhattisgarh. A fix is written but uncommitted — see §11, "In flight".
+- ~~**Three district names exist in two states each** (Pratapgarh, Hamirpur, Bilaspur) and resolve
+  arbitrarily.~~ **Closed 2026-09-23 (Sprint 28).** `PlaceIndex` constrains an ambiguous name to its
+  written state and resolves it to nothing when there is no state to choose by. Verified against the
+  imported corpus: exactly three names are ambiguous, and zero live rows held a district outside
+  their resolved state.
 
 ## 13. What it would take to run this for a real customer
 
