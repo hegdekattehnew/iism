@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(41 ADRs). Read it before making any structural decision — the summary below
+(42 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -129,6 +129,12 @@ api/                     FastAPI modular monolith
                          to email about" rule. Nothing depends on it.
     privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
                          Spans every module; nothing depends on it.
+    operations/          The back office (ADR-042): tenant_verification_events, the
+                         verification queue and decision routes, `require_operator()`'s
+                         permissions. A second leaf beside privacy/ -- depends on identity
+                         and marketplace, nothing depends on it. No staff-management
+                         endpoint, ever, by decision; `scripts/grant_staff.py` is the
+                         only writer of `users.is_staff`.
     analytics/           analytics_events (ADR-025). record() COMMITS.
 
     Not built. ADR-008's career_paths/ (graph-based role transition) and

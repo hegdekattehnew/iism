@@ -552,9 +552,9 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-23 (after Sprint 27).* Authored code: `api/` 108 files / 17,152 lines ·
-`scripts/` 8 / 3,690 · `tests/` 30 / 9,544 · `migrations/` 28 / 2,800 · `web/src/` 153 / 14,961
-(excluding the generated client, which is another ~7,000 lines and is never counted here).
+*Refreshed 2026-09-24 (after Sprint 32).* Authored code: `api/` 113 files / 18,597 lines ·
+`scripts/` 9 / 4,056 · `tests/` 35 / 10,813 · `migrations/` 29 / 2,945 · `web/src/` 178 / 18,174
+(excluding the generated client, which is another ~7,523 lines and is never counted here).
 
 ```
 api/                    FastAPI modular monolith
@@ -577,9 +577,12 @@ api/                    FastAPI modular monolith
                         employer.py (the same scorer reversed, batched per employer),
                         schemas, routes. No model client, by ADR-036.
   modules/analytics/    analytics_events (ADR-025). record() commits.
-  modules/geography/    State, District, SubDistrict. Its own module because jobs
-                        and profiles reference it and neither is a skill. No routes
-                        yet -- nothing consumes it over HTTP.
+  modules/geography/    State, District, SubDistrict, plus `PlaceIndex` -- the
+                        state-constrained resolver Sprint 28 gave the service layer
+                        after an ambiguous district name (Bilaspur, Hamirpur,
+                        Pratapgarh) resolved to the wrong state's row. Its own module
+                        because jobs and profiles reference it and neither is a skill.
+                        `GET /geography/states` and `/districts` are its only routes.
   modules/marketplace/  Job, JobSkill, Course, CourseSkill, CandidateProfile + collections;
                         publishing.py (jobs) and course_publishing.py (courses) are siblings,
                         listings.py their shared policy
@@ -607,6 +610,16 @@ api/                    FastAPI modular monolith
                         The row names a recipient by id and never holds an address --
                         that is resolved at send time, so contact stays out of a dumped
                         table and out of every log line (ADR-023).
+  modules/alerts/       Telling a candidate about a vacancy they never went looking for,
+                        and closing one whose date has passed -- both run in the worker,
+                        never a request. Reaches the one scorer through
+                        `matching.candidates_for_job` (ADR-037); no second, looser rule
+                        for "close enough to email about".
+  modules/operations/   The back office (ADR-042, Sprint 28): `tenant_verification_events`,
+                        the verification queue, `require_operator()`'s permissions. A
+                        second leaf beside privacy/ -- depends on identity and marketplace,
+                        nothing depends on it. `scripts/grant_staff.py` is the only writer
+                        of `users.is_staff`, ever, by decision.
   adapters/notifications/  NotificationProvider protocol + console impl
   adapters/nsqf/        base.py       NsqfSource port (6 iterators)
                         documents.py  ALL document parsing, shared by every source
@@ -614,10 +627,13 @@ api/                    FastAPI modular monolith
                         normalise.py  levels, HH:MM, credits, slugs, NCO codes
                         importer.py   phased projection into Postgres
 web/                    Next.js 16 PWA
-  src/app/[locale]/     27 routes, all bilingual: browse (skills, jobs, courses), signin,
+  src/app/[locale]/     39 routes, all bilingual: browse (skills, jobs, courses), signin,
                         signup/[type], profile, matches, account, employer/[org] (+ settings,
-                        candidates/[job]), audience pages, privacy/terms/grievance, status
-                        (local only), error.tsx, not-found.tsx, a catch-all
+                        team, candidates/[job], jobs/[job]/applications,
+                        courses/[course]/interests, interests), admin + admin/[slug] (the
+                        back office, ADR-042), invite/[token], audience pages,
+                        privacy/terms/grievance, status (local only), error.tsx,
+                        not-found.tsx, a catch-all
   src/lib/legal.ts      PRIVACY_NOTICE_VERSION (must match api/core/config.py) + grievance officer
   src/test/harness.tsx  the three mocked seams for Vitest component tests
   src/components/       Header, Hero, HowItWorks, Audiences, BrowsePanels, CtaBand,
@@ -641,11 +657,19 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0020 (application analytics events),
                         0021 (content translations), 0022 (locale base columns),
                         0023 (notification outbox), 0024 (job_role trigram index +
-                        role analytics names), 0025 (course interests + two widened CHECKs)
+                        role analytics names), 0025 (course interests + two widened CHECKs),
+                        0026 (invitations), 0027 (vacancy lifecycle + alerts, `alerted_at`
+                        backfill), 0028 (operator authority: `users.is_staff`, `verified_at`
+                        + evidence CHECK, `tenant_verification_events`)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
-                        retire_legacy_skills.py, seed_candidates.py (demo profiles +
-                        the golden pairs), evaluate_matching.py — all idempotent
+                        retire_legacy_skills.py, seed_candidates.py (demo profiles,
+                        the golden pairs -- 34/7/16 as of Sprint 29), evaluate_matching.py,
+                        grant_staff.py (the only writer of `users.is_staff`; refuses to
+                        create an account it cannot find), clean_fixtures.py (named
+                        fixture slugs only, `--dry-run` by default, never touches an
+                        account) — all idempotent except clean_fixtures and grant_staff,
+                        which are one-shot by design
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 backups/                schema.sql (committed DDL) + README.md (restore paths, drill record).
                         Dumps are encrypted and live in ~/iism-backups, never here.
