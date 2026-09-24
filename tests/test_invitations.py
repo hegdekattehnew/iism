@@ -585,6 +585,39 @@ class TestAnalytics:
             assert row.subject_type == "tenant"
             assert address not in str(row.payload)
 
+    async def test_leaving_is_measured_too_not_only_being_removed(
+        self, client: AsyncClient, db: AsyncSession, owner: tuple[dict[str, str], str]
+    ) -> None:
+        """A departure somebody chose for themselves used to be invisible.
+
+        `member_removed` was recorded by the *route* an owner uses to remove a
+        colleague, and `POST /leave` reaches the same service function by a
+        different handler -- so every self-departure went unmeasured. That is
+        `accept()`'s lesson one table over: the single writer is the only place
+        the measurement can be complete. Sprint 32 moved the record into
+        `remove_member`, which means leaving now records one as well.
+
+        `self` keeps the two apart, the way `job_closed` carries `automatic`.
+        """
+        from api.modules.analytics.models import AnalyticsEvent
+
+        _, slug = owner
+        address = _email("measured-leaver")
+        joiner = await _accept_as_new_account(
+            client, db, await _invite(client, owner, address), address
+        )
+        assert (await client.post(f"/org/{slug}/leave", headers=joiner)).status_code == 204
+
+        rows = (
+            await db.scalars(select(AnalyticsEvent).where(AnalyticsEvent.name == "member_removed"))
+        ).all()
+        assert rows, "leaving recorded nothing"
+        assert any(r.payload == {"self": True} for r in rows)
+        # And it still names the organisation rather than the person.
+        for row in rows:
+            assert row.subject_type == "tenant"
+            assert address not in str(row.payload)
+
 
 # --------------------------------------------------------------------- helpers
 

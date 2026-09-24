@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.modules.geography import resolve_location
+from api.modules.identity.models import User
 from api.modules.marketplace.models import (
     CandidateCertification,
     CandidateEducation,
@@ -98,15 +99,21 @@ async def get_or_create_profile(db: AsyncSession, user_id: uuid.UUID) -> Candida
     return await _load(db, profile.id)
 
 
-async def update_profile(
-    db: AsyncSession, user_id: uuid.UUID, **fields: object
-) -> CandidateProfile:
+async def update_profile(db: AsyncSession, user: User, **fields: object) -> CandidateProfile:
     """Applies only the keys supplied.
 
     Sections save independently, so a payload carrying three fields must not
     null out the fifteen it does not mention.
+
+    **Takes the `User`, not a user id, because one field on this form is not a
+    profile field.** `full_name` belongs to the identity side; the route used to
+    pop it off the payload, set it, and commit -- so saving a name and saving a
+    headline were two transactions, and the first could land while the second
+    failed. One screen, one save, one commit.
     """
-    profile = await get_or_create_profile(db, user_id)
+    if "full_name" in fields:
+        user.full_name = cast(str | None, fields.pop("full_name"))
+    profile = await get_or_create_profile(db, user.id)
     for key, value in fields.items():
         setattr(profile, key, value)
     if _LOCATION_FIELDS & fields.keys():
@@ -269,6 +276,32 @@ async def add_skills_bulk(
             db.add(CandidatePreferredRole(profile_id=profile.id, title=title))
 
     await db.commit()
+
+    # Measured here, after the commit, rather than in the route. `record()`
+    # commits, so calling it while these skills were still uncommitted would
+    # commit them as a side effect -- and a failure inside it would roll them
+    # back and return silently, because `record()` never raises.
+    #
+    # Counts only: which standards somebody holds is a description of them, and
+    # `analytics_events` describes nobody. `from_role` is the whole hypothesis
+    # Sprint 23 set out to measure -- that naming a role beats searching the
+    # standards -- so it is a fact about this write, not a shape of a response.
+    #
+    # Imported inside the function: `analytics` loads its routes, which load
+    # `marketplace.models`, which runs this package's `__init__`.
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "skills_bulk_added",
+        user_id=user_id,
+        payload={
+            "added": added,
+            "updated": updated,
+            # bool(), not `is not None`: an empty title is no title.
+            "from_role": bool(preferred_role_title),
+        },
+    )
     return await _load(db, profile.id), added, updated
 
 

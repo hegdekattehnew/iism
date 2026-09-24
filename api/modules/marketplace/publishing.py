@@ -196,8 +196,43 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
     return await _load(db, job.id)
 
 
+async def _record_for_job(
+    db: AsyncSession,
+    name: str,
+    *,
+    job_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    payload: dict[str, object] | None = None,
+) -> None:
+    """Measure a lifecycle event, subjected to the vacancy and never to a person.
+
+    **After the business commit, never before.** `record()` commits, so calling
+    it while the close was still uncommitted would commit it as a side effect,
+    and a failure inside `record()` would roll it back and return silently.
+
+    Imported inside the function: `analytics` loads routes that load
+    `marketplace.models`, so a module-level import is an ImportError at boot --
+    the cycle `tests/test_import_order.py` exists to catch.
+    """
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        name,
+        user_id=actor_user_id,
+        subject_type="job",
+        subject_id=job_id,
+        payload=payload,
+    )
+
+
 async def close_job(
-    db: AsyncSession, tenant_id: uuid.UUID, slug: str, reason: str = "filled"
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    slug: str,
+    *,
+    actor_user_id: uuid.UUID,
+    reason: str = "filled",
 ) -> Job:
     """Stop taking applications, without taking the vacancy down.
 
@@ -223,10 +258,23 @@ async def close_job(
     await _tell_live_applicants(db, job)
     await db.commit()
     log.info("marketplace.job_closed", slug=slug, reason=reason)
+    # `automatic` is always False on this path and that is not a guess: the two
+    # closures nobody asks for go elsewhere -- `_close_if_filled` in
+    # `applications/employer_service.py` sets the columns itself and records its
+    # own event, and the hourly expiry sweep never reaches this function.
+    await _record_for_job(
+        db,
+        "job_closed",
+        job_id=job.id,
+        actor_user_id=actor_user_id,
+        payload={"reason": reason, "automatic": False},
+    )
     return await _load(db, job.id)
 
 
-async def reopen_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
+async def reopen_job(
+    db: AsyncSession, tenant_id: uuid.UUID, slug: str, *, actor_user_id: uuid.UUID
+) -> Job:
     """Take applications again.
 
     **Clears `closes_at` if it is in the past**, which is not tidiness: leaving
@@ -243,6 +291,7 @@ async def reopen_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
         job.closes_at = None
     await db.commit()
     log.info("marketplace.job_reopened", slug=slug)
+    await _record_for_job(db, "job_reopened", job_id=job.id, actor_user_id=actor_user_id)
     return await _load(db, job.id)
 
 

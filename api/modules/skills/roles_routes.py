@@ -43,19 +43,13 @@ async def role_standards(
     locale: str = Depends(request_locale),
     user: "User | None" = Depends(get_optional_user),
 ) -> schemas.RoleStandards:
-    # Imported here, not at the top. `analytics` loads its routes, which load
-    # `marketplace.models`, which load `skills` -- so a module-level import
-    # would make `skills` and `analytics` each wait on the other at boot. Same
-    # fix `matching` uses for `applications`, for the same reason.
-    from api.modules.analytics import record
-
-    found = await service.standards_for_role(db, slug)
+    found = await service.standards_for_role_viewed(db, slug, user.id if user is not None else None)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Qualification not found")
 
     skills = [s.skill for s in found.standards]
     overrides = await overrides_for(db, "skill", skills, ("name", "description"), locale)
-    out = schemas.RoleStandards(
+    return schemas.RoleStandards(
         slug=found.qp.slug,
         job_role=found.qp.job_role,
         qp_code=found.qp.qp_code,
@@ -75,15 +69,3 @@ async def role_standards(
             for s in found.standards
         ],
     )
-    # Counts only. Which role someone looked at is about the role; the event
-    # carries `user_id` and nothing else that identifies them. `record()`
-    # commits, and this handler has no other uncommitted work.
-    await record(
-        db,
-        "role_suggested",
-        user_id=user.id if user is not None else None,
-        subject_type="qualification",
-        subject_id=found.qp.id,
-        payload={"standards": len(found.standards), "variants": found.variants},
-    )
-    return out

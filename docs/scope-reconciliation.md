@@ -163,8 +163,9 @@ supports:
   plainly and which is the honest caveat on the Hindi-first thesis.
 - Deterministic decides and the model explains (§5.3) — **kept absolutely**: there is no LLM in the
   product at all, so no generated number can reach a score.
-- "No business logic in route handlers" (§8.2) — **84% conformant**; see `CLAUDE.md` for the
-  recorded exceptions.
+- "No business logic in route handlers" (§8.2) — **now fully conformant, and enforced**. The audit
+  that produced this ledger found 17 violations in 107 handlers; Sprint 32 moved every one into its
+  service layer and `tests/test_route_delegation.py` fails on the next one.
 - Every external system behind an adapter (§8.2) — **kept**, with the caveat that only two
   integrations exist (`notifications`, `nsqf`), so the rule has not been tested by a payment or
   assessment vendor yet.

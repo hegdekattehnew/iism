@@ -109,22 +109,15 @@ async def register_organisation(
     verification, and doing it silently here would be the takeover-by-typo
     `confirm_link` is built to refuse.
     """
-    if user is not None:
-        tenant = await service.provision_organisation(
-            db, user, payload.organisation_name, payload.tenant_type
-        )
-        await db.commit()
-        return schemas.OrgRegisterResponse(
-            sent=False, expires_in_seconds=0, organisation_slug=tenant.slug
-        )
-    ttl, debug_code = await service.register_organisation(
+    result = await service.register_or_add_organisation(
         db,
-        payload.email,
-        payload.organisation_name,
-        payload.tenant_type,
-        payload.consent_version,
+        user,
+        email=payload.email,
+        name=payload.organisation_name,
+        tenant_type=payload.tenant_type,
+        consent_version=payload.consent_version,
     )
-    return schemas.OrgRegisterResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return schemas.OrgRegisterResponse(**vars(result))
 
 
 @router.post("/refresh", response_model=schemas.TokenPairOut)
@@ -199,9 +192,7 @@ async def create_organisation(
     This is the multi-role path: a candidate asked to start hiring gets a
     second membership, not a second account (ADR-038).
     """
-    tenant = await service.provision_organisation(
+    tenant = await service.add_organisation(
         db, user, payload.organisation_name, payload.tenant_type
     )
-    await db.commit()
-    await db.refresh(tenant)
     return schemas.TenantOut.model_validate(tenant)

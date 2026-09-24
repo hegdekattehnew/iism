@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
-from api.modules.analytics import record, record_many
 
 # Candidate routes require a candidate, not merely a signed-in account: an
 # organisation-only user used to get a CandidateProfile created on first look.
@@ -30,8 +29,8 @@ async def _profile(db: AsyncSession, user: User) -> CandidateProfile:
     their profile page first.
 
     `ensure_profile` commits when it creates and writes nothing when it does
-    not, so `record()` further down these handlers still has no uncommitted work
-    to sweep up.
+    not, so the `record()` calls inside `service.matches_for` and
+    `service.match_detail` still have no uncommitted work of ours to sweep up.
     """
     return await ensure_profile(db, user.id)
 
@@ -72,21 +71,13 @@ async def list_matches(
     user: User = Depends(get_current_candidate),
 ) -> schemas.MatchPage:
     profile = await _profile(db, user)
-    # `match_jobs` has accepted `state_id` since Sprint 8 and nothing ever
-    # passed it. Opt-in only: filtering by where someone lives would hide every
-    # vacancy they would move for.
-    scored = await service.match_jobs(db, profile.id, limit=limit, state_id=state_id)
-
-    await record(
-        db,
-        "matches_viewed",
-        user_id=user.id,
-        payload={"returned": len(scored)},
-    )
+    # `state_id` is opt-in only: filtering by where somebody lives would hide
+    # every vacancy they would move for.
+    page = await service.matches_for(db, profile.id, user.id, limit=limit, state_id=state_id)
     return schemas.MatchPage(
-        items=[_to_match(s) for s in scored],
-        total=len(scored),
-        has_skills=bool(await service.has_declared_skills(db, profile.id)),
+        items=[_to_match(s) for s in page.items],
+        total=len(page.items),
+        has_skills=page.has_skills,
     )
 
 
@@ -98,63 +89,10 @@ async def match_detail(
 ) -> schemas.MatchDetail:
     """One job, scored, with the courses that close its gap."""
     profile = await _profile(db, user)
-    scored = await service.match_job_by_slug(db, profile.id, slug)
-    if scored is None:
+    detail = await service.match_detail(db, profile.id, user.id, slug)
+    if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
-
-    courses = await service.courses_closing_gap(db, scored.result.missing)
-    entry = await service.entry_routes_for_job(db, scored.job.id)
-
-    await record(
-        db,
-        "match_opened",
-        user_id=user.id,
-        subject_type="job",
-        subject_id=scored.job.id,
-        payload={"score": scored.result.score, "missing": len(scored.result.missing)},
-    )
-    if scored.result.missing:
-        await record(
-            db,
-            "gap_viewed",
-            user_id=user.id,
-            subject_type="job",
-            subject_id=scored.job.id,
-            payload={
-                "missing": len(scored.result.missing),
-                "mandatory": scored.result.missing_mandatory,
-            },
-        )
-    if courses:
-        # Subjected to the **course**, not the job. It recorded
-        # `subject_type="job"` and a bare count until Sprint 24, so which
-        # course was recommended could not be recovered -- and `course_opened`
-        # has always written `{"from_job": slug}`, so the join key existed on
-        # one side only and ADR-025's click-through has been uncomputable since
-        # Sprint 10. `from_job` is spelled exactly as that handler spells it.
-        #
-        # Rows written before migration 0025 carry this name with
-        # `subject_type="job"`. They are not backfilled -- an event is a fact
-        # about what happened -- so any query must filter on the subject type.
-        await record_many(
-            db,
-            [
-                (
-                    "course_recommended",
-                    {
-                        "user_id": user.id,
-                        "subject_type": "course",
-                        "subject_id": suggestion.course.id,
-                        "payload": {
-                            "from_job": scored.job.slug,
-                            "closes": suggestion.closes_count,
-                            "rank": rank,
-                        },
-                    },
-                )
-                for rank, suggestion in enumerate(courses)
-            ],
-        )
+    scored, courses, entry = detail.scored, detail.courses, detail.entry
 
     base = _to_match(scored)
     return schemas.MatchDetail(

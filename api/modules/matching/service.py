@@ -431,3 +431,134 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
         ),
         locality=_locality(job, facts),
     )
+
+
+@dataclass(frozen=True)
+class MatchPage:
+    """A candidate's ranked vacancies, and whether they have declared anything.
+
+    `has_skills` is here rather than fetched separately by the caller because
+    an empty list means two different things -- nothing matched, or nothing was
+    declared to match against -- and the screen has to tell them apart.
+    """
+
+    items: list[ScoredJob]
+    has_skills: bool
+
+
+async def matches_for(
+    db: AsyncSession,
+    profile_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    limit: int = 20,
+    state_id: uuid.UUID | None = None,
+) -> MatchPage:
+    """The ranked page, measured once.
+
+    Separate from `match_jobs` deliberately: that function is also called by the
+    golden-set harness and by the alert sweep, and recording `matches_viewed`
+    inside it would count a nightly cron and a test run as somebody looking at
+    their matches. The event belongs to *this* act, so it lives in the function
+    that is only ever that act.
+    """
+    scored = await match_jobs(db, profile_id, limit=limit, state_id=state_id)
+    has_skills = await has_declared_skills(db, profile_id)
+
+    from api.modules.analytics import record
+
+    await record(db, "matches_viewed", user_id=user_id, payload={"returned": len(scored)})
+    return MatchPage(items=scored, has_skills=has_skills)
+
+
+@dataclass(frozen=True)
+class ScoredJobDetail:
+    """One scored vacancy with everything the detail screen shows.
+
+    A value object rather than three returns, because the three are one answer:
+    the score, the courses that close its gap, and how somebody becomes
+    qualified. Assembling them was 99 lines inside a route handler, along with
+    two conditional measurement rules -- which is the shape this module exists
+    to keep out of handlers (ADR-036: the scorer is pure, and everything around
+    it is testable service code).
+    """
+
+    scored: ScoredJob
+    courses: list["CourseSuggestion"]
+    entry: "EntryRouteFit | None"
+
+
+async def match_detail(
+    db: AsyncSession, profile_id: uuid.UUID, user_id: uuid.UUID, slug: str
+) -> ScoredJobDetail | None:
+    """Everything one match screen needs, measured as it is assembled.
+
+    `None` when the vacancy is not open, which the caller answers with a 404.
+
+    **The three measurements live here** because each is conditional on what the
+    score turned out to be, and "we recorded a gap view only when there was a
+    gap" is a fact about matching rather than about HTTP. They run after every
+    read and before nothing: `record()` commits, and there is no uncommitted
+    work of ours for it to take with it -- this whole function is reads.
+    """
+    scored = await match_job_by_slug(db, profile_id, slug)
+    if scored is None:
+        return None
+
+    courses = await courses_closing_gap(db, scored.result.missing)
+    entry = await entry_routes_for_job(db, scored.job.id)
+
+    from api.modules.analytics import record, record_many
+
+    await record(
+        db,
+        "match_opened",
+        user_id=user_id,
+        subject_type="job",
+        subject_id=scored.job.id,
+        payload={"score": scored.result.score, "missing": len(scored.result.missing)},
+    )
+    if scored.result.missing:
+        await record(
+            db,
+            "gap_viewed",
+            user_id=user_id,
+            subject_type="job",
+            subject_id=scored.job.id,
+            payload={
+                "missing": len(scored.result.missing),
+                "mandatory": scored.result.missing_mandatory,
+            },
+        )
+    if courses:
+        # Subjected to the **course**, not the job. It recorded
+        # `subject_type="job"` and a bare count until Sprint 24, so which course
+        # was recommended could not be recovered -- and `course_opened` has
+        # always written `{"from_job": slug}`, so the join key existed on one
+        # side only and ADR-025's click-through was uncomputable from Sprint 10
+        # to Sprint 24. `from_job` is spelled exactly as that handler spells it.
+        #
+        # Rows written before migration 0025 carry this name with
+        # `subject_type="job"`. They are not backfilled -- an event is a fact
+        # about what happened -- so any query must filter on the subject type.
+        await record_many(
+            db,
+            [
+                (
+                    "course_recommended",
+                    {
+                        "user_id": user_id,
+                        "subject_type": "course",
+                        "subject_id": suggestion.course.id,
+                        "payload": {
+                            "from_job": scored.job.slug,
+                            "closes": suggestion.closes_count,
+                            "rank": rank,
+                        },
+                    },
+                )
+                for rank, suggestion in enumerate(courses)
+            ],
+        )
+
+    return ScoredJobDetail(scored=scored, courses=courses, entry=entry)

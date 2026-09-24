@@ -414,3 +414,75 @@ async def scarce_skills(
     # Most demanded and least supplied first.
     scarce.sort(key=lambda s: (-s.required_by, s.held_by, s.name))
     return scarce[:limit]
+
+
+@dataclass(frozen=True)
+class ConsoleOverview:
+    """Everything the employer overview answers, in one read.
+
+    Assembled here rather than in a route module, which used to own the third
+    number and query for it inline -- the only inline `select(...)` left on a
+    shipping request path.
+    """
+
+    pools: list[JobPool]
+    scarce: list[ScarceSkill]
+    candidates_total: int
+
+
+async def console_overview(db: AsyncSession, tenant_id: uuid.UUID) -> ConsoleOverview:
+    """The overview, measured once, for both the demo and the real console.
+
+    `candidates_total` counts **profiles that have declared a standard**, not
+    registered accounts: an empty profile is not a candidate anybody could be
+    shown. It is deliberately **not** tenant-filtered -- it is a platform-wide
+    figure, one of the two aggregates in this module that are not scoped to the
+    caller (the other is `scarce_skills`' supply side, because scarcity is a
+    market fact). Both are counts; neither returns a row about a person, which
+    is what keeps them inside ADR-037.
+
+    `record()` commits, and there is nothing uncommitted here to sweep up: this
+    function is three reads.
+    """
+    pools = await job_pools(db, tenant_id)
+    scarce = await scarce_skills(db, tenant_id)
+    total = await db.scalar(select(func.count(func.distinct(CandidateSkill.profile_id)))) or 0
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "employer_overview_viewed",
+        subject_type="tenant",
+        subject_id=tenant_id,
+        payload={"jobs": len(pools)},
+    )
+    return ConsoleOverview(pools=pools, scarce=scarce, candidates_total=total)
+
+
+async def console_ranking(
+    db: AsyncSession, tenant_id: uuid.UUID, job_slug: str, *, limit: int
+) -> tuple[Job, list[ScoredCandidate]] | None:
+    """Ranked candidates for one vacancy, measured. `None` when there is no
+    such open vacancy in this tenant, which the caller answers with a 404.
+
+    Separate from `rank_candidates` because that function is also the one the
+    alert sweep reaches through `candidates_for_job` (ADR-037 -- there is no
+    second, looser scorer), and a cron must not record that somebody looked at
+    a shortlist.
+    """
+    found = await rank_candidates(db, tenant_id, job_slug, limit=limit)
+    if found is None:
+        return None
+    job, scored = found
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "employer_shortlist_viewed",
+        subject_type="job",
+        subject_id=job.id,
+        payload={"returned": len(scored)},
+    )
+    return job, scored

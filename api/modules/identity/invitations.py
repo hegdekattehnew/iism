@@ -218,6 +218,20 @@ async def invite(
             "path": f"/invite/{token}",
         },
     )
+
+    # The commit the route used to make. It belongs here: the invitation and
+    # the queued mail are one act, and a handler that has to remember to commit
+    # is one that eventually does not.
+    await db.commit()
+    await db.refresh(invitation)
+    # After the commit, never inside it -- see `_record_for_tenant`.
+    await _record_for_tenant(
+        db,
+        "member_invited",
+        tenant_id=tenant.id,
+        actor_user_id=actor.id,
+        payload={"role": role},
+    )
     return invitation, token
 
 
@@ -235,19 +249,42 @@ async def _open_invitations(
     return list(rows.all())
 
 
-async def list_invitations(db: AsyncSession, tenant_id: uuid.UUID) -> list[Invitation]:
+async def list_invitations(
+    db: AsyncSession, tenant_id: uuid.UUID
+) -> list[tuple[Invitation, str | None]]:
     """Every invitation this organisation has sent, newest first.
 
     Including spent ones: "did we ever invite her, and what happened?" is the
     question this screen exists to answer, and hiding the answer behind a
     filter makes the screen useless the day somebody needs it.
     """
-    rows = await db.scalars(
-        select(Invitation)
-        .where(Invitation.tenant_id == tenant_id)
-        .order_by(Invitation.created_at.desc())
+    rows = list(
+        (
+            await db.scalars(
+                select(Invitation)
+                .where(Invitation.tenant_id == tenant_id)
+                .order_by(Invitation.created_at.desc())
+            )
+        ).all()
     )
-    return list(rows.all())
+
+    # Each invitation with the name of whoever sent it. One lookup per distinct
+    # inviter rather than one per row: an organisation with twenty invitations
+    # usually has two or three people who sent them.
+    #
+    # Resolved here rather than in the route, because "the name we show for an
+    # inviter is their full name, or their address when they have not given
+    # one" is a rule about people, not a shape of a response.
+    inviter_ids = {i.invited_by_user_id for i in rows if i.invited_by_user_id is not None}
+    names: dict[uuid.UUID, str | None] = {}
+    for inviter_id in inviter_ids:
+        inviter = await db.get(User, inviter_id)
+        names[inviter_id] = (inviter.full_name or inviter.email) if inviter else None
+
+    return [
+        (i, names.get(i.invited_by_user_id) if i.invited_by_user_id is not None else None)
+        for i in rows
+    ]
 
 
 async def revoke(db: AsyncSession, *, tenant_id: uuid.UUID, invitation_id: uuid.UUID) -> Invitation:
@@ -384,6 +421,39 @@ async def accept(db: AsyncSession, *, invitation: Invitation, user: User) -> Mem
     return held
 
 
+async def _record_for_tenant(
+    db: AsyncSession,
+    name: str,
+    *,
+    tenant_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    payload: dict[str, object] | None = None,
+) -> None:
+    """Measure a team event, subjected to the **organisation**, never the person.
+
+    **Call this after the business commit, never before.** `record()` commits,
+    so a call made while a membership change is still uncommitted would commit
+    that change as a side effect -- and a failure inside `record()` would roll
+    it back and return silently, because `record()` never raises. Every caller
+    here commits first; that ordering is the rule, and it is why these live in
+    the service rather than in a route handler that has to remember it.
+
+    Imported inside the function: `analytics` loads its routes, which load
+    `marketplace.models`, which load `skills`, so a module-level import here is
+    an ImportError at boot -- the cycle `tests/test_import_order.py` catches.
+    """
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        name,
+        user_id=actor_user_id,
+        subject_type="tenant",
+        subject_id=tenant_id,
+        payload=payload,
+    )
+
+
 # ------------------------------------------------------------------- members
 
 
@@ -408,14 +478,31 @@ async def _member_or_404(db: AsyncSession, tenant_id: uuid.UUID, user_id: uuid.U
 
 
 async def set_role(
-    db: AsyncSession, *, tenant_id: uuid.UUID, user_id: uuid.UUID, role: str
-) -> Membership:
-    """Change somebody's role. Owner only, and never the last owner's."""
+    db: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    user_id: uuid.UUID,
+    role: str,
+) -> tuple[Membership, User]:
+    """Change somebody's role. Owner only, and never the last owner's.
+
+    Returns the colleague alongside the membership, because the screen naming
+    the change has to name the person it happened to. The route used to do that
+    lookup itself with a bare `db.get(User, ...)` and an `assert` for the case
+    this function has already ruled out.
+    """
     if role not in ("owner", *INVITABLE_ROLES):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown role")
     membership = await _member_or_404(db, tenant_id, user_id)
+    user = await db.get(User, user_id)
+    # `_member_or_404` resolved a membership, and `memberships.user_id` is a
+    # foreign key, so the row is there.
+    assert user is not None  # noqa: S101
     if membership.role == role:
-        return membership
+        # A no-op is not an event. Recording one would put a change in the
+        # measurement that nobody made.
+        return membership, user
     # Promotion to owner is always safe; it is the demotion that can empty the
     # room, so the guard runs on the way *down* only.
     if role != "owner":
@@ -423,18 +510,47 @@ async def set_role(
     membership.role = role
     await db.commit()
     await db.refresh(membership)
-    return membership
+    await _record_for_tenant(
+        db,
+        "member_role_changed",
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        payload={"role": role},
+    )
+    return membership, user
 
 
-async def remove_member(db: AsyncSession, *, tenant_id: uuid.UUID, user_id: uuid.UUID) -> None:
+async def remove_member(
+    db: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> None:
     """Take somebody out of the organisation. Their listings stay; they belong
-    to the organisation, not to whoever happened to post them."""
+    to the organisation, not to whoever happened to post them.
+
+    **Measured here rather than in the route, and that closes a gap.** Two paths
+    reach this function -- an owner removing a colleague, and somebody leaving
+    of their own accord -- and only the first went through a handler that
+    recorded anything, so every departure a person chose for themselves was
+    invisible. That is `accept()`'s lesson one table over: the single writer is
+    the only honest place to measure. `self` in the payload keeps the two
+    distinguishable, the way `job_closed` carries `automatic`.
+    """
     membership = await _member_or_404(db, tenant_id, user_id)
     await _refuse_if_last_owner(db, membership)
     await db.delete(membership)
     await db.commit()
+    await _record_for_tenant(
+        db,
+        "member_removed",
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        payload={"self": actor_user_id == user_id},
+    )
 
 
 async def leave(db: AsyncSession, *, tenant_id: uuid.UUID, user: User) -> None:
     """Show yourself out. The same guard, because it is the same question."""
-    await remove_member(db, tenant_id=tenant_id, user_id=user.id)
+    await remove_member(db, tenant_id=tenant_id, actor_user_id=user.id, user_id=user.id)

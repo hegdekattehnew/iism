@@ -528,6 +528,45 @@ class RoleStandards:
 _REQUIREMENT_ORDER = {"compulsory": 0, "elective": 1, "optional": 2}
 
 
+async def standards_for_role_viewed(
+    db: AsyncSession, slug: str, user_id: uuid.UUID | None
+) -> RoleStandards | None:
+    """`standards_for_role`, measured.
+
+    Separate from the plain lookup because `standards_for_role` is also the way
+    the role picker's own tests and any later caller read a qualification, and
+    recording `role_suggested` inside it would count those as somebody being
+    suggested a role. The event belongs to the act of looking, so it lives in
+    the function that is only ever that act.
+
+    Counts only: which role somebody looked at is a fact about the role. The row
+    carries `user_id` and nothing else that identifies them, and it is nullable
+    -- this surface is deliberately open to a signed-out visitor, because a
+    sign-up wizard cannot demand an account before it can help.
+
+    `record()` commits and there is nothing uncommitted here: this is a read.
+
+    Imported inside the function -- `analytics` loads its routes, which load
+    `marketplace.models`, which load `skills`, so a module-level import would
+    make the two wait on each other at boot.
+    """
+    found = await standards_for_role(db, slug)
+    if found is None:
+        return None
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "role_suggested",
+        user_id=user_id,
+        subject_type="qualification",
+        subject_id=found.qp.id,
+        payload={"standards": len(found.standards), "variants": found.variants},
+    )
+    return found
+
+
 async def standards_for_role(db: AsyncSession, slug: str) -> RoleStandards | None:
     """A qualification and the standards it is made of."""
     qp = await db.scalar(select(QualificationPack).where(QualificationPack.slug == slug))

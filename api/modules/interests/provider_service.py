@@ -119,3 +119,25 @@ async def set_status(
         payload={"status": new_status},
     )
     return interest
+
+
+async def set_status_and_reload(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    course_slug: str,
+    interest_id: uuid.UUID,
+    new_status: str,
+) -> tuple[CourseInterest, CandidateProfile, User]:
+    """Mark a learner contacted, and return the row the screen re-renders.
+
+    The sibling of `applications.employer_service.set_status_and_reload`, and
+    for the same reason: the route used to refetch the list and pick its row out
+    with a bare `next(...)`, which raises `StopIteration` -- a RuntimeError and
+    a 500 inside a coroutine -- if the row is ever filtered out.
+    """
+    interest = await set_status(db, tenant_id, course_slug, interest_id, new_status)
+    _course, rows = await interested_learners(db, tenant_id, course_slug)
+    for row in rows:
+        if row[0].id == interest.id:
+            return row
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Interest not found")

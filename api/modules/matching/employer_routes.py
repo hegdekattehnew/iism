@@ -9,15 +9,13 @@ in production rather than trusting a future reader to notice.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.config import get_settings
 from api.core.database import get_db_session
-from api.modules.analytics import record
 from api.modules.identity.models import Tenant
-from api.modules.marketplace.models import CandidateProfile, CandidateSkill
+from api.modules.marketplace.models import CandidateProfile
 from api.modules.matching import employer, schemas
 from api.modules.matching.scoring import MatchResult
 
@@ -92,19 +90,7 @@ async def _overview(db: AsyncSession, tenant: Tenant) -> schemas.EmployerOvervie
     implementations would drift, and the demo would stop being a demonstration
     of the real thing.
     """
-    pools = await employer.job_pools(db, tenant.id)
-    scarce = await employer.scarce_skills(db, tenant.id)
-    # Candidates who have declared something, not registered accounts. An empty
-    # profile is not a candidate an employer could ever be shown.
-    total = await db.scalar(select(func.count(func.distinct(CandidateSkill.profile_id)))) or 0
-
-    await record(
-        db,
-        "employer_overview_viewed",
-        subject_type="tenant",
-        subject_id=tenant.id,
-        payload={"jobs": len(pools)},
-    )
+    data = await employer.console_overview(db, tenant.id)
     return schemas.EmployerOverview(
         employer=schemas.EmployerOut.model_validate(tenant),
         jobs=[
@@ -116,28 +102,20 @@ async def _overview(db: AsyncSession, tenant: Tenant) -> schemas.EmployerOvervie
                 applications=p.applications,
                 new_applications=p.new_applications,
             )
-            for p in pools
+            for p in data.pools
         ],
-        scarce=[schemas.ScarceSkillOut(**vars(s)) for s in scarce],
-        candidates_total=total,
+        scarce=[schemas.ScarceSkillOut(**vars(s)) for s in data.scarce],
+        candidates_total=data.candidates_total,
     )
 
 
 async def _ranking(
     db: AsyncSession, tenant: Tenant, job_slug: str, limit: int
 ) -> schemas.CandidateRanking:
-    found = await employer.rank_candidates(db, tenant.id, job_slug, limit=limit)
+    found = await employer.console_ranking(db, tenant.id, job_slug, limit=limit)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     job, scored = found
-
-    await record(
-        db,
-        "employer_shortlist_viewed",
-        subject_type="job",
-        subject_id=job.id,
-        payload={"returned": len(scored)},
-    )
     return schemas.CandidateRanking(
         job=schemas.JobSummary.model_validate(job),
         items=[_card(s) for s in scored],

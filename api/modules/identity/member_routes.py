@@ -88,12 +88,13 @@ async def set_member_role(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.MemberOut:
     """Owner only. Refuses to demote the organisation's last owner (409)."""
-    membership = await service.set_role(
-        db, tenant_id=context.tenant.id, user_id=user_id, role=payload.role
+    membership, user = await service.set_role(
+        db,
+        tenant_id=context.tenant.id,
+        actor_user_id=context.user.id,
+        user_id=user_id,
+        role=payload.role,
     )
-    user = await db.get(User, user_id)
-    assert user is not None  # noqa: S101 - set_role resolved the membership
-    await _record(db, "member_role_changed", context, payload={"role": payload.role})
     return schemas.MemberOut(
         user_id=user.id,
         role=membership.role,
@@ -111,8 +112,9 @@ async def remove_member(
     db: AsyncSession = Depends(get_db_session),
 ) -> None:
     """Owner only. The last owner cannot be removed (409)."""
-    await service.remove_member(db, tenant_id=context.tenant.id, user_id=user_id)
-    await _record(db, "member_removed", context)
+    await service.remove_member(
+        db, tenant_id=context.tenant.id, actor_user_id=context.user.id, user_id=user_id
+    )
 
 
 @router.post("/leave", status_code=status.HTTP_204_NO_CONTENT)
@@ -145,19 +147,9 @@ async def list_invitations(
     hides the answer makes it useless on the one day somebody needs it.
     """
     now = datetime.now(UTC)
-    rows = await service.list_invitations(db, context.tenant.id)
-
-    # One lookup per distinct inviter, not one per row: an organisation with
-    # twenty invitations usually has two or three people who sent them.
-    inviter_ids = {i.invited_by_user_id for i in rows if i.invited_by_user_id is not None}
-    names: dict[uuid.UUID, str | None] = {}
-    for inviter_id in inviter_ids:
-        inviter = await db.get(User, inviter_id)
-        names[inviter_id] = (inviter.full_name or inviter.email) if inviter else None
-
     return [
-        _invitation_out(i, now, names.get(i.invited_by_user_id) if i.invited_by_user_id else None)
-        for i in rows
+        _invitation_out(invitation, now, inviter)
+        for invitation, inviter in await service.list_invitations(db, context.tenant.id)
     ]
 
 
@@ -187,11 +179,6 @@ async def create_invitation(
         email=payload.email,
         role=payload.role,
     )
-    await db.commit()
-    await db.refresh(invitation)
-    # After the commit, never inside it: `record()` commits, and a rollback in
-    # the middle would take the invitation with it.
-    await _record(db, "member_invited", context, payload={"role": payload.role})
     return _invitation_out(
         invitation, datetime.now(UTC), context.user.full_name or context.user.email
     )
@@ -317,28 +304,4 @@ async def accept_invitation(
     return schemas.InvitationAccepted(
         organisation_slug=tenant.slug,
         role=membership.role,
-    )
-
-
-async def _record(
-    db: AsyncSession,
-    name: str,
-    context: TenantContext,
-    payload: dict | None = None,
-) -> None:
-    """Measurement, subjected to the organisation and never to the person.
-
-    Imported inside the function: `analytics` loads its routes, which load
-    `marketplace.models`, which load `skills` -- a module-level import here is
-    an ImportError at boot, and `tests/test_import_order.py` is what catches it.
-    """
-    from api.modules.analytics import record
-
-    await record(
-        db,
-        name,
-        user_id=context.user.id,
-        subject_type="tenant",
-        subject_id=context.tenant.id,
-        payload=payload,
     )

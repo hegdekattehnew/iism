@@ -24,9 +24,9 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 31 — the quiet backend, and the scope ledger (`docs/scope-reconciliation.md`) |
-| **Next sprint** | 32 — the monetisation ADR (now 043) + payment adapter port |
-| **Tests** | 656 backend (`make check`), 259 web (`cd web && npm test`) |
+| **Last sprint** | 32 — every route handler delegates (17 violations moved, guarded) |
+| **Next sprint** | 33 — the monetisation ADR (now 043) + payment adapter port |
+| **Tests** | 680 backend (`make check`), 259 web (`cd web && npm test`) |
 | **Migrations** | head `0028`; 42 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -1114,7 +1114,25 @@ documents claim, and the client was in worse shape than its tests suggested.**
   outside the seed**, so `EVIDENCE_WEIGHT_SHARE = 0.10` is a constant for every real candidate --
   a tenth of the match score carries no information in production.
 
-### Sprint 32 — the monetisation ADR, and a payment adapter port (next)
+### Sprint 32 — every handler delegates (done 2026-09-24)
+
+The audit recorded 17 route-handler violations as accepted; the owner reversed that and asked for
+them fixed before any other work. All 17 moved, plus two the audit had classed as borderline, so
+the route layer now makes **zero** calls to `db.*`, `select()` or `record()`.
+
+- **The point was to preserve the ordering, not bury it.** Fifteen of the seventeen existed because
+  `record()` commits and therefore has to run after the business commit. Each service function now
+  commits and then records, with the reason written beside it -- one function owns the sequence
+  instead of every handler remembering it.
+- **`tests/test_route_delegation.py` is the guard**, and it names the module, the handler and the
+  call when it fails. Probed by restoring `update_organisation`'s old shape.
+- **One deliberate behaviour change**: `member_removed` now fires when somebody *leaves*, not only
+  when an owner removes them. Moving the record into the single writer is what exposed it -- the
+  leave path had never been measured. `{"self": true}` keeps the two apart.
+- Also found and fixed while doing it: `update_organisation` had **no service layer at all**, which
+  is how `contact_email` went eight sprints without the normalisation every other address has.
+
+### Sprint 33 — the monetisation ADR, and a payment adapter port (next)
 
 Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
 marketplace that also **sells courses** and carries **gig work**, and the honest next step is the

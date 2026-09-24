@@ -3,12 +3,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-import structlog
-from arq.jobs import Job, JobStatus
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from api.core import tasks
 from api.core.cache import close_redis
 from api.core.config import get_settings
 from api.core.database import dispose_engine
@@ -20,7 +19,7 @@ from api.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from api.core.tasks import close_task_pool, get_task_pool
+from api.core.tasks import close_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.applications import employer_router as applications_employer_router
 from api.modules.applications import router as applications_router
@@ -86,10 +85,6 @@ _settings = get_settings()
 # Before the app object, so anything the routers log at import time is already
 # formatted and redacted rather than going out through structlog's defaults.
 configure_logging()
-
-# After `configure_logging()`, so this logger inherits the shared processor
-# tail -- including the ADR-023 redaction filter -- rather than the defaults.
-log = structlog.get_logger("iism.api")
 
 app = FastAPI(
     title=_settings.app_name,
@@ -221,31 +216,13 @@ class TaskStatus(BaseModel):
 
 @tasks_router.post("/tasks/ping", response_model=TaskEnqueued, tags=["tasks"])
 async def enqueue_ping(note: str = "") -> TaskEnqueued:
-    pool = await get_task_pool()
-    job = await pool.enqueue_job("ping", note)
-    if job is None:  # pragma: no cover - only on a duplicate job id
-        raise RuntimeError("could not enqueue job")
-    return TaskEnqueued(job_id=job.job_id)
+    return TaskEnqueued(job_id=await tasks.enqueue_ping(note))
 
 
 @tasks_router.get("/tasks/{job_id}", response_model=TaskStatus, tags=["tasks"])
 async def task_status(job_id: str) -> TaskStatus:
-    pool = await get_task_pool()
-    job = Job(job_id, pool)
-    status = await job.status()
-    result: dict[str, Any] | None = None
-    if status is JobStatus.complete:
-        try:
-            result = await job.result(timeout=1)
-        except Exception:
-            # Swallowed on purpose -- a demonstration endpoint must not 500
-            # because a result expired -- but **logged**, which it was not.
-            # A job that raised is indistinguishable here from one that
-            # returned nothing, and without this line there was no way to
-            # tell which had happened.
-            log.warning("tasks.result_unavailable", job_id=job_id, exc_info=True)
-            result = None
-    return TaskStatus(job_id=job_id, status=status.value, result=result)
+    state, result = await tasks.task_result(job_id)
+    return TaskStatus(job_id=job_id, status=state, result=result)
 
 
 # Only mounted locally; in any other environment these paths do not exist.

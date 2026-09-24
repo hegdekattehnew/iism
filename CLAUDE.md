@@ -181,30 +181,31 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 - New architectural decisions (new datastore, new auth model, new AI approach, etc.) get a new
   ADR entry in `docs/adr/architecture-decisions.md`, not a silent divergence from the existing
   ones.
-- **"No business logic in route handlers" is 84% true, and the other 16% is written down.**
-  Audited 2026-09-24: 107 handlers, 17 violations. Recorded as accepted rather than refactored,
-  because most of them are a deliberate pattern and a "fix" would break it. Three shapes:
-  - **A commit in a handler** (5) and **an analytics write from a handler** (10) are the pattern,
-    not the exception. `record()` **commits**, so it must run *after* the business commit and
-    outside it — `identity/member_routes.py` states the reason beside the call ("a rollback in the
-    middle would take the invitation with it"). Moving these behind a service would either bury the
-    ordering or put two commits in one request. **Do not "fix" them.**
-  - **Three are real drift**, named so they are not mistaken for the above:
-    `identity/tenant_routes.py::update_organisation` has **no service layer at all** — it
-    `setattr`s over `model_dump()` and commits, which is safe only because `OrganisationIn` bounds
-    the fields, and is exactly how `contact_email` went eight sprints without the normalisation
-    every other address in that file has; `analytics/routes.py::course_opened` builds a `select()`
-    inline; `matching/routes.py::match_detail` is 99 lines, four service calls and two conditional
-    analytics rules.
-  - **Two aggregates are genuinely not tenant-filtered**, and anyone checking "every org-scoped
-    query filters on `context.tenant.id`" mechanically will hit them:
-    `matching/employer_routes.py:99` (`candidates_total`, a platform-wide count, deliberate) and
-    `matching/employer.py:387` (held-skill counts feeding `scarce_skills` — "scarcity is a market
-    fact"). Neither returns per-tenant or per-person data.
-  **Tenant scoping itself audited clean**: all 29 `{org_slug}` routes carry `require(...)`, and
-  every service reachable from them re-filters on `tenant_id` in the same `WHERE` as the slug or
-  id — including the two classic IDOR shapes, `org_slug`+`application_id` and
-  `org_slug`+`interest_id`, which resolve the parent through the tenant first.
+- **"No business logic in route handlers" is enforced, not asserted.**
+  `tests/test_route_delegation.py` parses every route module and fails when a handler -- or a
+  helper inside a route module -- calls `db.*`, `select()` or `record()`. Audited 2026-09-24 at
+  **17 violations in 107 handlers**; Sprint 32 moved all of them and the guard keeps the number at
+  zero. It asserts it **found** modules and handlers before asserting anything about them, and a
+  second test feeds the detector a known-bad snippet, because a matcher that matches nothing
+  reports a clean route layer for ever.
+- **The fix for an analytics call in a handler is to move it into the service, never to delete the
+  ordering.** `record()` **commits**, so it must run *after* the business commit and outside it:
+  calling it with uncommitted work pending commits that work as a side effect, and a failure inside
+  it rolls the work back and returns silently, because `record()` never raises. Fifteen of the
+  seventeen violations were handlers reasoning correctly about exactly this. Each service function
+  now commits and then records, with the reason written beside it — see
+  `invitations._record_for_tenant` and `publishing._record_for_job`.
+- **A service that measures an act must be the function that is only ever that act.**
+  `matches_for` wraps `match_jobs` rather than recording inside it, because `match_jobs` is also
+  called by the golden-set harness and the alert sweep — recording there would count a nightly cron
+  as somebody viewing their matches. Same for `console_ranking` over `rank_candidates` (the alert
+  sweep reaches it through `candidates_for_job`) and `standards_for_role_viewed` over
+  `standards_for_role`.
+- **Moving a record into its single writer can close a measurement gap, and did.** `member_removed`
+  was recorded by the handler an owner uses to remove a colleague; `POST /leave` reaches the same
+  service function through a different handler, so **every self-departure was invisible**. It now
+  records one, with `{"self": true}` in the payload to keep the two apart — the `job_closed`
+  / `automatic` move, and `accept()`'s lesson one table over.
 - **The feature crons live in `api/worker.py`, not `api/core/tasks.py`, and that split is a trap.**
   Core registers the heartbeat alone because it must not import a feature module (ADR-014). So
   pointing the Makefile at `api.core.tasks.WorkerSettings` yields a worker that starts cleanly,
@@ -465,8 +466,9 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprints 28-31 are done** (geography and operator authority, the back
-> office and the golden set, the silent-failure sweep, and the scope ledger). **Sprint 32 is
+> not for the queue. **Sprints 28-32 are done** (geography and operator authority, the back
+> office and the golden set, the silent-failure sweep, the scope ledger, and the delegation
+> refactor). **Sprint 33 is
 > next: the monetisation ADR — now 043 — and the payment adapter port.**
 > §11 also carries a
 > standing assessment of the three pillars the owner is building toward — jobs, sellable courses,

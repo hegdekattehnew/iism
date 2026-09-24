@@ -140,6 +140,31 @@ async def set_status(
     return application
 
 
+async def set_status_and_reload(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    job_slug: str,
+    application_id: uuid.UUID,
+    new_status: str,
+) -> tuple[Application, CandidateProfile, User, MatchResult]:
+    """Move an application along, and return the row the screen re-renders.
+
+    The row, not just the `Application`: the card beside it carries a score, and
+    a score comes from the scorer with the profile and the requirements in hand.
+    The route used to call `inbox()` afterwards and pick its row out with a bare
+    `next(...)`, which raises `StopIteration` -- a RuntimeError and a 500 inside
+    a coroutine -- if the row is ever filtered out. It cannot be today; doing the
+    lookup here means the day it can, this function answers it instead of
+    crashing.
+    """
+    application = await set_status(db, tenant_id, job_slug, application_id, new_status)
+    _job, rows = await inbox(db, tenant_id, job_slug)
+    for row in rows:
+        if row[0].id == application.id:
+            return row
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+
 async def _close_if_filled(db: AsyncSession, job: Job) -> bool:
     """Close the vacancy once every position is taken. Returns whether it did.
 

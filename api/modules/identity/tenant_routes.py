@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
-from api.modules.identity import schemas
+from api.modules.identity import schemas, service
 
 router = APIRouter(prefix="/org/{org_slug}", tags=["organisations"])
 
@@ -40,12 +40,7 @@ async def update_organisation(
     published URL, changing the type would strand listings already published
     under it, and verification is ours to assert rather than theirs to claim.
     """
-    # `exclude_unset`: a partial body must not blank the fields it omitted.
-    # Without it any client sending only `name` nulled the description, website,
-    # logo and contact address -- latent only because `OrgSettings` happens to
-    # send all six.
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(context.tenant, field, value)
-    await db.commit()
-    await db.refresh(context.tenant)
-    return schemas.OrganisationOut.model_validate(context.tenant)
+    tenant = await service.update_organisation(
+        db, context.tenant, payload.model_dump(exclude_unset=True)
+    )
+    return schemas.OrganisationOut.model_validate(tenant)

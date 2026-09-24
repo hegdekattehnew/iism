@@ -16,6 +16,7 @@ account:
 
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -440,6 +441,97 @@ async def provision_organisation(
     db.add(Membership(user_id=user.id, tenant_id=tenant.id, role="owner"))
     await db.flush()
     return tenant
+
+
+async def update_organisation(
+    db: AsyncSession, tenant: Tenant, fields: dict[str, object]
+) -> Tenant:
+    """Apply the fields an organisation's owner may change, and commit.
+
+    **`exclude_unset` is the caller's job and the partial-update rule is this
+    one's**: a body carrying only `name` must not blank the description, the
+    website, the logo and the contact address. That was latent for four sprints
+    only because `OrgSettings` happens to send all six every time.
+
+    This was the one write path in the product with **no service layer at all**
+    -- a `setattr` loop and a commit inside the handler. That is how
+    `contact_email` went eight sprints without the normalisation every other
+    address in `schemas.py` has: there was no function for the rule to live in.
+    A field needing resolution or normalisation now has somewhere to go.
+
+    What a member may **not** change is enforced by `OrganisationIn`, not here:
+    `slug` is a published URL, `tenant_type` would strand the listings already
+    published under it, and verification is ours to assert (ADR-042).
+    """
+    for field, value in fields.items():
+        setattr(tenant, field, value)
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+async def add_organisation(db: AsyncSession, user: User, name: str, tenant_type: str) -> Tenant:
+    """Provision an organisation for a signed-in caller, and commit it.
+
+    The thin wrapper `provision_organisation` deliberately is not.
+    `provision_organisation` only flushes, because its **third** caller is the
+    pending-organisation hand-off inside `verify_email_and_sign_in`, which is
+    part of a larger transaction that commits once at the end -- committing
+    there would split one sign-in into two. The two *request* paths that end
+    here do want a commit, and it used to sit in both handlers.
+    """
+    tenant = await provision_organisation(db, user, name, tenant_type)
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+@dataclass(frozen=True)
+class OrgRegistration:
+    """What cold registration did, for the one response that reports it.
+
+    A value object rather than a tuple: the signed-in and signed-out branches
+    return different halves of it, and a four-tuple at the call site would make
+    which-half-is-set a thing the reader has to reconstruct.
+    """
+
+    sent: bool
+    expires_in_seconds: int
+    debug_code: str | None = None
+    organisation_slug: str | None = None
+
+
+async def register_or_add_organisation(
+    db: AsyncSession,
+    user: User | None,
+    *,
+    email: str,
+    name: str,
+    tenant_type: str,
+    consent_version: str,
+) -> OrgRegistration:
+    """`POST /auth/org/register`, both cases, in the layer that owns the rule.
+
+    **Signed in: no new account, ever** -- the organisation becomes a second
+    membership on the identity already calling. That is ADR-038's whole point,
+    and it is a decision about identity rather than a shape of a response, so
+    it belongs here and not in a branch inside a handler. The route ignored who
+    was calling until Sprint 18, and a candidate who opened `/signup/employer`
+    forked into two `User` rows.
+
+    **Signed out:** ordinary cold registration, whose answer is deliberately
+    identical for a known and an unknown address (see `register_organisation`).
+
+    The typed address is never linked to a signed-in account here: linking a
+    credential needs its own verification, and doing it silently would be the
+    takeover-by-typo `confirm_link` exists to refuse.
+    """
+    if user is not None:
+        tenant = await add_organisation(db, user, name, tenant_type)
+        return OrgRegistration(sent=False, expires_in_seconds=0, organisation_slug=tenant.slug)
+
+    ttl, debug_code = await register_organisation(db, email, name, tenant_type, consent_version)
+    return OrgRegistration(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
 
 
 async def register_organisation(

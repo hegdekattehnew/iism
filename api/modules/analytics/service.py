@@ -28,7 +28,8 @@ from datetime import timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import delete, func
+from fastapi import HTTPException, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics.models import EVENT_NAMES, AnalyticsEvent
@@ -120,3 +121,42 @@ async def purge_expired(db: AsyncSession, *, older_than_days: int) -> int:
     )
     await db.commit()
     return int(getattr(result, "rowcount", 0) or 0)
+
+
+async def record_course_opened(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    course_slug: str,
+    from_job_slug: str | None,
+) -> None:
+    """The one event the client has to report, resolved and recorded here.
+
+    A slug comes in and an id goes on the row, so the lookup is part of
+    recording rather than something a route does first: the 404 for a course
+    that does not exist is this function's answer, and the route used to build
+    that `select()` inline -- the last inline query on any shipping request path.
+
+    `from_job_slug` is what makes ADR-025's click-through computable: without it
+    an opened course cannot be attributed to the gap it was recommended for, and
+    organic browsing would be counted as a recommendation that worked.
+
+    Imported inside the function: `marketplace.models` pulls in `skills`, and a
+    module-level import here would make `api.modules.analytics` drag both in
+    before its own routes do -- the ordering `tests/test_import_order.py` exists
+    to keep honest.
+    """
+    from api.modules.marketplace.models import Course
+
+    course_id = await db.scalar(select(Course.id).where(Course.slug == course_slug))
+    if course_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+
+    await record(
+        db,
+        "course_opened",
+        user_id=user_id,
+        subject_type="course",
+        subject_id=course_id,
+        payload={"from_job": from_job_slug} if from_job_slug else None,
+    )

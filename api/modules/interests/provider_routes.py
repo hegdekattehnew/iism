@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
@@ -75,16 +75,11 @@ async def set_interest_status(
     db: AsyncSession = Depends(get_db_session),
 ) -> InterestedLearnerOut:
     """Mark that you have been in touch. A withdrawn interest cannot be moved."""
-    await provider_service.set_status(
-        db, context.tenant.id, course_slug, interest_id, payload.status
+    return _learner(
+        *await provider_service.set_status_and_reload(
+            db, context.tenant.id, course_slug, interest_id, payload.status
+        )
     )
-    _, rows = await provider_service.interested_learners(db, context.tenant.id, course_slug)
-    # See the sibling in `applications/employer_routes.py`: a bare `next(...)`
-    # raises `StopIteration`, which a coroutine turns into a 500.
-    row = next((r for r in rows if r[0].id == interest_id), None)
-    if row is None:  # pragma: no cover - unreachable while the list is unfiltered
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Interest not found")
-    return _learner(*row)
 
 
 @router.get("/interests", response_model=list[CourseInterestCount])
