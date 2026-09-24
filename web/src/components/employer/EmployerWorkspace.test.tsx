@@ -184,3 +184,68 @@ describe("EmployerWorkspace — saying why a save failed", () => {
     expect(await screen.findByText(/Could not save\./)).toBeTruthy();
   });
 });
+
+describe("EmployerWorkspace — saying why publishing or closing failed", () => {
+  /**
+   * These four buttons used to fail in two different wrong ways.
+   *
+   * Publish and unpublish threw a sentinel, `new Error("publish-refused")`,
+   * and the screen mapped **every** failure to one fixed sentence about
+   * required standards -- so an employer whose fifteen-minute token had
+   * expired was told their vacancy needed a standard it already had. Close
+   * and reopen had no `onError` at all: the request failed, the row still
+   * said "Published", and nothing anywhere said why.
+   *
+   * These assert on the *server's own words*, because that is the whole point
+   * -- a test that only checks "some message appeared" would pass against the
+   * fixed sentence this sprint removed.
+   */
+  const refuse = (status: number, detail: string | null) =>
+    POST.mockResolvedValue({
+      data: undefined,
+      error: detail === null ? {} : { detail },
+      response: { status },
+    });
+
+  it("shows the refusal the server actually sent", async () => {
+    refuse(422, "Add at least one required standard before publishing");
+    world_([job({ status: "draft", is_open: false })]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Publish" }));
+
+    expect(
+      await screen.findByText("Add at least one required standard before publishing"),
+    ).toBeTruthy();
+  });
+
+  it("asks an expired session to sign in, instead of blaming the standards", async () => {
+    // The defect this sprint exists for. A 401 is not a missing standard, and
+    // telling somebody it is sends them to fix a vacancy that is already fine.
+    refuse(401, null);
+    world_([job({ status: "draft", is_open: false })]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText(/Your session has expired/)).toBeTruthy();
+    expect(screen.queryByText(/required standard/)).toBeNull();
+  });
+
+  it("says something when closing is refused, rather than leaving the row open", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    refuse(409, "This vacancy is already closed");
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Close vacancy" }));
+
+    expect(await screen.findByText("This vacancy is already closed")).toBeTruthy();
+    confirmSpy.mockRestore();
+  });
+
+  it("falls back to the generic line only when the failure carried nothing", async () => {
+    refuse(500, null);
+    world_([job({ status: "draft", is_open: false })]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByText(/Could not do that\./)).toBeTruthy();
+  });
+});

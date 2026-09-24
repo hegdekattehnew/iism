@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 
 import { Check, Field, Select, Text } from "@/components/profile/fields";
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
+import { detailOf } from "@/lib/http";
 import {
   EDUCATION_LEVELS,
   EMPLOYMENT_TYPES,
@@ -130,6 +131,15 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
           </div>
         </div>
       </section>
+
+      {saveDetails.isError && (
+        <Alert role="alert">
+          {/* The server names the field and the rule -- "Minimum salary:
+              Input should be greater than 0". Saving used to fail in total
+              silence: there was a success indicator and no failure one. */}
+          {detailOf(saveDetails.error) ?? t("errors.generic")}
+        </Alert>
+      )}
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={saveDetails.isPending}>

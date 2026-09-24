@@ -47,7 +47,14 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
 
   // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
-  const [refused, setRefused] = useState<string | null>(null);
+  // What the server said when publishing, closing or reopening was refused.
+  // This used to be a slug, rendered as one fixed sentence about required
+  // standards -- so an employer whose token had expired was told their vacancy
+  // needed a standard it already had. A wrong reason is worse than none.
+  const [actionFailed, setActionFailed] = useState<string | true | null>(null);
+  // A 401 from one of those mutations. The query-level check below cannot see
+  // it: the session expires while the page is already open.
+  const [signedOut, setSignedOut] = useState(false);
   // The server's own words when it has any. `saveFailed` alone produced
   // "Could not save. Check the details and try again." for a two-character
   // title, which names neither the field nor the rule.
@@ -66,7 +73,8 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
     );
   }
 
-  if (isSignedOut(jobs.error) || isSignedOut(me.error)) return <SessionExpired />;
+  if (signedOut || isSignedOut(jobs.error) || isSignedOut(me.error))
+    return <SessionExpired />;
   if (jobs.isError) {
     // A 404 here means "not a member of this organisation", which is
     // deliberately indistinguishable from "no such organisation". A 401
@@ -83,6 +91,17 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   const items: OrgJob[] = jobs.data ?? [];
   const current =
     editing && editing !== "new" ? items.find((j) => j.slug === editing) : null;
+
+  // Publish, unpublish, close and reopen all fail the same way and all used
+  // to fail silently or misleadingly. 401 goes to the panel built for it;
+  // anything else shows the server's own sentence where there is one.
+  const onActionError = (e: unknown) => {
+    if (isSignedOut(e)) {
+      setSignedOut(true);
+      return;
+    }
+    setActionFailed(detailOf(e) ?? true);
+  };
 
   const save = (payload: JobPayload) => {
     setSaveFailed(null);
@@ -132,10 +151,13 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
         <Button onClick={() => setEditing("new")}>{t("newJob")}</Button>
       </div>
 
-      {refused && (
-        <p className="rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-sm text-warning-text">
-          {t("publishRefused")}
-        </p>
+      {actionFailed && (
+        <Alert role="alert">
+          {/* The server's own words -- "Add at least one required standard
+              before publishing" -- when it sent any. The generic line is the
+              fallback for a failure that carried no explanation. */}
+          {typeof actionFailed === "string" ? actionFailed : t("actionFailed")}
+        </Alert>
       )}
 
       {jobs.isPending && (
@@ -205,13 +227,13 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                     type="button"
                     disabled={setPublished.isPending}
                     onClick={() => {
-                      setRefused(null);
+                      setActionFailed(null);
                       setPublished.mutate(
                         {
                           slug: job.slug,
                           published: job.status !== "published",
                         },
-                        { onError: () => setRefused(job.slug) },
+                        { onError: onActionError },
                       );
                     }}
                     className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
@@ -228,7 +250,11 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                           !confirm(t("confirmClose", { title: job.title }))
                         )
                           return;
-                        setOpen.mutate({ slug: job.slug, open: !job.is_open });
+                        setActionFailed(null);
+                        setOpen.mutate(
+                          { slug: job.slug, open: !job.is_open },
+                          { onError: onActionError },
+                        );
                       }}
                       className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                     >

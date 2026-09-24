@@ -64,6 +64,22 @@ const FIELD_NAMES: Record<string, string> = {
   name: "Name",
   contact_email: "Contact email",
   website: "Website",
+  // The candidate's own profile. Without these the six-collection editor and
+  // the details form rendered the raw column -- "full_name: String should have
+  // at most 120 characters" -- which names a database, not a field on screen.
+  full_name: "Full name",
+  headline: "Headline",
+  location_state: "State",
+  location_district: "District or city",
+  years_experience: "Years of experience",
+  education_level: "Highest education",
+  date_of_birth: "Date of birth",
+  expected_salary_min_inr: "Expected minimum salary",
+  expected_salary_max_inr: "Expected maximum salary",
+  notice_period: "Notice period",
+  preferred_employment_type: "Preferred employment type",
+  skill_slug: "Standard",
+  proficiency: "Confidence",
 };
 
 /**

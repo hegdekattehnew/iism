@@ -28,10 +28,13 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
   const org = useQuery({
     queryKey: ["org", orgSlug],
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}", {
+      const { data, error, response } = await api.GET("/org/{org_slug}", {
         params: { path: { org_slug: orgSlug } },
       });
-      if (error || !data) throw new Error("could not load the organisation");
+      // The status, not a sentence: `isSignedOut(org.error)` below reads it,
+      // and a fixed message made that check dead code -- the 401 branch it
+      // guards could never fire.
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,

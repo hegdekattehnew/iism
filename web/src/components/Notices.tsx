@@ -3,8 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ApiError, detailOf, readDetail } from "@/lib/http";
 
 /**
  * What changed since you last looked.
@@ -33,7 +34,16 @@ export function Notices() {
 
   const markRead = useMutation({
     mutationFn: async () => {
-      await api.POST("/me/notifications/read");
+      // `error` was not read at all here. openapi-fetch **resolves** on a
+      // non-2xx, so a 401 or a 500 ran `onSuccess`, the query refetched, the
+      // notices came back still unread -- and the button did nothing, for
+      // ever, with nothing anywhere saying why.
+      const { error, response } = await api.POST("/me/notifications/read");
+      // Read before the check: `if (error)` narrows the destructured group,
+      // and this endpoint declares no error body, so `response` would be
+      // `never` inside the branch.
+      const status = response.status;
+      if (error) throw new ApiError(status, readDetail(error));
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["me", "notifications"] });
@@ -62,6 +72,11 @@ export function Notices() {
           {t("markRead")}
         </Button>
       </div>
+      {markRead.isError && (
+        <Alert role="alert" className="mt-3">
+          {detailOf(markRead.error) ?? t("markReadFailed")}
+        </Alert>
+      )}
       <ul className="mt-3 space-y-2">
         {unread.map((notice) => (
           <li key={notice.id} className="text-sm">

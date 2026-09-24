@@ -18,7 +18,10 @@ describe("statusOf", () => {
   });
 
   it("returns null for the errors that carry no status", () => {
-    // The mutations still throw named messages that their call sites read.
+    // Sprint 30 removed the last mutations that threw a named sentinel --
+    // `publish-refused` and `close-failed` -- because the screen then showed
+    // one fixed sentence for every failure, including an expired session.
+    // The behaviour stays pinned: anything that is not a status reads as none.
     expect(statusOf(new Error("publish-refused"))).toBeNull();
     expect(statusOf(new Error("could not load listings"))).toBeNull();
     expect(statusOf(undefined)).toBeNull();
@@ -73,11 +76,21 @@ describe("readDetail", () => {
   });
 
   it("finds the field inside a nested location", () => {
+    // Still the nesting that is under test: `skill_slug` is four levels into
+    // `loc`, and reaching it is what lets it be labelled at all.
     expect(
       readDetail({
         detail: [{ loc: ["body", "skills", 0, "skill_slug"], msg: "Field required" }],
       }),
-    ).toBe("skill_slug: Field required");
+    ).toBe("Standard: Field required");
+  });
+
+  it("falls back to the raw field name when there is no label for it", () => {
+    // The map is a courtesy, not a gate -- a field nobody has named yet must
+    // still reach the screen rather than being dropped.
+    expect(readDetail({ detail: [{ loc: ["body", "wat"], msg: "nope" }] })).toBe(
+      "wat: nope",
+    );
   });
 
   it("joins several field errors", () => {

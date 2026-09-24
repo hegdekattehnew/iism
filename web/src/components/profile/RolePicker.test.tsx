@@ -14,12 +14,13 @@ vi.mock(
 
 const GET = vi.fn();
 const POST = vi.fn();
+const DELETE = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: {
     GET: (...a: unknown[]) => GET(...a),
     POST: (...a: unknown[]) => POST(...a),
     PUT: vi.fn(),
-    DELETE: vi.fn(),
+    DELETE: (...a: unknown[]) => DELETE(...a),
   },
 }));
 
@@ -90,7 +91,9 @@ beforeEach(() => {
   resetWorld();
   GET.mockReset();
   POST.mockReset();
+  DELETE.mockReset();
   POST.mockResolvedValue({ data: { skills: [] }, error: undefined, response: { status: 200 } });
+  DELETE.mockResolvedValue({ data: { skills: [] }, error: undefined, response: { status: 200 } });
   routeGets();
 });
 
@@ -225,5 +228,75 @@ describe("SkillsSection", () => {
 
     fireEvent.change(search, { target: { value: "zzz" } });
     expect(await screen.findByText(/Nothing matched that/)).toBeTruthy();
+  });
+});
+
+describe("SkillsSection — saying why a standard could not be added or removed", () => {
+  /**
+   * This file held no `error`, `isError` or `onError` at all, on the one
+   * control in the whole profile that moves a match score. Hitting the
+   * sixty-standard cap, or adding a standard after the fifteen-minute token
+   * had expired, produced no chip and no explanation -- the candidate had no
+   * way to tell a refusal from a slow network.
+   *
+   * `lib/profile.ts` threw the raw openapi-fetch body rather than an `Error`,
+   * so even a caller that wanted to handle it got `null` from `detailOf`.
+   * These assert on the server's own sentence, which is what that fix buys.
+   */
+  const findBlood = async () => {
+    GET.mockImplementation(async (path: string) =>
+      path === "/skills/search"
+        ? {
+            data: [{ slug: "blood", name: "Collect blood samples", nos_code: "HSS/N0513" }],
+            error: undefined,
+          }
+        : { data: [], error: undefined },
+    );
+    renderUi(<SkillsSection profile={null} />);
+    fireEvent.change(screen.getByLabelText("Try 'blood', 'रक्त' or 'khoon nikalna'"), {
+      target: { value: "blood" },
+    });
+    return screen.findByRole("button", { name: "Add" });
+  };
+
+  it("shows the cap the server named, rather than nothing at all", async () => {
+    POST.mockResolvedValue({
+      data: undefined,
+      error: { detail: "You can hold at most 60 standards" },
+      response: { status: 422 },
+    });
+    fireEvent.click(await findBlood());
+
+    expect(await screen.findByText("You can hold at most 60 standards")).toBeTruthy();
+  });
+
+  it("falls back to the generic line when the refusal carried nothing", async () => {
+    POST.mockResolvedValue({ data: undefined, error: {}, response: { status: 500 } });
+    fireEvent.click(await findBlood());
+
+    expect(await screen.findByText(/Could not change your standards/)).toBeTruthy();
+  });
+
+  it("reports a failed removal too, not only a failed add", async () => {
+    DELETE.mockResolvedValue({
+      data: undefined,
+      error: { detail: "That standard is not on your profile" },
+      response: { status: 404 },
+    });
+    const profile = {
+      id: "p1",
+      skills: [
+        {
+          skill: { slug: "blood", name: "Collect blood samples" },
+          proficiency: 3,
+          source: "self_declared",
+        },
+      ],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    renderUi(<SkillsSection profile={profile} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText("That standard is not on your profile")).toBeTruthy();
   });
 });

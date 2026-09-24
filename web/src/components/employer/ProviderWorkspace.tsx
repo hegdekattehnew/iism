@@ -5,7 +5,8 @@ import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { detailOf } from "@/lib/http";
+import { SessionExpired } from "@/components/SessionExpired";
+import { detailOf, isSignedOut } from "@/lib/http";
 import { Link } from "@/i18n/navigation";
 import {
   type CoursePayload,
@@ -31,6 +32,12 @@ import {
  * refused" for something that had never been attempted; and there was no
  * signed-out branch at all, so a provider whose token had expired was told they
  * had no access to their own organisation rather than being asked to sign in.
+ *
+ * **That second paragraph described a fix this file did not contain.** It was
+ * written as though done; `isSignedOut` was never imported here and
+ * `courses.isError` still answered "no access" to a 401. The branch below is
+ * the real one. A docstring that claims a fix is worse than one that admits
+ * the gap, because it stops anybody looking.
  */
 export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("providerWorkspace");
@@ -48,9 +55,13 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   // Two states, not one: they are shown on different screens and mean
   // different things.
-  const [refused, setRefused] = useState<string | null>(null);
+  // What the server said when publishing was refused -- its own sentence,
+  // not one fixed line about missing standards shown for every failure.
+  const [actionFailed, setActionFailed] = useState<string | true | null>(null);
   // The server's own words, like the employer's workspace.
   const [saveFailed, setSaveFailed] = useState<string | true | null>(null);
+  // A 401 from a mutation: the session expires while the page is already open.
+  const [signedOut, setSignedOut] = useState(false);
 
   if (me.isError) {
     return (
@@ -70,9 +81,13 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
     );
   }
 
+  if (signedOut || isSignedOut(courses.error) || isSignedOut(me.error))
+    return <SessionExpired />;
+
   if (courses.isError) {
     // A 404 here means "not a member of this organisation", which is
-    // deliberately indistinguishable from "no such organisation".
+    // deliberately indistinguishable from "no such organisation". A 401 is
+    // handled above: it means signed out, not unwelcome.
     return (
       <Card>
         <CardBody>
@@ -129,10 +144,12 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
         <Button onClick={() => setEditing("new")}>{t("newCourse")}</Button>
       </div>
 
-      {refused && (
-        <p className="rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-sm text-warning-text">
-          {t("publishRefused")}
-        </p>
+      {actionFailed && (
+        <Alert role="alert">
+          {/* The server's own words -- "Add at least one standard this course
+              teaches before publishing" -- when it sent any. */}
+          {typeof actionFailed === "string" ? actionFailed : t("actionFailed")}
+        </Alert>
       )}
 
       {courses.isPending && (
@@ -194,13 +211,21 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                     type="button"
                     disabled={setPublished.isPending}
                     onClick={() => {
-                      setRefused(null);
+                      setActionFailed(null);
                       setPublished.mutate(
                         {
                           slug: course.slug,
                           published: course.status !== "published",
                         },
-                        { onError: () => setRefused(course.slug) },
+                        {
+                          onError: (e) => {
+                            if (isSignedOut(e)) {
+                              setSignedOut(true);
+                              return;
+                            }
+                            setActionFailed(detailOf(e) ?? true);
+                          },
+                        },
                       );
                     }}
                     className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"

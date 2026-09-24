@@ -183,6 +183,11 @@ export function SystemStatus() {
           >
             {busy ? tt("running") : tt("run")}
           </Button>
+          {enqueue.isError && (
+            <p className="mt-3 text-sm text-danger-text" role="alert">
+              {tt("enqueueFailed")}
+            </p>
+          )}
 
           {jobId && (
             <dl className="mt-4 space-y-1.5 rounded-lg bg-surface-muted p-3 text-xs">

@@ -152,12 +152,16 @@ export function useOrgJobMutations(orgSlug: string) {
       const path = published
         ? "/org/{org_slug}/jobs/{slug}/publish"
         : "/org/{org_slug}/jobs/{slug}/unpublish";
-      const { data, error } = await api.POST(path, {
+      const { data, error, response } = await api.POST(path, {
         params: { path: { org_slug: orgSlug, slug } },
       });
       // The API refuses to publish a job requiring no standards, and that
-      // refusal is the message the employer needs to see.
-      if (error || !data) throw new Error("publish-refused");
+      // refusal is the message the employer needs to see -- so carry it.
+      // This used to throw the sentinel `new Error("publish-refused")`, and
+      // the screen then showed "a vacancy needs at least one standard" for
+      // *every* failure, including an expired session. A sentence that is
+      // wrong about why is worse than one that admits it does not know.
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -180,11 +184,11 @@ export function useOrgJobMutations(orgSlug: string) {
       const path = open
         ? "/org/{org_slug}/jobs/{slug}/reopen"
         : "/org/{org_slug}/jobs/{slug}/close";
-      const { data, error } = await api.POST(path, {
+      const { data, error, response } = await api.POST(path, {
         params: { path: { org_slug: orgSlug, slug } },
         ...(open ? {} : { body: { reason: reason ?? "filled" } }),
       });
-      if (error || !data) throw new Error("close-failed");
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -327,12 +331,13 @@ export function useOrgCourseMutations(orgSlug: string) {
       const path = published
         ? "/org/{org_slug}/courses/{slug}/publish"
         : "/org/{org_slug}/courses/{slug}/unpublish";
-      const { data, error } = await api.POST(path, {
+      const { data, error, response } = await api.POST(path, {
         params: { path: { org_slug: orgSlug, slug } },
       });
       // The API refuses to publish a course teaching nothing, and that refusal
-      // is the message the provider needs to see.
-      if (error || !data) throw new Error("publish-refused");
+      // is the message the provider needs to see -- so carry it, for the
+      // reason the job path above spells out.
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,

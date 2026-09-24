@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Select } from "@/components/profile/fields";
 import { RolePicker } from "@/components/profile/RolePicker";
 import { StandardPicker } from "@/components/StandardPicker";
+import { Alert } from "@/components/ui";
+import { detailOf } from "@/lib/http";
 import { type Profile, useProfileMutations } from "@/lib/profile";
 
 /**
@@ -19,11 +21,18 @@ import { type Profile, useProfileMutations } from "@/lib/profile";
  * The fallback is `StandardPicker` itself, not a copy of it. This section used
  * to carry its own fork of that search, which had lost the NOS code and the
  * no-results state -- the two things the picker exists to show.
+ *
+ * **Both writes report their failure**, which for a long time neither did:
+ * this file held no `error`, `isError` or `onError` at all, so hitting the
+ * 60-standard cap, or adding a skill after the fifteen-minute token had
+ * expired, simply produced no chip and no explanation -- on the one control
+ * in the whole profile that moves a match score.
  */
 export function SkillsSection({ profile }: { profile: Profile | null }) {
   const t = useTranslations("profilePage");
   const { addSkill, removeSkill } = useProfileMutations();
   const [proficiency, setProficiency] = useState(3);
+  const failed = addSkill.error ?? removeSkill.error;
 
   const held = new Set((profile?.skills ?? []).map((s) => s.skill.slug));
 
@@ -62,6 +71,15 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
           />
         </div>
       </div>
+
+      {failed != null && (
+        <Alert role="alert" className="mt-4">
+          {/* The server's own sentence -- it names the cap, and names the
+              standard it did not recognise. The generic line is the fallback
+              for a failure that carried nothing. */}
+          {detailOf(failed) ?? t("errors.skillWrite")}
+        </Alert>
+      )}
 
       <ul className="mt-5 space-y-2">
         {(profile?.skills ?? []).map((s) => (

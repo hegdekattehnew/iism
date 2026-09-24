@@ -125,7 +125,15 @@ export function SectionEditor({
                   setEditingId(e.id);
                   setOpen(true);
                 }}
-                onRemove={() => removeEntry.mutate({ collection, id: e.id })}
+                onRemove={() => {
+                  setError(null);
+                  removeEntry.mutate(
+                    { collection, id: e.id },
+                    // The banner above exists and the delete path never wrote
+                    // to it, so a refused removal was silent.
+                    { onError: (err) => setError(detailOf(err) ?? te("generic")) },
+                  );
+                }}
               />
             );
           })}

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SignUpForm } from "@/components/SignUpForm";
@@ -11,7 +11,20 @@ vi.mock(
   async () => (await import("@/test/harness")).navigationMock,
 );
 
-beforeEach(resetWorld);
+const POST = vi.fn();
+vi.mock("@/lib/api", () => ({
+  api: {
+    GET: vi.fn(),
+    POST: (...a: unknown[]) => POST(...a),
+    PUT: vi.fn(),
+    DELETE: vi.fn(),
+  },
+}));
+
+beforeEach(() => {
+  resetWorld();
+  POST.mockReset();
+});
 
 const input = (placeholder: string) =>
   screen.queryByPlaceholderText(placeholder);
@@ -90,5 +103,47 @@ describe("SignUpForm — consent is asked for, and cannot be skipped", () => {
     world.memberships = [personal()];
     renderUi(<SignUpForm type="employer" />);
     expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});
+
+describe("SignUpForm — the same endpoint, told the same way on both screens", () => {
+  /**
+   * `POST /me/organisations` has two callers. `CreateOrgForm` reads the status
+   * and names a duplicate name and a hit rate cap; this one threw
+   * `new Error("create failed")` and showed one generic line for both -- the
+   * verbatim string CLAUDE.md records as the origin of the "[object Object]"
+   * defect. Two paths to one endpoint should not disagree about what it said.
+   */
+  const create = async (status: number) => {
+    POST.mockResolvedValue({
+      data: undefined,
+      error: { detail: "no" },
+      response: { status, headers: new Headers() },
+    });
+    world.memberships = [personal()];
+    renderUi(<SignUpForm type="employer" />);
+    fireEvent.change(input("Sunrise Multispeciality Hospital") as HTMLElement, {
+      target: { value: "Acme" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+  };
+
+  it("names a duplicate organisation name", async () => {
+    await create(409);
+    expect(
+      await screen.findByText("You already have an organisation with that name."),
+    ).toBeTruthy();
+  });
+
+  it("names the daily cap rather than calling it a generic failure", async () => {
+    await create(429);
+    expect(await screen.findByText(/created a lot of organisations today/)).toBeTruthy();
+  });
+
+  it("keeps the generic line for a failure it cannot name", async () => {
+    await create(500);
+    expect(
+      await screen.findByText("Could not create the organisation. Try again."),
+    ).toBeTruthy();
   });
 });

@@ -404,6 +404,26 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   maps onto. A build that is red every morning for a reason nobody can fix from CI teaches people
   to ignore red builds. **`tests/test_golden_set.py` runs instead** — it checks everything about the
   set that is true without a scorer, and it catches both mistakes above statically.
+- **Every write must be able to report its own failure, and
+  `web/src/lib/mutation-errors.test.ts` is the guard.** It reads the source and fails when a
+  `useMutation` has neither an `onError` nor anything reading its `.isError`. Eleven paths had
+  neither: `SkillsSection` — *the one control in the profile that moves a match score* — held no
+  `error`, `isError` or `onError` at all, so the 60-standard cap produced no chip and no
+  explanation; `Notices.markRead` never read `error`, and **openapi-fetch resolves on a non-2xx**,
+  so `onSuccess` ran on a 500 and the button did nothing for ever. None of that is visible to
+  `tsc`, to `eslint`, or to a render test that does not make the server refuse.
+- **A fixed sentence that is wrong about *why* is worse than admitting you do not know.**
+  `org.ts` threw `new Error("publish-refused")` under a comment saying the server's refusal "is the
+  message the employer needs to see", and the screen mapped **every** failure to one line about
+  required standards — so an employer whose fifteen-minute token had expired was told their vacancy
+  needed a standard it already had. Mutations throw `ApiError(status, readDetail(error))`; a 401
+  goes to `SessionExpired`, the server's own sentence goes on screen, and the generic line is the
+  fallback for a failure that carried **nothing**. `FIELD_NAMES` in `lib/http.ts` must name any
+  field a form can break, or the person reads a database column.
+- **A docstring that claims a fix nobody made stops anybody looking.**
+  `ProviderWorkspace.tsx` described its signed-out branch in the past tense — "there was no
+  signed-out branch at all, so a provider whose token had expired was told they had no access" —
+  and `isSignedOut` was never imported in that file. The claim outlived the gap by four sprints.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,

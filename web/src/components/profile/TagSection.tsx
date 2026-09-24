@@ -117,7 +117,15 @@ export function TagSection({
               <button
                 type="button"
                 aria-label={t("delete")}
-                onClick={() => removeEntry.mutate({ collection, id: e.id })}
+                onClick={() => {
+                  setError(null);
+                  removeEntry.mutate(
+                    { collection, id: e.id },
+                    // Same gap as `SectionEditor`: the banner existed, the
+                    // delete path never wrote to it.
+                    { onError: (err) => setError(detailOf(err) ?? te("generic")) },
+                  );
+                }}
                 className="text-muted hover:text-danger-text"
               >
                 ×

@@ -132,6 +132,7 @@
     "description": "Enqueue a real background job. The worker picks it up, and the result comes back here — proving the async path is wired, not merely tested.",
     "run": "Run test task",
     "running": "Running…",
+    "enqueueFailed": "Could not enqueue the job.",
     "jobId": "Job",
     "statusLabel": "Status",
     "queued": "Queued",
@@ -459,6 +460,7 @@
     "present": "Present",
     "errors": {
       "duplicate": "That entry already exists.",
+      "skillWrite": "Could not change your standards. Try again, and sign in again if it keeps failing.",
       "generic": "Could not save. Please check the fields."
     },
     "roles": {
@@ -638,7 +640,7 @@
     "unpublish": "Unpublish",
     "published": "Published",
     "draft": "Draft",
-    "publishRefused": "A vacancy needs at least one required standard before it can be published — without one, nobody can be matched to it.",
+    "actionFailed": "Could not do that. Try again, and reload the page if it keeps failing.",
     "seeCandidates": "See candidates",
     "viewPublic": "View the public posting",
     "standardsCount": "{count, plural, =0 {No standards required yet} one {# required standard} other {# required standards}}",
@@ -820,7 +822,7 @@
     "noCourses": "No courses yet. Create one and describe the standards it teaches.",
     "newCourse": "New course",
     "editCourse": "Edit course",
-    "publishRefused": "A course needs at least one standard it teaches before it can be published — without one, it can never be recommended to anyone.",
+    "actionFailed": "Could not do that. Try again, and reload the page if it keeps failing.",
     "saveFailed": "Could not save. Check the details, or confirm this organisation is a training provider.",
     "signInPrompt": "Sign in with your work email to manage your courses.",
     "signIn": "Sign in",
@@ -1159,6 +1161,7 @@
   "notices": {
     "title": "{count, plural, one {# update} other {# updates}}",
     "markRead": "Mark as read",
+    "markReadFailed": "Could not mark these as read. Try again.",
     "statusChanged": "{organisation} moved your application for {vacancy} to: {status}.",
     "status": {
       "applied": "Applied",
