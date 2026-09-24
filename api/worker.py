@@ -14,9 +14,18 @@ after `dictConfig`. `WorkerSettings` below is otherwise `core.tasks`' own,
 re-exported unchanged -- the tasks stay where they are; only the entry point
 moves.
 
-`Makefile`'s `worker` target points here. Pointing it back at
-`api.core.tasks.WorkerSettings` silently restores the duplicate-line behaviour,
-which is why the settings class there is no longer the documented entrypoint.
+`Makefile`'s `worker` target points here, and **that is load-bearing for more
+than logging**. The feature crons are registered *below*, in this composition
+root, because `api/core/` must not import a feature module (ADR-014) -- so
+pointing the Makefile back at `api.core.tasks.WorkerSettings` gives a worker
+that starts cleanly, answers the health probe from the heartbeat, and silently
+runs **none** of `drain_notifications`, `send_job_alerts` or
+`close_expired_jobs`. No notification is ever sent, no candidate is alerted,
+and a closing date never closes anything. This docstring used to say only that
+the wrong entry point "restores the duplicate-line behaviour", which is true
+and a long way short.
+
+`tests/test_worker_schedule.py` is the guard, and it names what stops running.
 """
 
 from typing import Any

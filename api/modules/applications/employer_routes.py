@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
@@ -74,4 +74,11 @@ async def set_application_status(
         db, context.tenant.id, job_slug, application_id, payload.status
     )
     _, rows = await employer_service.inbox(db, context.tenant.id, job_slug)
-    return _applicant(*next(r for r in rows if r[0].id == application_id))
+    # `None` rather than a bare `next(...)`: `StopIteration` inside a coroutine
+    # becomes a RuntimeError and a 500. `set_status` has already resolved the
+    # row, so this cannot miss today -- which is exactly why it would be an
+    # unreadable crash the day a filter changes in `inbox`.
+    row = next((r for r in rows if r[0].id == application_id), None)
+    if row is None:  # pragma: no cover - unreachable while `inbox` is unfiltered
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+    return _applicant(*row)

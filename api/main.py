@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import structlog
 from arq.jobs import Job, JobStatus
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,6 +86,10 @@ _settings = get_settings()
 # Before the app object, so anything the routers log at import time is already
 # formatted and redacted rather than going out through structlog's defaults.
 configure_logging()
+
+# After `configure_logging()`, so this logger inherits the shared processor
+# tail -- including the ADR-023 redaction filter -- rather than the defaults.
+log = structlog.get_logger("iism.api")
 
 app = FastAPI(
     title=_settings.app_name,
@@ -233,6 +238,12 @@ async def task_status(job_id: str) -> TaskStatus:
         try:
             result = await job.result(timeout=1)
         except Exception:
+            # Swallowed on purpose -- a demonstration endpoint must not 500
+            # because a result expired -- but **logged**, which it was not.
+            # A job that raised is indistinguishable here from one that
+            # returned nothing, and without this line there was no way to
+            # tell which had happened.
+            log.warning("tasks.result_unavailable", job_id=job_id, exc_info=True)
             result = None
     return TaskStatus(job_id=job_id, status=status.value, result=result)
 

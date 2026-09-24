@@ -237,6 +237,11 @@ class BodySizeLimitMiddleware:
                 try:
                     declared = int(value)
                 except ValueError:
+                    # A header that is not a number tells us nothing, so it
+                    # cannot be used to reject early -- but it must not be
+                    # read as "no body" and trusted either. `counting_receive`
+                    # below still counts the real bytes, so the limit holds;
+                    # this only skips the cheap pre-check.
                     declared = 0
                 if declared > limit:
                     log.warning("http.body_too_large", declared=declared, limit=limit)
@@ -264,7 +269,15 @@ class BodySizeLimitMiddleware:
         try:
             await self.app(scope, counting_receive, tracking_send)
         except _BodyTooLarge:
+            # Logged either way. The declared-size path above has always
+            # logged; this one did not, so an oversized streamed body that
+            # tripped the limit *after* the response had begun left no trace
+            # at all -- the client saw a truncated response and nothing here
+            # recorded that a limit was the reason.
+            log.warning("http.body_too_large", received=received, limit=limit, started=started)
             if not started:
+                # A 413 cannot be sent once headers have gone; all that is
+                # left is to stop reading, which returning does.
                 await _reject(send, 413, "Request body too large")
 
 

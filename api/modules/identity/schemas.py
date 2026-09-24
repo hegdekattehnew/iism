@@ -252,6 +252,16 @@ class OrganisationIn(BaseModel):
     logo_url: Annotated[str | None, Field(max_length=500)] = None
     contact_email: EmailStr | None = None
 
+    @field_validator("contact_email", mode="after")
+    @classmethod
+    def _normalise(cls, v: str | None) -> str | None:
+        # Lowercased like every other address in this file. It was the one that
+        # was not -- `update_organisation` is the single write path in the
+        # product with no service layer behind it, so a `setattr` loop over
+        # `model_dump()` stored whatever was typed. This is also the address
+        # `notifications/service.py` sends an organisation's mail to.
+        return normalise_email(v) if v is not None else None
+
 
 class MembershipOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

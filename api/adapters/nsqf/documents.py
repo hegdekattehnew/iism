@@ -378,6 +378,16 @@ def mc_from_doc(doc: dict[str, Any]) -> McRecord | None:
             # recorded without hours.
             hours.append(McSkillHours(nos_code=code))
 
+    # Both `None` rather than raising, for the reason the per-unit handler above
+    # states: an unreadable figure does not invalidate a model curriculum, and
+    # refusing the document would lose 1,950 rows over a stray total. The
+    # source's own arithmetic does not always add up (422 of 23,903 comparable
+    # elements disagree with their stated total), so this is expected data
+    # rather than an exceptional case.
+    #
+    # Deliberately **not** routed to `ImportReport.problems`: unlike the
+    # importer's two reported failures, these are per-document and would put
+    # thousands of lines in a report nobody would then read.
     try:
         total = parse_hhmm_to_minutes(doc.get("grandTotal"))
     except NormalisationError:
@@ -404,6 +414,11 @@ def mc_from_doc(doc: dict[str, Any]) -> McRecord | None:
 
 
 def _as_int(value: object) -> int | None:
+    """An integer from whatever the source put there, or `None`.
+
+    `None` rather than zero: a geography record with an unreadable code is a
+    record with no code, and zero is a code somebody could match on.
+    """
     if isinstance(value, bool) or value is None:
         return None
     try:

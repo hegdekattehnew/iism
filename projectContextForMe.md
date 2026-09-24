@@ -24,11 +24,9 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 27 — a vacancy that ends, and alerts that reach people
-  (+ deleting one organisation, a switcher that survives ten, and the homepage
-  counts — reported and fixed 2026-09-23) |
-| **Next sprint** | 30 — the monetisation ADR (now 043) + payment adapter port |
-| **Tests** | 647 backend (`make check`), 234 web (`cd web && npm test`) |
+| **Last sprint** | 31 — the quiet backend, and the scope ledger (`docs/scope-reconciliation.md`) |
+| **Next sprint** | 32 — the monetisation ADR (now 043) + payment adapter port |
+| **Tests** | 656 backend (`make check`), 259 web (`cd web && npm test`) |
 | **Migrations** | head `0028`; 42 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -75,11 +73,12 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **40 ADRs — the source of truth for every design decision.** Read before any structural change. |
-| `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
+| `docs/adr/architecture-decisions.md` | **42 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. **Read the next row with it.** |
+| `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
-| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprint 20's is the latest). Lives outside the repo. |
+| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprints 30–31's is the latest). Lives outside the repo. |
 | `docs/nsqf-source-data-findings.md` | **Everything measured about the NSQF corpus** — field-naming traps, level distributions, content volumes, deduplication rates, translation costs, data-quality issues. Read before touching the importer. |
 | This file | Session-to-session continuity, environment quirks, hard-won gotchas. |
 
@@ -977,7 +976,7 @@ when they differ.
 No migration: `ix_jobs_status_closed` is on `(status, closed_at)`, so the posted count uses the
 leading column and gets the same index-only scan.
 
-### Sprint 28 — clear the decks (in progress)
+### Sprint 28 — clear the decks (done 2026-09-23)
 
 The monetisation ADR and payment port are **deferred by the owner**; the gate ADR-025 sets cannot be
 cited honestly yet (five golden pairs, all candidate→job where ADR-025 means course; click-through
@@ -1086,7 +1085,36 @@ absent too.
 - Probes on the scoring run itself: making `self_declared` score like `certified` fails the evidence
   ordering by name; removing the mandatory cap fails fourteen expectations by name.
 
-### Sprint 30 — the monetisation ADR, and a payment adapter port (next)
+### Sprints 30 and 31 — the audit, and acting on it (done 2026-09-24)
+
+No new functionality, by instruction: *"check the Scope from our baseline documents and the reality
+of completed items."* Three axes audited — route-handler delegation, tenant scoping, swallowed
+exceptions — and the result is worth stating as a whole: **the server is in better shape than the
+documents claim, and the client was in worse shape than its tests suggested.**
+
+- **Tenant scoping audited clean, and no security work followed.** All 29 `{org_slug}` routes
+  carry `require(...)`; every service reachable from them re-filters on `tenant_id` in the same
+  `WHERE` as the slug or id, including both classic IDOR shapes. The one auth-free surface is the
+  demonstration console, behind an allowlist that fails closed. Saying so *is* the result.
+- **Eleven frontend writes failed in silence, and the worst were not obscure.** `SkillsSection` --
+  the file whose own docstring calls it "the only part of a profile that changes a match score" --
+  had no `error`, `isError` or `onError` anywhere. `Notices.markRead` never read `error` at all,
+  and openapi-fetch resolves on a non-2xx, so `onSuccess` ran on a 500 and the button did nothing
+  for ever. See the frontend conventions in `CLAUDE.md`.
+- **One was actively misleading**: an expired session was told its vacancy needed a required
+  standard it already had. Fixed and verified in a browser against the real API.
+- **`ProviderWorkspace`'s docstring described a fix the file never contained** -- past tense, four
+  sprints old, `isSignedOut` never imported there. Found while writing the tests, not by the audit.
+- **`web/src/lib/mutation-errors.test.ts`** reads the source and fails when a `useMutation` has
+  neither an `onError` nor anything reading its `.isError`. **`tests/test_worker_schedule.py`**
+  asserts the four feature crons are registered where arq actually reads them.
+- **`docs/scope-reconciliation.md`** is the ledger: seven places the product definition and the
+  tree disagree, each naming the file that proves it. The `.docx` is deliberately not amended.
+  Its sharpest finding is in no other document: **three of the four `SKILL_SOURCES` have no writer
+  outside the seed**, so `EVIDENCE_WEIGHT_SHARE = 0.10` is a constant for every real candidate --
+  a tenth of the match score carries no information in production.
+
+### Sprint 32 — the monetisation ADR, and a payment adapter port (next)
 
 Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
 marketplace that also **sells courses** and carries **gig work**, and the honest next step is the
@@ -1300,10 +1328,14 @@ the logs. CORS is restricted to one origin.
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.
 - Multi-sector dilutes GTM focus — a knowing trade, reversible by narrowing GTM only.
-- Recommendation quality is **measured but barely**. `make evaluate` exists and runs five labelled
-  pairs on every change (Sprint 10); five pairs catch a regression and cannot defend a weighting.
-  Until the set reaches the planned 50–100, every claim about match *quality* — as opposed to match
-  *stability* — remains a hypothesis.
+- Recommendation quality is **measured, and not continuously**. Sprint 29 took the set from five
+  pairs to **34 pairs, 7 orderings and 16 course expectations**, which is enough to defend a
+  weighting — the five never were. Two things still qualify every claim. `make evaluate` **cannot
+  run in CI** (it needs the 21,303-standard corpus, which is not in the repository), so the number
+  is produced by hand rather than on every change. And **precision has no negative class**: ADR-025
+  names click-through, and `EVENT_NAMES` has `course_recommended` and `course_opened` but nothing
+  for a recommendation dismissed, so "shown and ignored" and "shown and rejected" are the same rows
+  (`docs/scope-reconciliation.md` §3).
 - Self-declared skills are unreliable until assessment integration lands. Three of the four
   `SKILL_SOURCES` have no writer at all: every real candidate scores the 0.6 evidence floor, and
   `assessed`/`certified` appear only in seeded fixtures. There is no assessment module or adapter.
@@ -1378,18 +1410,18 @@ grievance officer is not yet named** — rate limiting, and security headers.
    `/ops/*` and `make grant-staff` (ADR-042). It is still absent from `OrganisationIn` — no request
    shape can set it, and none can set `is_staff` either. The `/admin` pages landed in Sprint 29. What remains
    for a pilot is a notification when a badge changes, **so a revocation is currently silent**.
-7. **No teammate invitations — now Sprint 25 (§11).** `Membership.role` supports owner/admin/member
-   and the permission model reads it (ADR-039), but the only way to gain a membership is to create
-   the organisation, so `admin` and `member` are unreachable. One person per organisation, in a
-   product about organisations — and the sole owner deleting their account destroys every
-   application to that organisation's vacancies, silently.
+7. ~~**No teammate invitations.**~~ **Closed in Sprint 25.** Invitations, roles, the last-owner
+   guard and the escalation rule all ship, and the sole-owner data loss this line described is
+   refused with a 409 that is now reachable. `admin` and `member` are live roles.
 
 **Would embarrass in a pilot, cheap to fix.**
 
 8. ~~Five of six rich-profile collections are empty.~~ **Closed in Sprint 21** — the seed now
    writes work histories, education, languages, certifications and preferences (21/20/40/20/21/20
    rows as of 2026-09-22).
-9. The golden set is five pairs. Every claim about match quality rests on them (§12), and Sprint 23
-   changed the scoring weights with only those five to defend the change.
+9. ~~The golden set is five pairs.~~ **34 pairs, 7 orderings and 16 course expectations as of
+   Sprint 29.** What remains is that `make evaluate` cannot run in CI — it needs the 21,303-standard
+   corpus, which is not in the repository — so the number is real and is produced by hand.
+   `tests/test_golden_set.py` guards everything about the set that is checkable without a scorer.
 10. The corpus is English-only (§12), in a product whose thesis is Hindi-first. The *interface* is
    fully bilingual, including everything Sprints 23–24 added; the standards themselves are not.

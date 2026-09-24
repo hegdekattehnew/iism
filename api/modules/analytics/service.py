@@ -9,7 +9,17 @@ error -- so an event that is merely flushed is discarded when the request ends,
 which is exactly what happened the first time this was wired up: three `record`
 calls per request and an empty table. The consequence is that `record` must be
 called from a handler with no other uncommitted work, or after that work has
-been committed. Every current caller is a read endpoint.
+been committed.
+
+**"Every current caller is a read endpoint" was true when it was written and is
+not now.** Five write paths call `record` -- applying and withdrawing, closing
+and reopening a vacancy, and the three team events -- and every one of them
+commits its own work *first*, which is what keeps the rule intact: see
+`identity/member_routes.py`, where the ordering is spelled out beside the call
+("after the commit, never inside it: a rollback in the middle would take the
+invitation with it"). A caller that records before committing would have this
+function commit its half-finished work, and a failure here would roll that work
+back and return silently. The rule is the ordering, not the kind of endpoint.
 """
 
 import uuid
