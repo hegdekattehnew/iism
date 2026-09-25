@@ -474,8 +474,10 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
 > not for the queue. **Sprints 28-32 are done** (geography and operator authority, the back
 > office and the golden set, the silent-failure sweep, the scope ledger, and the delegation
-> refactor). **Sprint 33 is
-> next: the monetisation ADR — now 043 — and the payment adapter port.**
+> refactor). **Sprint 33 is next: a management-facing MVP push** — thin-slice government-agency
+> and external-system actors, plus the course-to-role alignment score
+> (`docs/IISM-Product-Backlog.docx` §4). **The monetisation ADR — now 043 — is deferred behind it,
+> not cancelled**; the ADR itself still proceeds in parallel, since it costs no engineering time.
 > §11 also carries a
 > standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
 > gig work — and what each actually needs.

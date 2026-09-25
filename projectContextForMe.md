@@ -25,7 +25,7 @@ has been wrong before, and §10 explains how.*
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
 | **Last sprint** | 32 — every route handler delegates (17 violations moved, guarded) |
-| **Next sprint** | 33 — the monetisation ADR (now 043) + payment adapter port |
+| **Next sprint** | 33 — management-facing MVP: thin-slice government-agency + external-system actors, course-to-role alignment (§11); monetisation ADR drafted in parallel, engineering deferred to Sprint 34+ |
 | **Tests** | 680 backend (`make check`), 259 web (`cd web && npm test`) |
 | **Migrations** | head `0028`; 42 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
@@ -1156,11 +1156,35 @@ the route layer now makes **zero** calls to `db.*`, `select()` or `record()`.
 - Also found and fixed while doing it: `update_organisation` had **no service layer at all**, which
   is how `contact_email` went eight sprints without the normalisation every other address has.
 
-### Sprint 33 — the monetisation ADR, and a payment adapter port (next)
+### Sprint 33 — a management-facing MVP push (next, reprioritised 2026-09-25)
 
-Sprint 27 finished the job-connect pillar's outstanding work. The owner's stated direction is a
-marketplace that also **sells courses** and carries **gig work**, and the honest next step is the
-decision, not the code.
+The owner's instruction superseded the monetisation-first plan below before any of it was built:
+optimise the next sprint for demonstrating the platform's full actor breadth to higher management,
+ahead of revenue. Full stories, acceptance criteria and sizing are in
+`docs/IISM-Product-Backlog.docx` (Epic B7 and BL-2.3, sequence in §4) — this entry is the decision
+record, not the detail.
+
+- **Government agency and external-system actors, thin slice.** Not the full production version —
+  a demo needs an ops-run CSV enrolment (reusing `scripts/seed_candidates.py`'s account-
+  construction path, not a second one), one programme-scoped reporting view, and API-key auth on
+  one or two read endpoints. The super-admin tier is deliberately cut from this push: it is the one
+  actor-type item with no audience-visible payoff, and ADR-042 already argues against building
+  admin escalation paths speculatively.
+- **The course-to-role alignment score, pulled forward to run alongside it.** The product
+  definition names this "the differentiator" (§5.5) and describes it as already built;
+  `docs/scope-reconciliation.md` #4 confirms it is not. If this MVP is pitched using that document,
+  this is the single most likely thing asked for — cheap, no new infrastructure, and no collision
+  with the actor-type work (matching vs. identity/auth).
+- **B7 alone is not "all actors."** Assessment Provider is a separate epic (B3, Sprint 35 in the
+  backlog's sequence) — do not let a demo claim full actor coverage before it lands too.
+- **Monetisation moves to Sprint 34+, not cancelled.** ADR-043 itself is a decision document, cheap
+  enough to keep drafting in parallel; the payment adapter port and billing module wait.
+
+### Sprint 34+ — the monetisation ADR, and a payment adapter port
+
+Deferred behind Sprint 33's actor-breadth push, not abandoned. The owner's stated direction is a
+marketplace that also **sells courses** and carries **gig work**, and the honest next step once the
+MVP push lands is the decision, not the code.
 
 - **Write ADR-043 first, superseding ADR-025** (042 went to operator authority, which
   landed first). ADR-025 says "free v1, no billing implementation…
@@ -1215,9 +1239,10 @@ expensive assets — 21,303 NSQF standards with role search, one pure determinis
 identity many roles, two working consent-and-revocation disclosure loops, geography to
 sub-district — are exactly what all three pillars need.
 
-Suggested order after Sprint 26: the monetisation ADR and a **payment adapter port only** (an
-interface with a console implementation that refuses production, as `ConsoleNotificationProvider`
-does), then course checkout, then gig as its own module.
+Suggested order, revised 2026-09-25: the management-facing actor-breadth MVP (Sprint 33) first,
+then the monetisation ADR and a **payment adapter port only** (an interface with a console
+implementation that refuses production, as `ConsoleNotificationProvider` does), then course
+checkout, then gig as its own module.
 
 ### Then, in rough order of value
 
