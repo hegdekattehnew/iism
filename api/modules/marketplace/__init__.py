@@ -21,6 +21,7 @@ from api.modules.marketplace.models import (
     Job,
     JobSkill,
 )
+from api.modules.marketplace.partner_routes import router as partner_router
 from api.modules.marketplace.profile_routes import router as profile_router
 from api.modules.marketplace.profile_service import (
     add_skill,
@@ -77,6 +78,7 @@ __all__ = [
     "list_courses",
     "list_jobs",
     "marketplace_router",
+    "partner_router",
     "profile_router",
     "course_publishing_router",
     "publishing_router",

@@ -38,6 +38,7 @@ from api.modules.marketplace import (
     courses_router,
     jobs_router,
     marketplace_router,
+    partner_router,
     profile_router,
     publishing_router,
 )
@@ -132,6 +133,7 @@ app.include_router(geography_router)
 app.include_router(jobs_router)
 app.include_router(courses_router)
 app.include_router(marketplace_router)
+app.include_router(partner_router)
 app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(organisation_router)

@@ -65,6 +65,13 @@ EXPERIENCE_WEIGHT = 0.07
 # is not the same as having none.
 EXPERIENCE_TAPER_YEARS = 3.0
 
+# What counts as a serious candidate, not merely a technical match: no
+# mandatory standard missing scores well above this, and a near-miss still
+# clears it. Lives here, not in a caller, so the alert sweep and the
+# operator-facing programme report agree on one number rather than two
+# modules independently deciding 60 is enough.
+SERIOUS_MATCH_SCORE = 60
+
 
 @dataclass(frozen=True)
 class RequiredSkill:

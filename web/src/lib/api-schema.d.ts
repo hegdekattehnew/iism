@@ -333,6 +333,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/partners/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Partner Jobs
+         * @description Open vacancies, for a partner holding a valid API key.
+         *
+         *     `account` is unused beyond authenticating the call — there is no
+         *     per-partner filter yet (`SERVICE_ACCOUNT_SCOPES` is a set of one), so
+         *     naming it in the signature is what makes the dependency run, not a value
+         *     this handler reads.
+         */
+        get: operations["partner_jobs_partners_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/otp/request": {
         parameters: {
             query?: never;
@@ -1654,6 +1679,32 @@ export interface paths {
          *     forget it.
          */
         post: operations["decide_verification_ops_organisations__org_slug__verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/programmes/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Programme Report
+         * @description Outcomes for one government-agency programme, by name (Sprint 33).
+         *
+         *     Stands in for an agency's own login, which does not exist yet -- an
+         *     operator views this on the agency's behalf. Always 200: a programme name
+         *     is free text (`CandidateProfile.enrolled_via_programme`'s docstring), not
+         *     a resource with its own row to 404 against, so an unrecognised name simply
+         *     reports zero.
+         */
+        get: operations["programme_report_ops_programmes__name__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3629,6 +3680,22 @@ export interface components {
             missing?: string[];
         };
         /**
+         * ProgrammeReportOut
+         * @description Outcomes for one government-agency programme (Sprint 33, BL-7.1b).
+         */
+        ProgrammeReportOut: {
+            /** Programme */
+            programme: string;
+            /** Enrolled */
+            enrolled: number;
+            /** Matched */
+            matched: number;
+            /** Applied */
+            applied: number;
+            /** Hired */
+            hired: number;
+        };
+        /**
          * ProviderStatusIn
          * @description What a provider may set. `registered` and `withdrawn` are the learner's.
          */
@@ -4783,6 +4850,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CourseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    partner_jobs_partners_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobPage"];
                 };
             };
             /** @description Validation Error */
@@ -7253,6 +7354,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programme_report_ops_programmes__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeReportOut"];
                 };
             };
             /** @description Validation Error */

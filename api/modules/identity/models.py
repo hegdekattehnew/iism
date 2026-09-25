@@ -280,3 +280,50 @@ class Invitation(Base):
 
     def is_open(self, now: datetime) -> bool:
         return self.state(now) == "pending"
+
+
+# The only scope a service account may hold today. A closed set of one, like
+# `Job.status`'s draft/published before a third value existed -- widening this
+# is a CHECK migration, not a schema redesign, when per-partner scopes matter.
+SERVICE_ACCOUNT_SCOPES = ("read",)
+
+
+class ServiceAccount(Base):
+    """A credential for an external system, not a person (Sprint 33, BL-7.2).
+
+    **Alongside JWT, not replacing it.** A partner is not a `User`: nobody signs
+    in, there is no phone or email, and `get_current_user`'s whole shape --
+    resolving an account, then a membership, then a tenant -- does not apply.
+    `core.security.get_service_account` is a second, independent dependency a
+    route opts into, the same way `require_operator()` is independent of
+    `require()`.
+
+    **The key is hashed the same way an OTP or a refresh token is**
+    (`hash_secret`/`verify_secret`, HMAC keyed on `JWT_SECRET_KEY`) -- a leaked
+    database dump must not itself be a working credential. The raw key exists
+    for one moment, when `scripts/issue_api_key.py` prints it; nothing after
+    that moment can recover it, including this table.
+
+    **Revoked, never deleted.** A row here is what a log line's
+    `service_account_id` resolves against; deleting it would turn every
+    historical access-log entry for that partner into an orphaned id.
+    """
+
+    __tablename__ = "service_accounts"
+    __table_args__ = (
+        CheckConstraint(one_of("scope", SERVICE_ACCOUNT_SCOPES), name="ck_service_account_scope"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # A short label for the partner ("acme-hr-integration"), not a display
+    # name -- this is what appears in an access log, so it should already read
+    # like one.
+    name: Mapped[str] = mapped_column(unique=True)
+    hashed_key: Mapped[str] = mapped_column(unique=True, index=True)
+    scope: Mapped[str] = mapped_column(default="read")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    @hybrid_property
+    def is_active(self) -> bool:
+        return self.revoked_at is None

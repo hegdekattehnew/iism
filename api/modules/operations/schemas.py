@@ -64,3 +64,15 @@ class OrganisationVerificationOut(BaseModel):
     verified_at: datetime | None = None
     verification_note: str | None = None
     history: list[VerificationEventOut]
+
+
+class ProgrammeReportOut(BaseModel):
+    """Outcomes for one government-agency programme (Sprint 33, BL-7.1b)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    programme: str
+    enrolled: int
+    matched: int
+    applied: int
+    hired: int

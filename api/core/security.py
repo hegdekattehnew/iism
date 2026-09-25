@@ -23,7 +23,8 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 import jwt
 import structlog
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.cache import get_redis
@@ -31,7 +32,7 @@ from api.core.config import get_settings
 from api.core.database import get_db_session
 
 if TYPE_CHECKING:  # imported for typing only; a runtime import would cycle
-    from api.modules.identity.models import User
+    from api.modules.identity.models import ServiceAccount, User
 
 TokenType = Literal["access", "refresh"]
 
@@ -63,6 +64,10 @@ _OTP_RATE_KEY = "auth:otp:rate:{channel}:{identifier}"
 Channel = Literal["sms", "email"]
 
 bearer_scheme = HTTPBearer(auto_error=False)
+# `auto_error=False` for the same reason as the bearer scheme above: a missing
+# key is this dependency's business to answer, in its own words, not FastAPI's
+# generic one.
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 @dataclass(frozen=True)
@@ -309,3 +314,41 @@ async def get_optional_user(
         return await get_current_user(credentials, db)
     except HTTPException:
         return None
+
+
+# ---------------------------------------------------------- service accounts
+
+
+async def get_service_account(
+    key: str | None = Depends(api_key_header),
+    db: AsyncSession = Depends(get_db_session),
+) -> "ServiceAccount":
+    """A partner's identity, independent of `get_current_user` (Sprint 33,
+    BL-7.2, ADR-017's payment-provider adapter's shape borrowed for a second
+    kind of external caller).
+
+    Alongside JWT, not layered under it: there is no `User` here, no
+    membership, no tenant -- a route asking for this dependency is opting into
+    a different actor entirely, the same way `require_operator()` opts a route
+    out of `require()`'s tenant resolution.
+
+    One key, one row, hashed the same way an OTP is (`hash_secret`): a leaked
+    database dump must not itself be a working credential. `401`, not `404` --
+    unlike an organisation slug, a partner's key is not a guessable path
+    segment there is anything to enumerate by refusing differently.
+    """
+    from api.modules.identity.models import ServiceAccount  # local: avoids a cycle at import time
+
+    if key is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing API key")
+
+    account = await db.scalar(
+        select(ServiceAccount).where(ServiceAccount.hashed_key == hash_secret(key))
+    )
+    if account is None or not account.is_active:
+        # The key itself never reaches the logger -- only the outcome does.
+        log.warning("auth.service_account_denied")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or revoked API key")
+
+    structlog.contextvars.bind_contextvars(service_account_id=str(account.id))
+    return account

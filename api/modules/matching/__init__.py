@@ -16,7 +16,7 @@ from api.modules.matching.employer_routes import (
 from api.modules.matching.employer_routes import org_router as employer_org_router
 from api.modules.matching.routes import router
 from api.modules.matching.schemas import CandidateCardOut
-from api.modules.matching.scoring import MatchResult, score_match
+from api.modules.matching.scoring import SERIOUS_MATCH_SCORE, MatchResult, score_match
 from api.modules.matching.service import courses_closing_gap, match_jobs
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "candidate_card",
     "score_profiles",
     "MatchResult",
+    "SERIOUS_MATCH_SCORE",
     "employer_org_router",
     "courses_closing_gap",
     "match_jobs",

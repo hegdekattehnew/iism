@@ -1,10 +1,11 @@
 """The back office: what an operator may do, and the record of having done it.
 
-Its own module, a leaf in the `privacy/` mould -- it depends on `identity` and
-`marketplace` and nothing depends on it (ADR-014). Putting it in `identity/`
-would invert that arrow the first time the queue needed a listing count, which
-is day one: `marketplace` already imports `identity`, so the cycle would be
-immediate.
+Its own module, a leaf in the `privacy/` mould -- it depends on `identity`,
+`marketplace` and, since Sprint 33, `matching` (for the programme report's
+serious-match count), and nothing depends on it (ADR-014). Putting it in
+`identity/` would invert that arrow the first time the queue needed a listing
+count, which is day one: `marketplace` already imports `identity`, so the
+cycle would be immediate.
 
 The dangerous function lives here rather than in `scripts/grant_staff.py`, so
 that granting operator authority is exercised by the ordinary test fixtures. A
@@ -12,14 +13,18 @@ bare script is the one shape that cannot be.
 """
 
 import uuid
+from dataclasses import dataclass
 
 import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import ORGANISATION_TYPES
+from api.modules.applications.models import Application
 from api.modules.identity.models import Membership, Tenant, User
-from api.modules.marketplace.models import Course, Job
+from api.modules.marketplace.models import CandidateProfile, Course, Job
+from api.modules.matching import match_jobs
+from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
 from api.modules.operations.models import TenantVerificationEvent
 
 log = structlog.get_logger("iism.ops")
@@ -163,3 +168,67 @@ async def staff_roster(db: AsyncSession) -> list[User]:
     the product answers it.
     """
     return list((await db.scalars(select(User).where(User.is_staff.is_(True)))).all())
+
+
+@dataclass(frozen=True)
+class ProgrammeReport:
+    """What a government-agency programme has to show for itself so far.
+
+    Enrolled and applied/hired are cheap counts; matched is not -- it calls the
+    real scorer once per enrolled candidate, through `match_jobs`, the same
+    function `/me/matches` uses (ADR-037: one scorer, never a second, looser
+    "probably has a match" rule). Fine at programme scale (tens of candidates);
+    were this ever run at thousands, it would need the same batching
+    `matching.employer._candidates_for_jobs` already does the other direction.
+    """
+
+    programme: str
+    enrolled: int
+    matched: int
+    applied: int
+    hired: int
+
+
+async def programme_report(db: AsyncSession, programme: str) -> ProgrammeReport:
+    """Outcomes for one government-agency programme, by name.
+
+    Unknown programme names are not an error -- there is no programme table to
+    check against (see `CandidateProfile.enrolled_via_programme`'s docstring),
+    so a typo simply reports zero rather than 404ing on a resource that was
+    never a real entity to look up.
+    """
+    profile_ids = list(
+        (
+            await db.scalars(
+                select(CandidateProfile.id).where(
+                    CandidateProfile.enrolled_via_programme == programme
+                )
+            )
+        ).all()
+    )
+    if not profile_ids:
+        return ProgrammeReport(programme=programme, enrolled=0, matched=0, applied=0, hired=0)
+
+    matched = 0
+    for profile_id in profile_ids:
+        scored = await match_jobs(db, profile_id)
+        if any(s.result.score >= SERIOUS_MATCH_SCORE for s in scored):
+            matched += 1
+
+    applied = await db.scalar(
+        select(func.count(func.distinct(Application.profile_id))).where(
+            Application.profile_id.in_(profile_ids)
+        )
+    )
+    hired = await db.scalar(
+        select(func.count(func.distinct(Application.profile_id))).where(
+            Application.profile_id.in_(profile_ids), Application.status == "hired"
+        )
+    )
+    return ProgrammeReport(
+        programme=programme,
+        enrolled=len(profile_ids),
+        matched=matched,
+        applied=applied or 0,
+        hired=hired or 0,
+    )

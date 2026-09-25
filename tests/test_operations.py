@@ -7,6 +7,7 @@ mostly about what that writer must *refuse*.
 """
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
@@ -20,9 +21,17 @@ from api.core.authorization import (
     require_operator,
 )
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
+from api.modules.applications.models import Application
 from api.modules.identity.models import Tenant, User
+from api.modules.marketplace.models import (
+    CandidateProfile,
+    CandidateSkill,
+    Job,
+    JobSkill,
+)
 from api.modules.operations import service
 from api.modules.operations.models import TenantVerificationEvent
+from api.modules.skills.models import Skill
 
 NOTE = "Registration certificate and GST checked against the register."
 
@@ -370,3 +379,97 @@ class TestEveryOperatorRouteIsGuarded:
                 if dependency.call is not None
             }
             assert any("require_operator" in name for name in names), route.path
+
+
+# --------------------------------------------- Sprint 33: the programme report
+
+
+async def _enrolled_candidate(
+    db: AsyncSession, *, programme: str | None, skill_id: uuid.UUID | None
+) -> CandidateProfile:
+    user = User(phone=f"+9193{uuid.uuid4().int % 100000000:08d}")
+    db.add(user)
+    await db.flush()
+    profile = CandidateProfile(user_id=user.id, enrolled_via_programme=programme)
+    db.add(profile)
+    await db.flush()
+    if skill_id is not None:
+        db.add(CandidateSkill(profile_id=profile.id, skill_id=skill_id, proficiency=3))
+        await db.flush()
+    return profile
+
+
+class TestProgrammeReport:
+    """The government-agency actor's thin slice (BL-7.1b). No candidate card,
+    no employer-facing payload -- this is an operator viewing an aggregate,
+    not a pool of named people, so ADR-037's disclosure rule does not apply
+    here the way it does to `candidates_for_job`."""
+
+    async def test_counts_only_the_named_programme(self, db: AsyncSession) -> None:
+        skill = Skill(
+            slug="programme-report-skill",
+            name="Handle programme report records",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="TST/N0903",
+            source="nsqf",
+        )
+        tenant = Tenant(
+            slug="programme-report-employer", name="Report Hospital", tenant_type="employer"
+        )
+        db.add_all([skill, tenant])
+        await db.flush()
+        job = Job(
+            slug="programme-report-job", tenant_id=tenant.id, title="Clerk", status="published"
+        )
+        db.add(job)
+        await db.flush()
+        db.add(JobSkill(job_id=job.id, skill_id=skill.id, importance=4, is_mandatory=True))
+        await db.flush()
+
+        # Enrolled, matches the job, applies, and is hired.
+        matched = await _enrolled_candidate(db, programme="PMKVY-TEST", skill_id=skill.id)
+        db.add(Application(job_id=job.id, profile_id=matched.id, status="hired"))
+
+        # Enrolled under the same programme, but holds no skill -- no match,
+        # no application.
+        await _enrolled_candidate(db, programme="PMKVY-TEST", skill_id=None)
+
+        # Enrolled under a *different* programme -- must not be counted at all.
+        other_programme = await _enrolled_candidate(
+            db, programme="OTHER-PROGRAMME", skill_id=skill.id
+        )
+        db.add(Application(job_id=job.id, profile_id=other_programme.id, status="hired"))
+
+        # Never enrolled through a programme at all (self-registered).
+        await _enrolled_candidate(db, programme=None, skill_id=skill.id)
+        await db.commit()
+
+        report = await service.programme_report(db, "PMKVY-TEST")
+        assert report.enrolled == 2
+        assert report.matched == 1
+        assert report.applied == 1
+        assert report.hired == 1
+
+    async def test_an_unrecognised_programme_reports_zero_not_an_error(
+        self, db: AsyncSession
+    ) -> None:
+        report = await service.programme_report(db, "no-such-programme")
+        assert report.enrolled == report.matched == report.applied == report.hired == 0
+
+    async def test_the_route_requires_operator_authority(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        anon = await client.get("/ops/programmes/PMKVY-TEST")
+        assert anon.status_code == 401
+
+        stranger = await _candidate(client)
+        refused = await client.get("/ops/programmes/PMKVY-TEST", headers=stranger)
+        assert refused.status_code == 404
+
+        headers = await _operator(client, db)
+        allowed = await client.get("/ops/programmes/PMKVY-TEST", headers=headers)
+        assert allowed.status_code == 200
+        body = allowed.json()
+        assert body["programme"] == "PMKVY-TEST"
+        assert set(body) == {"programme", "enrolled", "matched", "applied", "hired"}

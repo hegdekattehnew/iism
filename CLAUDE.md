@@ -89,12 +89,18 @@ api/                     FastAPI modular monolith
                          profile (ADR-009/010/011/032/038). invitations.py holds the three
                          rules about teams -- escalation, the last owner, enumeration-safety --
                          each in one function. member_routes.py has two routers, because
-                         somebody accepting an invitation is not yet a member.
+                         somebody accepting an invitation is not yet a member. ServiceAccount
+                         (Sprint 33) is a fourth credential, alongside JWT rather than under
+                         it -- an external system is not a `User` and never signs in.
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
                          listings.py is what they *do* share: which standards exist,
                          the refusal of retired ones, slug uniqueness, eager loading.
+                         partner_routes.py (Sprint 33) is the external-system actor's one
+                         endpoint, gated by `core.security.get_service_account` rather than
+                         `require()` -- same `service.list_jobs` the public listing calls,
+                         because a partner is not owed a second query path.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
@@ -131,10 +137,13 @@ api/                     FastAPI modular monolith
                          Spans every module; nothing depends on it.
     operations/          The back office (ADR-042): tenant_verification_events, the
                          verification queue and decision routes, `require_operator()`'s
-                         permissions. A second leaf beside privacy/ -- depends on identity
-                         and marketplace, nothing depends on it. No staff-management
-                         endpoint, ever, by decision; `scripts/grant_staff.py` is the
-                         only writer of `users.is_staff`.
+                         permissions, and (Sprint 33) the government-agency programme
+                         report -- an operator stands in for an agency login that does
+                         not exist yet. A second leaf beside privacy/ -- depends on
+                         identity, marketplace and, since Sprint 33, matching (for the
+                         report's serious-match count) -- nothing depends on it. No
+                         staff-management endpoint, ever, by decision;
+                         `scripts/grant_staff.py` is the only writer of `users.is_staff`.
     analytics/           analytics_events (ADR-025). record() COMMITS.
 
     Not built. ADR-008's career_paths/ (graph-based role transition) and

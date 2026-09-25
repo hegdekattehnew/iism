@@ -38,6 +38,7 @@ from api.core.config import get_settings
 from api.modules.alerts.models import JobAlert
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job, open_job
+from api.modules.matching.scoring import SERIOUS_MATCH_SCORE as MIN_SCORE
 from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.alerts")
@@ -45,11 +46,6 @@ log = structlog.get_logger("iism.alerts")
 # How many vacancies one sweep will consider. The cron runs often; a backlog
 # drains over a few minutes rather than in one long transaction.
 MAX_JOBS_PER_SWEEP = 10
-
-# Nobody hears about a vacancy they are not a serious candidate for. The same
-# number the employer console treats as "ready": no mandatory standard missing
-# scores well above this, and a near-miss still clears it.
-MIN_SCORE = 60
 
 
 @dataclass(frozen=True)

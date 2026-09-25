@@ -14,6 +14,7 @@ router = APIRouter(prefix="/ops", tags=["operations"])
 # a route that 404s for ever and reads as missing.
 CanReadOrgs = Depends(require_operator(Permission.OPS_ORG_READ))
 CanVerifyOrgs = Depends(require_operator(Permission.OPS_ORG_VERIFY))
+CanReadProgrammes = Depends(require_operator(Permission.OPS_PROGRAMME_READ))
 
 
 @router.get("/organisations", response_model=list[schemas.UnverifiedOrganisation])
@@ -79,6 +80,24 @@ async def decide_verification(
         db, tenant, decision=payload.decision, note=payload.note, actor=context.user
     )
     return _detail(tenant, await service.verification_history(db, tenant.id))
+
+
+@router.get("/programmes/{name}", response_model=schemas.ProgrammeReportOut)
+async def programme_report(
+    name: str,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadProgrammes,
+) -> schemas.ProgrammeReportOut:
+    """Outcomes for one government-agency programme, by name (Sprint 33).
+
+    Stands in for an agency's own login, which does not exist yet -- an
+    operator views this on the agency's behalf. Always 200: a programme name
+    is free text (`CandidateProfile.enrolled_via_programme`'s docstring), not
+    a resource with its own row to 404 against, so an unrecognised name simply
+    reports zero.
+    """
+    report = await service.programme_report(db, name)
+    return schemas.ProgrammeReportOut.model_validate(report)
 
 
 def _detail(tenant, history) -> schemas.OrganisationVerificationOut:  # type: ignore[no-untyped-def]

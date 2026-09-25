@@ -386,6 +386,14 @@ class CandidateProfile(Base):
         ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
     )
 
+    # Set only by a government-agency bulk enrolment (Sprint 33, ADR pending);
+    # NULL for every account that signed up on their own. A free-text name
+    # rather than a table: a programme is named ad hoc by whoever runs the
+    # enrolment, and there is exactly one write path (`bulk_enrol_candidates`)
+    # -- a lookup table would be a second source of truth for a value that
+    # never needs its own attributes.
+    enrolled_via_programme: Mapped[str | None] = mapped_column(default=None, index=True)
+
     headline: Mapped[str | None] = mapped_column(default=None)
     location_state: Mapped[str | None] = mapped_column(default=None)
     location_district: Mapped[str | None] = mapped_column(default=None)

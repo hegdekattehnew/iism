@@ -81,6 +81,10 @@ class Permission(StrEnum):
     # verify their own organisation. A test asserts the two sets are disjoint.
     OPS_ORG_READ = "ops:org:read"
     OPS_ORG_VERIFY = "ops:org:verify"
+    # Sprint 33, BL-7.1b: the government-agency actor's thin slice stands in
+    # for an agency login that does not exist yet (an operator views the
+    # report on the agency's behalf).
+    OPS_PROGRAMME_READ = "ops:programme:read"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -131,7 +135,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
 # becomes a function of the user and **no route changes**, which is the whole
 # reason callers ask for a Permission rather than for the flag (ADR-022).
 OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
-    {Permission.OPS_ORG_READ, Permission.OPS_ORG_VERIFY}
+    {Permission.OPS_ORG_READ, Permission.OPS_ORG_VERIFY, Permission.OPS_PROGRAMME_READ}
 )
 
 
