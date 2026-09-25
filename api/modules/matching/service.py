@@ -31,6 +31,7 @@ from api.modules.matching.scoring import (
     RequiredSkill,
     score_match,
 )
+from api.modules.skills import standards_for_role
 from api.modules.skills.hierarchy import QpEntryRoute, QpSkill, QualificationPack
 from api.modules.skills.models import Skill
 
@@ -331,6 +332,81 @@ async def courses_closing_gap(
     # that merely improves a score.
     suggestions.sort(key=lambda s: (-s.covers_mandatory, -s.closes_count, s.course.title))
     return suggestions[:limit]
+
+
+@dataclass(frozen=True)
+class RoleAlignment:
+    """How much of one role's requirement one course actually teaches.
+
+    Independent of any candidate -- a provider's own question, "does my course
+    cover this occupation", not "would this candidate get hired" (ADR-037 does
+    not apply here for the reason it applies to `candidates_for_job`: nothing
+    here identifies a person, because no person is in the comparison at all).
+    """
+
+    course: Course
+    qp: QualificationPack
+    role_name: str
+    covered: list[str]
+    missing: list[str]
+    required_count: int
+    coverage_ratio: float
+
+
+async def course_role_alignment(
+    db: AsyncSession, course: Course, role_slug: str
+) -> RoleAlignment | None:
+    """Coverage against the role's **compulsory** standards only.
+
+    Electives are deliberately excluded, the same distinction
+    `standards_for_role` itself draws: "choose one of these" is not "all of
+    these are required", and folding electives in would inflate a course's
+    apparent coverage of a requirement it does not fully address. Compared at
+    concept level (`Skill.concept_id or Skill.id`), the same key
+    `courses_closing_gap` uses, so a course and a qualification that picked
+    different but equivalent rows for the same standard still meet.
+    """
+    role = await standards_for_role(db, role_slug)
+    if role is None:
+        return None
+
+    wanted = {
+        s.skill.concept_id or s.skill.id: s.skill.name
+        for s in role.standards
+        if s.requirement == "compulsory"
+    }
+    role_name = role.qp.job_role or role.qp.name
+    if not wanted:
+        return RoleAlignment(
+            course=course,
+            qp=role.qp,
+            role_name=role_name,
+            covered=[],
+            missing=[],
+            required_count=0,
+            coverage_ratio=0.0,
+        )
+
+    taught_rows = (
+        await db.execute(
+            select(Skill.concept_id, Skill.id)
+            .join(CourseSkill, CourseSkill.skill_id == Skill.id)
+            .where(CourseSkill.course_id == course.id)
+        )
+    ).all()
+    taught_keys = {r.concept_id or r.id for r in taught_rows}
+
+    covered = sorted(name for key, name in wanted.items() if key in taught_keys)
+    missing = sorted(name for key, name in wanted.items() if key not in taught_keys)
+    return RoleAlignment(
+        course=course,
+        qp=role.qp,
+        role_name=role_name,
+        covered=covered,
+        missing=missing,
+        required_count=len(wanted),
+        coverage_ratio=len(covered) / len(wanted),
+    )
 
 
 async def entry_routes_for_job(db: AsyncSession, job_id: uuid.UUID) -> EntryRouteFit | None:

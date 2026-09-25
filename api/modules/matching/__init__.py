@@ -14,10 +14,16 @@ from api.modules.matching.employer_routes import (
     mount_employer_console,
 )
 from api.modules.matching.employer_routes import org_router as employer_org_router
+from api.modules.matching.provider_routes import org_router as provider_org_router
 from api.modules.matching.routes import router
 from api.modules.matching.schemas import CandidateCardOut
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE, MatchResult, score_match
-from api.modules.matching.service import courses_closing_gap, match_jobs
+from api.modules.matching.service import (
+    RoleAlignment,
+    course_role_alignment,
+    courses_closing_gap,
+    match_jobs,
+)
 
 __all__ = [
     "CandidateCardOut",
@@ -25,8 +31,11 @@ __all__ = [
     "candidate_card",
     "score_profiles",
     "MatchResult",
+    "RoleAlignment",
     "SERIOUS_MATCH_SCORE",
+    "course_role_alignment",
     "employer_org_router",
+    "provider_org_router",
     "courses_closing_gap",
     "match_jobs",
     "mount_employer_console",

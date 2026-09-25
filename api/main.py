@@ -42,7 +42,7 @@ from api.modules.marketplace import (
     profile_router,
     publishing_router,
 )
-from api.modules.matching import employer_org_router, mount_employer_console
+from api.modules.matching import employer_org_router, mount_employer_console, provider_org_router
 from api.modules.matching import router as matching_router
 from api.modules.notifications import router as notifications_router
 from api.modules.operations import router as operations_router
@@ -159,6 +159,7 @@ app.include_router(privacy_org_router)
 app.include_router(operations_router)
 
 app.include_router(employer_org_router)
+app.include_router(provider_org_router)
 
 # The *demonstration* console is unauthenticated, so it mounts in local
 # environments only. The authenticated one above needs no guard. The flag is

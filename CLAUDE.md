@@ -114,6 +114,10 @@ api/                     FastAPI modular monolith
     matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
                          scoring.py is pure -- no I/O, no clock, no model. employer.py is
                          the same scorer run in reverse for the console (ADR-037).
+                         provider_routes.py (Sprint 33) is course_role_alignment --
+                         a course measured against a role, with no candidate in the
+                         comparison at all, so ADR-037 does not apply the way it does
+                         to candidates_for_job.
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they

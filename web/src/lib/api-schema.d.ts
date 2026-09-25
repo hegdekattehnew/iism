@@ -1753,6 +1753,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/courses/{course_slug}/alignment/{role_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alignment With Role
+         * @description How much of one role's compulsory requirement this course teaches.
+         *
+         *     Independent of any candidate (BL-2.3): a provider deciding whether to
+         *     build or adjust a course, not a hiring decision. `role_slug` is a
+         *     qualification pack's slug, the same one `GET /roles/{slug}/standards`
+         *     already resolves.
+         */
+        get: operations["alignment_with_role_org__org_slug__courses__course_slug__alignment__role_slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/employer/employers": {
         parameters: {
             query?: never;
@@ -2376,6 +2401,31 @@ export interface components {
             /** Fee Inr */
             fee_inr?: number | null;
             tenant: components["schemas"]["TenantOut"];
+        };
+        /**
+         * CourseRoleAlignmentOut
+         * @description A course measured against one role, with no candidate in the request
+         *     (Sprint 33, BL-2.3).
+         */
+        CourseRoleAlignmentOut: {
+            /** Course Slug */
+            course_slug: string;
+            /** Course Title */
+            course_title: string;
+            /** Role Slug */
+            role_slug: string;
+            /** Role Name */
+            role_name: string;
+            /** Qualification Code */
+            qualification_code?: string | null;
+            /** Covered */
+            covered?: string[];
+            /** Missing */
+            missing?: string[];
+            /** Required Count */
+            required_count: number;
+            /** Coverage Percent */
+            coverage_percent: number;
         };
         /**
          * CourseSkillIn
@@ -7450,6 +7500,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    alignment_with_role_org__org_slug__courses__course_slug__alignment__role_slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_slug: string;
+                role_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRoleAlignmentOut"];
                 };
             };
             /** @description Validation Error */
