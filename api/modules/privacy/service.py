@@ -54,42 +54,68 @@ async def _memberships(db: AsyncSession, user_id: uuid.UUID) -> list[tuple[Membe
     return [(m, t) for m, t in rows.all()]
 
 
-async def _listings(db: AsyncSession, tenant_id: uuid.UUID) -> int:
-    jobs = await db.scalar(select(func.count()).select_from(Job).where(Job.tenant_id == tenant_id))
-    courses = await db.scalar(
-        select(func.count()).select_from(Course).where(Course.tenant_id == tenant_id)
+async def _membership_counts(
+    db: AsyncSession, tenant_ids: list[uuid.UUID], user_id: uuid.UUID
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """(other members, other owners) per tenant, in one grouped query.
+
+    Sprint 26 deliberately removed the cap on organisations per account, so a
+    preview that ran two counts per organisation in a loop turned into a
+    round trip per organisation the caller belongs to -- unnoticeable for one,
+    real for the account this feature exists to make safe for.
+    """
+    if not tenant_ids:
+        return {}
+    rows = await db.execute(
+        select(
+            Membership.tenant_id,
+            func.count(),
+            func.count().filter(Membership.role == "owner"),
+        )
+        .where(Membership.tenant_id.in_(tenant_ids), Membership.user_id != user_id)
+        .group_by(Membership.tenant_id)
     )
-    return (jobs or 0) + (courses or 0)
+    return {tenant_id: (total, owners) for tenant_id, total, owners in rows.all()}
+
+
+async def _listings_by_tenant(
+    db: AsyncSession, tenant_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Open listings per tenant, two grouped queries total rather than two
+    counts per organisation the caller belongs to."""
+    if not tenant_ids:
+        return {}
+    counts: dict[uuid.UUID, int] = dict.fromkeys(tenant_ids, 0)
+    for model in (Job, Course):
+        rows = await db.execute(
+            select(model.tenant_id, func.count())
+            .where(model.tenant_id.in_(tenant_ids))
+            .group_by(model.tenant_id)
+        )
+        for tenant_id, count in rows.all():
+            counts[tenant_id] += count
+    return counts
 
 
 async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
+    memberships = [
+        (m, t) for m, t in await _memberships(db, user.id) if t.tenant_type != "personal"
+    ]
+    tenant_ids = [t.id for _, t in memberships]
+    counts = await _membership_counts(db, tenant_ids, user.id)
+    listings = await _listings_by_tenant(db, tenant_ids)
+
     deleted: list[OrganisationFate] = []
     blocked: list[OrganisationFate] = []
-    for membership, tenant in await _memberships(db, user.id):
-        if tenant.tenant_type == "personal":
-            continue
-        others = await db.scalar(
-            select(func.count())
-            .select_from(Membership)
-            .where(Membership.tenant_id == tenant.id, Membership.user_id != user.id)
-        )
+    for membership, tenant in memberships:
         fate = OrganisationFate(
-            slug=tenant.slug, name=tenant.name, listings=await _listings(db, tenant.id)
+            slug=tenant.slug, name=tenant.name, listings=listings.get(tenant.id, 0)
         )
+        others, other_owners = counts.get(tenant.id, (0, 0))
         if not others:
             deleted.append(fate)
-        elif membership.role == "owner":
-            other_owners = await db.scalar(
-                select(func.count())
-                .select_from(Membership)
-                .where(
-                    Membership.tenant_id == tenant.id,
-                    Membership.user_id != user.id,
-                    Membership.role == "owner",
-                )
-            )
-            if not other_owners:
-                blocked.append(fate)
+        elif membership.role == "owner" and not other_owners:
+            blocked.append(fate)
     return DeletionPreview(organisations_deleted=deleted, blocked_by=blocked)
 
 

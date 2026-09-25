@@ -40,7 +40,11 @@ class Settings(BaseSettings):
 
     # --- auth (ADR-009, ADR-032) ---
     jwt_secret_key: str = _DEFAULT_SECRET
-    jwt_algorithm: str = "HS256"
+    # A closed set, not a bare `str`: `jwt.decode` is called with whatever this
+    # says, and PyJWT accepts "none" as a literal algorithm name. A bare `str`
+    # makes a misconfigured environment variable an unsigned-token hole rather
+    # than a startup validation error.
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
 

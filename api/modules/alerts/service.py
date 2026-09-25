@@ -87,6 +87,15 @@ async def _already_told(db: AsyncSession, job_id: uuid.UUID) -> set[uuid.UUID]:
     return set(rows.all())
 
 
+async def _users_by_id(db: AsyncSession, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, User]:
+    """One query per job rather than one per eligible candidate -- ten jobs
+    against twenty-five candidates each was up to 250 individual lookups."""
+    if not user_ids:
+        return {}
+    rows = await db.scalars(select(User).where(User.id.in_(user_ids)))
+    return {u.id: u for u in rows.all()}
+
+
 async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepResult:
     """Alert matched candidates about vacancies nobody has been told about yet.
 
@@ -131,6 +140,7 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
         told = await _already_told(db, job.id)
         profile_ids = [c.profile.id for c in eligible if c.profile.id not in told]
         recent = await _recent_alert_counts(db, profile_ids)
+        users = await _users_by_id(db, {c.profile.user_id for c in eligible})
 
         sent_for_this_job = 0
         for candidate in eligible:
@@ -146,7 +156,7 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
                 capped += 1
                 continue
 
-            user = await db.get(User, profile.user_id)
+            user = users.get(profile.user_id)
             if user is None:
                 continue
 
