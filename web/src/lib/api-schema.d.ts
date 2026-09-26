@@ -1301,6 +1301,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/events/course-dismissed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Course Dismissed
+         * @description The "not interested" signal (Sprint 33, BL-2.2) -- a client-side act
+         *     the server cannot infer any other way, the same reason `course-opened`
+         *     has its own endpoint rather than being derived from a later request.
+         */
+        post: operations["course_dismissed_me_events_course_dismissed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/applications": {
         parameters: {
             query?: never;
@@ -1770,6 +1792,33 @@ export interface paths {
          *     already resolves.
          */
         get: operations["alignment_with_role_org__org_slug__courses__course_slug__alignment__role_slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/market-demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Market Demand
+         * @description Which standards the whole market wants that the candidate pool cannot
+         *     supply (Sprint 33, BL-2.4) -- the demand-side mirror of the employer
+         *     console's `scarce_skills`, not scoped to this provider's own courses.
+         *
+         *     `context` establishes that a signed-in member of *some* organisation is
+         *     asking; the answer itself is the same for every caller, employer or
+         *     provider alike, because market scarcity is a fact about the platform, not
+         *     about who is looking at it.
+         */
+        get: operations["market_demand_org__org_slug__market_demand_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2286,6 +2335,18 @@ export interface components {
             tenant: components["schemas"]["TenantOut"];
             /** Skills */
             skills?: components["schemas"]["CourseSkillOut"][];
+        };
+        /**
+         * CourseDismissedIn
+         * @description The negative half of `CourseOpenedIn` (Sprint 33, BL-2.2). Same shape,
+         *     same reason for `from_job_slug`: a dismissal only means something against
+         *     the recommendation it was shown alongside.
+         */
+        CourseDismissedIn: {
+            /** Course Slug */
+            course_slug: string;
+            /** From Job Slug */
+            from_job_slug?: string | null;
         };
         /**
          * CourseIn
@@ -6720,6 +6781,37 @@ export interface operations {
             };
         };
     };
+    course_dismissed_me_events_course_dismissed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseDismissedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_applications_me_applications_get: {
         parameters: {
             query?: {
@@ -7533,6 +7625,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CourseRoleAlignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    market_demand_org__org_slug__market_demand_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScarceSkillOut"][];
                 };
             };
             /** @description Validation Error */

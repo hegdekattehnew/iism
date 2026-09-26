@@ -72,6 +72,11 @@ EVENT_NAMES = (
     # counting recipients here would be a headcount of candidates on an event
     # that must name none.
     "job_alerts_sent",
+    # Sprint 33, BL-2.2. `course_opened`'s missing half: precision@5 (ADR-025)
+    # had a positive signal only -- "shown and opened" and "shown, opened and
+    # four explicitly rejected" were the same rows. Same shape as
+    # `course_opened`, subject to the course, `from_job_slug` in the payload.
+    "course_dismissed",
 )
 
 

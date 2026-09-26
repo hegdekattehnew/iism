@@ -160,3 +160,34 @@ async def record_course_opened(
         subject_id=course_id,
         payload={"from_job": from_job_slug} if from_job_slug else None,
     )
+
+
+async def record_course_dismissed(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    course_slug: str,
+    from_job_slug: str | None,
+) -> None:
+    """The negative half of `record_course_opened` (Sprint 33, BL-2.2).
+
+    Same shape, same reason for resolving the slug here rather than in the
+    route, same reason for the local import -- see that function's docstring.
+    Gives precision@5 (ADR-025) a negative class: before this, "shown and
+    opened" and "shown, opened and four explicitly rejected" were the same
+    rows, indistinguishable.
+    """
+    from api.modules.marketplace.models import Course
+
+    course_id = await db.scalar(select(Course.id).where(Course.slug == course_slug))
+    if course_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+
+    await record(
+        db,
+        "course_dismissed",
+        user_id=user_id,
+        subject_type="course",
+        subject_id=course_id,
+        payload={"from_job": from_job_slug} if from_job_slug else None,
+    )

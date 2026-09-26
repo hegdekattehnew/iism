@@ -106,6 +106,18 @@ class Settings(BaseSettings):
     max_alerts_per_job: int = 25
     max_alerts_per_candidate_per_day: int = 5
 
+    # --- matching weights (Sprint 33, BL-2.1) ---
+    # `scoring.py` stays pure and never reads these -- `ScoreWeights` is a
+    # value `matching.service.weights_from_settings()` builds from them and
+    # passes in. Defaults are the numbers the scorer has used since Sprint 10;
+    # `make evaluate` is bit-identical against them.
+    match_weight_coverage: float = 0.75
+    match_weight_level: float = 0.08
+    match_weight_experience: float = 0.07
+    match_weight_evidence_share: float = 0.10
+    match_mandatory_gap_cap: float = 0.45
+    match_experience_taper_years: float = 3.0
+
     # --- database pool ---
     db_pool_size: int = 5
     db_max_overflow: int = 10

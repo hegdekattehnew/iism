@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import get_settings
 from api.modules.marketplace.models import (
     CandidatePreferredLocation,
     CandidateProfile,
@@ -29,6 +30,7 @@ from api.modules.matching.scoring import (
     MatchResult,
     MissingSkill,
     RequiredSkill,
+    ScoreWeights,
     score_match,
 )
 from api.modules.skills import standards_for_role
@@ -38,6 +40,22 @@ from api.modules.skills.models import Skill
 # How many jobs survive retrieval to be scored. Generous relative to the current
 # catalogue and cheap to raise; it exists so the shape is right, not to ration.
 RETRIEVAL_LIMIT = 500
+
+
+def weights_from_settings() -> ScoreWeights:
+    """Where configuration and the pure scorer actually meet (Sprint 33,
+    BL-2.1). `scoring.py` may never call `get_settings()`; this does, once per
+    scoring pass, so a re-tune is an environment variable, not a deploy.
+    """
+    settings = get_settings()
+    return ScoreWeights(
+        coverage=settings.match_weight_coverage,
+        level=settings.match_weight_level,
+        experience=settings.match_weight_experience,
+        evidence_share=settings.match_weight_evidence_share,
+        mandatory_gap_cap=settings.match_mandatory_gap_cap,
+        experience_taper_years=settings.match_experience_taper_years,
+    )
 
 
 @dataclass(frozen=True)
@@ -239,6 +257,7 @@ async def match_jobs(
 
     requirements = await requirements_for(db, job_ids)
     jobs = {j.id: j for j in (await db.scalars(select(Job).where(Job.id.in_(job_ids)))).all()}
+    weights = weights_from_settings()
 
     scored = [
         ScoredJob(
@@ -250,6 +269,7 @@ async def match_jobs(
                 candidate_level=attained_level(held, requirements.get(job_id, [])),
                 job_min_years=jobs[job_id].experience_min_years,
                 candidate_years=facts.years_experience,
+                weights=weights,
             ),
             locality=_locality(jobs[job_id], facts),
         )
@@ -504,6 +524,7 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
             candidate_level=attained_level(held, requirements),
             job_min_years=job.experience_min_years,
             candidate_years=facts.years_experience,
+            weights=weights_from_settings(),
         ),
         locality=_locality(job, facts),
     )

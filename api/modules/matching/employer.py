@@ -25,7 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
-from api.modules.matching.service import RETRIEVAL_LIMIT, attained_level, requirements_for
+from api.modules.matching.service import (
+    RETRIEVAL_LIMIT,
+    attained_level,
+    requirements_for,
+    weights_from_settings,
+)
 from api.modules.skills.models import Skill
 
 
@@ -164,6 +169,7 @@ async def _candidates_for_jobs(
         else {}
     )
 
+    weights = weights_from_settings()
     out: dict[uuid.UUID, list[ScoredCandidate]] = {}
     for job in jobs:
         reqs = requirements.get(job.id, [])
@@ -177,6 +183,7 @@ async def _candidates_for_jobs(
                     candidate_level=attained_level(held_by_profile.get(pid, []), reqs),
                     job_min_years=job.experience_min_years,
                     candidate_years=profiles[pid].years_experience,
+                    weights=weights,
                 ),
             )
             for pid in pools[job.id]
@@ -235,6 +242,7 @@ async def score_profiles(
             )
         ).all()
     }
+    weights = weights_from_settings()
     return {
         pid: score_match(
             requirements,
@@ -243,6 +251,7 @@ async def score_profiles(
             candidate_level=attained_level(held_by_profile.get(pid, []), requirements),
             job_min_years=job.experience_min_years,
             candidate_years=years.get(pid),
+            weights=weights,
         )
         for pid in profile_ids
     }
@@ -363,21 +372,44 @@ async def scarce_skills(
     scarcity is a market fact, and narrowing it to people who already matched
     would make every standard look plentiful.
     """
-    required = (
-        await db.execute(
-            select(
-                Skill.id,
-                Skill.concept_id,
-                Skill.nos_code,
-                Skill.name,
-                func.count(func.distinct(Job.id)).label("required_by"),
-            )
-            .join(JobSkill, JobSkill.skill_id == Skill.id)
-            .join(Job, Job.id == JobSkill.job_id)
-            .where(Job.tenant_id == tenant_id, Job.status == "published")
-            .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
+    return await _scarce_skills(db, tenant_id=tenant_id, limit=limit)
+
+
+async def market_scarce_skills(db: AsyncSession, *, limit: int = 8) -> list[ScarceSkill]:
+    """The same shortage, demanded by the whole market rather than one
+    employer (Sprint 33, BL-2.4).
+
+    A course provider has no vacancies of its own to ask "what do *I* need" --
+    the question a training provider actually has is which standards the
+    market broadly wants and the candidate pool broadly lacks, mirroring the
+    employer-facing view rather than a second, looser metric.
+    """
+    return await _scarce_skills(db, tenant_id=None, limit=limit)
+
+
+async def _scarce_skills(
+    db: AsyncSession, *, tenant_id: uuid.UUID | None, limit: int
+) -> list[ScarceSkill]:
+    """Shared query: `tenant_id=None` is every employer's demand, one tenant's
+    id is that employer's alone. One construction site for the same reason
+    `candidate_card()` is -- two copies of "what counts as demand" is how they
+    would eventually disagree."""
+    demand = (
+        select(
+            Skill.id,
+            Skill.concept_id,
+            Skill.nos_code,
+            Skill.name,
+            func.count(func.distinct(Job.id)).label("required_by"),
         )
-    ).all()
+        .join(JobSkill, JobSkill.skill_id == Skill.id)
+        .join(Job, Job.id == JobSkill.job_id)
+        .where(Job.status == "published")
+        .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
+    )
+    if tenant_id is not None:
+        demand = demand.where(Job.tenant_id == tenant_id)
+    required = (await db.execute(demand)).all()
     if not required:
         return []
 

@@ -74,6 +74,33 @@ SERIOUS_MATCH_SCORE = 60
 
 
 @dataclass(frozen=True)
+class ScoreWeights:
+    """The business's dials on the scorer, gathered into one value (Sprint 33,
+    BL-2.1) so re-tuning them is a configuration change, not a deployment.
+
+    A *value passed in*, never read here: `score_match` stays pure (ADR-036)
+    precisely because nothing inside this module calls `get_settings()`.
+    `matching.service.weights_from_settings()` is where configuration and the
+    scorer actually meet, and it lives there rather than here for that reason.
+
+    Defaults are every number this scorer has used since Sprint 10 -- calling
+    `score_match` with no `weights` argument at all reproduces every score
+    from before this change, exactly, which is what keeps `make evaluate`
+    bit-identical.
+    """
+
+    coverage: float = COVERAGE_WEIGHT
+    level: float = LEVEL_WEIGHT
+    experience: float = EXPERIENCE_WEIGHT
+    evidence_share: float = EVIDENCE_WEIGHT_SHARE
+    mandatory_gap_cap: float = MANDATORY_GAP_CAP
+    experience_taper_years: float = EXPERIENCE_TAPER_YEARS
+
+
+DEFAULT_WEIGHTS = ScoreWeights()
+
+
+@dataclass(frozen=True)
 class RequiredSkill:
     """One standard a job requires, as the scorer sees it."""
 
@@ -158,8 +185,12 @@ def score_match(
     candidate_level: Decimal | None = None,
     job_min_years: int | None = None,
     candidate_years: int | None = None,
+    weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> MatchResult:
-    """Score one candidate against one job. Pure: no I/O, no clock, no model."""
+    """Score one candidate against one job. Pure: no I/O, no clock, no model.
+
+    `weights` defaults to every number this scorer has always used; a caller
+    passes its own only to re-tune deliberately (BL-2.1)."""
     if not required:
         # A job that lists no requirements cannot be matched against. Returning
         # zero is honest; returning 100 would rank empty jobs top.
@@ -249,20 +280,20 @@ def score_match(
     years_short: int | None = None
     if job_min_years and candidate_years is not None and candidate_years < job_min_years:
         years_short = job_min_years - candidate_years
-        experience_score = max(0.0, 1.0 - years_short / EXPERIENCE_TAPER_YEARS)
+        experience_score = max(0.0, 1.0 - years_short / weights.experience_taper_years)
 
     raw = (
-        COVERAGE_WEIGHT * coverage
-        + LEVEL_WEIGHT * level_score
-        + EXPERIENCE_WEIGHT * experience_score
-        + EVIDENCE_WEIGHT_SHARE * evidence_score
+        weights.coverage * coverage
+        + weights.level * level_score
+        + weights.experience * experience_score
+        + weights.evidence_share * evidence_score
     )
 
     missing_mandatory = sum(1 for m in missing if m.is_mandatory)
     capped = False
     if missing_mandatory:
-        capped = raw > MANDATORY_GAP_CAP
-        raw = min(raw, MANDATORY_GAP_CAP)
+        capped = raw > weights.mandatory_gap_cap
+        raw = min(raw, weights.mandatory_gap_cap)
 
     # Most important first, so the reason reads in the order a person cares
     # about: what is mandatory and missing, then what matters most.

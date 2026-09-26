@@ -201,6 +201,86 @@ class TestScoring:
         ]
 
 
+class TestConfigurableWeights:
+    """BL-2.1: a re-tune is a settings change, not a deployment. The default
+    is proved bit-identical to the pre-Sprint-33 scorer by `make evaluate`
+    (all 34 golden pairs, 7 orderings, 16 course expectations); these prove
+    the other half -- that a *different* weights value actually changes the
+    number, and that configuration actually reaches the scorer."""
+
+    def test_a_different_weights_value_changes_the_score(self) -> None:
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS, ScoreWeights
+
+        reqs = [_req("a", importance=5, mandatory=True)]
+        held = [
+            HeldSkill(
+                skill_id=reqs[0].skill_id,
+                concept_id=None,
+                name="a",
+                proficiency=3,
+                source="self_declared",
+            )
+        ]
+
+        default = score_match(reqs, held, weights=DEFAULT_WEIGHTS)
+        zero_coverage = score_match(reqs, held, weights=ScoreWeights(coverage=0.0))
+        assert zero_coverage.score != default.score
+
+        # All four terms zeroed leaves nothing for `raw` to be built from.
+        all_zero = score_match(
+            reqs,
+            held,
+            weights=ScoreWeights(coverage=0.0, level=0.0, experience=0.0, evidence_share=0.0),
+        )
+        assert all_zero.score == 0
+
+    def test_weights_from_settings_reaches_the_scorer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from api.core.config import get_settings
+        from api.modules.matching.service import weights_from_settings
+
+        monkeypatch.setenv("MATCH_WEIGHT_COVERAGE", "0")
+        get_settings.cache_clear()
+        try:
+            weights = weights_from_settings()
+            assert weights.coverage == 0.0
+            # The other five defaults are undisturbed by overriding one.
+            assert weights.level == 0.08
+            assert weights.experience == 0.07
+            assert weights.evidence_share == 0.10
+            assert weights.mandatory_gap_cap == 0.45
+            assert weights.experience_taper_years == 3.0
+        finally:
+            monkeypatch.delenv("MATCH_WEIGHT_COVERAGE")
+            get_settings.cache_clear()
+
+    def test_scoring_module_still_never_reads_settings(self) -> None:
+        """The acceptance criterion, checked rather than trusted: scoring.py
+        must import no configuration, or a re-tune would be reachable from
+        inside the function the golden set depends on being pure. Checked via
+        the parsed import statements, not a string search -- the module's own
+        docstrings talk about `get_settings()` to explain why it is *not*
+        called here, which a naive substring check cannot tell apart."""
+        import ast
+        import inspect
+
+        from api.modules.matching import scoring
+
+        tree = ast.parse(inspect.getsource(scoring))
+        imported_modules = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        } | {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        assert not any("config" in m for m in imported_modules), imported_modules
+
+
 async def _auth(client: AsyncClient) -> dict[str, str]:
     """Same shape as tests/test_profile.py, so sign-in behaves identically."""
     phone = "9" + uuid.uuid4().int.__str__()[:9]
@@ -754,3 +834,108 @@ class TestCourseRecommendationsAreAttributable:
         assert {r.subject_id for r in rows} == {c.id for c in gap["courses"]}
         # The key `course_opened` uses, spelled the same way on both sides.
         assert {r.payload["from_job"] for r in rows} == {gap["job"].slug}
+
+
+class TestMarketDemand:
+    """BL-2.4: the same `scarce_skills` question, asked market-wide rather
+    than for one employer -- the signal `scope-reconciliation.md` #6 found a
+    course provider had no way to see."""
+
+    @pytest.fixture
+    async def two_employers(self, db: AsyncSession) -> dict:
+        """Two different employers both requiring the same standard, plus one
+        neither requires -- market-wide demand must sum across tenants, which
+        a single-employer fixture cannot prove."""
+        shared = Skill(
+            slug="market-demand-shared",
+            name="Widely wanted standard",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="MKT/N0001",
+            source="nsqf",
+        )
+        lonely = Skill(
+            slug="market-demand-lonely",
+            name="Rarely wanted standard",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="MKT/N0002",
+            source="nsqf",
+        )
+        db.add_all([shared, lonely])
+        await db.flush()
+
+        first = Tenant(slug="market-demand-employer-a", name="Employer A", tenant_type="employer")
+        second = Tenant(slug="market-demand-employer-b", name="Employer B", tenant_type="employer")
+        db.add_all([first, second])
+        await db.flush()
+
+        job_a = Job(
+            slug="market-demand-job-a", tenant_id=first.id, title="Role A", status="published"
+        )
+        job_b = Job(
+            slug="market-demand-job-b", tenant_id=second.id, title="Role B", status="published"
+        )
+        db.add_all([job_a, job_b])
+        await db.flush()
+        db.add_all(
+            [
+                JobSkill(job_id=job_a.id, skill_id=shared.id, importance=4, is_mandatory=True),
+                JobSkill(job_id=job_b.id, skill_id=shared.id, importance=4, is_mandatory=True),
+                JobSkill(job_id=job_a.id, skill_id=lonely.id, importance=2, is_mandatory=False),
+            ]
+        )
+        await db.commit()
+        return {"shared": shared, "lonely": lonely, "employer_a": first}
+
+    async def test_demand_sums_across_every_employer(
+        self, db: AsyncSession, two_employers: dict
+    ) -> None:
+        from api.modules.matching.employer import market_scarce_skills, scarce_skills
+
+        market = {s.nos_code: s for s in await market_scarce_skills(db)}
+        assert market["MKT/N0001"].required_by == 2
+        assert market["MKT/N0002"].required_by == 1
+
+        # The employer-scoped view must be untouched by the refactor: Employer
+        # A required both standards, Employer B required neither's own count.
+        one_employer = {
+            s.nos_code: s for s in await scarce_skills(db, two_employers["employer_a"].id)
+        }
+        assert one_employer["MKT/N0001"].required_by == 1
+        assert one_employer["MKT/N0002"].required_by == 1
+
+    async def test_the_route_is_reachable_by_a_course_provider(
+        self, client: AsyncClient, two_employers: dict
+    ) -> None:
+        """The point of BL-2.4: a provider, not only an employer, can ask."""
+        email = f"market-{uuid.uuid4().hex[:10]}@example.com"
+        code = (
+            await client.post(
+                "/auth/org/register",
+                json={
+                    "email": email,
+                    "organisation_name": "Market Demand Institute",
+                    "tenant_type": "course_provider",
+                    "consent_version": CONSENT,
+                },
+            )
+        ).json()["debug_code"]
+        tokens = (
+            await client.post("/auth/email/otp/verify", json={"email": email, "code": code})
+        ).json()
+        headers = {"authorization": f"Bearer {tokens['access_token']}"}
+        me = (await client.get("/auth/me", headers=headers)).json()
+        org_slug = next(
+            m["tenant"]["slug"]
+            for m in me["memberships"]
+            if m["tenant"]["tenant_type"] != "personal"
+        )
+
+        response = await client.get(f"/org/{org_slug}/market-demand", headers=headers)
+        assert response.status_code == 200, response.text
+        body = {row["nos_code"]: row for row in response.json()}
+        assert body["MKT/N0001"]["required_by"] == 2
+
+    async def test_it_requires_authentication(self, client: AsyncClient) -> None:
+        assert (await client.get("/org/anything/market-demand")).status_code == 401
