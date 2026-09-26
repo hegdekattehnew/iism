@@ -22,6 +22,9 @@
 >   tenant; ADR-042 adds a second authority that no membership can grant.
 > - **ADR-003** — qualified by ADR-034. Its rejection of a second store for *vector search* stands
 >   and pgvector is unchanged; ADR-034 adds a document store for *source data* only.
+> - **ADR-025** — its deferral clause is carried forward by ADR-043, cited honestly rather than
+>   declared satisfied: two of its three gate metrics are still thin. ADR-025's mandatory
+>   instrumentation is unchanged.
 
 ## ADR-001: Overall Product Architecture
 
@@ -1509,3 +1512,89 @@ ends determines whether the product acquires a privilege-escalation path along w
 - **A route that forgets the dependency is the residual risk**, exactly as three of eight publishing
   writes once shipped without their second guard (ADR-039). It is pinned by reading the app's own
   route table, not by remembering.
+
+---
+
+## ADR-043: Payment Adapter Port, Monetisation Still Deferred
+
+**Status:** Accepted (September 2026). Carries ADR-025's deferral clause forward — it does not
+declare that clause satisfied.
+
+**Context:** ADR-025 deferred all billing and named three metrics that must exist before a successor
+ADR authorises billing code: recommendation precision@5 against a hand-labelled golden set,
+candidate-to-course click-through, and provider-reported enrolment conversion. As of Sprint 33:
+
+- **Precision@5 is now citable.** Sprint 29 took the golden set from 5 pairs to 34 pairs, 7
+  orderings and 16 course expectations — thin against a target of 50–100, but real and defensible
+  for the first time.
+- **Click-through is joinable, not populated.** Sprint 24 gave `course_recommended` and
+  `course_opened` a shared subject, so the query exists — it returns near-zero rows, because the
+  platform has no real user volume yet.
+- **Enrolment conversion has no surface at all.** Sprint 24 deliberately modelled *interest*, not
+  *enrolment*: whether somebody actually enrolled is a fact the provider's own system owns, and this
+  platform cannot verify it without asking the provider to report it, which is unbuilt.
+
+Two of three gates remain thin. Against that, the owner's stated direction — a marketplace that
+sells courses and carries gig work — has been deferred once already (ADR-025) and again through
+Sprint 33's actor-breadth push. Sprint 33 demonstrated the platform to management with no
+monetisation story at all, which is the cost of continued deferral becoming visible rather than
+theoretical.
+
+**Decision:** Build the payment adapter *port* only — an interface plus a console implementation
+that refuses to run, following ADR-017's own precedent for notifications and email. No gateway
+integration, no `Order`, `Entitlement`, or `Payout` table, and no route calls it. This is not a
+claim that ADR-025's gate is passed.
+
+**Options considered:** 1. Full billing implementation now (gateway integration, orders, entitlements, checkout)
+2. Continue deferring; build nothing
+3. Payment adapter port only, no billing code
+4. Payment adapter port plus a provider-facing enrolment/conversion reporting surface, to close
+   ADR-025's remaining gap before writing anything payment-shaped
+
+**Trade-offs:**
+
+- Option 1: ✅ Fastest path to revenue if traction is real
+❌ Builds against exactly the two metrics ADR-025 named as still unvalidated
+❌ Sprint 24's "interest, not enrolment" reasoning **inverts** the moment money moves through the
+platform: taking payment makes this platform the system of record for enrolment, a materially larger
+claim than anything built so far
+
+- Option 2: ✅ No engineering spent against an unvalidated model
+❌ The owner's stated direction has no path forward of any kind
+❌ Blocks every later sequencing step (course checkout, gig) indefinitely rather than merely delaying
+it
+
+- Option 3: ✅ Matches ADR-017's own adapter precedent exactly — an interface commits to no vendor
+and costs one small file tree
+✅ Lets course-checkout design start against a real protocol instead of a hypothetical one
+❌ Produces no revenue and closes none of ADR-025's metric gaps by itself
+
+- Option 4: ✅ Would make ADR-025's gate fully citable before any payment-shaped code exists
+❌ A provider-facing enrolment-reporting surface is its own scoped product feature — asking a
+training provider to report back into the platform — not a one-sprint addition to an adapter port,
+and bundling it here would understate its size
+
+**Final decision:** Option 3. `api/adapters/payments/` defines a `PaymentProvider` protocol
+(ADR-017's shape: business logic depends on the protocol, never on a gateway SDK) and a
+`ConsolePaymentProvider`. It differs from its `notifications/` and `email/` siblings in one respect:
+those have a legitimate development-mode success path, because real features call them today. This
+one has no caller anywhere in the tree — course checkout does not exist — so `ConsolePaymentProvider`
+refuses unconditionally, in every environment, rather than only in production. Succeeding would
+fabricate a transaction for a flow that is not built.
+
+This ADR does **not** claim ADR-025's gate is satisfied. Recording that plainly is the point of
+writing it now rather than waiting: click-through is joinable but near-zero in volume, and enrolment
+conversion has no surface at all. Course checkout — the feature that would generate real signal on
+both — is deliberately out of scope here.
+
+**Consequences:**
+
+- `api/adapters/payments/` exists with zero callers, the same state `notifications/` was in before
+  Sprint 4 wired sign-in to it. An adapter is allowed to predate its first caller; ADR-017 does not
+  require the reverse.
+- The next ADR in this sequence is course checkout itself — `Order`/`Entitlement` schema, the
+  gateway's real implementation, refund handling — not written here, and gated on the owner choosing
+  to spend the sprint.
+- ADR-025's instrumentation mandate is unchanged and still binds. Nothing here reduces the
+  requirement to keep measuring precision@5, click-through and provider-reported conversion, and
+  nothing here should be read by a future reader as having satisfied it.

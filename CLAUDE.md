@@ -112,12 +112,18 @@ api/                     FastAPI modular monolith
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
     matching/            Deterministic scoring + gap-closing courses (ADR-007, ADR-036).
-                         scoring.py is pure -- no I/O, no clock, no model. employer.py is
-                         the same scorer run in reverse for the console (ADR-037).
+                         scoring.py is pure -- no I/O, no clock, no model, and (Sprint 33)
+                         no settings read either: ScoreWeights is a value passed in, built
+                         from configuration by service.py's weights_from_settings(), never
+                         read inside the scorer itself. employer.py is the same scorer run
+                         in reverse for the console (ADR-037), and (Sprint 33) also holds
+                         market_scarce_skills -- the same scarcity query with no tenant
+                         filter, for a course provider asking what the whole market needs.
                          provider_routes.py (Sprint 33) is course_role_alignment --
                          a course measured against a role, with no candidate in the
                          comparison at all, so ADR-037 does not apply the way it does
-                         to candidates_for_job.
+                         to candidates_for_job -- and market_router, the provider-facing
+                         read of market_scarce_skills.
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
@@ -148,7 +154,9 @@ api/                     FastAPI modular monolith
                          report's serious-match count) -- nothing depends on it. No
                          staff-management endpoint, ever, by decision;
                          `scripts/grant_staff.py` is the only writer of `users.is_staff`.
-    analytics/           analytics_events (ADR-025). record() COMMITS.
+    analytics/           analytics_events (ADR-025). record() COMMITS. course_dismissed
+                         (Sprint 33) is course_opened's negative half -- precision@5's
+                         missing class, same shape, its own handler for the same reason.
 
     Not built. ADR-008's career_paths/ (graph-based role transition) and
     ADR-005/013/018's intelligence/ (LLM extraction, embeddings) have an ADR
@@ -159,6 +167,10 @@ api/                     FastAPI modular monolith
     notifications/       NotificationProvider protocol + console impl (the reference)
     nsqf/                NsqfSource port, Mongo and JSON-file sources, shared document
                          parsing, normalisation and the importer (ADR-034)
+    payments/            PaymentProvider port (Sprint 34, ADR-043). Its console impl
+                         refuses unconditionally, not only in production -- there is no
+                         course-checkout feature calling it yet, so succeeding would
+                         fabricate a transaction for a flow that does not exist.
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -485,15 +497,18 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprints 28-32 are done** (geography and operator authority, the back
-> office and the golden set, the silent-failure sweep, the scope ledger, and the delegation
-> refactor). **Sprint 33 is next: a management-facing MVP push** — thin-slice government-agency
-> and external-system actors, plus the course-to-role alignment score
-> (`docs/IISM-Product-Backlog.docx` §4). **The monetisation ADR — now 043 — is deferred behind it,
-> not cancelled**; the ADR itself still proceeds in parallel, since it costs no engineering time.
-> §11 also carries a
-> standing assessment of the three pillars the owner is building toward — jobs, sellable courses,
-> gig work — and what each actually needs.
+> not for the queue. **Sprints 28-34 are done** (geography and operator authority, the back
+> office and the golden set, the silent-failure sweep, the scope ledger, the delegation
+> refactor, Sprint 33's actor-breadth MVP — thin-slice government-agency and external-system
+> actors, course-to-role alignment, and the rest of Epic B2 pulled forward alongside it:
+> configurable match weights, the `course_dismissed` signal, and market-wide scarce-skills for
+> course providers — and Sprint 34's ADR-043 with a payment adapter port). **Sprint 35 is next:
+> Epic B3, the Assessment Provider** (`docs/IISM-Product-Backlog.docx` §4). The payment port —
+> a `PaymentProvider` protocol plus a console implementation that refuses unconditionally — has
+> no caller anywhere yet and no billing code, no `Order`/`Entitlement` table; it does **not**
+> claim ADR-025's deferral gate is satisfied, and the ADR says so plainly: two of its three
+> metrics are still thin. §11 also carries a standing assessment of the three pillars the owner is
+> building toward — jobs, sellable courses, gig work — and what each actually needs.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

@@ -24,10 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 32 — every route handler delegates (17 violations moved, guarded) |
-| **Next sprint** | 33 — management-facing MVP: thin-slice government-agency + external-system actors, course-to-role alignment (§11); monetisation ADR drafted in parallel, engineering deferred to Sprint 34+ |
-| **Tests** | 680 backend (`make check`), 259 web (`cd web && npm test`) |
-| **Migrations** | head `0028`; 42 ADRs |
+| **Last sprint** | 34 — ADR-043 and a payment adapter port (no caller yet, by design) |
+| **Next sprint** | 35 — Epic B3, the Assessment Provider (§11, `docs/IISM-Product-Backlog.docx` §4) |
+| **Tests** | 729 backend (`make check`), 259 web (`cd web && npm test`) |
+| **Migrations** | head `0031`; 43 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -1156,7 +1156,7 @@ the route layer now makes **zero** calls to `db.*`, `select()` or `record()`.
 - Also found and fixed while doing it: `update_organisation` had **no service layer at all**, which
   is how `contact_email` went eight sprints without the normalisation every other address has.
 
-### Sprint 33 — a management-facing MVP push (next, reprioritised 2026-09-25)
+### Sprint 33 — a management-facing MVP push (done 2026-09-26)
 
 The owner's instruction superseded the monetisation-first plan below before any of it was built:
 optimise the next sprint for demonstrating the platform's full actor breadth to higher management,
@@ -1164,41 +1164,64 @@ ahead of revenue. Full stories, acceptance criteria and sizing are in
 `docs/IISM-Product-Backlog.docx` (Epic B7 and BL-2.3, sequence in §4) — this entry is the decision
 record, not the detail.
 
-- **Government agency and external-system actors, thin slice.** Not the full production version —
-  a demo needs an ops-run CSV enrolment (reusing `scripts/seed_candidates.py`'s account-
-  construction path, not a second one), one programme-scoped reporting view, and API-key auth on
-  one or two read endpoints. The super-admin tier is deliberately cut from this push: it is the one
-  actor-type item with no audience-visible payoff, and ADR-042 already argues against building
-  admin escalation paths speculatively.
-- **The course-to-role alignment score, pulled forward to run alongside it.** The product
-  definition names this "the differentiator" (§5.5) and describes it as already built;
-  `docs/scope-reconciliation.md` #4 confirms it is not. If this MVP is pitched using that document,
-  this is the single most likely thing asked for — cheap, no new infrastructure, and no collision
-  with the actor-type work (matching vs. identity/auth).
+- **Government agency and external-system actors, thin slice.** Shipped: an ops-run CSV enrolment
+  (`scripts/bulk_enrol_candidates.py`, reusing `identity.provision_candidate` rather than a second
+  construction path), a programme-scoped reporting view (`GET /ops/programmes/{name}`), and API-key
+  auth (`ServiceAccount`, a fourth credential beside JWT) on a partner-facing `GET /partners/jobs`
+  route. The super-admin tier stayed cut, per the original decision — no audience-visible payoff and
+  ADR-042 already argues against speculative admin escalation paths.
+- **The course-to-role alignment score, pulled forward to run alongside it.** Shipped:
+  `course_role_alignment` and `GET /org/{slug}/courses/{slug}/alignment/{role_slug}`, independent of
+  any candidate (ADR-037 does not apply the way it does to `candidates_for_job`, because there is no
+  candidate in this comparison at all). `docs/scope-reconciliation.md` #4 is now closed.
+- **The rest of Epic B2, pulled forward again once B7 and BL-2.3 landed**, on the owner's
+  instruction to keep going rather than stop at the originally-scoped slice:
+  - **BL-2.1, configurable match weights.** `ScoreWeights` is a value object built by
+    `weights_from_settings()` and passed into `score_match`; `scoring.py` still reads no
+    configuration at all (an AST-based test checks this, not a substring search — a naive one
+    false-positived on `ScoreWeights`'s own docstring). `make evaluate` printed the identical
+    baseline with default weights, confirming bit-for-bit equivalence.
+  - **BL-2.2, `course_dismissed`.** `course_opened`'s negative half — precision@5's missing class,
+    named in `docs/scope-reconciliation.md` #3 as absent. Migration 0031 widens the CHECK by hand,
+    per the established pattern; the two events are counted separately, not collapsed.
+  - **BL-2.4, market-wide scarce skills.** `market_scarce_skills` reuses `scarce_skills`'s query
+    with `tenant_id=None` via a shared `_scarce_skills` helper, rather than a second copy of the
+    demand query — the same "one construction site" discipline as `candidate_card()`. New
+    `GET /org/{slug}/market-demand`, reachable by a course provider for the first time.
 - **B7 alone is not "all actors."** Assessment Provider is a separate epic (B3, Sprint 35 in the
-  backlog's sequence) — do not let a demo claim full actor coverage before it lands too.
-- **Monetisation moves to Sprint 34+, not cancelled.** ADR-043 itself is a decision document, cheap
-  enough to keep drafting in parallel; the payment adapter port and billing module wait.
+  backlog's sequence) — a demo must not claim full actor coverage before it lands too.
+- 724 backend tests (was 606 at the start of Sprint 28). `make gen-api` regenerated twice, both
+  purely additive diffs. Every feature verified live against the running dev server and seeded data,
+  not only through pytest.
 
-### Sprint 34+ — the monetisation ADR, and a payment adapter port
+### Sprint 34 — ADR-043, and a payment adapter port (done 2026-09-26)
 
-Deferred behind Sprint 33's actor-breadth push, not abandoned. The owner's stated direction is a
-marketplace that also **sells courses** and carries **gig work**, and the honest next step once the
-MVP push lands is the decision, not the code.
+The owner's stated direction is a marketplace that also **sells courses** and carries **gig work**;
+Sprint 33 demonstrated the platform to management with no monetisation story at all, which made
+continued deferral's cost visible rather than theoretical.
 
-- **Write ADR-043 first, superseding ADR-025** (042 went to operator authority, which
-  landed first). ADR-025 says "free v1, no billing implementation…
-  a successor ADR is required before any billing code is written, **and must cite those metrics**"
-  — precision@5 on the golden set, candidate-to-course click-through, provider-reported enrolment
-  conversion. Two of the three are still thin (5 golden pairs; click-through joinable only since
-  Sprint 24). **The ADR should say so rather than pretend the gate was passed** — deciding to
-  proceed with weak data is a legitimate call, and recording it as weak is what makes it honest.
-- **Then the port, and only the port.** `api/adapters/payments/` as an interface with a console
-  implementation that refuses production, exactly as `ConsoleNotificationProvider` and
-  `ConsoleEmailProvider` do. No gateway, no orders, no entitlements. ADR-017 has listed payment
-  providers as a future adapter since the beginning and nothing was ever written.
-- Sequencing after that is in the pillar assessment below: course checkout (~2 sprints), then gig
-  as its own module with its own ADR.
+- **ADR-043 supersedes ADR-025's deferral clause — carried forward, not declared satisfied.**
+  ADR-025 named three gate metrics. Precision@5 is now citable (34 golden pairs, up from 5, per
+  Sprint 29). Click-through is joinable since Sprint 24 but has near-zero real volume. Enrolment
+  conversion has **no surface at all** — Sprint 24 deliberately modelled interest, not enrolment,
+  because a provider's own system is the source of truth for whether somebody enrolled. The ADR
+  says this plainly rather than treating the port's existence as having passed the gate.
+- **The port, and only the port.** `api/adapters/payments/` — a `PaymentProvider` protocol
+  (`create_payment(amount_paise, currency, reference) -> transaction_id`) and
+  `ConsolePaymentProvider`. No gateway, no `Order`/`Entitlement`/`Payout` table, no route or service
+  calls it — `tests/test_payment_adapter.py` statically asserts nothing under `api/modules/` imports
+  it, which is the ADR's whole premise and the thing to re-check if it ever fails.
+- **It differs from its `notifications/`/`email/` siblings in one respect, deliberately.** Those
+  have a real development-mode success path because real features call them today. This one has no
+  caller anywhere — course checkout does not exist — so `ConsolePaymentProvider.create_payment`
+  refuses **unconditionally**, not only in production; succeeding would fabricate a transaction for
+  a flow that is not built. The production check stays anyway, in the same shape as its siblings, so
+  the day a real provider replaces this one, the line that must never be deleted is already the one
+  being overwritten.
+- 729 backend tests (was 724). `make check` clean.
+- **Sequencing after this** is in the pillar assessment below: course checkout (~2 sprints, its own
+  ADR for `Order`/`Entitlement` and the real gateway implementation), then gig as its own module with
+  its own ADR. Neither is started.
 
 ### Also outstanding, in rough order
 
@@ -1219,14 +1242,16 @@ that sells courses, connects jobs, and carries gig work.*
 - **Job connect — built, end to end**, and ahead of the other two. Publish → NSQF-scored match →
   apply → employer inbox → contact disclosed. What remains is Sprint 26's lifecycle and reach.
 - **Selling courses — listed and demanded, never sold.** `Course.fee_inr` exists and renders, and
-  **nothing downstream reads it as money**: no payment adapter (`api/adapters/` holds
-  `notifications/` and `nsqf/` and nothing else), and no order, entitlement, enrolment, refund,
-  payout or invoice table in any of 26 migrations. **ADR-025 forbids writing billing code** until
-  a successor ADR cites precision@5 on the golden set (5 pairs), candidate-to-course click-through
-  (only *joinable* since Sprint 24, with no volume behind it) and provider-reported enrolment
-  conversion (no surface at all). That gate has not been passed. Note also that Sprint 24's
-  "interest, not enrolment" reasoning **inverts** the moment money moves through the platform: if
-  we take the payment, we are the system of record for the enrolment.
+  **nothing downstream reads it as money**: `api/adapters/payments/` (Sprint 34, ADR-043) is a
+  protocol and a console implementation with no caller, deliberately — no order, entitlement,
+  enrolment, refund, payout or invoice table in any of 31 migrations. **ADR-025 still forbids
+  writing billing code** until a successor ADR cites precision@5 on the golden set (34 pairs now,
+  up from 5), candidate-to-course click-through (only *joinable* since Sprint 24, with no volume
+  behind it) and provider-reported enrolment conversion (no surface at all). ADR-043 names the
+  first metric as citable and the other two as still thin — it does not claim the gate is passed,
+  only that a port may exist ahead of it. Note also that Sprint 24's "interest, not enrolment"
+  reasoning **inverts** the moment money moves through the platform: if we take the payment, we are
+  the system of record for the enrolment.
 - **Gig work — does not exist.** Zero hits for "gig" or "freelanc" across `api/`, `web/src`,
   `docs/` and `scripts/`. It is not a feature but a third marketplace with different physics:
   `Job` encodes a permanent salaried vacancy (monthly salary bands, years of experience,
@@ -1239,10 +1264,10 @@ expensive assets — 21,303 NSQF standards with role search, one pure determinis
 identity many roles, two working consent-and-revocation disclosure loops, geography to
 sub-district — are exactly what all three pillars need.
 
-Suggested order, revised 2026-09-25: the management-facing actor-breadth MVP (Sprint 33) first,
-then the monetisation ADR and a **payment adapter port only** (an interface with a console
-implementation that refuses production, as `ConsoleNotificationProvider` does), then course
-checkout, then gig as its own module.
+Suggested order, revised 2026-09-26: the management-facing actor-breadth MVP (Sprint 33, done) and
+the monetisation ADR with a **payment adapter port only** (Sprint 34, done — see its entry in §11)
+are both behind us now. Next is Epic B3, the Assessment Provider (Sprint 35), then course checkout
+against the port already in place, then gig as its own module.
 
 ### Then, in rough order of value
 
