@@ -37,6 +37,7 @@ from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
 from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
+from api.modules.matching.tasks import refresh_embeddings
 from api.modules.notifications.tasks import drain_notifications
 
 # Named on the command line as `arq --custom-log-dict api.worker.LOG_CONFIG`.
@@ -93,6 +94,11 @@ class WorkerSettings:
         # late costs nothing, and checking every minute would be a query per
         # minute forever to catch something that happens rarely.
         cron(close_expired_jobs, minute={0}, run_at_startup=False),
+        # Every two minutes (Sprint 36, BL-5.1): a published job or a saved
+        # skill set should have a semantic-similarity term within minutes,
+        # not by the next hourly sweep -- and it is cheap when nothing is
+        # NULL, one indexed-ish query per table returning no rows.
+        cron(refresh_embeddings, minute=set(range(0, 60, 2)), run_at_startup=False),
     ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings

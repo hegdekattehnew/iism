@@ -102,6 +102,10 @@ async def _write_skills(db: AsyncSession, job: Job, rows: list[JobSkillIn]) -> N
                 is_mandatory=is_mandatory,
             )
         )
+    # What this vacancy requires just changed, so any embedding computed from
+    # the old set no longer describes it (Sprint 36, BL-5.1) -- see
+    # `marketplace.profile_service._write_skills`'s identical note.
+    job.embedding = None
     await db.flush()
 
 

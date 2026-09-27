@@ -5,6 +5,7 @@ Other modules import from `api.modules.skills` only. Reaching into `.service` or
 what ADR-014's microservices path depends on avoiding.
 """
 
+from api.modules.skills.graph import SKILL_RELATION_TYPES, SkillRelation
 from api.modules.skills.models import ALIAS_SCRIPTS, SKILL_TYPES, Skill, SkillAlias
 from api.modules.skills.roles_routes import router as roles_router
 from api.modules.skills.routes import router
@@ -13,6 +14,8 @@ from api.modules.skills.service import (
     QualificationRef,
     SearchHit,
     count_skills,
+    embedding_text_for_skills,
+    get_skill_by_nos_code,
     get_skill_by_slug,
     list_skills,
     qualifications_for_skill,
@@ -24,6 +27,7 @@ from api.modules.skills.service import (
 
 __all__ = [
     "ALIAS_SCRIPTS",
+    "SKILL_RELATION_TYPES",
     "SKILL_TYPES",
     "NsqfLevel",
     "NsqfLevelIn",
@@ -31,7 +35,10 @@ __all__ = [
     "SearchHit",
     "Skill",
     "SkillAlias",
+    "SkillRelation",
     "count_skills",
+    "embedding_text_for_skills",
+    "get_skill_by_nos_code",
     "get_skill_by_slug",
     "list_skills",
     "qualifications_for_skill",

@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 from api.modules.geography import resolve_location
 from api.modules.identity.models import User
 from api.modules.marketplace.models import (
+    SKILL_SOURCES,
     CandidateCertification,
     CandidateEducation,
     CandidateExperience,
@@ -155,17 +156,22 @@ async def resolve_certification_skill(db: AsyncSession, skill_slug: str | None) 
 
 
 async def _write_skills(
-    db: AsyncSession, profile: CandidateProfile, items: list[tuple[str, int]]
+    db: AsyncSession,
+    profile: CandidateProfile,
+    items: list[tuple[str, int]],
+    *,
+    source: str = "self_declared",
 ) -> tuple[int, int]:
-    """The one place a candidate's own claim becomes a `CandidateSkill` row.
+    """The one place a candidate's claim becomes a `CandidateSkill` row.
 
-    Both the single add and the bulk add come through here, and nothing else in
-    the request path constructs one. That is what keeps `source` honest: a
-    second construction site is how a suggested standard would one day be
-    written as `inferred` -- which scores *above* `self_declared` (0.7 against
-    0.6), and would let the easy path outrank a candidate who typed the same
-    standards by hand. Suggestion changes how a standard is found, never how
-    well it is evidenced.
+    Every caller comes through here and nothing else in the request path
+    constructs one -- self-declared adds, bulk adds, and (Sprint 35, BL-3.1/
+    BL-3.2) verified evidence via `record_verified_skill`. That is what keeps
+    `source` honest: a second construction site is how a suggested standard
+    would one day be written as `inferred` -- which scores *above*
+    `self_declared` (0.7 against 0.6), and would let the easy path outrank a
+    candidate who typed the same standards by hand. Suggestion changes how a
+    standard is found, never how well it is evidenced.
 
     All or nothing. Every slug is resolved and the cap checked **before**
     anything is written: a batch of eight that lands three, with nothing on
@@ -213,21 +219,55 @@ async def _write_skills(
         if existing is not None:
             # Re-adding updates the proficiency rather than erroring; that is
             # what the user means, and it keeps the UI from needing a separate
-            # edit path.
+            # edit path. Source only ever moves up the evidence ladder --
+            # SKILL_SOURCES is ordered self_declared < inferred < assessed <
+            # certified (see EVIDENCE_WEIGHT's matching order in
+            # matching/scoring.py, cross-checked by
+            # test_skill_sources_are_ordered_by_evidentiary_strength in
+            # tests/test_profile.py) -- so a later self-declared re-add can
+            # never downgrade a standard this candidate already had verified.
             existing.proficiency = proficiency
+            if SKILL_SOURCES.index(source) > SKILL_SOURCES.index(existing.source):
+                existing.source = source
         else:
             db.add(
                 CandidateSkill(
                     profile_id=profile.id,
                     skill_id=skills[slug].id,
                     proficiency=proficiency,
-                    # Anything a user says about themselves is self-declared --
-                    # typed or ticked. Only an assessment or certificate may set
-                    # a stronger source.
-                    source="self_declared",
+                    source=source,
                 )
             )
+    if wanted:
+        # What the candidate holds just changed, so any embedding computed
+        # from the old set no longer describes them (Sprint 36, BL-5.1). NULL
+        # is this column's own "needs (re)computing" signal -- the worker
+        # sweep is what fills it back in, never this request (ADR-036).
+        profile.embedding = None
     return len(new), len(wanted) - len(new)
+
+
+# An assessment result or a verified certificate carries no candidate-typed
+# proficiency. 4, not the automatic 5 that would make evidenced competence
+# indistinguishable from a candidate claiming mastery of their own accord.
+VERIFIED_PROFICIENCY = 4
+
+
+async def record_verified_skill(
+    db: AsyncSession, profile: CandidateProfile, skill_slug: str, *, source: str
+) -> tuple[int, int]:
+    """The one entry point a leaf module may call to record evidenced skill
+    (Sprint 35, BL-3.1/BL-3.2) -- `assessment/` calls this, never
+    `CandidateSkill` directly, so there remains exactly one construction site.
+
+    Commits. Callers are webhook/back-office handlers with nothing else
+    pending, unlike `_write_skills`'s other two callers.
+    """
+    if source not in ("assessed", "certified"):
+        raise ValueError(f"record_verified_skill is for evidenced sources only, got {source!r}")
+    result = await _write_skills(db, profile, [(skill_slug, VERIFIED_PROFICIENCY)], source=source)
+    await db.commit()
+    return result
 
 
 async def add_skill(
@@ -317,6 +357,7 @@ async def remove_skill(db: AsyncSession, user_id: uuid.UUID, skill_slug: str) ->
             CandidateSkill.skill_id == skill.id,
         )
     )
+    profile.embedding = None  # see _write_skills's identical note (Sprint 36, BL-5.1)
     await db.commit()
     return await _load(db, profile.id)
 

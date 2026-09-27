@@ -55,6 +55,7 @@ def weights_from_settings() -> ScoreWeights:
         evidence_share=settings.match_weight_evidence_share,
         mandatory_gap_cap=settings.match_mandatory_gap_cap,
         experience_taper_years=settings.match_experience_taper_years,
+        semantic=settings.match_weight_semantic,
     )
 
 
@@ -74,6 +75,9 @@ class CandidateFacts:
     years_experience: int | None
     states: frozenset[uuid.UUID]
     districts: frozenset[uuid.UUID]
+    # `None` until the worker sweep has computed one (Sprint 36, BL-5.1);
+    # `score_match` treats `None` as "no semantic signal", never as a penalty.
+    embedding: list[float] | None = None
 
 
 async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateFacts:
@@ -102,6 +106,7 @@ async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateF
         years_experience=profile.years_experience if profile is not None else None,
         states=frozenset(states),
         districts=frozenset(districts),
+        embedding=profile.embedding if profile is not None else None,
     )
 
 
@@ -269,6 +274,8 @@ async def match_jobs(
                 candidate_level=attained_level(held, requirements.get(job_id, [])),
                 job_min_years=jobs[job_id].experience_min_years,
                 candidate_years=facts.years_experience,
+                job_embedding=jobs[job_id].embedding,
+                candidate_embedding=facts.embedding,
                 weights=weights,
             ),
             locality=_locality(jobs[job_id], facts),
@@ -524,6 +531,8 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
             candidate_level=attained_level(held, requirements),
             job_min_years=job.experience_min_years,
             candidate_years=facts.years_experience,
+            job_embedding=job.embedding,
+            candidate_embedding=facts.embedding,
             weights=weights_from_settings(),
         ),
         locality=_locality(job, facts),

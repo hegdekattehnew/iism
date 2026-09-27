@@ -8,6 +8,7 @@ mostly about what that writer must *refuse*.
 
 import uuid
 from decimal import Decimal
+from typing import cast
 
 import pytest
 from httpx import AsyncClient
@@ -473,3 +474,190 @@ class TestProgrammeReport:
         body = allowed.json()
         assert body["programme"] == "PMKVY-TEST"
         assert set(body) == {"programme", "enrolled", "matched", "applied", "hired"}
+
+
+# ---------------------------------------- Sprint 35, BL-3.2: certified evidence
+
+CERT_NOTE = "Certificate number and issuer checked against the SSC's own register."
+
+
+async def _skill(db: AsyncSession, slug: str) -> Skill:
+    skill = Skill(slug=slug, name=slug.replace("-", " ").title(), skill_type="technical")
+    db.add(skill)
+    await db.flush()
+    return skill
+
+
+async def _add_certification(
+    client: AsyncClient, headers: dict[str, str], *, name: str, skill_slug: str | None = None
+) -> str:
+    """Returns the new certification's id. The generic collection route
+    returns the *whole* profile, not the created row -- see
+    `profile_routes.py::add_entry` -- so the newest entry is the last one."""
+    body = (
+        await client.post(
+            "/me/profile/certifications",
+            headers=headers,
+            json={"name": name, "skill_slug": skill_slug},
+        )
+    ).json()
+    return cast(str, body["certifications"][-1]["id"])
+
+
+class TestCertificationVerification:
+    async def test_requires_operator_authority(self, client: AsyncClient) -> None:
+        anon = await client.get("/ops/candidates/certifications")
+        assert anon.status_code == 401
+
+        stranger = await _candidate(client)
+        assert (
+            await client.get("/ops/candidates/certifications", headers=stranger)
+        ).status_code == 404
+
+    async def test_the_queue_excludes_certifications_naming_no_standard(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        await client.post(
+            "/me/profile/certifications",
+            headers=candidate,
+            json={"name": "Untargeted Certificate"},
+        )
+        headers = await _operator(client, db)
+        body = (await client.get("/ops/candidates/certifications", headers=headers)).json()
+        assert body == []
+
+    async def test_the_queue_carries_enough_to_decide_on(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        await client.post(
+            "/me/profile/certifications",
+            headers=candidate,
+            json={
+                "name": "Phlebotomy Technician Certificate",
+                "issuing_body": "NSDC",
+                "skill_slug": "phlebotomy",
+            },
+        )
+        headers = await _operator(client, db)
+        body = (await client.get("/ops/candidates/certifications", headers=headers)).json()
+        assert len(body) == 1
+        assert body[0]["name"] == "Phlebotomy Technician Certificate"
+        assert body[0]["skill_slug"] == "phlebotomy"
+        assert body[0]["issuing_body"] == "NSDC"
+
+    async def test_verifying_writes_a_certified_candidate_skill(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(
+            client, candidate, name="Phlebotomy Technician Certificate", skill_slug="phlebotomy"
+        )
+
+        headers = await _operator(client, db)
+        body = (
+            await client.post(
+                f"/ops/candidates/certifications/{cert_id}/verify",
+                headers=headers,
+                json={"note": CERT_NOTE},
+            )
+        ).json()
+        assert body["skill_slug"] == "phlebotomy"
+        assert body["verification_note"] == CERT_NOTE
+
+        me = (await client.get("/auth/me", headers=candidate)).json()
+        profile = await db.scalar(
+            select(CandidateProfile).where(CandidateProfile.user_id == uuid.UUID(me["id"]))
+        )
+        assert profile is not None
+        row = await db.scalar(select(CandidateSkill).where(CandidateSkill.profile_id == profile.id))
+        assert row is not None
+        assert row.source == "certified"
+
+        # Left the queue: it is now verified.
+        queue = (await client.get("/ops/candidates/certifications", headers=headers)).json()
+        assert cert_id not in [row["id"] for row in queue]
+
+    async def test_a_certification_naming_no_standard_cannot_be_verified(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(client, candidate, name="Untargeted Certificate")
+
+        headers = await _operator(client, db)
+        refused = await client.post(
+            f"/ops/candidates/certifications/{cert_id}/verify",
+            headers=headers,
+            json={"note": CERT_NOTE},
+        )
+        assert refused.status_code == 400
+
+    async def test_an_unknown_certification_is_404(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _operator(client, db)
+        missing = await client.post(
+            f"/ops/candidates/certifications/{uuid.uuid4()}/verify",
+            headers=headers,
+            json={"note": CERT_NOTE},
+        )
+        assert missing.status_code == 404
+
+    async def test_evidence_shorter_than_ten_characters_is_refused(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(
+            client, candidate, name="Phlebotomy Technician Certificate", skill_slug="phlebotomy"
+        )
+
+        headers = await _operator(client, db)
+        refused = await client.post(
+            f"/ops/candidates/certifications/{cert_id}/verify",
+            headers=headers,
+            json={"note": "ok"},
+        )
+        assert refused.status_code == 422
+
+    async def test_a_second_certification_for_the_same_standard_upgrades_not_duplicates(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`_write_skills`'s own invariant: one row per skill per profile,
+        regardless of which source added or upgraded it."""
+        skill = await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        me = (await client.get("/auth/me", headers=candidate)).json()
+        await client.post(
+            "/me/profile/skills",
+            headers=candidate,
+            json={"skill_slug": "phlebotomy", "proficiency": 2},
+        )
+        cert_id = await _add_certification(
+            client, candidate, name="Phlebotomy Technician Certificate", skill_slug="phlebotomy"
+        )
+
+        headers = await _operator(client, db)
+        await client.post(
+            f"/ops/candidates/certifications/{cert_id}/verify",
+            headers=headers,
+            json={"note": CERT_NOTE},
+        )
+
+        profile = await db.scalar(
+            select(CandidateProfile).where(CandidateProfile.user_id == uuid.UUID(me["id"]))
+        )
+        assert profile is not None
+        rows = list(
+            await db.scalars(
+                select(CandidateSkill).where(
+                    CandidateSkill.profile_id == profile.id, CandidateSkill.skill_id == skill.id
+                )
+            )
+        )
+        assert len(rows) == 1
+        assert rows[0].source == "certified"

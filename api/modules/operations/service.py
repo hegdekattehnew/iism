@@ -16,13 +16,16 @@ import uuid
 from dataclasses import dataclass
 
 import structlog
+from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from api.core.authorization import ORGANISATION_TYPES
 from api.modules.applications.models import Application
 from api.modules.identity.models import Membership, Tenant, User
-from api.modules.marketplace.models import CandidateProfile, Course, Job
+from api.modules.marketplace import record_verified_skill
+from api.modules.marketplace.models import CandidateCertification, CandidateProfile, Course, Job
 from api.modules.matching import match_jobs
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
 from api.modules.operations.models import TenantVerificationEvent
@@ -128,6 +131,76 @@ async def set_verification(
     await db.refresh(event)
     log.info("ops.verification", tenant_id=str(tenant.id), decision=decision)
     return event
+
+
+async def unverified_certifications(
+    db: AsyncSession, *, limit: int = 100
+) -> list[tuple[CandidateCertification, str | None]]:
+    """The queue: certifications naming a standard (`skill_id IS NOT NULL`)
+    that nobody has verified yet (Sprint 35, BL-3.2).
+
+    A certification naming no standard has nothing for this queue to decide
+    -- there is no `CandidateSkill` write it could ever produce -- so it is
+    excluded rather than shown with a decision that cannot be made.
+    """
+    stmt = (
+        select(CandidateCertification, User.full_name)
+        .join(CandidateProfile, CandidateCertification.profile_id == CandidateProfile.id)
+        .join(User, CandidateProfile.user_id == User.id)
+        .where(
+            CandidateCertification.skill_id.is_not(None),
+            CandidateCertification.verified_at.is_(None),
+        )
+        .order_by(CandidateCertification.id)
+        .limit(limit)
+    )
+    return [(row[0], row[1]) for row in (await db.execute(stmt)).all()]
+
+
+async def certification_for_review(
+    db: AsyncSession, certification_id: uuid.UUID
+) -> CandidateCertification | None:
+    # `profile` has no eager-load option on the model (only `skill` does,
+    # since every read of a certification touches it) -- loaded explicitly
+    # here because `verify_certification` reads `certification.profile` in
+    # an async context, where a lazy load raises `MissingGreenlet`.
+    return await db.scalar(
+        select(CandidateCertification)
+        .where(CandidateCertification.id == certification_id)
+        .options(selectinload(CandidateCertification.profile))
+    )
+
+
+async def verify_certification(
+    db: AsyncSession, certification: CandidateCertification, *, note: str, actor: User
+) -> CandidateCertification:
+    """The one non-seed writer of `source='certified'` BL-3.2 asks for.
+
+    Denormalised onto the certification row alone (see its model docstring
+    for why this is simpler than `tenant_verification_events` on purpose).
+    Goes through `record_verified_skill` -- `marketplace`'s one public seam
+    onto `_write_skills` -- rather than constructing a `CandidateSkill` here,
+    so there remains exactly one construction site regardless of which
+    module the write originates from.
+    """
+    if certification.skill_id is None or certification.skill is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "This certification names no standard -- there is nothing to verify it against",
+        )
+    certification.verified_at = func.now()
+    certification.verified_by = actor.id
+    certification.verification_note = note
+
+    # `record_verified_skill` commits; that single commit also persists the
+    # three column assignments above, in the same transaction as the skill
+    # write -- both or neither, which is the property that matters here.
+    await record_verified_skill(
+        db, certification.profile, certification.skill.slug, source="certified"
+    )
+    await db.refresh(certification)
+    log.info("ops.certification_verified", certification_id=str(certification.id))
+    return certification
 
 
 async def set_staff(db: AsyncSession, *, address: str, staff: bool) -> User:

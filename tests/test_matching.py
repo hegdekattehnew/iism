@@ -281,6 +281,158 @@ class TestConfigurableWeights:
         assert not any("config" in m for m in imported_modules), imported_modules
 
 
+class TestSemanticSimilarity:
+    """BL-5.2: additive, bounded, and off by default. `make evaluate` proves
+    the default is bit-identical to before this weight existed; these prove
+    the mechanism does what the acceptance criteria require when it is
+    deliberately turned on."""
+
+    def _pair(self, *, mandatory_missing: bool = False):
+        matched_req = _req("held-standard", importance=5)
+        reqs = [matched_req]
+        if mandatory_missing:
+            reqs.append(_req("missing-mandatory", importance=5, mandatory=True))
+        held = [_held(matched_req)]
+        return reqs, held
+
+    def test_default_weight_is_zero_regardless_of_embeddings(self) -> None:
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS
+
+        reqs, held = self._pair()
+        without = score_match(reqs, held, weights=DEFAULT_WEIGHTS)
+        with_identical = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=DEFAULT_WEIGHTS,
+        )
+        assert with_identical.score == without.score
+        assert with_identical.semantic_similarity == 1.0
+
+    def test_a_nonzero_weight_adds_to_the_score_for_similar_embeddings(self) -> None:
+        from api.modules.matching.scoring import ScoreWeights
+
+        # Deliberately not a perfect match: a second, optional standard the
+        # candidate does not hold, so coverage is below 1.0 and there is
+        # room for the additive term to actually move the score. A perfect
+        # match is already at the raw ceiling `min(raw, 1.0)` enforces, and
+        # nothing additive could raise it further.
+        matched_req = _req("held-standard", importance=5)
+        unmatched_req = _req("unheld-optional", importance=5)
+        reqs = [matched_req, unmatched_req]
+        held = [_held(matched_req)]
+        weights = ScoreWeights(semantic=0.1)
+        without_embeddings = score_match(reqs, held, weights=weights)
+        with_embeddings = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert with_embeddings.score > without_embeddings.score
+
+    def test_a_missing_embedding_on_either_side_scores_zero_not_a_penalty(self) -> None:
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(semantic=0.2)
+        no_job_embedding = score_match(
+            reqs, held, job_embedding=None, candidate_embedding=[1.0, 0.0, 0.0], weights=weights
+        )
+        no_candidate_embedding = score_match(
+            reqs, held, job_embedding=[1.0, 0.0, 0.0], candidate_embedding=None, weights=weights
+        )
+        neither = score_match(reqs, held, weights=weights)
+        assert (
+            no_job_embedding.score
+            == no_candidate_embedding.score
+            == neither.score
+            == score_match(reqs, held, weights=ScoreWeights()).score
+        )
+
+    def test_dissimilar_embeddings_are_clamped_to_zero_not_negative(self) -> None:
+        """Opposite vectors have cosine -1. A penalty here would violate
+        "additive... never override a hard skill requirement" just as
+        surely as an uncapped bonus would -- it must floor at 0, same as no
+        signal at all, never go below."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(semantic=0.3)
+        opposite = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[-1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        no_signal = score_match(reqs, held, weights=weights)
+        assert opposite.score == no_signal.score
+        assert opposite.semantic_similarity == 0.0
+
+    def test_cannot_escape_the_mandatory_cap(self) -> None:
+        """ADR-036's own bound: "can refine a ranking but never override a
+        missing-mandatory-standard cap." Maximum possible similarity, a large
+        weight, and the cap must still hold."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair(mandatory_missing=True)
+        weights = ScoreWeights(semantic=0.9)
+        result = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert result.capped_by_mandatory is True
+        assert result.score == round(weights.mandatory_gap_cap * 100)
+
+    def test_score_never_exceeds_100_even_with_an_untuned_weight(self) -> None:
+        """The four original components already sum to 1.0 at their own
+        defaults; a `semantic` weight added on top without lowering another
+        is exactly the "deliberate, separately-measured re-tune" this story
+        defers, but a raw score past 1.0 must still not become a score past
+        100 in the meantime."""
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS, ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(
+            coverage=DEFAULT_WEIGHTS.coverage,
+            level=DEFAULT_WEIGHTS.level,
+            experience=DEFAULT_WEIGHTS.experience,
+            evidence_share=DEFAULT_WEIGHTS.evidence_share,
+            semantic=0.5,
+        )
+        result = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert result.score <= 100
+
+    def test_zero_matched_standards_still_scores_zero(self) -> None:
+        """Sprint 10's own rule, restated for this term: "Zero matched
+        standards scores zero, deliberately." A semantic term must not be
+        the thing that quietly reintroduces the noise that rule was written
+        to prevent."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs = [_req("wanted", importance=5)]
+        result = score_match(
+            reqs,
+            [],
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=ScoreWeights(semantic=0.9),
+        )
+        assert result.score == 0
+
+
 async def _auth(client: AsyncClient) -> dict[str, str]:
     """Same shape as tests/test_profile.py, so sign-in behaves identically."""
     phone = "9" + uuid.uuid4().int.__str__()[:9]

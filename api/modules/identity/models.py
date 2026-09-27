@@ -285,7 +285,7 @@ class Invitation(Base):
 # The only scope a service account may hold today. A closed set of one, like
 # `Job.status`'s draft/published before a third value existed -- widening this
 # is a CHECK migration, not a schema redesign, when per-partner scopes matter.
-SERVICE_ACCOUNT_SCOPES = ("read",)
+SERVICE_ACCOUNT_SCOPES = ("read", "assessment:write")
 
 
 class ServiceAccount(Base):

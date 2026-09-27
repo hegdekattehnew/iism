@@ -27,6 +27,7 @@ ENTRY_POINTS = [
     "api.modules.alerts",
     "api.modules.analytics",
     "api.modules.applications",
+    "api.modules.assessment",
     "api.modules.identity",
     "api.modules.interests",
     "api.modules.marketplace",

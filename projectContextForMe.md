@@ -24,10 +24,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 34 — ADR-043 and a payment adapter port (no caller yet, by design) |
-| **Next sprint** | 35 — Epic B3, the Assessment Provider (§11, `docs/IISM-Product-Backlog.docx` §4) |
-| **Tests** | 729 backend (`make check`), 259 web (`cd web && npm test`) |
-| **Migrations** | head `0031`; 43 ADRs |
+| **Last sprint** | 36 — semantic similarity (BL-5.1/5.2, off by default) and the `SkillRelation` foundation (BL-6.1) |
+| **Next sprint** | 37 — resume monetisation (`BL-1.2`/`BL-1.3`, billing module) per the backlog's own sequence, or owner redirect |
+| **Tests** | 793 backend (`make check`), 259 web (`cd web && npm test`) |
+| **Migrations** | head `0035`; 44 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -1223,6 +1223,107 @@ continued deferral's cost visible rather than theoretical.
   ADR for `Order`/`Entitlement` and the real gateway implementation), then gig as its own module with
   its own ADR. Neither is started.
 
+### Sprint 35 — Epic B3, verified evidence (done 2026-09-26)
+
+`docs/scope-reconciliation.md`'s postscript named the sharpest, cheapest finding of the whole
+ledger: three of four `SKILL_SOURCES` had no writer outside `scripts/seed_candidates.py`, so
+`EVIDENCE_WEIGHT_SHARE = 0.10` was a constant for every real candidate. This gives two of them one.
+
+- **BL-3.1, the assessment-provider webhook.** `api/adapters/assessment/` is a `AssessmentProvider`
+  protocol (`parse_result`, turning one vendor's payload into a normalised phone/standard-code/
+  pass-fail) plus `ConsoleAssessmentProvider`, the reference implementation BL-3.1's own acceptance
+  criteria call for pending "a signed provider partnership" (a business dependency, not an
+  engineering one). `POST /partners/assessment-results` resolves the phone to a candidate (lazily
+  creating their profile if they have never opened it, the same rule `/me/matches` follows) and the
+  standard code to a `Skill` via the new `get_skill_by_nos_code` (nos_code is unique in the corpus,
+  unlike names or sector-local ids), then writes through `record_verified_skill` -- never a second
+  construction site. A failed attempt writes nothing and is not an error; an unknown candidate or
+  standard is a 404, not a silent 200, because a real partner needs to know a result did not land.
+- **No new table, deliberately.** ADR-023 names "assessment results" among the data an encryption
+  path must exist for before it is collected, and that path is unbuilt (§13.4 below). The webhook
+  persists only a coarse pass/fail through the already-plaintext `CandidateSkill.source` column --
+  never a score, a transcript, or free text -- and answers synchronously with what happened instead
+  of writing an audit trail, which is also what a real integration partner actually needs.
+- **`ServiceAccount.scope` stopped being a set of one.** `assessment:write` joins `read`
+  (migration 0032, hand-written CHECK widen, the established pattern); `require_service_scope()` is
+  a second question beside `get_service_account`'s -- not just which partner, but what they may do.
+  A read-only key against the webhook is a 403, not a 401: the key is real, ADR-038's rule that an
+  authenticated identity's insufficient permission is a 403 applies to a service account too.
+- **BL-3.2, an operator-verified certification.** `CandidateCertification` gained
+  `verified_at`/`verified_by`/`verification_note` (migration 0033), with the same evidence CHECK
+  ADR-042 put on `tenants.verified_at` -- a badge with no evidence must not be representable,
+  whichever table it lives on. Deliberately simpler than `tenant_verification_events`: a candidate's
+  own certification is theirs to edit or delete at any time, unlike an organisation's badge, so
+  there is no symmetrical need for an append-only history an operator must consult before acting.
+  `OPS_CANDIDATE_VERIFY` is a new operator permission; `GET /ops/candidates/certifications` is the
+  queue (certifications naming a standard, not yet verified) and `POST .../verify` the decision,
+  which writes through `record_verified_skill` in the same transaction as the certification's own
+  columns.
+- **`_write_skills` gained a `source` parameter and an upgrade-only rule.** Re-adding a
+  self-declared skill can never downgrade one already `assessed` or `certified` --
+  `SKILL_SOURCES.index(new) > SKILL_SOURCES.index(existing)` before overwriting, and a test cross-
+  checks that tuple's order against `matching.scoring.EVIDENCE_WEIGHT`'s own ascending order, since
+  the two silently drifting apart would be a scoring regression nothing else would catch.
+- **Verified live against the seeded database, not only pytest**: issued a real `assessment:write`
+  API key, POSTed a pass for the seeded candidate `+919000000001` against a real NOS code
+  (`MSME/ASC/N1514`) and watched `CandidateSkill.source` land as `assessed`; a read-only key against
+  the same route came back 403, and against the pre-existing `/partners/jobs` still 200. Signed in
+  as the existing operator (`hiring@apollo-care.example`), added a certification against the same
+  candidate, verified it through `/ops/candidates/certifications/{id}/verify`, and confirmed
+  `source='certified'`, `proficiency=4`, and the row leaving the queue. Both demo API keys revoked
+  afterwards.
+- 759 backend tests (was 729). `make check` clean; migrations 0032/0033 rehearsed down and up with
+  zero further autogenerate drift; `make gen-api` regenerated, purely additive.
+
+### Sprint 36 — semantic similarity, and the skill graph's foundation (done 2026-09-27)
+
+BL-5.1/5.2 per `docs/HLD` §9.2 and ADR-036's own deferral ("deterministic overlap ships first so
+there is a baseline to measure any addition against"); BL-6.1 alongside it, both NEXT in the
+backlog's near-term sequence.
+
+- **`api/adapters/embeddings/`** — an `EmbeddingProvider` protocol pinned to 384 dimensions
+  (ADR-031) and `HashingEmbeddingProvider`, an honestly-labelled placeholder: deterministic feature
+  hashing over lower-cased word tokens, not the ADR-013/031-mandated self-hosted
+  sentence-transformers model. **Not silently substituted** — that model needs `sentence-
+  transformers` added to `pyproject.toml` (torch, a ~470 MB download), which is an infrastructure
+  decision flagged rather than made inside this story. Swapping it in later touches only
+  `get_embedding_provider()`; nothing else in the pipeline knows which provider is behind the port.
+- **`Job.embedding`/`CandidateProfile.embedding`**, migration 0034 — plus `embedding_provider`,
+  `embedding_model`, `embedding_computed_at` on both (ADR-031: "every stored vector records the
+  provider, model identifier and model version"). `NULL` means "needs (re)computing", not "has
+  none" — a skill write sets it back to `NULL` (`marketplace.profile_service._write_skills` /
+  `remove_skill`; `marketplace.publishing._write_skills`) rather than leaving a vector that no
+  longer describes what the row now holds.
+- **`matching.tasks.refresh_embeddings`** is the only thing that ever fills a `NULL` back in — a
+  worker cron every two minutes, the same "claim by writing, cheap when nothing is NULL" shape the
+  alert sweep uses, never inside a request or inside `scoring.py` (ADR-036). Text comes from
+  `skills.embedding_text_for_skills`: performance criteria, never a skill's own title ("OJT" and
+  "Project" are real unit titles that embed to noise on their own, per the outstanding-work note
+  this closes); falls back to a skill's `description`, then its `name`, for the ~35% of standards
+  with none.
+- **`score_match` gained `job_embedding`/`candidate_embedding` and a `semantic` weight, default 0.0
+  in both `ScoreWeights` and `Settings.match_weight_semantic`.** Cosine similarity, clamped to
+  `[0, 1]` (never a penalty for a dissimilar or missing embedding), added into `raw` *before* the
+  mandatory cap so it narrows toward the cap like every other component rather than escaping it —
+  and `raw = min(raw, 1.0)` is a new safety clamp, since the four original weights already sum to
+  1.0 and `semantic` is additive on top rather than carved from an existing share. `make evaluate`
+  prints the identical baseline — bit-for-bit, because the default weight is 0.
+- **`SkillRelation`** (`api/modules/skills/graph.py`, migration 0035) — a typed (`implies`,
+  `related_to`), weighted, directed edge between two skills. Explicitly the foundation only: no
+  inference and no career-path output reads it yet (BL-6.2/6.3, held for the next planning cycle,
+  per the backlog's own reprioritisation note). Left `skill_concepts` (Sprint 9's equivalence
+  grouping) untouched — a different structure answering a different question.
+- **Verified live against the seeded database**: ran `refresh_embeddings` directly — 20 published
+  jobs and 20 of 40 candidate profiles got a real 384-dim vector (the other 20 have no declared
+  skills, correctly left `NULL` rather than a meaningless zero vector); confirmed
+  `embedding_provider='hashing'`, `embedding_model='feature-hash-word-v1'`. Re-fetched
+  `/me/matches` for the seeded candidate with matches (`+919000000001`) and confirmed the known
+  score (88) is unchanged. Worker restarted and its startup line lists `cron:refresh_embeddings`
+  alongside the other four.
+- 793 backend tests (was 759). `make check` clean; migrations 0034/0035 rehearsed down and up with
+  zero autogenerate drift; `make gen-api` shows no new routes (this sprint is entirely internal to
+  matching — no schema or endpoint changed).
+
 ### Also outstanding, in rough order
 
 - ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
@@ -1264,10 +1365,14 @@ expensive assets — 21,303 NSQF standards with role search, one pure determinis
 identity many roles, two working consent-and-revocation disclosure loops, geography to
 sub-district — are exactly what all three pillars need.
 
-Suggested order, revised 2026-09-26: the management-facing actor-breadth MVP (Sprint 33, done) and
-the monetisation ADR with a **payment adapter port only** (Sprint 34, done — see its entry in §11)
-are both behind us now. Next is Epic B3, the Assessment Provider (Sprint 35), then course checkout
-against the port already in place, then gig as its own module.
+Suggested order, re-revised 2026-09-27: the management-facing actor-breadth MVP (Sprint 33), the
+monetisation ADR with a **payment adapter port only** (Sprint 34), Epic B3's verified evidence
+(Sprint 35), and BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36) are all behind us now — see each
+one's entry in §11. Per the backlog's own near-term sequence (`docs/IISM-Product-Backlog.docx`
+§4), next is Order 6: `BL-1.2`/`BL-1.3`, resuming the monetisation epic against the payment port
+already in place — a billing module for orders and entitlements, the real gateway
+implementation. Course checkout, résumé ingestion, the rest of Epic B6, and gig as its own module
+remain queued behind that.
 
 ### Then, in rough order of value
 
@@ -1282,9 +1387,13 @@ against the port already in place, then gig as its own module.
   experiences and education, which no scorer reads, and needs multipart, object storage, a documents
   table, PDF/DOCX extraction, AES-256-GCM with KMS (ADR-023) and an `LLMProvider` adapter (ADR-031)
   before one skill reaches a profile. Revisit once role-led suggestion shows what gap remains.
-- **Semantic similarity** — the deliberate omission from Sprint 10 (ADR-007 names it; ADR-036 says
-  deterministic overlap ships first so there is a baseline). Embeddings over performance criteria,
-  never titles: `OJT` and `Project` embed to noise. Also the answer if role search proves too weak.
+- ~~**Semantic similarity**~~ **Closed 2026-09-27 (Sprint 36).** The mechanism exists end to end
+  (`api/adapters/embeddings/`, the two embedding columns, the worker sweep, the additive bounded
+  term in `score_match`) and is off by default (`match_weight_semantic=0.0`) — turning it up is a
+  deliberate, separately-measured re-tune, not yet done, and the embedding provider itself is a
+  placeholder (feature hashing, not the ADR-013/031 sentence-transformers model — see Sprint 36's
+  entry). Still the answer if role search ever proves too weak; the plumbing no longer needs to
+  be built first.
 - **Hindi for the corpus.** The interface is fully bilingual; the *corpus* is not. Say that plainly
   in any demo. ~$5 for the navigable surface, blocked on credentials rather than design.
 - **Confirm the PWA installs on a real device.** Manifest, icons and worker are in place and tested
@@ -1298,8 +1407,10 @@ against the port already in place, then gig as its own module.
 - **`CLAUDE.md` cites ADR-026 for the siblings-not-generalisations rule.** ADR-026 is *Supply
   Acquisition Strategy*; that rule has no ADR and lives only in `CLAUDE.md`. Either write it as one
   or stop citing a number for it.
-- Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist), typed `SkillRelation`
-  edges, observability (ADR-019), the ADR-023 encryption path, caching as caching (ADR-020).
+- Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist) -- the graph it would
+  traverse now has its foundation table (`SkillRelation`, Sprint 36, BL-6.1) but no edges, no
+  inference and no route yet (BL-6.2/6.3) -- observability (ADR-019), the ADR-023 encryption path,
+  caching as caching (ADR-020).
 
 ### Measured in Sprint 27 (performance and security)
 
@@ -1424,13 +1535,19 @@ the logs. CORS is restricted to one origin.
   pairs to **34 pairs, 7 orderings and 16 course expectations**, which is enough to defend a
   weighting — the five never were. Two things still qualify every claim. `make evaluate` **cannot
   run in CI** (it needs the 21,303-standard corpus, which is not in the repository), so the number
-  is produced by hand rather than on every change. And **precision has no negative class**: ADR-025
-  names click-through, and `EVENT_NAMES` has `course_recommended` and `course_opened` but nothing
-  for a recommendation dismissed, so "shown and ignored" and "shown and rejected" are the same rows
-  (`docs/scope-reconciliation.md` §3).
-- Self-declared skills are unreliable until assessment integration lands. Three of the four
-  `SKILL_SOURCES` have no writer at all: every real candidate scores the 0.6 evidence floor, and
-  `assessed`/`certified` appear only in seeded fixtures. There is no assessment module or adapter.
+  is produced by hand rather than on every change. ~~And **precision has no negative class**~~
+  **Closed in Sprint 33.** `course_dismissed` gives `course_recommended`/`course_opened` a negative
+  signal for the first time -- "shown and ignored" and "shown and rejected" are no longer the same
+  rows. What remains is volume: near-zero real dismissals exist yet to measure against.
+- ~~Self-declared skills are unreliable until assessment integration lands. Three of the four
+  `SKILL_SOURCES` have no writer at all.~~ **Two of three closed in Sprint 35.**
+  `api/adapters/assessment/` plus a webhook writes `assessed`; an operator-verified certification
+  path writes `certified`. Neither has *volume* yet -- no real assessment partnership is signed, and
+  the certification-verification queue depends on candidates adding certifications with a
+  `skill_slug`, which is not a step the profile wizard currently prompts for -- so
+  `EVIDENCE_WEIGHT_SHARE` is no longer *structurally* a constant, but it may still be one in practice
+  until either happens. `inferred` remains unwritten anywhere; that is BL-4.1/4.2's résumé-ingestion
+  territory, deliberately still separate.
 - Employer-side supply is the weakest link in Indian vocational markets.
 - ~~Two vocabularies coexist.~~ **Closed in Sprint 9.** The 52 curated skills are retired and
   every link points at a National Occupational Standard. What replaced it is a smaller, honest

@@ -36,6 +36,8 @@ EXPECTED_CRONS = {
     "cron:send_job_alerts": "no candidate hears about a vacancy they did not go looking for",
     "cron:close_expired_jobs": "a closing date never closes anything",
     "cron:purge_expired_analytics": "events are kept past their retention period",
+    "cron:refresh_embeddings": "a published job or a saved skill set never gets "
+    "a semantic-similarity term, and BL-5.2's whole ranking refinement is inert",
 }
 
 REPO = Path(__file__).resolve().parent.parent

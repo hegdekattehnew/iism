@@ -66,6 +66,35 @@ class OrganisationVerificationOut(BaseModel):
     history: list[VerificationEventOut]
 
 
+class UnverifiedCertification(BaseModel):
+    """One row of the certification queue (Sprint 35, BL-3.2): enough to
+    decide without opening anything else."""
+
+    id: uuid.UUID
+    candidate_name: str | None = None
+    name: str
+    issuing_body: str | None = None
+    credential_id: str | None = None
+    skill_slug: str
+    skill_name: str
+
+
+class CertificationVerifyIn(BaseModel):
+    """The evidence for a decision. No `decision` field, unlike organisation
+    verification: a certification has no revoke path yet (the candidate's own
+    edit/delete controls that row), so there is only ever one direction."""
+
+    note: Annotated[str, Field(min_length=10, max_length=500)]
+
+
+class VerifiedCertificationOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    skill_slug: str
+    verified_at: datetime
+    verification_note: str
+
+
 class ProgrammeReportOut(BaseModel):
     """Outcomes for one government-agency programme (Sprint 33, BL-7.1b)."""
 

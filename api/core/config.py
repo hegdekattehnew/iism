@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     match_weight_evidence_share: float = 0.10
     match_mandatory_gap_cap: float = 0.45
     match_experience_taper_years: float = 3.0
+    # Sprint 36, BL-5.2. Zero: additive on top of the four above, not carved
+    # out of them, and turning it up is a deliberate, separately-measured
+    # re-tune this story explicitly defers -- `make evaluate` must stay
+    # bit-identical while this is 0.
+    match_weight_semantic: float = 0.0
 
     # --- database pool ---
     db_pool_size: int = 5

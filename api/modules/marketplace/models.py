@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
     Computed,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    Text,
     UniqueConstraint,
     and_,
     func,
@@ -19,6 +21,7 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.elements import ColumnElement
 
+from api.adapters.embeddings.base import EMBEDDING_DIMENSIONS
 from api.core.database import Base, one_of
 
 # Imported for its side effect as well as its use: jobs and profiles carry
@@ -79,7 +82,37 @@ _TSV = (
 )
 
 
-class Job(Base):
+class _EmbeddingColumns:
+    """A semantic-similarity vector, shared by `Job` and `CandidateProfile`
+    (Sprint 36, BL-5.1).
+
+    Computed at write time by `matching.tasks.refresh_embeddings`, never
+    inline in a request (ADR-036) and never inside `scoring.py` itself --
+    "the embedding lives beside the scorer, not inside it" is this story's own
+    acceptance criterion. **NULL means "needs (re)computing"**, not "has none":
+    a skill write sets it back to NULL (`marketplace.profile_service._write_
+    skills`, `marketplace.publishing._write_skills`) rather than leaving a
+    vector that no longer describes what this row now holds, and the sweep is
+    the only thing that ever fills it back in.
+
+    `embedding_provider`/`embedding_model` are not decoration -- ADR-031 states
+    plainly that "every stored vector records the provider, model identifier
+    and model version... no vector's provenance is ever ambiguous", which
+    matters the day a real model replaces the placeholder one and half the
+    corpus is stale until the sweep catches up.
+    """
+
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSIONS), default=None
+    )
+    embedding_provider: Mapped[str | None] = mapped_column(default=None)
+    embedding_model: Mapped[str | None] = mapped_column(default=None)
+    embedding_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class Job(_EmbeddingColumns, Base):
     """A vacancy, expressed as a set of required skills rather than keywords."""
 
     __tablename__ = "jobs"
@@ -343,7 +376,7 @@ class CourseSkill(Base):
     skill: Mapped["Skill"] = relationship(lazy="selectin")
 
 
-class CandidateProfile(Base):
+class CandidateProfile(_EmbeddingColumns, Base):
     """A candidate's employability picture. One per user."""
 
     __tablename__ = "candidate_profiles"
@@ -547,9 +580,18 @@ class CandidateEducation(Base):
 class CandidateCertification(Base):
     """A credential, optionally tied to a skill in the taxonomy.
 
-    `skill_id` is the important column: a verified certificate is what will let
-    a skill be recorded with source='certified' rather than 'self_declared',
+    `skill_id` is the important column: a verified certificate is what lets a
+    skill be recorded with source='certified' rather than 'self_declared',
     which is how evidence outranks a self-claim in scoring (ADR-007).
+
+    `verified_at`/`verified_by`/`verification_note` (Sprint 35, BL-3.2) are
+    denormalised onto this row alone, deliberately simpler than
+    `tenant_verification_events` (ADR-042): a candidate's own certification is
+    theirs to edit or delete at any time, unlike an organisation's badge,
+    which only an operator can touch -- there is no symmetrical need for an
+    append-only history an operator must consult before acting. The evidence
+    CHECK is the same shape regardless: a badge with no evidence must not be
+    representable.
     """
 
     __tablename__ = "candidate_certifications"
@@ -557,6 +599,11 @@ class CandidateCertification(Base):
         CheckConstraint(
             "expires_on IS NULL OR issued_on IS NULL OR expires_on >= issued_on",
             name="ck_certification_dates",
+        ),
+        CheckConstraint(
+            "verified_at IS NULL OR ("
+            "verified_by IS NOT NULL AND length(btrim(verification_note)) >= 10)",
+            name="ck_candidate_certifications_verified_has_evidence",
         ),
         Index("ix_candidate_certifications_profile_id", "profile_id"),
     )
@@ -574,6 +621,11 @@ class CandidateCertification(Base):
     skill_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("skills.id", ondelete="SET NULL"), default=None
     )
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    verified_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    verification_note: Mapped[str | None] = mapped_column(Text, default=None)
 
     profile: Mapped["CandidateProfile"] = relationship(back_populates="certifications")
     skill: Mapped["Skill | None"] = relationship(lazy="selectin")

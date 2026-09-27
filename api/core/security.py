@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
@@ -352,3 +352,29 @@ async def get_service_account(
 
     structlog.contextvars.bind_contextvars(service_account_id=str(account.id))
     return account
+
+
+def require_service_scope(scope: str) -> Callable[..., Awaitable["ServiceAccount"]]:
+    """A second question beyond `get_service_account`'s: not just *which*
+    partner, but *what may they do* (Sprint 35, BL-3.1).
+
+    `SERVICE_ACCOUNT_SCOPES` was a set of one -- "read" -- until an assessment
+    provider needed to write. A key is one scope, not a set (unlike
+    `Permission`, which a membership role grants several of at once), so this
+    is a straight equality check, not a membership test. **403, not 401**: the
+    key is real and the caller is authenticated -- ADR-038's rule that an
+    established identity's insufficient permission is a 403 applies here just
+    as it does to a membership role.
+    """
+
+    async def dependency(
+        account: "ServiceAccount" = Depends(get_service_account),
+    ) -> "ServiceAccount":
+        if account.scope != scope:
+            log.warning("auth.service_account_wrong_scope", service_account_id=str(account.id))
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "This API key is not scoped for this request"
+            )
+        return account
+
+    return dependency

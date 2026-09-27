@@ -1,4 +1,6 @@
-"""Issue or revoke an external system's API key (Sprint 33, BL-7.2).
+"""Issue or revoke an external system's API key (Sprint 33, BL-7.2; --scope
+added Sprint 35, BL-3.1, when a second scope, 'assessment:write', joined the
+original read-only one).
 
 **The raw key exists for one moment: this print.** It is hashed the same way
 an OTP or a refresh token is (`hash_secret`, HMAC on `JWT_SECRET_KEY`) before
@@ -29,14 +31,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.database import dispose_engine, get_sessionmaker
 from api.core.logging import configure_logging
 from api.core.security import hash_secret
-from api.modules.identity.models import ServiceAccount
+from api.modules.identity.models import SERVICE_ACCOUNT_SCOPES, ServiceAccount
 
 
 async def _find(db: AsyncSession, name: str) -> ServiceAccount | None:
     return await db.scalar(select(ServiceAccount).where(ServiceAccount.name == name))
 
 
-async def _run(name: str, *, revoke: bool, apply: bool) -> int:
+async def _run(name: str, *, revoke: bool, apply: bool, scope: str) -> int:
     configure_logging()
     async with get_sessionmaker()() as db:
         existing = await _find(db, name)
@@ -62,12 +64,12 @@ async def _run(name: str, *, revoke: bool, apply: bool) -> int:
             return 1
 
         if not apply:
-            print(f"DRY RUN. Would issue a new key for: {name!r}")
+            print(f"DRY RUN. Would issue a new key for: {name!r} (scope={scope!r})")
             print("\nRe-run with --apply to write.")
             return 0
 
         raw_key = secrets.token_urlsafe(32)
-        account = ServiceAccount(name=name, hashed_key=hash_secret(raw_key))
+        account = ServiceAccount(name=name, hashed_key=hash_secret(raw_key), scope=scope)
         db.add(account)
         await db.commit()
         print(f"Issued for {name!r}. This is the only time the key is shown:\n")
@@ -82,8 +84,14 @@ def main() -> int:
     parser.add_argument("name", help="a short label for the partner, e.g. acme-hr-integration")
     parser.add_argument("--revoke", action="store_true", help="revoke the existing key instead")
     parser.add_argument("--apply", action="store_true", help="write; otherwise this is a dry run")
+    parser.add_argument(
+        "--scope",
+        default="read",
+        choices=SERVICE_ACCOUNT_SCOPES,
+        help="what this key may do (default: read)",
+    )
     args = parser.parse_args()
-    return asyncio.run(_run(args.name, revoke=args.revoke, apply=args.apply))
+    return asyncio.run(_run(args.name, revoke=args.revoke, apply=args.apply, scope=args.scope))
 
 
 if __name__ == "__main__":

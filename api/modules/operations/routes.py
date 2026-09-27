@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,7 @@ router = APIRouter(prefix="/ops", tags=["operations"])
 CanReadOrgs = Depends(require_operator(Permission.OPS_ORG_READ))
 CanVerifyOrgs = Depends(require_operator(Permission.OPS_ORG_VERIFY))
 CanReadProgrammes = Depends(require_operator(Permission.OPS_PROGRAMME_READ))
+CanVerifyCandidates = Depends(require_operator(Permission.OPS_CANDIDATE_VERIFY))
 
 
 @router.get("/organisations", response_model=list[schemas.UnverifiedOrganisation])
@@ -80,6 +83,58 @@ async def decide_verification(
         db, tenant, decision=payload.decision, note=payload.note, actor=context.user
     )
     return _detail(tenant, await service.verification_history(db, tenant.id))
+
+
+@router.get("/candidates/certifications", response_model=list[schemas.UnverifiedCertification])
+async def certification_queue(
+    limit: int = Query(100, ge=1, le=200),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanVerifyCandidates,
+) -> list[schemas.UnverifiedCertification]:
+    """Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2)."""
+    rows = await service.unverified_certifications(db, limit=limit)
+    return [
+        schemas.UnverifiedCertification(
+            id=cert.id,
+            candidate_name=candidate_name,
+            name=cert.name,
+            issuing_body=cert.issuing_body,
+            credential_id=cert.credential_id,
+            # Guaranteed non-null: the queue query itself filters on
+            # `skill_id IS NOT NULL`.
+            skill_slug=cert.skill.slug,  # type: ignore[union-attr]
+            skill_name=cert.skill.name,  # type: ignore[union-attr]
+        )
+        for cert, candidate_name in rows
+    ]
+
+
+@router.post(
+    "/candidates/certifications/{certification_id}/verify",
+    response_model=schemas.VerifiedCertificationOut,
+)
+async def verify_certification(
+    certification_id: uuid.UUID,
+    payload: schemas.CertificationVerifyIn,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanVerifyCandidates,
+) -> schemas.VerifiedCertificationOut:
+    """Sets `CandidateSkill.source='certified'` for the standard this
+    certification names (Sprint 35, BL-3.2) -- the non-seed writer
+    `docs/scope-reconciliation.md`'s postscript asks for."""
+    certification = await service.certification_for_review(db, certification_id)
+    if certification is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+    certification = await service.verify_certification(
+        db, certification, note=payload.note, actor=context.user
+    )
+    return schemas.VerifiedCertificationOut(
+        id=certification.id,
+        name=certification.name,
+        skill_slug=certification.skill.slug,  # type: ignore[union-attr]
+        verified_at=certification.verified_at,
+        verification_note=certification.verification_note,
+    )
 
 
 @router.get("/programmes/{name}", response_model=schemas.ProgrammeReportOut)

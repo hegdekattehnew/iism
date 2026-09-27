@@ -1323,6 +1323,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/partners/assessment-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Assessment Result */
+        post: operations["submit_assessment_result_partners_assessment_results_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/applications": {
         parameters: {
             query?: never;
@@ -1707,6 +1724,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/candidates/certifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Certification Queue
+         * @description Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2).
+         */
+        get: operations["certification_queue_ops_candidates_certifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/candidates/certifications/{certification_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Certification
+         * @description Sets `CandidateSkill.source='certified'` for the standard this
+         *     certification names (Sprint 35, BL-3.2) -- the non-seed writer
+         *     `docs/scope-reconciliation.md`'s postscript asks for.
+         */
+        post: operations["verify_certification_ops_candidates_certifications__certification_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ops/programmes/{name}": {
         parameters: {
             query?: never;
@@ -2045,6 +2104,23 @@ export interface components {
             updated_at: string;
         };
         /**
+         * AssessmentWebhookOut
+         * @description `written` is `True` iff a `CandidateSkill` was added or upgraded.
+         *
+         *     A failed assessment attempt is a legitimate, successful call to this
+         *     endpoint that writes nothing -- `written=False` with no error -- not a
+         *     4xx. The route reserves 4xx for a payload this platform cannot act on at
+         *     all: an unparseable body, an unknown candidate, an unknown standard.
+         */
+        AssessmentWebhookOut: {
+            /** Written */
+            written: boolean;
+            /** Added */
+            added: number;
+            /** Updated */
+            updated: number;
+        };
+        /**
          * CandidateCardOut
          * @description A ranked candidate, described without identifying them.
          *
@@ -2241,6 +2317,16 @@ export interface components {
             /** Nsqf Level */
             nsqf_level?: number | null;
             skill?: components["schemas"]["SkillOut"] | null;
+        };
+        /**
+         * CertificationVerifyIn
+         * @description The evidence for a decision. No `decision` field, unlike organisation
+         *     verification: a certification has no revoke path yet (the candidate's own
+         *     edit/delete controls that row), so there is only ever one direction.
+         */
+        CertificationVerifyIn: {
+            /** Note */
+            note: string;
         };
         /** ComponentHealth */
         ComponentHealth: {
@@ -4280,6 +4366,30 @@ export interface components {
             count: number;
         };
         /**
+         * UnverifiedCertification
+         * @description One row of the certification queue (Sprint 35, BL-3.2): enough to
+         *     decide without opening anything else.
+         */
+        UnverifiedCertification: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Candidate Name */
+            candidate_name?: string | null;
+            /** Name */
+            name: string;
+            /** Issuing Body */
+            issuing_body?: string | null;
+            /** Credential Id */
+            credential_id?: string | null;
+            /** Skill Slug */
+            skill_slug: string;
+            /** Skill Name */
+            skill_name: string;
+        };
+        /**
          * UnverifiedOrganisation
          * @description One row of the queue: enough to decide without opening anything else.
          */
@@ -4385,6 +4495,25 @@ export interface components {
             decision: "granted" | "revoked";
             /** Note */
             note: string;
+        };
+        /** VerifiedCertificationOut */
+        VerifiedCertificationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Skill Slug */
+            skill_slug: string;
+            /**
+             * Verified At
+             * Format: date-time
+             */
+            verified_at: string;
+            /** Verification Note */
+            verification_note: string;
         };
     };
     responses: never;
@@ -6812,6 +6941,41 @@ export interface operations {
             };
         };
     };
+    submit_assessment_result_partners_assessment_results_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentWebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_applications_me_applications_get: {
         parameters: {
             query?: {
@@ -7496,6 +7660,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    certification_queue_ops_candidates_certifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnverifiedCertification"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_certification_ops_candidates_certifications__certification_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CertificationVerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedCertificationOut"];
                 };
             };
             /** @description Validation Error */

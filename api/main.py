@@ -23,6 +23,7 @@ from api.core.tasks import close_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.applications import employer_router as applications_employer_router
 from api.modules.applications import router as applications_router
+from api.modules.assessment import router as assessment_router
 from api.modules.geography import router as geography_router
 from api.modules.identity import (
     account_router,
@@ -149,6 +150,7 @@ app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)
 app.include_router(analytics_router)
+app.include_router(assessment_router)
 app.include_router(applications_router)
 app.include_router(applications_employer_router)
 app.include_router(interests_router)

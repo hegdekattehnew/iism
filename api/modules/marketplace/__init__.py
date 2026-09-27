@@ -29,6 +29,7 @@ from api.modules.marketplace.profile_service import (
     add_skills_bulk,
     ensure_profile,
     get_or_create_profile,
+    record_verified_skill,
     remove_skill,
     update_profile,
 )
@@ -84,6 +85,7 @@ __all__ = [
     "profile_router",
     "course_publishing_router",
     "publishing_router",
+    "record_verified_skill",
     "remove_skill",
     "update_profile",
 ]

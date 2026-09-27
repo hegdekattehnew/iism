@@ -131,6 +131,53 @@ async def get_skill_by_slug(db: AsyncSession, slug: str) -> Skill | None:
     return await db.scalar(select(Skill).where(Skill.slug == slug))
 
 
+async def get_skill_by_nos_code(db: AsyncSession, nos_code: str) -> Skill | None:
+    """`nos_code` is unique in the corpus (unlike names or sector-local ids,
+    see CLAUDE.md), which is what makes it the right key for an external
+    system to cite a standard by (Sprint 35, BL-3.1) -- a slug is this
+    platform's own identifier and no assessment provider will have one."""
+    return await db.scalar(select(Skill).where(Skill.nos_code == nos_code))
+
+
+async def embedding_text_for_skills(db: AsyncSession, skill_ids: list[uuid.UUID]) -> str:
+    """The text a semantic-similarity embedding is computed from (Sprint 36,
+    BL-5.1): performance criteria, never a skill's own title. "OJT" and
+    "Project" are real unit titles in this corpus and embed to noise on their
+    own -- the assessable content underneath a title is what actually
+    describes the standard. Falls back to a skill's own `description`, then
+    its `name`, only for the ~35% of standards with no recorded performance
+    criteria at all.
+    """
+    if not skill_ids:
+        return ""
+    criteria_rows = (
+        await db.execute(
+            select(PerformanceElement.skill_id, PerformanceCriterion.description)
+            .join(PerformanceCriterion, PerformanceCriterion.element_id == PerformanceElement.id)
+            .where(PerformanceElement.skill_id.in_(skill_ids))
+        )
+    ).all()
+    by_skill: dict[uuid.UUID, list[str]] = {}
+    for skill_id, description in criteria_rows:
+        by_skill.setdefault(skill_id, []).append(description)
+
+    missing = [sid for sid in skill_ids if sid not in by_skill]
+    fallback_rows = (
+        (
+            await db.execute(
+                select(Skill.id, Skill.name, Skill.description).where(Skill.id.in_(missing))
+            )
+        ).all()
+        if missing
+        else []
+    )
+    fallback_text = {row.id: row.description or row.name for row in fallback_rows}
+
+    parts = [text for sid in skill_ids for text in by_skill.get(sid, [])]
+    parts.extend(fallback_text.get(sid, "") for sid in missing)
+    return " ".join(p for p in parts if p)
+
+
 async def list_skills(
     db: AsyncSession,
     *,

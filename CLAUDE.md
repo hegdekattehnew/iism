@@ -91,7 +91,11 @@ api/                     FastAPI modular monolith
                          each in one function. member_routes.py has two routers, because
                          somebody accepting an invitation is not yet a member. ServiceAccount
                          (Sprint 33) is a fourth credential, alongside JWT rather than under
-                         it -- an external system is not a `User` and never signs in.
+                         it -- an external system is not a `User` and never signs in. Its
+                         `scope` (Sprint 35) is a single value per key, not a set --
+                         `core.security.require_service_scope()` is the second question
+                         beyond `get_service_account`'s "which partner": not just who, but
+                         what they may do.
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
@@ -101,13 +105,26 @@ api/                     FastAPI modular monolith
                          endpoint, gated by `core.security.get_service_account` rather than
                          `require()` -- same `service.list_jobs` the public listing calls,
                          because a partner is not owed a second query path.
+                         profile_service.py's `_write_skills` is the one construction site
+                         for a `CandidateSkill`; `record_verified_skill` (Sprint 35) is its
+                         public wrapper for evidenced sources, so `assessment/` and
+                         `operations/` write through it rather than each holding a second
+                         copy of the same insert.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
                          QpEntryRoute, QpNcoCode, ModelCurriculum;
                          content.py = what a standard actually says, ~614k rows
                          (ADR-004, ADR-034). roles_routes.py + role_aliases.py =
-                         role search: a job title to its qualification's standards
+                         role search: a job title to its qualification's standards.
+                         graph.py = SkillRelation (Sprint 36, BL-6.1): a typed,
+                         weighted edge between two *different* skills -- a new
+                         graph, not a replacement for concepts.py's SkillConcept,
+                         which groups rows that mean the *same* thing. Foundation
+                         only; nothing reads it yet (BL-6.2/6.3, held).
+                         service.py's embedding_text_for_skills is what BL-5.1's
+                         embedding sweep calls: performance criteria, never a
+                         skill's own title ("OJT" embeds to noise on its own).
     geography/           State, District, SubDistrict, plus the service that resolves a
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
@@ -123,7 +140,15 @@ api/                     FastAPI modular monolith
                          a course measured against a role, with no candidate in the
                          comparison at all, so ADR-037 does not apply the way it does
                          to candidates_for_job -- and market_router, the provider-facing
-                         read of market_scarce_skills.
+                         read of market_scarce_skills. (Sprint 36, BL-5.2) score_match
+                         also takes job_embedding/candidate_embedding and a semantic
+                         weight, defaulted to None/0 -- additive, clamped to [0, 1],
+                         applied before the mandatory cap so it can refine but never
+                         escape it. tasks.py's refresh_embeddings cron is what fills
+                         Job.embedding/CandidateProfile.embedding in; a skill write
+                         sets its owner's back to NULL rather than leaving it stale
+                         (marketplace._write_skills x2), and scoring.py itself still
+                         reads no settings and calls no model.
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
@@ -149,11 +174,24 @@ api/                     FastAPI modular monolith
                          verification queue and decision routes, `require_operator()`'s
                          permissions, and (Sprint 33) the government-agency programme
                          report -- an operator stands in for an agency login that does
-                         not exist yet. A second leaf beside privacy/ -- depends on
-                         identity, marketplace and, since Sprint 33, matching (for the
-                         report's serious-match count) -- nothing depends on it. No
-                         staff-management endpoint, ever, by decision;
-                         `scripts/grant_staff.py` is the only writer of `users.is_staff`.
+                         not exist yet. (Sprint 35, BL-3.2) also the certification
+                         queue: an evidence CHECK denormalised onto
+                         `candidate_certifications` itself rather than a second
+                         `tenant_verification_events`-shaped log, because a candidate's
+                         own certification is theirs to edit or delete at any time. A
+                         second leaf beside privacy/ -- depends on identity, marketplace
+                         and, since Sprint 33, matching (for the report's serious-match
+                         count) -- nothing depends on it. No staff-management endpoint,
+                         ever, by decision; `scripts/grant_staff.py` is the only writer
+                         of `users.is_staff`.
+    assessment/          (Sprint 35, BL-3.1) The one webhook an assessment provider
+                         calls. No model of its own: ADR-023 names "assessment results"
+                         among the data an encryption path must exist for before it is
+                         collected, and that path is unbuilt, so this deliberately
+                         persists nothing beyond a plain `CandidateSkill.source='assessed'`
+                         row -- a coarse pass/fail, never a score or a transcript. A
+                         leaf: depends on identity, marketplace and skills; nothing
+                         depends on it.
     analytics/           analytics_events (ADR-025). record() COMMITS. course_dismissed
                          (Sprint 33) is course_opened's negative half -- precision@5's
                          missing class, same shape, its own handler for the same reason.
@@ -171,6 +209,17 @@ api/                     FastAPI modular monolith
                          refuses unconditionally, not only in production -- there is no
                          course-checkout feature calling it yet, so succeeding would
                          fabricate a transaction for a flow that does not exist.
+    assessment/          AssessmentProvider port (Sprint 35, ADR-017). Its console impl
+                         has a real caller (`api/modules/assessment/`), unlike payments,
+                         so it refuses only in production, not unconditionally.
+    embeddings/          EmbeddingProvider port (Sprint 36, BL-5.1, ADR-013/031). The
+                         console impl (HashingEmbeddingProvider) is an honest
+                         placeholder for the mandated self-hosted sentence-transformers
+                         model -- deterministic feature hashing, not a trained model,
+                         because that dependency is an infrastructure decision (torch,
+                         a ~470 MB download) this story does not make silently. Every
+                         implementation is pinned to 384 dimensions (ADR-031) so a real
+                         model can replace this one with no schema change.
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -497,18 +546,24 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > **What to build next lives in [projectContextForMe.md](projectContextForMe.md) §11**, with §0 as
 > the two-minute orientation: branch, test counts, how to run it, demo logins. This section is the
 > record of *what was learned* sprint by sprint — read it for the rules that must not be broken,
-> not for the queue. **Sprints 28-34 are done** (geography and operator authority, the back
+> not for the queue. **Sprints 28-36 are done** (geography and operator authority, the back
 > office and the golden set, the silent-failure sweep, the scope ledger, the delegation
 > refactor, Sprint 33's actor-breadth MVP — thin-slice government-agency and external-system
 > actors, course-to-role alignment, and the rest of Epic B2 pulled forward alongside it:
 > configurable match weights, the `course_dismissed` signal, and market-wide scarce-skills for
-> course providers — and Sprint 34's ADR-043 with a payment adapter port). **Sprint 35 is next:
-> Epic B3, the Assessment Provider** (`docs/IISM-Product-Backlog.docx` §4). The payment port —
-> a `PaymentProvider` protocol plus a console implementation that refuses unconditionally — has
-> no caller anywhere yet and no billing code, no `Order`/`Entitlement` table; it does **not**
-> claim ADR-025's deferral gate is satisfied, and the ADR says so plainly: two of its three
-> metrics are still thin. §11 also carries a standing assessment of the three pillars the owner is
-> building toward — jobs, sellable courses, gig work — and what each actually needs.
+> course providers — Sprint 34's ADR-043 with a payment adapter port, Sprint 35's Epic B3:
+> `api/adapters/assessment/` plus a webhook that writes `CandidateSkill.source='assessed'`
+> (BL-3.1), and an operator-verified `source='certified'` path off a candidate's own
+> certification (BL-3.2) — closing `docs/scope-reconciliation.md`'s sharpest finding, that three
+> of four `SKILL_SOURCES` had no writer outside the seed — and Sprint 36: BL-5.1/5.2's
+> semantic-similarity term (`api/adapters/embeddings/`, an additive bounded weight in
+> `score_match`, a worker cron that fills `Job.embedding`/`CandidateProfile.embedding` in and a
+> skill write that invalidates them), and BL-6.1's `SkillRelation` foundation). **Sprint 37 is
+> next**, per `docs/IISM-Product-Backlog.docx` §4's near-term sequence: `BL-1.2`/`BL-1.3`, resuming
+> the monetisation epic (the payment adapter port from Sprint 34 plus a billing module for orders
+> and entitlements) — or the owner may redirect. §11 also carries a standing assessment of the
+> three pillars the owner is building toward — jobs, sellable courses, gig work — and what each
+> actually needs.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

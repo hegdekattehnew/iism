@@ -85,6 +85,9 @@ class Permission(StrEnum):
     # for an agency login that does not exist yet (an operator views the
     # report on the agency's behalf).
     OPS_PROGRAMME_READ = "ops:programme:read"
+    # Sprint 35, BL-3.2: the same evidence pattern ADR-042 gives an
+    # organisation's badge, for a candidate's own certification claim.
+    OPS_CANDIDATE_VERIFY = "ops:candidate:verify"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -135,7 +138,12 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
 # becomes a function of the user and **no route changes**, which is the whole
 # reason callers ask for a Permission rather than for the flag (ADR-022).
 OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
-    {Permission.OPS_ORG_READ, Permission.OPS_ORG_VERIFY, Permission.OPS_PROGRAMME_READ}
+    {
+        Permission.OPS_ORG_READ,
+        Permission.OPS_ORG_VERIFY,
+        Permission.OPS_PROGRAMME_READ,
+        Permission.OPS_CANDIDATE_VERIFY,
+    }
 )
 
 
