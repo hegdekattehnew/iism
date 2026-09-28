@@ -56,6 +56,14 @@ APPLICATION_STATUSES = (
 # `no_show` are both live -- the engagement is over, not the disclosure.
 LIVE_STATUSES = ("applied", "shortlisted", "hired", "completed", "no_show")
 
+# Two different questions, and a gig is where they part. A finished gig worker
+# moves `hired` -> `completed`, so anything counting `status == "hired"` alone
+# stops counting them. `no_show` was hired, but left the seat empty.
+#   - Does this person occupy one of the vacancy's positions? (`_close_if_filled`)
+FILLED_STATUSES = ("hired", "completed")
+#   - Was this person ever hired? (the programme report's outcome figure)
+WAS_HIRED_STATUSES = ("hired", "completed", "no_show")
+
 # What an employer may move an application to. Neither `applied` (the
 # candidate's opening move) nor `withdrawn` (theirs to take back) is here.
 EMPLOYER_STATUSES = ("shortlisted", "rejected", "hired", "completed", "no_show")

@@ -551,3 +551,49 @@ class TestGigAppearsInMatching:
         matches = (await client.get("/me/matches", headers=candidate)).json()
         slugs = [item["job"]["slug"] for item in matches["items"]]
         assert job_slug in slugs
+
+
+async def _gig_with_outcomes(db: AsyncSession, statuses: list[str], *, positions: int) -> Job:
+    tenant = Tenant(slug=f"fill-{uuid.uuid4().hex[:8]}", name="Fill Co", tenant_type="employer")
+    db.add(tenant)
+    await db.flush()
+    job = Job(
+        slug=f"fill-gig-{uuid.uuid4().hex[:8]}",
+        tenant_id=tenant.id,
+        title="Shift",
+        status="published",
+        employment_type="gig",
+        positions=positions,
+        closes_at=datetime.now(UTC) + timedelta(days=2),
+    )
+    db.add(job)
+    await db.flush()
+    for status in statuses:
+        user = User(phone=f"+9194{uuid.uuid4().int % 100000000:08d}")
+        db.add(user)
+        await db.flush()
+        profile = CandidateProfile(user_id=user.id)
+        db.add(profile)
+        await db.flush()
+        db.add(Application(job_id=job.id, profile_id=profile.id, status=status))
+    await db.flush()
+    return job
+
+
+class TestAFinishedGigStillFillsItsPosition:
+    """`completed` moves a worker out of `hired`. Counting `hired` alone let a
+    two-position gig take on a third person once the first had finished."""
+
+    async def test_a_completed_worker_still_occupies_a_position(self, db: AsyncSession) -> None:
+        from api.modules.applications.employer_service import _close_if_filled
+
+        job = await _gig_with_outcomes(db, ["completed", "hired"], positions=2)
+        assert await _close_if_filled(db, job) is True
+        assert job.close_reason == "filled"
+
+    async def test_a_no_show_leaves_the_position_open(self, db: AsyncSession) -> None:
+        from api.modules.applications.employer_service import _close_if_filled
+
+        job = await _gig_with_outcomes(db, ["no_show", "hired"], positions=2)
+        assert await _close_if_filled(db, job) is False
+        assert job.closed_at is None

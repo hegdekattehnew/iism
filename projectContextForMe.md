@@ -28,7 +28,7 @@ has been wrong before, and §10 explains how.*
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
 | **Last sprint** | 37 — BL-7.3's tiered operator authority (ADR-044), then Epic B8's gig work, reusing `Job`/`Application` instead of a sibling module (ADR-046, superseding ADR-045 §1-4) |
 | **Next sprint** | 38 — resume monetisation (`BL-1.2`/`BL-1.3`, billing module) per the backlog's own sequence, or owner redirect |
-| **Tests** | 827 backend (`make check`), 259 web (`cd web && npm test`) |
+| **Tests** | 832 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
 | **Migrations** | head `0037`; 46 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -124,6 +124,9 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
   models only, `User` and `Membership` layered on in Sprint 4.
 
 ## 4. Current state
+
+*This section's sprint-by-sprint record stops at Sprint 24. Sprints 25–27 are written up in
+`CLAUDE.md` → Current state; Sprints 28 onward are in §11 below. Read those for anything recent.*
 
 **Sprint 24 (somebody is interested) — complete, 2026-09-21.** Deployment deferred; the question was
 which functionality is worth most, and a scan across all three actors found one that got nothing at
@@ -910,8 +913,12 @@ reach the remote was one called *"Correct the git section: the branch is pushed"
 went on asserting they were safe. **A claim about the remote is only true at the moment it is
 checked**; re-check it, do not read it here.
 
-- Branch **`v2/foundations`**, tracking `origin/v2/foundations`. Work continues on it; `main` now
-  contains everything through Sprint 24.
+- Branch **`v2/foundations`**, tracking `origin/v2/foundations`. Work continues on it; `main`
+  contains everything through Sprint 24 **and nothing after**. As of 2026-09-28 the branch was 38
+  commits ahead — Sprints 25–37 — and **CI had not run on any of them**, because it triggers on
+  pull requests and `main` only. That is how Sprint 37 pushed a branch whose web build failed
+  (see its follow-up in §11). The fix is a second pull request to `main`, opened by the owner
+  in the browser (`gh` is not installed); check whether it exists rather than trusting this line.
 - Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
   branch tip against the document is what failed for four sprints.
 - **CI runs on pull requests and on `main`.** Both jobs — *API: lint, types, tests* and *Web: lint,
@@ -1416,12 +1423,8 @@ three files.
   has a writer and no reader. No aggregate rating, no completion-count badge, and reputation must
   never feed `score_match` without its own design pass following `weights_from_settings()`'s
   precedent (a value passed in, never read inside the scorer).
-- **The frontend gap is named, not routed around.** Three client-side arrays
-  (`web/src/lib/profile.ts`, `JobBrowser.tsx`, `employer/JobEditor.tsx`) and two i18n namespaces
-  across three locale files do not know about `"gig"` yet — a gig `Job` on the public `/jobs`
-  browse page renders the literal string `"employmentType.gig"` until a follow-up story adds them.
-  Deliberately not solved by filtering gigs out of `/jobs` on the backend, which would be backend
-  logic compensating for a frontend gap.
+- ~~**The frontend gap is named, not routed around.**~~ **Closed the same day — see the
+  follow-up below.** It was worse than "named": the gap broke the web build.
 - **Live-verified end to end against the running dev server and seeded data**, not just pytest:
   posted a real gig via `curl` in Chennai/Tamil Nadu requiring a skill the seeded candidate
   `+919000000001` actually holds — `positions`/`closes_at` persisted (the bug-fix proof), and the
@@ -1429,8 +1432,9 @@ three files.
   zero code changes to `matching/service.py` or `scoring.py`. Walked a second real application
   through `applied → shortlisted → hired → completed`, submitted both review directions (201 each),
   confirmed a duplicate direction (409), a review before `completed` (409), and a review on a
-  `no_show` application (409) are all refused. `make gen-api`'s diff is purely additive — every
-  removed line is a widened `Literal`/enum replaced by the same line plus the new value.
+  `no_show` application (409) are all refused. `make gen-api`'s diff widened three unions and
+  removed nothing — which was reported here as "purely additive", and was not: a widened union
+  breaks every hand-written narrower copy of it downstream (see the follow-up).
 - 827 backend tests (was 793), 259 web tests unchanged (backend-only sprint). `make check` clean;
   migration 0036 (tiers) and 0037 (gig + outcomes + reviews) each rehearsed down and up with zero
   autogenerate drift; `make evaluate` printed the identical 34 pairs/7 orderings/16 course
@@ -1440,6 +1444,43 @@ three files.
   `docs/IISM-Product-Backlog.docx` updated: BL-7.3, BL-8.1 and BL-8.2 marked done, the Epic B8
   intro and the "Following This Window" sequence table both rewritten to describe what was
   actually built rather than what was originally proposed.
+
+**Follow-up, 2026-09-28 — a pre-sprint architecture audit found Sprint 37 had shipped broken.**
+
+- **The pushed branch did not build.** `npx tsc --noEmit` failed in `SearchResults.tsx`: the
+  regenerated client typed `employment_type` with `"gig"`, and `JobBrowser.tsx` still declared a
+  four-value copy. `npm test` was green because Vitest does not type-check, and CI never ran
+  because it triggers on pull requests and `main` only (§10). The sprint's own claim that the
+  client diff was "purely additive" was the error — additive to the schema, breaking downstream.
+- **Fixed by deleting copies, not by adding a value to each.** `lib/profile.ts`'s
+  `EMPLOYMENT_TYPES` is now the one list; `JobBrowser` and `JobEditor` import it.
+  `ApplicationList` had `application.status as Status` onto a hand-written five-value union —
+  the cast is what hid `completed`/`no_show` from the compiler — and now derives `Status` from
+  `components["schemas"]["ApplicationOut"]["status"]`, so its colour map is exhaustive and the
+  next status is a compile error. Labels for `gig`, `completed` and `no_show` in `en`/`hi`/`ms`;
+  `ApplicationList.test.tsx` renders both statuses and **fails against the previous messages**
+  (`MISSING_MESSAGE`), checked before trusting it. The "completed" hint does not promise a
+  rating screen, because none exists yet.
+- **Two counts were wrong in Sprint 37's own backend.** A finished gig worker moves `hired` →
+  `completed`, and both `_close_if_filled` and the programme report counted `status == "hired"`
+  alone — so a two-position gig took a third person once the first had finished, and the report
+  dropped everybody whose gig ended. Two named sets in `applications/models.py`, because they are
+  different questions: `FILLED_STATUSES = (hired, completed)` for "occupies a position" — a
+  **no-show leaves the seat empty** (the owner's call) — and `WAS_HIRED_STATUSES` adding
+  `no_show` for "was this person ever hired". Both regression tests fail against the old code.
+- **The module-boundary rule in `CLAUDE.md` was half fiction.** "Never import another module's
+  `.models`" — about sixty imports do, enforced by nothing. The half that *is* true everywhere —
+  no module imports another's `service`/`*_service`/`routes`/`*_routes` — is now
+  `tests/test_module_boundaries.py`, which asserts it found the modules and the cross-module
+  imports first, and feeds its detector a known-bad snippet. `CLAUDE.md` states the real rule
+  and names the shared-models debt an ADR-014 split would have to pay.
+- Verified: `tsc`, `eslint`, `next build` and the first-load budget clean; 832 backend and 260 web
+  tests; the seeded candidate's `/en/applications` and `/hi/applications` show "Completed" /
+  "काम पूरा हुआ" and "Did not attend" / "उपस्थित नहीं हुए" in the list and in the notices, and
+  the gig's job page shows its employment type in both languages with no raw key anywhere.
+- **Still open, deliberately:** the employer inbox offers only shortlist / not suitable / hire, so
+  `completed`, `no_show` and both review directions are reachable by API only. That is a real
+  follow-up story (a gig-specific inbox action plus a rating form), not a label.
 
 ### Also outstanding, in rough order
 
@@ -1470,7 +1511,7 @@ that sells courses, connects jobs, and carries gig work.*
   only that a port may exist ahead of it. Note also that Sprint 24's "interest, not enrolment"
   reasoning **inverts** the moment money moves through the platform: if we take the payment, we are
   the system of record for the enrolment.
-- **Gig work — built backend-only in Sprint 37 (ADR-046), reusing `Job`/`Application`.** The
+- **Gig work — built in Sprint 37 (ADR-046), reusing `Job`/`Application`.** The
   September 2026 assessment above (and ADR-045's original design) argued gig work needed its own
   module because it was a genuinely different market; the owner's direct instruction — "a gig work
   can also be considered as a temporary job assignment" — rejected that premise before BL-8.2 was
@@ -1479,9 +1520,11 @@ that sells courses, connects jobs, and carries gig work.*
   `matching/service.py` or `scoring.py` — verified live, not just in pytest (§11, Sprint 37).
   `Application` carries the completion event (`completed`/`no_show`, reachable only from `hired`)
   and a full two-sided `application_reviews` table is the reputation layer, foundation-only (a
-  writer, no reader yet, the `SkillRelation` shape). What is genuinely still missing: the frontend
-  (three client-side employment-type arrays and two i18n namespaces don't know `"gig"` exists yet)
-  and any payment/payout, which ADR-045 §5 and ADR-025/ADR-043's billing gate both still forbid.
+  writer, no reader yet, the `SkillRelation` shape). An employer can post a gig and a candidate
+  can find, apply to and track one in the interface. What is genuinely still missing: the
+  employer's controls to mark a gig completed or a no-show and both sides' rating form (API only
+  today), and any payment/payout, which ADR-045 §5 and ADR-025/ADR-043's billing gate both still
+  forbid.
 
 **Nothing built so far has to be undone for any of it**, which is the important finding. The
 expensive assets — 21,303 NSQF standards with role search, one pure deterministic scorer, one

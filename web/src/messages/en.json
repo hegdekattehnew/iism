@@ -231,7 +231,8 @@
       "full_time": "Full time",
       "part_time": "Part time",
       "contract": "Contract",
-      "apprenticeship": "Apprenticeship"
+      "apprenticeship": "Apprenticeship",
+      "gig": "Gig (short-term)"
     },
     "experience": "{min}+ years",
     "experienceRange": "{min}–{max} years",
@@ -680,7 +681,8 @@
       "full_time": "Full time",
       "part_time": "Part time",
       "contract": "Contract",
-      "apprenticeship": "Apprenticeship"
+      "apprenticeship": "Apprenticeship",
+      "gig": "Gig (short-term)"
     },
     "saveFailed": "Could not save. Check the details and try again.",
     "positions": "How many people",
@@ -1130,14 +1132,18 @@
       "withdrawn": "Withdrawn",
       "shortlisted": "Shortlisted",
       "rejected": "Not selected",
-      "hired": "Hired"
+      "hired": "Hired",
+      "completed": "Completed",
+      "no_show": "Did not attend"
     },
     "statusHint": {
       "applied": "The employer has your application.",
       "withdrawn": "You withdrew this. The employer no longer sees your contact details.",
       "shortlisted": "The employer shortlisted you.",
       "rejected": "The employer is not taking this one forward.",
-      "hired": "You got the job."
+      "hired": "You got the job.",
+      "completed": "You finished this assignment.",
+      "no_show": "The employer recorded that you did not attend this assignment."
     },
     "vacancyClosed": "This vacancy is closed and is no longer taking applications."
   },
@@ -1168,7 +1174,9 @@
       "withdrawn": "Withdrawn",
       "shortlisted": "Shortlisted",
       "rejected": "Not selected",
-      "hired": "Hired"
+      "hired": "Hired",
+      "completed": "Completed",
+      "no_show": "Did not attend"
     }
   },
   "searchPage": {

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.core.authorization import ORGANISATION_TYPES
-from api.modules.applications.models import Application
+from api.modules.applications.models import WAS_HIRED_STATUSES, Application
 from api.modules.identity.models import Membership, Tenant, User
 from api.modules.marketplace import record_verified_skill
 from api.modules.marketplace.models import CandidateCertification, CandidateProfile, Course, Job
@@ -308,7 +308,8 @@ async def programme_report(db: AsyncSession, programme: str) -> ProgrammeReport:
     )
     hired = await db.scalar(
         select(func.count(func.distinct(Application.profile_id))).where(
-            Application.profile_id.in_(profile_ids), Application.status == "hired"
+            Application.profile_id.in_(profile_ids),
+            Application.status.in_(WAS_HIRED_STATUSES),
         )
     )
     return ProgrammeReport(

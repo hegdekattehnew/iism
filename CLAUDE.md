@@ -167,7 +167,14 @@ api/                     FastAPI modular monolith
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
                          applied, and goes when they withdraw. Depends on
-                         marketplace and matching; nothing depends on it.
+                         marketplace and matching. Read by operations/ and privacy/
+                         (the two leaves), and lazily by marketplace (closing a
+                         vacancy tells its applicants) and matching (applicant
+                         counts) -- each a function-level import, because the
+                         module-level form is a cycle. `FILLED_STATUSES` and
+                         `WAS_HIRED_STATUSES` (models.py) are two different
+                         questions a gig pulls apart: `completed` still fills a
+                         position, `no_show` was hired but does not.
                          (Sprint 37, BL-8.1/8.2, ADR-046) `completed`/`no_show` are two new
                          statuses, reachable only from `hired` and only when the underlying
                          `Job.employment_type` is `"gig"` (`employer_service.set_status`,
@@ -257,9 +264,14 @@ docs/adr/                Architecture Decision Records (source of truth for desi
 ```
 
 Each module under `api/modules/` is internally cohesive (its own models, schemas, service
-logic, routes) and exposes a narrow public interface via its `__init__.py`. Other modules
-import from `api.modules.<name>` only — never from `.service` or `.models` directly. This is
-what makes the modular-monolith → microservices path (ADR-014) realistic later.
+logic, routes) and exposes a narrow public interface via its `__init__.py`. **No module
+imports another module's service or route layer** (`service.py`, `*_service.py`,
+`routes.py`, `*_routes.py`) — business logic is reached through the owner's `__init__`.
+`tests/test_module_boundaries.py` enforces that. What is *not* enforced, and was stated here
+for thirty sprints as though it were: modules read each other's `.models`, `.schemas` and
+pure constants (`matching.scoring.SERIOUS_MATCH_SCORE`) directly — about sixty imports,
+audited 2026-09-28. That is shared data, not shared logic, and it is the part an ADR-014
+split would have to turn into interfaces first; do not add to it casually.
 `api/modules/skills/` is the reference implementation of the pattern; copy its shape.
 
 ## Conventions
@@ -402,6 +414,13 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
   `hi.json` must be updated together (ADR-033).
 - `src/lib/api-schema.d.ts` is generated — run `make gen-api` after changing any endpoint.
   A breaking backend change should surface as a TypeScript error, not a runtime failure.
+  **It only does if something runs `tsc`.** `npm test` (Vitest) does not type-check, and CI
+  runs on pull requests and `main` only — so after `make gen-api`, run
+  `cd web && npx tsc --noEmit`. Sprint 37 added `"gig"` to a union, regenerated the client,
+  ran the web tests green and pushed a branch whose build failed: three hand-written
+  four-value copies of `employment_type`. **Derive a closed set from `api-schema.d.ts`
+  (`components["schemas"][...]`), never restate it** — and never `as` a server value onto a
+  hand-written union, which is how `ApplicationList` hid two statuses from the compiler.
 - Mobile-first. The target device is a low-end Android on mobile data.
 - Server state goes through **TanStack Query**, not hand-rolled `useEffect` + `setState`.
   React 19's `react-hooks/set-state-in-effect` rule treats the hand-rolled form as an error.

@@ -6,8 +6,11 @@ import { useFormatter, useTranslations } from "next-intl";
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 
-type Status = "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+// From the generated client, never restated: a hand-written copy plus a cast
+// let `completed`/`no_show` reach this screen with no colour and no compile error.
+type Status = components["schemas"]["ApplicationOut"]["status"];
 
 /** The Hindi title when there is one. Every other listing does this; these two
  *  did not, so /hi/applications showed English titles on a Hindi page. */
@@ -22,6 +25,8 @@ const TONE: Record<Status, string> = {
   hired: "bg-success-surface text-success-text",
   rejected: "bg-surface-muted text-muted",
   withdrawn: "bg-warning-surface text-warning-text",
+  completed: "bg-success-surface text-success-text",
+  no_show: "bg-warning-surface text-warning-text",
 };
 
 /** Where each application stands, in the candidate's own words. */
@@ -54,7 +59,7 @@ export function ApplicationList() {
   return (
     <ul className="mt-8 space-y-4">
       {data.map((application) => {
-        const status = application.status as Status;
+        const status: Status = application.status;
         return (
           <li key={application.id}>
             <Card>

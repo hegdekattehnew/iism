@@ -7,6 +7,7 @@ import { Area, Field, Select, Text } from "@/components/profile/fields";
 import { type Standard, StandardPicker } from "@/components/StandardPicker";
 import { Badge, Button, Card, CardBody } from "@/components/ui";
 import type { JobPayload, OrgJob } from "@/lib/org";
+import { EMPLOYMENT_TYPES } from "@/lib/profile";
 
 /**
  * Composing a vacancy against the national taxonomy.
@@ -152,7 +153,7 @@ export function JobEditor({
                 name="employment_type"
                 defaultValue={job?.employment_type ?? "full_time"}
               >
-                {["full_time", "part_time", "contract", "apprenticeship"].map(
+                {EMPLOYMENT_TYPES.map(
                   (v) => (
                     <option key={v} value={v}>
                       {t(`employment.${v}`)}

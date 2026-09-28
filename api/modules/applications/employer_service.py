@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
-from api.modules.applications.models import Application
+from api.modules.applications.models import FILLED_STATUSES, Application
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job
 from api.modules.matching import score_profiles
@@ -202,7 +202,7 @@ async def _close_if_filled(db: AsyncSession, job: Job) -> bool:
         await db.scalar(
             select(func.count())
             .select_from(Application)
-            .where(Application.job_id == job.id, Application.status == "hired")
+            .where(Application.job_id == job.id, Application.status.in_(FILLED_STATUSES))
         )
     ) or 0
     if hired < job.positions:

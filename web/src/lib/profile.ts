@@ -47,6 +47,7 @@ export const EMPLOYMENT_TYPES = [
   "part_time",
   "contract",
   "apprenticeship",
+  "gig",
 ] as const;
 
 export function useProfile(enabled = true) {

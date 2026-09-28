@@ -1979,7 +1979,17 @@ to make on this ADR's own reasoning alone
   label belongs. Deliberately shipped backend-only, matching this project's established
   precedent for every prior backend-first sprint — not routed around by filtering gigs out of
   `/jobs` on the backend, which would be backend logic existing solely to compensate for a
-  frontend gap.
+  frontend gap. *Amended 2026-09-28:* shipping backend-only was not the neutral choice this
+  bullet assumed. Widening `employment_type` broke the web type-check wherever the client held a
+  narrower hand-written copy, so the branch as pushed did not build. The labels and the single
+  shared list landed the same day; what stays API-only is the employer's completed/no-show
+  controls and the rating form.
+- **"Hired" became two questions, and a no-show answers them differently** (owner's decision,
+  2026-09-28). Whether an application *fills a position* — which closes a vacancy at its
+  head-count — counts `hired` and `completed`; a no-show left the seat empty and does not. Whether
+  somebody *was hired* — the programme report's outcome figure — counts all three. Both sets are
+  named once in `applications/models.py`; a bare `status == "hired"` is now the bug this
+  sprint shipped twice.
 - **ADR-045 remains in this document, marked superseded, rather than deleted.** Its reasoning
   about *why* a gig looked different was not wrong on its own terms — the owner's instruction
   changed the premise, not the analysis. A future story reconsidering this boundary should read

@@ -7,8 +7,7 @@ import { useDeferredValue, useState } from "react";
 import { Button } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-
-const TYPES = ["full_time", "part_time", "contract", "apprenticeship"] as const;
+import { EMPLOYMENT_TYPES as TYPES } from "@/lib/profile";
 
 type Job = {
   slug: string;

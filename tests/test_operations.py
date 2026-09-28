@@ -585,6 +585,30 @@ class TestProgrammeReport:
         assert report.applied == 1
         assert report.hired == 1
 
+    async def test_a_finished_or_absent_gig_worker_was_still_hired(self, db: AsyncSession) -> None:
+        """A gig moves `hired` on to `completed` or `no_show`. Both people were
+        hired; counting `status == "hired"` alone dropped them from the report."""
+        tenant = Tenant(slug="programme-gig-employer", name="Gig Co", tenant_type="employer")
+        db.add(tenant)
+        await db.flush()
+        job = Job(
+            slug="programme-gig-job",
+            tenant_id=tenant.id,
+            title="Shift",
+            status="published",
+            employment_type="gig",
+        )
+        db.add(job)
+        await db.flush()
+        for status in ("completed", "no_show", "rejected"):
+            profile = await _enrolled_candidate(db, programme="GIG-PROGRAMME", skill_id=None)
+            db.add(Application(job_id=job.id, profile_id=profile.id, status=status))
+        await db.commit()
+
+        report = await service.programme_report(db, "GIG-PROGRAMME")
+        assert report.applied == 3
+        assert report.hired == 2
+
     async def test_an_unrecognised_programme_reports_zero_not_an_error(
         self, db: AsyncSession
     ) -> None:
