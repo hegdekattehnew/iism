@@ -1,17 +1,19 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
 from api.core.localisation import overrides_for, request_locale
-from api.modules.applications import employer_service
+from api.modules.applications import employer_service, review_service
 from api.modules.applications.schemas import (
     ApplicantOut,
     ApplicantPage,
     ContactOut,
     JobRef,
+    ReviewIn,
+    ReviewOut,
     StatusIn,
 )
 from api.modules.matching import candidate_card
@@ -69,9 +71,33 @@ async def set_application_status(
     context: TenantContext = CanShortlist,
     db: AsyncSession = Depends(get_db_session),
 ) -> ApplicantOut:
-    """Shortlist, reject or hire. A withdrawn application cannot be moved."""
+    """Shortlist, reject, hire -- or, for a gig, complete/no-show. A withdrawn
+    application cannot be moved."""
     return _applicant(
         *await employer_service.set_status_and_reload(
             db, context.tenant.id, job_slug, application_id, payload.status
         )
     )
+
+
+@router.post(
+    "/{application_id}/review", response_model=ReviewOut, status_code=status.HTTP_201_CREATED
+)
+async def review_worker(
+    job_slug: str,
+    application_id: uuid.UUID,
+    payload: ReviewIn,
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> ReviewOut:
+    """Rate the worker of a completed gig engagement (Sprint 37, Epic B8)."""
+    review = await review_service.submit_worker_review(
+        db,
+        context.tenant.id,
+        job_slug,
+        application_id,
+        rating=payload.rating,
+        comment=payload.comment,
+        author_user_id=context.user.id,
+    )
+    return ReviewOut.model_validate(review)

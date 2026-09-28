@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from api.modules.identity import TenantOut
 from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn, SkillOut
 
-EmploymentType = Literal["full_time", "part_time", "contract", "apprenticeship"]
+EmploymentType = Literal["full_time", "part_time", "contract", "apprenticeship", "gig"]
 CourseMode = Literal["online", "offline", "hybrid"]
 CourseLanguage = Literal["en", "hi", "both"]
 Status = Literal["draft", "published"]
@@ -146,6 +146,18 @@ class JobIn(BaseModel):
             and self.salary_max_inr < self.salary_min_inr
         ):
             raise ValueError("salary_max_inr must not be below salary_min_inr")
+        return self
+
+    @model_validator(mode="after")
+    def _a_gig_has_an_end(self) -> "JobIn":
+        """A temporary job assignment without an end date is not one (Sprint
+        37, Epic B8). The other half of this invariant -- a gig also needs a
+        resolvable place, not "somewhere in India" -- is DB-dependent
+        (`resolve_location` is async) and lives in `publishing.py` instead,
+        after location resolution runs.
+        """
+        if self.employment_type == "gig" and self.closes_at is None:
+            raise ValueError("A gig posting needs closes_at -- a shift with no end is not a gig")
         return self
 
 

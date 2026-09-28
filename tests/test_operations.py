@@ -13,17 +13,19 @@ from typing import cast
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import (
     OPERATOR_PERMISSIONS,
     ROLE_PERMISSIONS,
+    TIER_PERMISSIONS,
     Permission,
     require_operator,
 )
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.applications.models import Application
-from api.modules.identity.models import Tenant, User
+from api.modules.identity.models import STAFF_TIERS, Tenant, User
 from api.modules.marketplace.models import (
     CandidateProfile,
     CandidateSkill,
@@ -80,13 +82,18 @@ async def _register_org(client: AsyncClient, name: str) -> tuple[dict[str, str],
     return headers, slug
 
 
-async def _operator(client: AsyncClient, db: AsyncSession) -> dict[str, str]:
-    """An account holding the flag. Granted the way the product grants it."""
+async def _operator(
+    client: AsyncClient, db: AsyncSession, *, tier: str = "admin"
+) -> dict[str, str]:
+    """An account holding the flag. Granted the way the product grants it --
+    `admin` by default so every existing test keeps the unrestricted access
+    `is_staff=True` alone used to mean (Sprint 37, BL-7.3)."""
     headers = await _candidate(client)
     me = (await client.get("/auth/me", headers=headers)).json()
     user = await db.get(User, uuid.UUID(me["id"]))
     assert user is not None
     user.is_staff = True
+    user.staff_tier = tier
     await db.commit()
     return headers
 
@@ -146,15 +153,18 @@ class TestWhoMayReachTheBackOffice:
         """There is no writer over HTTP, in this or any later revision.
 
         The scan asserts it **finds** the field on the way out first, so a
-        rename cannot make this pass by finding nothing anywhere.
+        rename cannot make this pass by finding nothing anywhere. Covers
+        `staff_tier` too (Sprint 37, BL-7.3) -- the same rule, one tier down.
         """
         schema = (await client.get("/openapi.json")).json()
         components = schema["components"]["schemas"]
         assert "is_staff" in components["UserOut"]["properties"]
+        assert "staff_tier" in components["UserOut"]["properties"]
 
         for name, model in components.items():
             if name.endswith(("In", "Request", "Verify", "Update")):
                 assert "is_staff" not in model.get("properties", {}), name
+                assert "staff_tier" not in model.get("properties", {}), name
 
 
 class TestTheQueue:
@@ -289,7 +299,7 @@ class TestGrantingTheFlag:
         one-command account takeover."""
         address = _email()
         with pytest.raises(LookupError):
-            await service.set_staff(db, address=address, staff=True)
+            await service.set_staff(db, address=address, staff=True, tier="admin")
         assert await db.scalar(select(User).where(User.email == address)) is None
 
     async def test_it_grants_and_revokes_an_account_that_exists(
@@ -299,7 +309,7 @@ class TestGrantingTheFlag:
         me = (await client.get("/auth/me", headers=headers)).json()
         assert me["is_staff"] is False
 
-        await service.set_staff(db, address=me["email"], staff=True)
+        await service.set_staff(db, address=me["email"], staff=True, tier="admin")
         assert (await client.get("/auth/me", headers=headers)).json()["is_staff"] is True
 
         await service.set_staff(db, address=me["email"], staff=False)
@@ -310,6 +320,129 @@ class TestGrantingTheFlag:
     ) -> None:
         await _operator(client, db)
         assert len(await service.staff_roster(db)) >= 1
+
+
+# ------------------------------------------- Sprint 37, BL-7.3: operator tiers
+
+
+class TestOperatorTiers:
+    """ADR-044: `is_staff` alone answers *is this an operator at all*;
+    `staff_tier` answers *which actions*. `support` covers every read-only or
+    single-subject decision; only `admin` may grant an organisation's public
+    "Verified" badge."""
+
+    def test_admin_is_every_operator_permission_and_a_superset_of_support(self) -> None:
+        assert TIER_PERMISSIONS["admin"] == OPERATOR_PERMISSIONS
+        assert TIER_PERMISSIONS["support"] < TIER_PERMISSIONS["admin"]
+
+    def test_org_verify_is_reserved_to_admin(self) -> None:
+        assert Permission.OPS_ORG_VERIFY not in TIER_PERMISSIONS["support"]
+        assert Permission.OPS_ORG_VERIFY in TIER_PERMISSIONS["admin"]
+
+    async def test_a_support_operator_can_read_the_queue(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _operator(client, db, tier="support")
+        assert (await client.get("/ops/organisations", headers=headers)).status_code == 200
+
+    async def test_a_support_operator_is_refused_org_verify_with_403_not_404(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The tier question is not the operator question. They have already
+        proven staff standing -- a 404 here would pretend they had not."""
+        _, slug = await _register_org(client, "Tier Gated Ltd")
+        headers = await _operator(client, db, tier="support")
+        refused = await client.post(
+            f"/ops/organisations/{slug}/verification",
+            headers=headers,
+            json={"decision": "granted", "note": NOTE},
+        )
+        assert refused.status_code == 403
+
+    async def test_a_stranger_gets_404_on_the_very_same_route_a_support_operator_gets_403_on(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The oracle-safety proof: two different refusals, on the same URL,
+        distinguishable only by whether staff standing exists at all."""
+        _, slug = await _register_org(client, "Oracle Check Ltd")
+        stranger = await _candidate(client)
+        support = await _operator(client, db, tier="support")
+
+        as_stranger = await client.post(
+            f"/ops/organisations/{slug}/verification",
+            headers=stranger,
+            json={"decision": "granted", "note": NOTE},
+        )
+        as_support = await client.post(
+            f"/ops/organisations/{slug}/verification",
+            headers=support,
+            json={"decision": "granted", "note": NOTE},
+        )
+        assert as_stranger.status_code == 404
+        assert as_support.status_code == 403
+        assert as_stranger.json() != as_support.json()
+
+    async def test_an_admin_operator_can_verify_an_organisation(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _, slug = await _register_org(client, "Admin Gated Ltd")
+        headers = await _operator(client, db, tier="admin")
+        granted = await client.post(
+            f"/ops/organisations/{slug}/verification",
+            headers=headers,
+            json={"decision": "granted", "note": NOTE},
+        )
+        assert granted.status_code == 200
+
+    async def test_a_support_operator_can_still_verify_a_certification(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`OPS_CANDIDATE_VERIFY` is scoped to one person's own evidence, not
+        a public badge -- it stays in `support`."""
+        headers = await _operator(client, db, tier="support")
+        assert (
+            await client.get("/ops/candidates/certifications", headers=headers)
+        ).status_code == 200
+
+
+class TestStaffTierIntegrity:
+    async def test_granting_without_a_tier_is_refused(self, db: AsyncSession) -> None:
+        address = _email()
+        db.add(User(email=address, consent_version=CONSENT))
+        await db.commit()
+        with pytest.raises(ValueError, match="requires a tier"):
+            await service.set_staff(db, address=address, staff=True)
+
+    async def test_revoking_clears_the_tier(self, client: AsyncClient, db: AsyncSession) -> None:
+        headers, _ = await _register_org(client, "Revoked Operator Ltd")
+        me = (await client.get("/auth/me", headers=headers)).json()
+        await service.set_staff(db, address=me["email"], staff=True, tier="support")
+        await service.set_staff(db, address=me["email"], staff=False)
+        user = await db.scalar(select(User).where(User.email == me["email"]))
+        assert user is not None
+        assert user.is_staff is False
+        assert user.staff_tier is None
+
+    async def test_the_database_refuses_staff_with_no_tier(self, db: AsyncSession) -> None:
+        user = User(email=_email(), consent_version=CONSENT, is_staff=True, staff_tier=None)
+        db.add(user)
+        with pytest.raises(IntegrityError):
+            await db.commit()
+
+    async def test_the_database_refuses_a_tier_on_a_non_operator(self, db: AsyncSession) -> None:
+        user = User(email=_email(), consent_version=CONSENT, is_staff=False, staff_tier="admin")
+        db.add(user)
+        with pytest.raises(IntegrityError):
+            await db.commit()
+
+    async def test_the_database_refuses_an_unknown_tier(self, db: AsyncSession) -> None:
+        user = User(email=_email(), consent_version=CONSENT, is_staff=True, staff_tier="superuser")
+        db.add(user)
+        with pytest.raises(IntegrityError):
+            await db.commit()
+
+    async def test_all_named_tiers_are_the_two_documented_ones(self) -> None:
+        assert set(STAFF_TIERS) == {"support", "admin"}
 
 
 class TestDeletingAVerifiedOrganisation:

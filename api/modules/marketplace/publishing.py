@@ -52,6 +52,17 @@ log = structlog.get_logger("iism.marketplace")
 # Fields copied straight from the payload. Listed rather than `model_dump()`ed
 # wholesale so `search_vector` -- GENERATED ALWAYS, and rejected by Postgres on
 # any write -- can never reach an INSERT by way of a schema someone extended.
+#
+# `positions`/`closes_at` were missing here from Sprint 27 (when both columns
+# were added) until Sprint 37 -- `JobIn` accepted and validated both the whole
+# time, but neither `create_job` nor `update_job` ever copied them onto the
+# row, so an employer who filled in "3 positions, closes in 2 weeks" silently
+# got `positions=1, closes_at=NULL`. Harmless for a permanent vacancy (a wrong
+# default nobody who cared would notice); fatal for reusing `Job` as a gig
+# shift (Sprint 37, Epic B8), whose whole premise is that these two columns
+# carry real values. No test exercised either field through the HTTP API --
+# every prior test set them by direct ORM construction -- which is how this
+# went unnoticed for ten sprints.
 _PLAIN_FIELDS = (
     "title",
     "description",
@@ -63,6 +74,8 @@ _PLAIN_FIELDS = (
     "salary_min_inr",
     "salary_max_inr",
     "nsqf_level_min",
+    "positions",
+    "closes_at",
 )
 
 
@@ -138,8 +151,23 @@ async def get_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
     return await _load(db, job.id)
 
 
+def _require_gig_has_a_place(payload: JobIn, district_id: uuid.UUID | None) -> None:
+    """The other half of `JobIn._a_gig_has_an_end`'s invariant (Sprint 37,
+    Epic B8): "somewhere in India" is not a postable gig. DB-dependent
+    (`resolve_location` is async and best-effort), so it lives here, after
+    resolution runs, rather than in the schema -- the same reason `set_published`
+    checks for a required standard here rather than in `JobIn` itself.
+    """
+    if payload.employment_type == "gig" and district_id is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "A gig posting needs a resolvable district -- check location_state/location_district",
+        )
+
+
 async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
     location = await resolve_location(db, payload.location_state, payload.location_district)
+    _require_gig_has_a_place(payload, location.district_id)
     job = Job(
         slug=await unique_slug(db, Job.slug, payload.title, payload.location_district),
         tenant_id=tenant_id,
@@ -166,6 +194,7 @@ async def update_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str, payload:
     for field in _PLAIN_FIELDS:
         setattr(job, field, getattr(payload, field))
     location = await resolve_location(db, payload.location_state, payload.location_district)
+    _require_gig_has_a_place(payload, location.district_id)
     job.state_id, job.district_id = location.state_id, location.district_id
     # The slug is not regenerated. It is a published URL as soon as the job goes
     # live, and rewriting it on a title tweak breaks every link to it.

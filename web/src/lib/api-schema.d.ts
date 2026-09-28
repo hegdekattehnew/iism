@@ -1381,6 +1381,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/applications/{application_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Poster
+         * @description Rate the poster of a completed gig engagement (Sprint 37, Epic B8).
+         */
+        post: operations["review_poster_me_applications__application_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/saved-jobs": {
         parameters: {
             query?: never;
@@ -1451,9 +1471,30 @@ export interface paths {
         head?: never;
         /**
          * Set Application Status
-         * @description Shortlist, reject or hire. A withdrawn application cannot be moved.
+         * @description Shortlist, reject, hire -- or, for a gig, complete/no-show. A withdrawn
+         *     application cannot be moved.
          */
         patch: operations["set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Worker
+         * @description Rate the worker of a completed gig engagement (Sprint 37, Epic B8).
+         */
+        post: operations["review_worker_org__org_slug__jobs__job_slug__applications__application_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/me/course-interests": {
@@ -2048,7 +2089,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
             /**
              * Applied At
              * Format: date-time
@@ -2089,7 +2130,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
             /** Message */
             message?: string | null;
             /**
@@ -2189,7 +2230,7 @@ export interface components {
              */
             willing_to_relocate: boolean;
             /** Preferred Employment Type */
-            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
             /** Expected Salary Min Inr */
             expected_salary_min_inr?: number | null;
             /** Expected Salary Max Inr */
@@ -2244,7 +2285,7 @@ export interface components {
             /** Willing To Relocate */
             willing_to_relocate?: boolean | null;
             /** Preferred Employment Type */
-            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
             /** Expected Salary Min Inr */
             expected_salary_min_inr?: number | null;
             /** Expected Salary Max Inr */
@@ -3013,7 +3054,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -3067,7 +3108,7 @@ export interface components {
              * @default full_time
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /**
              * Experience Min Years
              * @default 0
@@ -3112,7 +3153,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -3616,7 +3657,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -3933,6 +3974,40 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * ReviewIn
+         * @description One direction of a completed gig engagement's rating (Sprint 37, Epic
+         *     B8). `subject_role` is never accepted here -- it is fixed by which of the
+         *     two routes a caller reaches, never a value the caller states.
+         */
+        ReviewIn: {
+            /** Rating */
+            rating: number;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** ReviewOut */
+        ReviewOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Subject Role
+             * @enum {string}
+             */
+            subject_role: "poster" | "worker";
+            /** Rating */
+            rating: number;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * RoleHit
@@ -4285,7 +4360,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "shortlisted" | "rejected" | "hired";
+            status: "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -4444,6 +4519,8 @@ export interface components {
              * @default false
              */
             is_staff: boolean;
+            /** Staff Tier */
+            staff_tier?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipOut"][];
         };
@@ -4856,7 +4933,7 @@ export interface operations {
                 /** @description Filter by skill slug */
                 skill?: string | null;
                 location_state?: string | null;
-                employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+                employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
                 nsqf_level_max?: number | null;
                 limit?: number;
                 offset?: number;
@@ -7078,6 +7155,41 @@ export interface operations {
             };
         };
     };
+    review_poster_me_applications__application_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_saved_jobs_me_saved_jobs_get: {
         parameters: {
             query?: never;
@@ -7222,6 +7334,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_worker_org__org_slug__jobs__job_slug__applications__application_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                application_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
                 };
             };
             /** @description Validation Error */

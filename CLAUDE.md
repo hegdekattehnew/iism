@@ -95,7 +95,13 @@ api/                     FastAPI modular monolith
                          `scope` (Sprint 35) is a single value per key, not a set --
                          `core.security.require_service_scope()` is the second question
                          beyond `get_service_account`'s "which partner": not just who, but
-                         what they may do.
+                         what they may do. `staff_tier` (Sprint 37, BL-7.3, ADR-044) is a
+                         second global flag beside `is_staff` -- `support`/`admin`, checked
+                         against `TIER_PERMISSIONS` in `core/authorization.py`, never a role.
+                         `require_operator()`'s refusal now splits into 404 (not staff at all)
+                         and 403 (staff, but this tier lacks the permission).
+                         `scripts/grant_staff.py --tier` is still the only writer of either
+                         column.
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
@@ -109,7 +115,15 @@ api/                     FastAPI modular monolith
                          for a `CandidateSkill`; `record_verified_skill` (Sprint 35) is its
                          public wrapper for evidenced sources, so `assessment/` and
                          `operations/` write through it rather than each holding a second
-                         copy of the same insert.
+                         copy of the same insert. `EMPLOYMENT_TYPES` (Sprint 37, BL-8.1/8.2,
+                         ADR-046) gained `"gig"` -- a gig is a `Job`, not a new model, per the
+                         Product Owner's own framing of a gig as a temporary job assignment.
+                         `publishing.py`'s `_require_gig_has_a_place` refuses a gig with no
+                         resolvable district; `JobIn`'s validator refuses one with no
+                         `closes_at`. The same change fixed a ten-sprint-old bug: `_PLAIN_FIELDS`
+                         had never included `positions`/`closes_at`, so both were silently
+                         dropped by `create_job`/`update_job` even though `JobIn` always
+                         accepted them -- harmless for a permanent vacancy, fatal for a gig.
     skills/              NSQF taxonomy. models.py = Skill/SkillAlias (the leaf);
                          hierarchy.py = AwardingBody → Sector → SubSector →
                          Occupation → QualificationPack → QpSkill, plus
@@ -154,6 +168,16 @@ api/                     FastAPI modular monolith
                          a candidate's contact reaches an employer because they
                          applied, and goes when they withdraw. Depends on
                          marketplace and matching; nothing depends on it.
+                         (Sprint 37, BL-8.1/8.2, ADR-046) `completed`/`no_show` are two new
+                         statuses, reachable only from `hired` and only when the underlying
+                         `Job.employment_type` is `"gig"` (`employer_service.set_status`,
+                         not the CHECK). `review_service.py` is a sibling of `service.py`/
+                         `employer_service.py`, reused from both identity contexts: a full
+                         two-sided `application_reviews` row per direction (`subject_role`
+                         names who the rating is *about*, never who wrote it), write-once,
+                         reviewable only once `completed` -- `no_show` is deliberately not
+                         reviewable, the same reasoning ADR-045 already gave. Foundation
+                         only; nothing reads it yet, the `SkillRelation` shape.
     interests/           Registering interest in a course, and the provider's
                          view of who did. A **sibling** of applications/, not an
                          extension: a course publishes what it teaches, so an
@@ -559,9 +583,16 @@ what makes the modular-monolith → microservices path (ADR-014) realistic later
 > semantic-similarity term (`api/adapters/embeddings/`, an additive bounded weight in
 > `score_match`, a worker cron that fills `Job.embedding`/`CandidateProfile.embedding` in and a
 > skill write that invalidates them), and BL-6.1's `SkillRelation` foundation). **Sprint 37 is
-> next**, per `docs/IISM-Product-Backlog.docx` §4's near-term sequence: `BL-1.2`/`BL-1.3`, resuming
-> the monetisation epic (the payment adapter port from Sprint 34 plus a billing module for orders
-> and entitlements) — or the owner may redirect. §11 also carries a standing assessment of the
+> done** — BL-7.3's tiered operator authority (`staff_tier`, ADR-044), then Epic B8's gig work, per
+> the owner's own reprioritisation ("reprioritise what is left in B7 and take up Epic B8 post
+> that"): the owner overrode ADR-045's sibling-module design mid-sprint — "a gig work can also be
+> considered as a temporary job assignment and should be treated like a job" — so BL-8.1/8.2 shipped
+> as ADR-046 instead: `gig` joins `EMPLOYMENT_TYPES`, `Application` gains `completed`/`no_show`, and
+> `application_reviews` gives a full two-sided rating, all with zero changes to `matching/`,
+> `scoring.py` or the golden set. **Sprint 38 is next**, per `docs/IISM-Product-Backlog.docx` §4's
+> near-term sequence: `BL-1.2`/`BL-1.3`, resuming the monetisation epic (the payment adapter port
+> from Sprint 34 plus a billing module for orders and entitlements) — or the owner may redirect. §11
+> also carries a standing assessment of the
 > three pillars the owner is building toward — jobs, sellable courses, gig work — and what each
 > actually needs.
 

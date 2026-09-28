@@ -291,6 +291,9 @@ class UserOut(BaseModel):
     # the back office to somebody who holds it, and a fact about them that they
     # are entitled to see in their own export.
     is_staff: bool = False
+    # Same rule as `is_staff`, one tier down (ADR-044, Sprint 37, BL-7.3):
+    # read-only for ever, no request shape may carry this name.
+    staff_tier: str | None = None
     memberships: list[MembershipOut] = Field(default_factory=list)
 
 

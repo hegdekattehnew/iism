@@ -77,6 +77,10 @@ EVENT_NAMES = (
     # four explicitly rejected" were the same rows. Same shape as
     # `course_opened`, subject to the course, `from_job_slug` in the payload.
     "course_dismissed",
+    # Sprint 37, Epic B8. Subject to the job (a gig, always, since a review is
+    # only ever reachable through a `completed` application), payload carries
+    # `subject_role` and `rating` -- never the candidate's identity.
+    "application_review_submitted",
 )
 
 

@@ -80,7 +80,8 @@ async def set_status(
     application_id: uuid.UUID,
     new_status: str,
 ) -> Application:
-    """Move an application along: shortlisted, rejected, hired."""
+    """Move an application along: shortlisted, rejected, hired -- or, for a
+    gig engagement only, completed/no_show (Sprint 37, Epic B8)."""
     job = await _job_of(db, tenant_id, job_slug)
     application = await db.scalar(
         select(Application).where(Application.id == application_id, Application.job_id == job.id)
@@ -93,6 +94,22 @@ async def set_status(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "This application has been withdrawn by the candidate"
         )
+    if new_status in ("completed", "no_show"):
+        # A narrower rule than shortlist/reject/hire, which have no ordering
+        # enforced at all today -- deliberately so, unlike these two: they gate
+        # whether a review can ever be written (review_service.py) and name a
+        # real-world event that either happened or did not, which "completing"
+        # an application nobody hired does not mean anything about.
+        if application.status != "hired":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Only a hired application can be marked completed or no-show",
+            )
+        if job.employment_type != "gig":
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Only a gig engagement can be marked completed or no-show",
+            )
 
     application.status = new_status
     filled = await _close_if_filled(db, job)

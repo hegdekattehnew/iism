@@ -31,6 +31,14 @@ MEMBERSHIP_ROLES = ("owner", "admin", "member")
 # to hand the organisation to a stranger who never accepted anything else.
 INVITABLE_ROLES = ("admin", "member")
 
+# Operator tiers (ADR-044, Sprint 37, BL-7.3) -- the closed set the database
+# enforces. What each tier actually grants lives in `core/authorization.py`
+# beside `OPERATOR_PERMISSIONS`, not here: that mapping is an authorization
+# concern, this tuple is a schema one. Still not a role (ADR-042's "an
+# operator is not a role" holds) -- a second global flag beside `is_staff`,
+# never a `Membership`.
+STAFF_TIERS = ("support", "admin")
+
 # How long an unaccepted invitation stays good for. Short enough that a
 # forwarded mail from a departed colleague is not a standing key.
 INVITE_TTL_DAYS = 7
@@ -118,6 +126,16 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("phone IS NOT NULL OR email IS NOT NULL", name="ck_users_has_identifier"),
+        CheckConstraint(
+            one_of("staff_tier", STAFF_TIERS, nullable=True), name="ck_users_staff_tier"
+        ),
+        # `NULL` iff not staff. "Staff with no tier" and "tiered but not
+        # staff" are both unrepresentable, the same shape ADR-042's own
+        # evidence CHECK uses for `tenants.verified_at`/`verified_by`.
+        CheckConstraint(
+            "(is_staff AND staff_tier IS NOT NULL) OR (NOT is_staff AND staff_tier IS NULL)",
+            name="ck_users_staff_tier_pairs_with_flag",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -152,6 +170,10 @@ class User(Base):
     # exists to prevent. A test scans the OpenAPI schema for any request body
     # carrying this name.
     is_staff: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # The tier (ADR-044, Sprint 37, BL-7.3). See `STAFF_TIERS` above for why
+    # this is still not a role, and `ck_users_staff_tier_pairs_with_flag`
+    # for why it cannot drift from `is_staff`.
+    staff_tier: Mapped[str | None] = mapped_column(default=None)
     preferred_locale: Mapped[str] = mapped_column(default="en")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

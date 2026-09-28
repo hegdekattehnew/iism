@@ -31,7 +31,12 @@ from api.core.database import Base, one_of
 from api.modules.geography.models import District, State  # noqa: F401
 from api.modules.skills.models import Skill
 
-EMPLOYMENT_TYPES = ("full_time", "part_time", "contract", "apprenticeship")
+# "gig" (Sprint 37, Epic B8): a temporary job assignment, treated as a `Job`
+# rather than a separate model -- see ADR-046. Shared by `Job.employment_type`
+# and `CandidateProfile.preferred_employment_type` (both CHECKs below are
+# generated from this one tuple via `one_of()`), so a candidate can also state
+# gig work as a preference.
+EMPLOYMENT_TYPES = ("full_time", "part_time", "contract", "apprenticeship", "gig")
 COURSE_MODES = ("online", "offline", "hybrid")
 COURSE_LANGUAGES = ("en", "hi", "both")
 STATUSES = ("draft", "published")

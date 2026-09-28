@@ -4,10 +4,12 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-22 · **Sprints 1–24 built, merged to `main` via PR #1, CI green.**
-Sprint 23 made a profile buildable by someone who cannot name a National Occupational Standard;
-Sprint 24 closed the course loop for training providers. **Sprint 25 is agreed: teammate
-invitations and the sole-owner trap** (§11). Deployment is deferred by the owner, deliberately.
+**Last updated:** 2026-09-28 · **Sprints 1–37 built.** Sprint 35 gave three of four
+`SKILL_SOURCES` a real writer outside the seed; Sprint 36 added semantic similarity (off by
+default) and the `SkillRelation` foundation; Sprint 37 built BL-7.3's tiered operator authority
+(ADR-044) and then Epic B8's gig work — reusing `Job`/`Application` rather than the sibling module
+ADR-045 had proposed, on the owner's own instruction (ADR-046). **Sprint 38 is next: resume
+monetisation, or owner redirect** (§11). Deployment is deferred by the owner, deliberately.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -24,10 +26,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 36 — semantic similarity (BL-5.1/5.2, off by default) and the `SkillRelation` foundation (BL-6.1) |
-| **Next sprint** | 37 — resume monetisation (`BL-1.2`/`BL-1.3`, billing module) per the backlog's own sequence, or owner redirect |
-| **Tests** | 793 backend (`make check`), 259 web (`cd web && npm test`) |
-| **Migrations** | head `0035`; 44 ADRs |
+| **Last sprint** | 37 — BL-7.3's tiered operator authority (ADR-044), then Epic B8's gig work, reusing `Job`/`Application` instead of a sibling module (ADR-046, superseding ADR-045 §1-4) |
+| **Next sprint** | 38 — resume monetisation (`BL-1.2`/`BL-1.3`, billing module) per the backlog's own sequence, or owner redirect |
+| **Tests** | 827 backend (`make check`), 259 web (`cd web && npm test`) |
+| **Migrations** | head `0037`; 46 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -1324,6 +1326,121 @@ backlog's near-term sequence.
   zero autogenerate drift; `make gen-api` shows no new routes (this sprint is entirely internal to
   matching — no schema or endpoint changed).
 
+### Sprint 37 — tiered operator authority, then gig work as a `Job` (done 2026-09-28)
+
+Two pieces of direct owner instruction, in sequence, not a story picked off the backlog. First:
+"reprioritise what is left in B7 and take up Epic B8 post that" — so BL-7.3, the only unbuilt piece
+of Epic B7, shipped first. Second, arriving mid-design-review for Epic B8: "a gig work can also be
+considered as a temporary job assignment and should be treated like a job in our system" — which
+overrode ADR-045's own design (a wholly separate sibling module, written and reviewed but never
+built) before a line of BL-8.2 was written.
+
+**BL-7.3 — tiered operator authority (ADR-044).**
+
+- `users.staff_tier` (`support`/`admin`) sits beside `is_staff`, with a CHECK pairing them
+  (`is_staff` true iff `staff_tier` is not null). `TIER_PERMISSIONS` in `core/authorization.py`
+  maps each tier to a `frozenset[Permission]`, with `assert TIER_PERMISSIONS["support"] <
+  TIER_PERMISSIONS["admin"] == OPERATOR_PERMISSIONS` holding the two in a known relationship.
+- `require_operator()`'s single 404 split into two answers, generalising ADR-038's rule one level
+  up from tenant membership to operator tier: **404** if the caller is not staff at all (the same
+  refusal a stranger gets), **403** if they are staff but this tier lacks the specific permission
+  (they have already established standing as an operator, so the refusal can say so).
+- `scripts/grant_staff.py --tier {support,admin}` is still the only writer of either column — no
+  HTTP route grants either, the standing rule since Sprint 13 unrelaxed.
+- Hit the harness's own permission-grant safety gate once while writing `STAFF_TIERS` into
+  `identity/models.py` — a classifier distinct from normal tool-use permissions, triggered by
+  defining new privilege-escalation logic. Stopped, explained, and re-implemented from a
+  user-approved design rather than working around it.
+- Migration 0036 backfills every existing `is_staff=true` row to `staff_tier='admin'`. Verified
+  live: a fresh `support` operator reads the verification queue (200) but gets 403 on
+  `OPS_ORG_VERIFY`; a stranger gets 404 on the identical URL; the pre-existing `admin` operator
+  was backfilled and unaffected.
+
+**Epic B8 — gig work reuses `Job`/`Application` (ADR-046, superseding ADR-045 §1-4).**
+
+ADR-045 had argued from first principles that a gig is a different *kind* of market — a scheduled
+need rather than a standing offer, proximity as a hard filter rather than a tie-break, a real
+completion event, bidirectional reputation — and proposed four new tables in a new sibling module,
+`api/modules/gig/`, with its own scorer. None of it was ever built. The owner's instruction
+rejected the premise, not just the conclusion: the physics ADR-045 named are properties a `Job`
+row can be given, not proof it cannot hold them. Verified against the actual code before writing
+anything, not assumed: `open_job()`, `match_jobs`'s retrieval SQL, `score_match`, and the hourly
+`close_expired_jobs` worker cron contain **zero references to `employment_type`** — a `Job` row
+with `employment_type="gig"`, a real `closes_at` and a real `positions` count already flows
+through the existing matching, ranking and auto-close pipeline with no code change to any of those
+three files.
+
+- **A genuine pre-existing bug, found while grounding the redesign and fixed as a prerequisite**:
+  `publishing.py`'s `_PLAIN_FIELDS` tuple never included `"positions"` or `"closes_at"`, even
+  though `JobIn` has always accepted both with real validation. `create_job`/`update_job` silently
+  dropped whatever an employer submitted for either field — ten sprints latent, harmless for a
+  permanent vacancy (nothing read them), fatal for a gig (both are load-bearing). No test anywhere
+  exercised either field through the HTTP API; every existing test used direct ORM construction.
+  Added a regression test that failed against the old code first, then fixed it.
+- **`EMPLOYMENT_TYPES` gains `"gig"`**, shared by `Job.employment_type` and
+  `CandidateProfile.preferred_employment_type` — the owner's own second decision, when asked
+  directly whether a candidate should be able to state gig work as a preference. Two new
+  invariants close the actual gap: `publishing._require_gig_has_a_place` refuses a gig whose
+  district does not resolve (422, service-layer, same place `resolve_location` already runs — not
+  a schema `NOT NULL`, because a permanent vacancy's district may still be null); `JobIn`'s
+  validator refuses `employment_type="gig"` with `closes_at=None` ("a shift with no end is not a
+  gig").
+- **No second scorer — this satisfies ADR-037 rather than testing it.** ADR-045's case for a
+  separate scorer rested entirely on gig-against-candidate being a different comparison from
+  job-against-candidate. Once a gig is a `Job`, that premise is gone: `score_match` never asked
+  what kind of `Job` it was scoring, and `matching._locality` keeps its existing tie-break role for
+  gigs exactly as it does for permanent vacancies — the owner's instruction was to treat a gig as a
+  job, not to give proximity a different role for one `employment_type`.
+- **`Application` gains `completed`/`no_show`**, reachable only from `hired`, and only when the
+  underlying `Job.employment_type == "gig"` — enforced in `employer_service.set_status` as a
+  service-layer refusal (409/422), not a CHECK, since the rule spans two tables. A permanent
+  vacancy's `hired` stays terminal exactly as before.
+- **Full two-sided rating, not status-only** — the owner's explicit scope choice when asked
+  directly. New table `application_reviews`: `subject_role ∈ {poster, worker}` names who the
+  rating is *about*, never who wrote it, so `UNIQUE (application_id, subject_role)` makes each
+  direction write-once without one party's review waiting on the other's row to exist. Reviewable
+  only once `Application.status == "completed"` — `no_show` is deliberately not reviewable,
+  ADR-045's own reasoning carried forward unchanged: a no-show is evidence about the cancellation,
+  which the status already carries. `review_service.py` sits beside `service.py`/
+  `employer_service.py` in `applications/`, reused from both identity contexts (`POST
+  /me/applications/{id}/review` and `POST .../applications/{id}/review`).
+- **No new module.** Everything landed in the two modules that already own the concepts —
+  `marketplace/` for the posting-side invariant, `applications/` for the outcome and the review.
+  This formally supersedes BL-8.2's original acceptance criteria ("does not extend
+  `marketplace.Job`") and ADR-045 §1-4; ADR-045's §5 (no payment, no payout) is untouched.
+- **One `Job` row per shift/date, stated as the shape rather than deferred as a gap.** A recurring
+  gig ("every Saturday for a month") is multiple postings, the same way a staffing agency books
+  each shift separately — building a multi-shift sub-model would reintroduce the complexity the
+  owner's steer was deliberately avoiding.
+- **Foundation only, by the same discipline `SkillRelation` shipped under**: `application_reviews`
+  has a writer and no reader. No aggregate rating, no completion-count badge, and reputation must
+  never feed `score_match` without its own design pass following `weights_from_settings()`'s
+  precedent (a value passed in, never read inside the scorer).
+- **The frontend gap is named, not routed around.** Three client-side arrays
+  (`web/src/lib/profile.ts`, `JobBrowser.tsx`, `employer/JobEditor.tsx`) and two i18n namespaces
+  across three locale files do not know about `"gig"` yet — a gig `Job` on the public `/jobs`
+  browse page renders the literal string `"employmentType.gig"` until a follow-up story adds them.
+  Deliberately not solved by filtering gigs out of `/jobs` on the backend, which would be backend
+  logic compensating for a frontend gap.
+- **Live-verified end to end against the running dev server and seeded data**, not just pytest:
+  posted a real gig via `curl` in Chennai/Tamil Nadu requiring a skill the seeded candidate
+  `+919000000001` actually holds — `positions`/`closes_at` persisted (the bug-fix proof), and the
+  gig ranked at the top of that candidate's real `GET /me/matches` (score 96, district match) with
+  zero code changes to `matching/service.py` or `scoring.py`. Walked a second real application
+  through `applied → shortlisted → hired → completed`, submitted both review directions (201 each),
+  confirmed a duplicate direction (409), a review before `completed` (409), and a review on a
+  `no_show` application (409) are all refused. `make gen-api`'s diff is purely additive — every
+  removed line is a widened `Literal`/enum replaced by the same line plus the new value.
+- 827 backend tests (was 793), 259 web tests unchanged (backend-only sprint). `make check` clean;
+  migration 0036 (tiers) and 0037 (gig + outcomes + reviews) each rehearsed down and up with zero
+  autogenerate drift; `make evaluate` printed the identical 34 pairs/7 orderings/16 course
+  expectations — bit-for-bit, since nothing in `matching/` or `scoring.py` changed.
+- ADR-044 (operator tiers) and ADR-046 (gig reuses `Job`, superseding ADR-045 §1-4) both written to
+  `docs/adr/architecture-decisions.md`, with amendment-record bullets at the top of the file.
+  `docs/IISM-Product-Backlog.docx` updated: BL-7.3, BL-8.1 and BL-8.2 marked done, the Epic B8
+  intro and the "Following This Window" sequence table both rewritten to describe what was
+  actually built rather than what was originally proposed.
+
 ### Also outstanding, in rough order
 
 - ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
@@ -1353,26 +1470,33 @@ that sells courses, connects jobs, and carries gig work.*
   only that a port may exist ahead of it. Note also that Sprint 24's "interest, not enrolment"
   reasoning **inverts** the moment money moves through the platform: if we take the payment, we are
   the system of record for the enrolment.
-- **Gig work — does not exist.** Zero hits for "gig" or "freelanc" across `api/`, `web/src`,
-  `docs/` and `scripts/`. It is not a feature but a third marketplace with different physics:
-  `Job` encodes a permanent salaried vacancy (monthly salary bands, years of experience,
-  `notice_period` on the profile), there is no availability model, no proximity ranking beyond
-  Sprint 23's tie-break, no reputation layer and no completion record for a payment to settle
-  against. Downstream of the money layer by necessity, and it should get an ADR before code.
+- **Gig work — built backend-only in Sprint 37 (ADR-046), reusing `Job`/`Application`.** The
+  September 2026 assessment above (and ADR-045's original design) argued gig work needed its own
+  module because it was a genuinely different market; the owner's direct instruction — "a gig work
+  can also be considered as a temporary job assignment" — rejected that premise before BL-8.2 was
+  built. `employment_type="gig"` plus a real `closes_at`/`positions`/`district_id` on the existing
+  `Job` gives matching, ranking and auto-close everything they need, with zero changes to
+  `matching/service.py` or `scoring.py` — verified live, not just in pytest (§11, Sprint 37).
+  `Application` carries the completion event (`completed`/`no_show`, reachable only from `hired`)
+  and a full two-sided `application_reviews` table is the reputation layer, foundation-only (a
+  writer, no reader yet, the `SkillRelation` shape). What is genuinely still missing: the frontend
+  (three client-side employment-type arrays and two i18n namespaces don't know `"gig"` exists yet)
+  and any payment/payout, which ADR-045 §5 and ADR-025/ADR-043's billing gate both still forbid.
 
 **Nothing built so far has to be undone for any of it**, which is the important finding. The
 expensive assets — 21,303 NSQF standards with role search, one pure deterministic scorer, one
 identity many roles, two working consent-and-revocation disclosure loops, geography to
 sub-district — are exactly what all three pillars need.
 
-Suggested order, re-revised 2026-09-27: the management-facing actor-breadth MVP (Sprint 33), the
+Suggested order, re-revised 2026-09-28: the management-facing actor-breadth MVP (Sprint 33), the
 monetisation ADR with a **payment adapter port only** (Sprint 34), Epic B3's verified evidence
-(Sprint 35), and BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36) are all behind us now — see each
-one's entry in §11. Per the backlog's own near-term sequence (`docs/IISM-Product-Backlog.docx`
-§4), next is Order 6: `BL-1.2`/`BL-1.3`, resuming the monetisation epic against the payment port
-already in place — a billing module for orders and entitlements, the real gateway
-implementation. Course checkout, résumé ingestion, the rest of Epic B6, and gig as its own module
-remain queued behind that.
+(Sprint 35), BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36), and BL-7.3 plus Epic B8's gig work
+(Sprint 37) are all behind us now — see each one's entry in §11. Per the backlog's own near-term
+sequence (`docs/IISM-Product-Backlog.docx` §4), next is Order 6: `BL-1.2`/`BL-1.3`, resuming the
+monetisation epic against the payment port already in place — a billing module for orders and
+entitlements, the real gateway implementation. Course checkout, résumé ingestion, the rest of
+Epic B6, and gig work's own frontend (§11's Sprint 37 entry names the gap) remain queued behind
+that.
 
 ### Then, in rough order of value
 

@@ -25,6 +25,12 @@
 > - **ADR-025** — its deferral clause is carried forward by ADR-043, cited honestly rather than
 >   declared satisfied: two of its three gate metrics are still thin. ADR-025's mandatory
 >   instrumentation is unchanged.
+> - **ADR-042** — extended by ADR-044. "An operator is not a role" stands; ADR-044 adds a second
+>   global flag (`staff_tier`) beside `is_staff`, the tiering ADR-042's own consequences section
+>   already anticipated.
+> - **ADR-045** — superseded in part by ADR-046. §1–4 (the sibling module, the new tables, the
+>   second scorer) are withdrawn: the owner determined a gig is a temporary job assignment and
+>   should be treated as one. §5 (no payment/payout) is untouched and still holds.
 
 ## ADR-001: Overall Product Architecture
 
@@ -1598,3 +1604,383 @@ both — is deliberately out of scope here.
 - ADR-025's instrumentation mandate is unchanged and still binds. Nothing here reduces the
   requirement to keep measuring precision@5, click-through and provider-reported conversion, and
   nothing here should be read by a future reader as having satisfied it.
+
+---
+
+## ADR-044: Operator Authority Tiers
+
+**Status:** Accepted (September 2026). **Extends ADR-042**, which stands unchanged for the
+question it already answers -- operator authority is global, flag-granted, and not a `Membership`
+role. This ADR answers the question ADR-042 deliberately left open and named its own escape hatch
+for.
+
+**Context:** `users.is_staff` has been a single boolean since ADR-042 (Sprint 28): every operator
+gets every `OPS_*` permission that exists. ADR-042's own consequences section anticipated this
+would not stay true forever: *"When authority stops being a boolean — an operator who may verify
+but not suspend — `OPERATOR_PERMISSIONS` becomes a function of the user and no route changes."*
+`require_operator()`'s dependency body carried a `# pragma: no cover - seam for tiers` comment
+against exactly this line since the sprint it was written.
+
+The immediate trigger (Sprint 37, BL-7.3, reprioritised ahead of Epic B8 on the owner's
+instruction): `OPS_ORG_VERIFY` is not like the other three `OPS_*` permissions. Granting or
+revoking an organisation's "Verified" badge is a decision with **public** blast radius — every
+visitor to that organisation's listings sees it — where `OPS_ORG_READ`, `OPS_PROGRAMME_READ` and
+`OPS_CANDIDATE_VERIFY` are each either read-only or scoped to one candidate's own evidence. A
+single flag cannot express "trusted enough to review a certificate" without also expressing
+"trusted enough to publish a trust signal to the entire marketplace."
+
+**Decision:**
+
+1. **A second column, not a second model.** `users.staff_tier: str | None`, closed to
+   `STAFF_TIERS = ("support", "admin")`. `NULL` iff `is_staff` is false —
+   `ck_users_staff_tier_pairs_with_flag` makes "staff with no tier" and "tiered but not staff" both
+   unrepresentable, the same shape ADR-042 used for `tenants.verified_at`/`verified_by`. **Still not
+   a role**: this is a second global flag beside `is_staff`, on the same `users` row, never a
+   `Membership` — ADR-042's "an operator is not a role" is unchanged by having two flags instead of
+   one.
+2. **`TIER_PERMISSIONS: dict[str, frozenset[Permission]]` in `core/authorization.py`, exactly the
+   function ADR-042 predicted.** `support` holds `OPS_ORG_READ`, `OPS_PROGRAMME_READ`,
+   `OPS_CANDIDATE_VERIFY`; `admin` holds all four, `TIER_PERMISSIONS["admin"] ==
+   OPERATOR_PERMISSIONS`, asserted at import time. No route changed — `require_operator(permission)`
+   still takes one `Permission` and the eleven call sites across `operations/routes.py` are
+   untouched. Widening this to a third tier later is two dictionary entries, not a schema change.
+3. **The refusal for an insufficient tier is 403, not 404 — a deliberate departure from ADR-042's
+   own rule, narrowed to where it still applies.** ADR-042 made every operator refusal 404, on the
+   reasoning that "a non-operator has proved no standing." That reasoning is intact for a
+   non-operator. It does not extend to an operator whose tier lacks one specific permission: that
+   caller has already proved operator standing — the same fact a 200 on any other `/ops` route
+   would confirm — so a 403 discloses nothing a stranger could not already infer by trying. This is
+   ADR-038's tenant-side rule (an established identity's insufficient permission is a 403) applied
+   one level up, and it produces a genuine, testable oracle: the same URL answers 404 to a stranger
+   and 403 to a `support` operator.
+4. **No new HTTP writer, in this or any later revision — the one constraint BL-7.3's acceptance
+   criteria named explicitly.** `scripts/grant_staff.py` gains a required `--tier` flag on grant;
+   revoke clears both columns together. There is still no "manage operators" route, and there will
+   not be one, for the reason ADR-042 gives: a back office whose first feature is its own escalation
+   path is the failure this rule exists to prevent.
+5. **Migration 0036 backfills every existing `is_staff = true` row to `admin`.** Not a default of
+   convenience — a boolean's only honest equivalent tier is the one with no restrictions. Any
+   narrower backfill would silently take access away from an account that already had it, at the
+   moment this migration ran, which is a worse failure mode than a boot-time refusal would have
+   been and would not even announce itself.
+
+**Options considered:** 1. Leave `is_staff` a boolean; treat `OPS_ORG_VERIFY` as an accepted risk
+2. A third `Membership`-style role scoped to a synthetic "platform" tenant
+3. Two independent booleans (`is_staff`, `may_verify_orgs`)
+4. A tier column resolving to a `Permission` subset via a dictionary in `core/authorization.py`
+
+**Trade-offs:**
+
+- Option 1: ✅ Zero engineering
+❌ Does not address BL-7.3's own premise — the one action with public blast radius stays as
+reachable as a read-only report, forever, by construction
+
+- Option 2: ✅ Reuses `ROLE_PERMISSIONS`' existing machinery
+❌ Directly contradicts ADR-042's founding rule: a synthetic tenant is still a tenant, and
+`Membership`-shaped authority for something that belongs to nobody's organisation reintroduces the
+exact confusion ADR-042 was written to end
+
+- Option 3: ✅ Simplest possible schema change
+❌ Does not generalise — a third distinction needs a third column, and `require_operator()` would
+need a per-permission `if` rather than one table lookup; ADR-042 explicitly named this shape as the
+one to avoid ("becomes a function of the user," not a second flag per permission)
+
+- Option 4: ✅ Matches ADR-042's own anticipated shape exactly
+✅ Adding a tier or moving a permission between tiers touches one dictionary, no migration, no
+route
+❌ A second dimension of authority is a second thing to reason about when auditing who can do what
+
+**Final decision:** Option 4.
+
+**Consequences:**
+
+- **`require_operator()`'s docstring now states two rules where it stated one**, and a test proves
+  both are reachable on the same URL (`test_a_stranger_gets_404_on_the_very_same_route_a_support_
+  operator_gets_403_on`) — the same discipline ADR-042 itself used to prove its own 404-vs-403
+  split non-vacuous.
+- **`OperatorContext.permissions` is now the caller's granted subset, not the full
+  `OPERATOR_PERMISSIONS` set.** Nothing outside `core/authorization.py` compared it against the
+  full set before this change, so nothing else needed to move — but a future route written as
+  `if OPS_X in OPERATOR_PERMISSIONS` instead of asking `require_operator(Permission.OPS_X)` for the
+  permission it actually needs would silently bypass the tier check. There is no such call site
+  today; this is the risk to watch for.
+- **A `support` operator can still be handed every read in the back office and the one write scoped
+  to a single candidate's evidence, with no path to the public-facing badge.** This is the actual
+  audience-visible capability BL-7.3 unlocks: a second operator can be brought on for routine
+  verification work without also being trusted with the marketplace's public trust signal.
+- **The seam ADR-042 left is now closed.** `# pragma: no cover - seam for tiers` is gone from
+  `require_operator()`; the line it marked is now the real tier check, not a vacuous one.
+
+---
+
+## ADR-045: Gig / Short-Term Work — Design Phase (BL-8.1)
+
+**Status:** Superseded in part by ADR-046 (September 2026). §1–4 below (the sibling module, the
+new tables, the second scorer) are withdrawn — the owner determined a gig is a temporary job
+assignment and should be treated as one, reusing `Job`/`Application` instead. §5 (no
+payment/payout) is untouched and still holds. Kept here in full, not deleted: its reasoning about
+why a gig looked like a different market was not wrong on its own terms, and a future story
+revisiting this boundary should read both ADRs. Nothing described below was ever built against
+this design; BL-8.2 was built against ADR-046 instead.
+
+**Context:** The Business Requirements Document names gig work as the third pillar and is explicit
+about why it is last: *"a genuinely different market with its own physics — availability rather
+than a permanent vacancy — rather than an extension of the first two."* The Product Requirements
+Document (§8.3) and the High-Level Design (§9.3) agree on the shape of the answer without
+specifying it: *"a genuinely different market with its own physics; warrants its own design phase
+rather than an extension of this product"* and *"a new, sibling module... does not extend
+`marketplace.Job`... reuses `geography/` and `skills/`."* Neither document goes further. This ADR
+is where the physics actually get specified.
+
+**What makes this a different market, concretely — not just a slogan:**
+
+1. **A vacancy is a standing offer; a gig is a scheduled need.** `Job` has no start or end time —
+   it is open until closed. A gig is inherently time-boxed: a specific shift, or a short run of
+   them, with a real start and end. There is no equivalent of `JobSkill`/`CandidateSkill`'s
+   always-on comparison — the question is not just "can this person do this work" but "can this
+   person do this work *at this time*."
+2. **Proximity is a hard filter, not a tie-break.** `matching._locality` is deliberately a
+   tie-break, not a score component, because a strong permanent-job match is worth relocating for
+   — ADR-037's own reasoning. Nobody relocates for a one-day gig. A gig listing outside a worker's
+   reachable radius is not a worse match; it is not a match, the same way a missing mandatory
+   standard is not "a slightly worse fit" for a vacancy that requires it.
+3. **A vacancy does not end when someone is hired; a gig does.** Sprint 27 gave `Job` a lifecycle
+   because *closing* was missing — but even closed, a job was never "completed" in the sense of a
+   specific piece of work being finished and judged. A gig has a real completion event, and only a
+   completion event can produce evidence of whether the work was actually done well — which neither
+   `Job` nor `Application` has any way to represent.
+4. **Reputation is bidirectional and gig-specific.** `CandidateSkill.source` (self-declared →
+   inferred → assessed → certified) is evidence about a *skill*, gathered once and reused across
+   every future match. Gig reputation is evidence about *reliability*, accumulated one completed
+   engagement at a time, and it runs both directions — a poster who cancels on short notice or
+   never pays is exactly as much a data point as a worker who does not show up.
+
+**Decision:**
+
+1. **A new sibling module, `api/modules/gig/`.** Depends on `identity` (who posted, who worked),
+   `geography` (district-level proximity, reusing the existing `PlaceIndex` resolution — no new
+   location-resolution logic), and `skills` (required standards, compared at concept level via the
+   same `Skill.concept_id or Skill.id` key `scoring.py` and `courses_closing_gap` already use).
+   **Does not import `marketplace`, and nothing in `marketplace` imports it.** No shared table with
+   `Job`; a `GigListing` is a new, independent model, not a subtype or a new `Job.status` value —
+   exactly Sprint 27's own lesson about `closed_at` restated for a bigger fork.
+2. **A gig poster is an existing `employer` tenant, not a new actor type.** Epic B7 is about new
+   *actors* (a government agency, an external system); Epic B8 is about a new *market* for an actor
+   that already exists. Inventing a fifth tenant type here would blur that distinction for no
+   benefit — a staffing agency or a hospital already registered as an `employer` should be able to
+   post both a permanent vacancy and a weekend shift from the same account, the same
+   ADR-038 reasoning that refused to fork an account by role. A new `Permission.GIG_PUBLISH`,
+   scoped `require(Permission.GIG_PUBLISH, "employer")`, mirrors `JOB_PUBLISH` exactly.
+3. **The domain model, sized to what matching, proximity and completion actually need — no more:**
+   - **`GigListing`** — poster `tenant_id`, a district (`district_id`, **not nullable**: unlike a
+     job, "somewhere in India" is not a postable gig), one or more shift windows
+     (`starts_at`/`ends_at`, timezone-aware per the `tenants.created_at` lesson), `positions`
+     (reusing `Job.positions`' own reasoning almost verbatim), and required skills through a
+     `GigListingSkill` association table shaped like `JobSkill` (`skill_id`, `importance`,
+     `is_mandatory`) — the *shape* is reused because it is a good shape, not the *table*.
+   - **`GigWorkerAvailability`** — `profile_id`, a window (or a recurring pattern — a decision
+     BL-8.2 still owes: a fixed date range is simplest to ship and cheapest to get right; a
+     recurring weekly pattern is what a real gig worker actually wants and is explicitly the harder
+     version deferred to BL-8.2's own build, not decided here). Lives in `gig/`, not as new columns
+     on `CandidateProfile` — most candidates will never post one, the same reasoning that keeps
+     `interests/` a sibling of `applications/` rather than columns bolted onto `Job`.
+   - **`GigAssignment`** — one row per worker matched to one listing.
+     `status ∈ {offered, accepted, in_progress, completed, no_show, cancelled_by_worker,
+     cancelled_by_poster}`. This is the lifecycle Sprint 27 gave `Job` a smaller version of
+     (`closed_at`/`close_reason`), sized up: a gig's status is a fact about *one worker's*
+     engagement, not the listing as a whole, because a listing with three positions can have one
+     worker complete, one no-show and one still in progress simultaneously.
+   - **`GigReview`** — one row per direction per completed assignment (`assignment_id`,
+     `rating_of` ∈ `{worker, poster}`, a 1-5 rating, an optional comment). Two rows, not one row
+     with two rating columns: a poster rating a worker and a worker rating a poster are different
+     acts by different people, and forcing them into one row means one party's review can only ever
+     be written after the other's, or the row does not exist yet to update. **Only writable once
+     `status = completed`** — a rating on a cancelled or no-show engagement is not evidence about
+     the work, it is evidence about the cancellation, which the `status` value already carries.
+4. **Matching is its own lightweight function, not `score_match`, and this is not the second
+   scorer ADR-037 forbids.** ADR-037's rule is about *one comparison* — candidate against
+   permanent vacancy — having exactly one implementation. Candidate-against-gig-shift is a
+   different comparison, with a different hard filter (availability and proximity, not "missing
+   mandatory caps at 45%") and a different concept of evidence (completion history, not
+   `candidate_skills.source`). Reusing `score_match`'s specific weights and cap, tuned against the
+   permanent-job golden set, would import numbers that have nothing to do with this question.
+   What *is* reused: the concept-level comparison key (`Skill.concept_id or Skill.id`) and the
+   general shape (retrieval narrows, then a bounded function scores the survivors) — patterns, not
+   the tuned instance. **Retrieval for gig work filters on district and availability-window
+   overlap before skill match is even considered** — the inverse order from `match_jobs`, where
+   skill overlap drives retrieval and locality only breaks ties among the results.
+5. **No payment, no payout, in this design or in BL-8.2.** ADR-025's gate on billing code applies
+   here exactly as it applies to course checkout — a worker being paid through the platform is a
+   materially larger claim (the platform becomes the payer of record) than anything this design
+   proposes. A completed gig produces a review, not an invoice.
+
+**Options considered:** 1. Extend `Job`/`Application` with gig-specific nullable columns
+(`is_gig`, `shift_starts_at`, …)
+2. A new sibling module, sharing no tables with `marketplace`, as described above
+3. A fully separate service (its own database, its own deployment) given how different the domain is
+
+**Trade-offs:**
+
+- Option 1: ✅ No new module, reuses existing routes and the existing employer console
+❌ `Job.status`'s CHECK, `open_job()`, every listing query and the golden set would all need to
+learn a second meaning of "open" — exactly the "closing is not a third `status`" lesson from
+Sprint 27, at a much larger scale, for a domain that does not actually share `Job`'s invariants
+(a gig is not "closed" when filled, it is "in progress")
+
+- Option 2: ✅ Matches the HLD's own placement table and Sprint 27's precedent for how this
+codebase handles "looks similar, is not the same lifecycle"
+✅ `marketplace/`, `matching/` and `scoring.py` are provably untouched — the golden set and every
+existing test stay bit-identical by construction, not by discipline
+❌ Real duplication of shape (a second `*Skill` association table, a second retrieval-then-score
+pipeline) — accepted because the shapes are genuinely different once availability and proximity are
+hard filters rather than a tie-break
+
+- Option 3: ✅ Maximum isolation; nothing here can ever regress the job-matching path
+❌ ADR-014's whole premise is that the modular monolith defers the microservices decision until
+there is a reason for it, and "the domain feels different" is not yet a reason a monolith cannot
+express — this reaches for Option 3's cost before Option 2's cost has actually been felt
+
+**Final decision:** Option 2.
+
+**Consequences:**
+
+- **BL-8.2 inherits three explicit open decisions this ADR deliberately does not close**: a fixed
+  availability window versus a recurring pattern; whether `GigListingSkill.importance`/
+  `is_mandatory` feed a hard filter or a soft score the way they do for `Job`; and whether a
+  worker's aggregate reputation (once `GigReview` rows exist to aggregate) should influence gig
+  *ranking* or only be *shown* — the same "does behaviour rank or merely reorder" question ADR-036
+  already answered once for the main platform, worth re-asking rather than assuming the same answer
+  transfers.
+- **No golden set exists for gig matching, and none can be built before real listings and real
+  completions do.** The same honesty ADR-043 applied to the monetisation gate applies here: BL-8.2
+  should not claim a tuned scorer before there is data to tune it against, and should say so in its
+  own commit the way ADR-043 said so about semantic similarity's placeholder.
+- **`api/modules/gig/` will need its own `tests/test_import_order.py` entry and its own migration
+  sequence**, but neither exists yet — this ADR authorises the module's *shape*, not its schema.
+  The first concrete artifact of BL-8.2 is the migration that creates `gig_listings`,
+  `gig_worker_availability`, `gig_assignments` and `gig_reviews`, reviewed on its own terms.
+- **Nothing in this design requires touching `marketplace/`, `matching/`, `scoring.py`, or the
+  golden set.** That is the property Option 2 was chosen to guarantee, and BL-8.2's own tests
+  should assert it the way `tests/test_payment_adapter.py` asserts nothing under `api/modules/`
+  imports the payment port before checkout exists.
+
+---
+
+## ADR-046: Gig Work Reuses `Job` — Supersedes ADR-045 §1–4 (Sprint 37, Epic B8)
+
+**Status:** Accepted (September 2026). Implemented and live-verified in the same sprint.
+
+**Context:** ADR-045 was written, reviewed and never built — no migration, no module, no route
+ever existed against it. Before BL-8.2 build work began, the owner gave a direct instruction that
+overrides ADR-045's central premise: **"A gig work can also be considered as a temporary job
+assignment and should be treated like a job in our system"** — for both the marketplace (postings)
+and matching (a candidate's ranked results). ADR-045 had argued the opposite from first principles
+(§"What makes this a different market, concretely"), reasoning forward from an assumption — a gig
+*must* be architecturally distinct because its physics differ — that the owner's framing rejects
+outright: the physics ADR-045 named (a real end, a real place, a completion event, bidirectional
+reputation) are properties a `Job` row can simply be given, not proof that a `Job` row cannot hold
+them.
+
+Verified against the actual code before any of this was written, not assumed: `open_job()`
+(`marketplace/models.py`), `match_jobs`'s retrieval SQL, `score_match` (`matching/scoring.py`), and
+the existing hourly `close_expired_jobs` worker cron (`alerts/service.py`) contain **zero
+references to `employment_type`**. A `Job` row with `employment_type="gig"`, a real `closes_at`,
+and a real `positions` count already flows through the existing matching, ranking, and auto-close
+pipeline with no code change to any of those three files. This is the fact ADR-045 did not have
+occasion to check, because it never considered reuse as an option.
+
+**Decision:**
+
+1. **A gig is a `Job` with `employment_type="gig"`.** No new module, no `GigListing`, no
+   `GigListingSkill`. `Job.district_id` (already `NOT NULL`-enforced in effect by
+   `resolve_location`), `Job.closes_at`, `Job.positions` are exactly ADR-045's "a district, a
+   window, a headcount" — they already existed on `Job`, unused by permanent vacancies for
+   anything but the closing-date/auto-close feature Sprint 27 built. Two invariants close the one
+   real gap: a gig with no resolvable district is refused at creation (422, service-layer, the same
+   place `resolve_location` already runs — not a schema-level `NOT NULL`, because a permanent
+   vacancy's district may still be null), and `JobIn` refuses `employment_type="gig"` with
+   `closes_at=None` ("a shift with no end is not a gig") — both new checks, not the CHECK-widening
+   migration, which only had to teach the enum a new value.
+2. **`gig` joins the shared `EMPLOYMENT_TYPES` tuple** consumed by both `Job.employment_type` and
+   `CandidateProfile.preferred_employment_type` — the owner's own second decision when asked
+   directly. A candidate can state "gig" as a preferred employment type the same way they state
+   "part_time" today; no separate preference model.
+3. **Matching needs no second scorer, and this satisfies ADR-037 rather than testing it.**
+   ADR-037's rule is "one comparison, one implementation." Gig-against-candidate is not a
+   *different* comparison from permanent-vacancy-against-candidate once a gig is a `Job` — it is
+   the *same* comparison, because `score_match` never asked what kind of `Job` it was scoring.
+   ADR-045's argument for a second scorer rested entirely on gig work being a different kind of
+   thing than a `Job`; once it is a `Job`, that argument has no premise left to stand on.
+   `matching._locality`'s tie-break-not-hard-filter behaviour is **unchanged** for gigs too — the
+   owner's instruction was to treat a gig as a job, not to give proximity a different role for one
+   `employment_type` than another.
+4. **Application outcomes, not a new `GigAssignment` model.** `Application` already carries one
+   row per candidate per `Job`; `APPLICATION_STATUSES` gains `completed` and `no_show`, reachable
+   only from `hired`, and only when the underlying job's `employment_type == "gig"` (enforced in
+   `employer_service.set_status`, a service-layer refusal, the same shape as "no required standard
+   blocks publish" — not a CHECK, because the rule spans two tables). A permanent vacancy's `hired`
+   stays terminal exactly as before Sprint 37.
+5. **Full two-sided rating, not status-only** — the owner's explicit choice when asked to scope
+   it. New table `application_reviews`: `subject_role ∈ {poster, worker}` names **who the rating is
+   about**, not who wrote it, so `UNIQUE (application_id, subject_role)` makes each direction
+   write-once without one party's review having to wait on the other's row existing. Reviewable
+   only once `Application.status == "completed"` — `no_show` is deliberately not reviewable, ADR-
+   045's own reasoning carried forward unchanged: a no-show is evidence about the cancellation,
+   which the status value already carries, not evidence about the work.
+6. **§5 of ADR-045 is untouched.** No payment, no payout. A completed gig produces a review, not
+   an invoice — the same gate ADR-025/ADR-043 apply to billing generally.
+
+**Options considered:** 1. Keep ADR-045 as designed (sibling module, second scorer) and build
+BL-8.2 against it, overriding the owner's later instruction
+2. Reuse `Job`/`Application` as described above, formally superseding ADR-045 §1–4
+3. A middle path — a new `GigListing` table that is not a `Job` subtype, but reads through the
+   existing `match_jobs` pipeline via a view or union
+
+**Trade-offs:**
+
+- Option 1: ❌ Directly contradicts an explicit, direct instruction from the product owner, given
+  after ADR-045 was written and before any of it was built — there is no design-quality argument
+  strong enough to justify overriding that
+- Option 2: ✅ Zero code changes to `matching/`, `scoring.py`, or the golden set — verified by
+  grep before writing a line, not asserted after
+✅ One `_PLAIN_FIELDS` fix (a genuine pre-existing bug: `positions`/`closes_at` were accepted by
+`JobIn` and silently dropped by `create_job`/`update_job`, latent because nothing exercised them
+through the HTTP API) is the only marketplace-side surprise, and it benefits every permanent
+vacancy too, not only gigs
+❌ `Job`/`Application` gain concepts (a completion event, a no-show, a review) that do not apply to
+a permanent vacancy — accepted because the alternative (Option 1) is no longer the owner's decision
+to make on this ADR's own reasoning alone
+- Option 3: ❌ A view or union across `Job` and a new `GigListing` reintroduces exactly the
+  "closing is not a third status" risk Sprint 27 already paid down once, and for less benefit than
+  Option 2 — it still has to solve the placement question when the direct answer (make it a `Job`)
+  is sitting right there
+
+**Final decision:** Option 2.
+
+**Consequences:**
+
+- **One `Job` row per shift/date, not a recurring-gig model.** A staffing agency booking "every
+  Saturday for a month" posts four `Job` rows, the same way a real staffing agency books each shift
+  separately today. Accepted as the shape, not deferred as a gap — building a multi-shift
+  sub-model would reintroduce exactly the complexity this ADR's reuse decision was meant to avoid.
+- **No aggregate reputation surface yet.** `application_reviews` ships as a foundation-only table
+  — a writer, no reader — the same shape `SkillRelation` shipped in (ADR-041's neighbour, Sprint
+  36). There is no average-rating computation, no completion-count badge, and no query anywhere
+  that reads more than one row at a time. Building one is a future story, not an oversight.
+- **Reputation must never feed `score_match` without its own design pass.** If a later story wants
+  a reputation-aware re-rank, it follows `weights_from_settings()`'s own precedent — a value
+  computed outside `scoring.py` and passed in as an argument, never read from the database or
+  settings inside the scorer itself (ADR-036's purity rule, ADR-037's one-scorer rule still bind
+  it).
+- **The frontend does not know about `"gig"` yet, and this ADR does not close that gap.** Three
+  client-side arrays (`web/src/lib/profile.ts`, `JobBrowser.tsx`, `employer/JobEditor.tsx`) and two
+  i18n namespaces across three locale files still need the new value; until they do, a gig `Job`
+  on the public `/jobs` browse page renders the literal string `"employmentType.gig"` where a
+  label belongs. Deliberately shipped backend-only, matching this project's established
+  precedent for every prior backend-first sprint — not routed around by filtering gigs out of
+  `/jobs` on the backend, which would be backend logic existing solely to compensate for a
+  frontend gap.
+- **ADR-045 remains in this document, marked superseded, rather than deleted.** Its reasoning
+  about *why* a gig looked different was not wrong on its own terms — the owner's instruction
+  changed the premise, not the analysis. A future story reconsidering this boundary should read
+  both.

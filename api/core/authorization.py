@@ -133,10 +133,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
 }
 
 # What `users.is_staff` grants, and the only route to an `OPS_` permission
-# (ADR-042). A frozenset rather than a function today; when operator authority
-# stops being a boolean -- somebody who may verify but not suspend -- this
-# becomes a function of the user and **no route changes**, which is the whole
-# reason callers ask for a Permission rather than for the flag (ADR-022).
+# (ADR-042) -- every permission any operator tier may hold. `TIER_PERMISSIONS`
+# below is the function ADR-042 already anticipated: "when operator authority
+# stops being a boolean... this becomes a function of the user and no route
+# changes" (Sprint 37, BL-7.3, ADR-044).
 OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
     {
         Permission.OPS_ORG_READ,
@@ -145,6 +145,26 @@ OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.OPS_CANDIDATE_VERIFY,
     }
 )
+
+# The two tiers (ADR-044). `support` is every read-only or single-subject
+# decision; `admin` adds the one action with public blast radius --
+# `OPS_ORG_VERIFY` grants an organisation's own "Verified" badge, which every
+# visitor sees, not just the person whose evidence was reviewed.
+# `admin` is a strict superset of `support`, asserted below rather than
+# merely intended: a route asking for a permission neither tier grants is
+# still caught at import time by `require_operator`'s existing check against
+# `OPERATOR_PERMISSIONS`, which this mapping must never fall short of.
+TIER_PERMISSIONS: dict[str, frozenset[Permission]] = {
+    "support": frozenset(
+        {
+            Permission.OPS_ORG_READ,
+            Permission.OPS_PROGRAMME_READ,
+            Permission.OPS_CANDIDATE_VERIFY,
+        }
+    ),
+    "admin": OPERATOR_PERMISSIONS,
+}
+assert TIER_PERMISSIONS["support"] < TIER_PERMISSIONS["admin"] == OPERATOR_PERMISSIONS  # noqa: S101
 
 
 @dataclass(frozen=True)
@@ -309,14 +329,22 @@ def require_operator(
     `scripts/grant_staff.py`, which needs database credentials: a capability
     strictly greater than anything the API grants.
 
-    **404, not 403**, and with FastAPI's own wording. ADR-039's enumeration
-    argument does not carry here -- there is one back office and its path is not
-    guessable -- but its other half does: a 403 acknowledges standing the caller
-    has already proved, and a non-operator has proved none. A 403 would tell
-    somebody poking at `/ops` that they had found the back office and that one
-    flag on their row was all that stood in the way. A *different* detail string
-    would be just as good an oracle, so the body matches an unrouted path
-    exactly and a test compares the two.
+    **404, not 403, for a non-operator** -- and with FastAPI's own wording.
+    ADR-039's enumeration argument does not carry here -- there is one back
+    office and its path is not guessable -- but its other half does: a 403
+    acknowledges standing the caller has already proved, and a non-operator has
+    proved none. A 403 would tell somebody poking at `/ops` that they had found
+    the back office and that one flag on their row was all that stood in the
+    way. A *different* detail string would be just as good an oracle, so the
+    body matches an unrouted path exactly and a test compares the two.
+
+    **403, not 404, for an operator whose tier lacks this permission**
+    (Sprint 37, BL-7.3, ADR-044). That caller has already proved operator
+    standing -- they are staff, the same fact a 200 on any other `/ops` route
+    would confirm -- so refusing this one action tells them nothing a stranger
+    could not already see by trying. This is ADR-038's own rule
+    (an established identity's insufficient permission is a 403) applied one
+    level up from a tenant membership to operator authority.
     """
     if permission not in OPERATOR_PERMISSIONS:
         # At import time, not per request. A route asking for JOB_PUBLISH here
@@ -331,12 +359,21 @@ def require_operator(
             # distinguishable from this one.
             log.warning("authz.operator_denied", permission=permission.value)
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
-        if permission not in OPERATOR_PERMISSIONS:  # pragma: no cover - seam for tiers
-            log.warning("authz.operator_permission_denied", permission=permission.value)
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+        granted = TIER_PERMISSIONS.get(user.staff_tier or "", frozenset())
+        if permission not in granted:
+            # Staff standing is already proven; this is the tier question, not
+            # the operator one, so the answer is 403 -- see the docstring above.
+            log.warning(
+                "authz.operator_tier_denied",
+                permission=permission.value,
+                staff_tier=user.staff_tier,
+            )
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "Your operator tier does not include this action"
+            )
         # Opaque and non-personal, like `tenant_id` above. `user_id` is already
         # bound by `get_current_user`, so the access line says who acted.
-        structlog.contextvars.bind_contextvars(operator=True)
-        return OperatorContext(user=user, permissions=OPERATOR_PERMISSIONS)
+        structlog.contextvars.bind_contextvars(operator=True, staff_tier=user.staff_tier)
+        return OperatorContext(user=user, permissions=granted)
 
     return dependency

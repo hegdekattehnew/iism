@@ -20,10 +20,15 @@ somebody with database access rather than by another operator -- and the last
 operator can be removed without needing an interface that would have to let
 them.
 
+A grant needs `--tier` (Sprint 37, BL-7.3, ADR-044): `support` for the
+read-only and single-subject actions, `admin` for those plus granting an
+organisation's own public "Verified" badge. A revoke clears both `is_staff`
+and the tier together -- there is no such thing as a tierless operator.
+
 Dry run by default:
 
-    .venv/bin/python scripts/grant_staff.py ops@example.com             # says what would happen
-    .venv/bin/python scripts/grant_staff.py ops@example.com --apply     # does it
+    .venv/bin/python scripts/grant_staff.py ops@example.com --tier support        # would grant
+    .venv/bin/python scripts/grant_staff.py ops@example.com --tier admin --apply  # grants it
     .venv/bin/python scripts/grant_staff.py ops@example.com --revoke --apply
 """
 
@@ -36,13 +41,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import dispose_engine, get_sessionmaker
 from api.core.logging import configure_logging
-from api.modules.identity.models import User
+from api.modules.identity.models import STAFF_TIERS, User
 from api.modules.operations import set_staff, staff_roster
 
 
 def _label(user: User) -> str:
     """Enough to recognise the account, and the id it is actually keyed on."""
-    return f"{user.full_name or '(no name)'} · {user.email or user.phone} · {user.id}"
+    tier = f" [{user.staff_tier}]" if user.is_staff else ""
+    return f"{user.full_name or '(no name)'} · {user.email or user.phone} · {user.id}{tier}"
 
 
 async def _find(db: AsyncSession, address: str) -> User | None:
@@ -53,9 +59,8 @@ async def _find(db: AsyncSession, address: str) -> User | None:
     return user
 
 
-async def _run(address: str, *, revoke: bool, apply: bool) -> int:
+async def _run(address: str, *, revoke: bool, apply: bool, tier: str | None) -> int:
     configure_logging()
-    verb = "Revoke from" if revoke else "Grant to"
     async with get_sessionmaker()() as db:
         user = await _find(db, address)
         if user is None:
@@ -63,15 +68,34 @@ async def _run(address: str, *, revoke: bool, apply: bool) -> int:
             print("This never creates one — ask them to sign up first.", file=sys.stderr)
             return 1
 
-        if user.is_staff == (not revoke):
-            print(f"Already {'not ' if revoke else ''}an operator: {_label(user)}")
+        if revoke:
+            if not user.is_staff:
+                print(f"Already not an operator: {_label(user)}")
+            elif not apply:
+                print(f"DRY RUN. Would revoke from: {_label(user)}")
+                print("\nRe-run with --apply to write.")
+            else:
+                await set_staff(db, address=address, staff=False)
+                print(f"Revoked from: {_label(user)}")
+        elif user.is_staff and user.staff_tier == tier:
+            print(f"Already an operator at this tier: {_label(user)}")
+        elif user.is_staff:
+            # A tier change, not a fresh grant -- said plainly, so re-running
+            # this against an existing operator with a different `--tier`
+            # cannot be mistaken for a no-op.
+            change = f"{user.staff_tier} -> {tier}"
+            if not apply:
+                print(f"DRY RUN. Would change tier ({change}): {_label(user)}")
+                print("\nRe-run with --apply to write.")
+            else:
+                await set_staff(db, address=address, staff=True, tier=tier)
+                print(f"Changed tier ({change}): {_label(user)}")
         elif not apply:
-            print("DRY RUN. Would change:")
-            print(f"  {verb}: {_label(user)}")
+            print(f"DRY RUN. Would grant [{tier}] to: {_label(user)}")
             print("\nRe-run with --apply to write.")
         else:
-            await set_staff(db, address=address, staff=not revoke)
-            print(f"{'Revoked from' if revoke else 'Granted to'}: {_label(user)}")
+            await set_staff(db, address=address, staff=True, tier=tier)
+            print(f"Granted [{tier}] to: {_label(user)}")
 
         # Printed every run, including the dry one. "Who else is staff" is the
         # question worth answering at the moment you add one, and nothing else
@@ -91,8 +115,13 @@ def main() -> int:
     parser.add_argument("address", help="the email or phone of an account that already exists")
     parser.add_argument("--revoke", action="store_true", help="take operator authority away")
     parser.add_argument("--apply", action="store_true", help="write; otherwise this is a dry run")
+    parser.add_argument(
+        "--tier", choices=STAFF_TIERS, help="required when granting: which operator tier"
+    )
     args = parser.parse_args()
-    return asyncio.run(_run(args.address, revoke=args.revoke, apply=args.apply))
+    if not args.revoke and args.tier is None:
+        parser.error("--tier is required when granting (choices: " + ", ".join(STAFF_TIERS) + ")")
+    return asyncio.run(_run(args.address, revoke=args.revoke, apply=args.apply, tier=args.tier))
 
 
 if __name__ == "__main__":

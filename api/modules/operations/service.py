@@ -203,7 +203,9 @@ async def verify_certification(
     return certification
 
 
-async def set_staff(db: AsyncSession, *, address: str, staff: bool) -> User:
+async def set_staff(
+    db: AsyncSession, *, address: str, staff: bool, tier: str | None = None
+) -> User:
     """Grant or revoke operator authority. **Reachable only from a script.**
 
     No HTTP route in this product calls this, in this or any later revision
@@ -215,10 +217,18 @@ async def set_staff(db: AsyncSession, *, address: str, staff: bool) -> User:
     staff is a one-command account takeover, so an unknown address is an error
     and nothing is written.
 
+    **A grant requires a tier; a revoke clears it** (Sprint 37, BL-7.3,
+    ADR-044). `ck_users_staff_tier_pairs_with_flag` would refuse the write
+    anyway if the two ever disagreed -- this just fails with a clearer message
+    before asking the database to.
+
     The log line carries the user id and never the address -- the ADR-023
     redaction tail reads this stream too, but not leaking in the first place is
     cheaper than being masked.
     """
+    if staff and tier is None:
+        raise ValueError("granting operator authority requires a tier")
+
     key = address.strip().lower()
     user = await db.scalar(select(User).where(func.lower(User.email) == key))
     if user is None:
@@ -227,9 +237,12 @@ async def set_staff(db: AsyncSession, *, address: str, staff: bool) -> User:
         raise LookupError(f"no account for {address!r} -- this never creates one")
 
     user.is_staff = staff
+    user.staff_tier = tier if staff else None
     await db.commit()
     await db.refresh(user)
-    log.warning("ops.staff_changed", user_id=str(user.id), is_staff=staff)
+    log.warning(
+        "ops.staff_changed", user_id=str(user.id), is_staff=staff, staff_tier=user.staff_tier
+    )
     return user
 
 
