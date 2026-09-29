@@ -9,8 +9,8 @@ from api.modules.interests.models import INTEREST_STATUSES, PROVIDER_STATUSES
 
 # Closed on the way out so the generated TypeScript client types a status as a
 # union rather than `string`; `tests/test_enumerations.py` holds it to the CHECK.
-InterestStatus = Literal["registered", "withdrawn", "contacted"]
-ProviderStatus = Literal["contacted"]
+InterestStatus = Literal["registered", "withdrawn", "contacted", "enrolled"]
+ProviderStatus = Literal["contacted", "enrolled"]
 
 # The unions above and the tuples the CHECK is generated from must agree. A
 # closed union on an output model is a latent 500 the moment the database holds

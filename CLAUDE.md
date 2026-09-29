@@ -190,6 +190,14 @@ api/                     FastAPI modular monolith
                          extension: a course publishes what it teaches, so an
                          interested learner cannot be scored, and a shared
                          abstraction would need the second scorer ADR-037 forbids.
+                         (Sprint 38, ADR-047) `"enrolled"` is a fourth status, provider-
+                         settable through the same `PATCH .../interests/{id}` route
+                         `"contacted"` already used -- self-reported, never platform-
+                         verified. Exists so ADR-025's "provider-reported enrolment
+                         conversion" metric has a surface at all; `scripts/
+                         report_conversion_metrics.py` (`make monetisation-metrics`)
+                         reads it and `analytics_events` for that metric and click-
+                         through, the two ADR-043 left thin.
     notifications/       The outbox (ADR-006): queued inside the request, sent by the
                          worker. The row names a recipient and never holds an
                          address -- that is resolved at send time.
@@ -608,12 +616,18 @@ split would have to turn into interfaces first; do not add to it casually.
 > considered as a temporary job assignment and should be treated like a job" — so BL-8.1/8.2 shipped
 > as ADR-046 instead: `gig` joins `EMPLOYMENT_TYPES`, `Application` gains `completed`/`no_show`, and
 > `application_reviews` gives a full two-sided rating, all with zero changes to `matching/`,
-> `scoring.py` or the golden set. **Sprint 38 is next**, per `docs/IISM-Product-Backlog.docx` §4's
-> near-term sequence: `BL-1.2`/`BL-1.3`, resuming the monetisation epic (the payment adapter port
-> from Sprint 34 plus a billing module for orders and entitlements) — or the owner may redirect. §11
-> also carries a standing assessment of the
-> three pillars the owner is building toward — jobs, sellable courses, gig work — and what each
-> actually needs.
+> `scoring.py` or the golden set. **Sprint 38 is done** — closing the structural half of ADR-025's
+> monetisation gate before touching `BL-1.3` (ADR-047): `course_interests` gained a provider-
+> reported `"enrolled"` status (migration 0038) and `scripts/report_conversion_metrics.py`
+> (`make monetisation-metrics`) makes click-through and enrolment conversion mechanically
+> answerable, alongside `make evaluate`'s existing precision@5. **This does not authorise `BL-1.3`**
+> — verified live, both metrics read real but small (`1/5` click-through, `3/15` enrolment
+> conversion) on this dev/demo database, and ADR-047 says plainly that closing the volume gap needs
+> real traffic or an explicit owner override. Asked which, the owner chose to **wait for real
+> traffic** (2026-09-29) — `BL-1.3` is a standing not-started, not an open question, until usage
+> moves the numbers or the owner says otherwise. §11 also carries a standing assessment of the three
+> pillars the owner is building toward — jobs, sellable courses, gig work — and what each actually
+> needs.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

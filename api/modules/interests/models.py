@@ -5,10 +5,15 @@ For twenty-three sprints it then offered the learner nothing to press, and told
 the provider nothing at all -- they published into silence. This is Sprint 21's
 application, for the course side.
 
-**Interest, not enrolment.** Whether somebody actually enrolled is a fact the
-provider owns, in their own system; a status this platform cannot verify would
-drift from reality the first week. What this product can know is that a learner
-said "I want this", and that is what the row records.
+**Interest, not enrolment -- with one exception, and it is the provider's to
+claim.** Whether somebody actually enrolled is a fact the provider owns, in
+their own system; the platform cannot independently verify it and does not try
+to. `"enrolled"` (Sprint 38, ADR-047) is a *provider-reported* status, the same
+unverified trust boundary `"contacted"` already carries -- not the platform
+learning the fact, only the provider stating it. It exists because ADR-025
+named "provider-reported enrolment conversion" as a metric that must be
+citable before any billing code is written, and until this sprint there was no
+surface for a provider to report it on at all.
 
 **Keyed on the profile, not the user** -- the same reason `applications/models.py`
 gives: erasure deletes the profile, so an account exercising its right to be
@@ -37,16 +42,18 @@ from api.core.database import Base, one_of
 from api.modules.marketplace import models as _marketplace  # noqa: F401
 
 # A closed set, like `APPLICATION_STATUSES`. `registered` and `withdrawn` are
-# the learner's; `contacted` is the provider's.
-INTEREST_STATUSES = ("registered", "withdrawn", "contacted")
+# the learner's; `contacted` and `enrolled` are the provider's.
+INTEREST_STATUSES = ("registered", "withdrawn", "contacted", "enrolled")
 
 # The statuses in which a provider may still see who this is. `withdrawn` is
 # deliberately absent: withdrawing takes the contact details back.
-LIVE_STATUSES = ("registered", "contacted")
+LIVE_STATUSES = ("registered", "contacted", "enrolled")
 
 # What a provider may set. Neither `registered` (the learner's opening move) nor
-# `withdrawn` (theirs to take back) is here.
-PROVIDER_STATUSES = ("contacted",)
+# `withdrawn` (theirs to take back) is here. No ordering is enforced between
+# `contacted` and `enrolled` -- a provider may report either at any time, the
+# same as `contacted` always could, because both are equally self-reported.
+PROVIDER_STATUSES = ("contacted", "enrolled")
 
 
 class CourseInterest(Base):

@@ -444,13 +444,13 @@ COURSE_INTERESTS: list[tuple[str, str, str]] = [
     # NSDC Healthcare Academy
     ("+919000000007", "infection-control-in-hospitals", "registered"),
     ("+919000000006", "ward-shift-management", "registered"),
-    ("+919000000009", "critical-care-support-skills", "contacted"),
+    ("+919000000009", "critical-care-support-skills", "enrolled"),
     ("+919000000010", "geriatric-home-care-advanced", "registered"),
     # SkillBridge Institute
     ("+919000000013", "phlebotomy-refresher", "registered"),
     ("+919000000012", "ecg-technician-advanced", "withdrawn"),
     ("+919000000015", "oxygen-and-airway-support", "registered"),
-    ("+919000000011", "sterile-processing-essentials", "contacted"),
+    ("+919000000011", "sterile-processing-essentials", "enrolled"),
     # Allied Health Skills Academy
     ("+919000000014", "laboratory-microscopy-basics", "registered"),
     ("+919000000017", "medical-records-and-data-entry", "registered"),

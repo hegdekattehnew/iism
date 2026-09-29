@@ -73,6 +73,10 @@ issue-api-key: ## Issue or revoke a partner's API key: make issue-api-key NAME=a
 evaluate: ## Score the matcher against the hand-labelled golden set
 	$(NO_TIMEOUT) $(PY) scripts/evaluate_matching.py
 
+.PHONY: monetisation-metrics
+monetisation-metrics: ## Report ADR-025's click-through and enrolment-conversion metrics (ADR-047)
+	$(NO_TIMEOUT) $(PY) scripts/report_conversion_metrics.py
+
 # ---------------------------------------------------------------- backup
 # Operator scripts share the app's database engine, which now carries a
 # statement timeout. The importer and the seed run legitimately long statements.

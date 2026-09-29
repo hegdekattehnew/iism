@@ -31,6 +31,9 @@
 > - **ADR-045** — superseded in part by ADR-046. §1–4 (the sibling module, the new tables, the
 >   second scorer) are withdrawn: the owner determined a gig is a temporary job assignment and
 >   should be treated as one. §5 (no payment/payout) is untouched and still holds.
+> - **ADR-025 / ADR-043** — extended by ADR-047. The structural half of the gate (no surface for a
+>   provider to report an enrolment) is closed; the volume half (real traffic) is not, and is not
+>   something a later ADR can close by writing more code.
 
 ## ADR-001: Overall Product Architecture
 
@@ -1994,3 +1997,88 @@ to make on this ADR's own reasoning alone
   about *why* a gig looked different was not wrong on its own terms — the owner's instruction
   changed the premise, not the analysis. A future story reconsidering this boundary should read
   both.
+
+---
+
+## ADR-047: Provider-Reported Enrolment Surface — Closing the Structural Half of ADR-025's Gate
+
+**Status:** Accepted (September 2026). Extends ADR-025 and ADR-043. Does **not** authorise `BL-1.3`
+(billing) on its own.
+
+**Context:** ADR-025 named three metrics that must be citable before any billing code is written:
+recommendation precision@5, candidate-to-course click-through, and provider-reported enrolment
+conversion. ADR-043 (Sprint 34) built the payment adapter port but explicitly declined to close
+that gate — precision@5 was citable, but click-through was "joinable, not populated" and enrolment
+conversion "has no surface at all." Asked how to proceed toward `BL-1.3`, the owner chose to close
+the gate first.
+
+Checked against the code before writing anything: `api/modules/interests/models.py` already
+separates the learner's moves (`registered`, `withdrawn`) from the provider's (`contacted`), with a
+generic `provider_service.set_status`/`set_status_and_reload` pair that accepts any value in
+`PROVIDER_STATUSES` through the existing `PATCH .../interests/{interest_id}` route with no route
+change. `course_recommended` and `course_opened` (Sprint 24/33) already carry `user_id` and
+`subject_id=course.id`, so click-through was already computable — nothing had ever queried it.
+
+**Decision:** Add `"enrolled"` to `CourseInterest`'s status set, provider-settable at the same
+unverified trust level `"contacted"` already carries. Add `scripts/report_conversion_metrics.py`
+(`make monetisation-metrics`) to compute click-through and enrolment conversion from columns that
+already exist — a sibling to `make evaluate`, which already answers precision@5 and touches no
+`analytics_events` row. No new table, no new module, no new route, no new permission.
+
+**Options considered:** 1. Full billing implementation now, treating ADR-043's port as sufficient license
+2. Continue deferring; build nothing further
+3. Close only the structural gap: a provider-reported enrolment surface plus the two missing reports
+4. Also fabricate synthetic analytics/interest data so the metrics read as strong on a cold demo database
+
+**Trade-offs:**
+
+- Option 1: ✅ Fastest path to `BL-1.3`
+❌ Ignores that ADR-043 explicitly declined to claim the gate was passed, and that nothing has
+changed about real traffic since then
+
+- Option 2: ✅ No engineering spent against an unvalidated model
+❌ Leaves `BL-1.3` blocked indefinitely with no path forward, the same cost ADR-043 already weighed
+against continued deferral
+
+- Option 3: ✅ Matches ADR-043's own named "Option 4," reusing `CourseInterest` rather than adding
+a table or module — the smallest change that makes the metric mechanically answerable
+✅ Every number the resulting script prints is real, including an honest zero
+❌ Does not, and cannot, make the *volume* underlying either metric large — that requires real
+usage, not code
+
+- Option 4: ✅ Would make both metrics look stronger immediately
+❌ Directly contradicts this project's own instrumentation philosophy (ADR-025 exists precisely so
+a revenue-shaped decision is not made on invented signal) and would misrepresent product traction to
+whichever future ADR cites the number
+
+**Final decision:** Option 3.
+
+**Consequences:**
+
+- `course_interests.status` gains `"enrolled"` (migration 0038); `INTEREST_STATUSES`,
+  `PROVIDER_STATUSES` and `LIVE_STATUSES` in `interests/models.py` all include it, and the module's
+  own docstring now distinguishes "provider-reported" from "platform-verified" explicitly, since the
+  original text ("interest, not enrolment... a status this platform cannot verify") was correct
+  about verification and would otherwise read as contradicted by this change.
+- **This closes the structural gap only.** Verified live against the running dev server: a real
+  seeded candidate's `/me/matches` call and a real `POST /me/events/course-opened` call produced a
+  genuine `1/5 (20.0%)` click-through reading, and a real provider `PATCH` produced a genuine
+  `3/15 (20.0%)` enrolment-conversion reading — both numbers are true and both are trivially small,
+  because this is a dev/demo database with a handful of seeded actors, not a production platform
+  with real candidates and providers using it. Nothing in this ADR changes that.
+- **`BL-1.3` is still not authorised.** Whether to proceed to billing now requires either real
+  traction numbers clearing a bar the owner sets, or the same kind of explicit override the owner
+  already gave once this session for Epic B8 over ADR-045 §1–4. This ADR takes no position on which;
+  it only makes the question answerable with a real number instead of "no surface exists."
+  ADR-025's instrumentation mandate is otherwise unchanged and still binds. **Answered, 2026-09-29:**
+  asked directly, the owner chose to wait for real traffic rather than override. `BL-1.3` is a
+  standing not-started as of this date, not an open question — re-raise it only once usage moves
+  either metric, or the owner redirects.
+- **The frontend does not gain a control for this either, and that is named rather than silently
+  shipped**, per this project's established precedent (see ADR-046's own frontend-gap consequence,
+  amended after Sprint 37 shipped a build break). `web/src/components/employer/ProviderInbox.tsx`
+  hardcodes `{ status: "contacted" }` as the only value its button ever sends; `tsc --noEmit` passes
+  clean against the widened union (confirmed, unlike Sprint 37's first pass), so nothing is broken —
+  but a provider using the web UI has no way to mark a learner enrolled today, only a direct API
+  call can. Building that button, and the two i18n labels it needs, is a small follow-up story, not
+  bundled here because it was not part of what ADR-025's gate required.

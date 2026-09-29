@@ -377,6 +377,28 @@ class TestWhatAProviderSees:
         assert response.json()["status"] == "contacted"
         assert response.json()["contact"] is not None
 
+    async def test_marking_enrolled_keeps_the_contact(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Sprint 38, ADR-047: provider-reported, unverified, same as `contacted`."""
+        learner = await _candidate(client)
+        await client.post(
+            "/me/course-interests", headers=learner, json={"course_slug": "open-phlebotomy"}
+        )
+        provider = await _owner_of(client, db, catalogue["provider"])
+        listed = (
+            await client.get("/org/learn-co/courses/open-phlebotomy/interests", headers=provider)
+        ).json()["items"][0]
+
+        response = await client.patch(
+            f"/org/learn-co/courses/open-phlebotomy/interests/{listed['interest_id']}",
+            headers=provider,
+            json={"status": "enrolled"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "enrolled"
+        assert response.json()["contact"] is not None
+
     async def test_a_withdrawn_interest_cannot_be_moved_along(
         self, catalogue: dict, client: AsyncClient, db: AsyncSession
     ) -> None:

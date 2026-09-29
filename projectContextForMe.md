@@ -4,12 +4,16 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-28 · **Sprints 1–37 built.** Sprint 35 gave three of four
+**Last updated:** 2026-09-29 · **Sprints 1–38 built.** Sprint 35 gave three of four
 `SKILL_SOURCES` a real writer outside the seed; Sprint 36 added semantic similarity (off by
 default) and the `SkillRelation` foundation; Sprint 37 built BL-7.3's tiered operator authority
 (ADR-044) and then Epic B8's gig work — reusing `Job`/`Application` rather than the sibling module
-ADR-045 had proposed, on the owner's own instruction (ADR-046). **Sprint 38 is next: resume
-monetisation, or owner redirect** (§11). Deployment is deferred by the owner, deliberately.
+ADR-045 had proposed, on the owner's own instruction (ADR-046). Sprint 38 closed the *structural*
+half of ADR-025's monetisation gate (ADR-047) — a provider-reported `"enrolled"` status and a
+report script — without authorising `BL-1.3`. Asked to override the remaining volume gap or wait,
+the owner chose to **wait for real traffic** — `BL-1.3` stays not started, and this is a decision,
+not an open question, until real usage or the owner says otherwise. Deployment is deferred by the
+owner, deliberately.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -26,10 +30,10 @@ has been wrong before, and §10 explains how.*
 | | |
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 37 — BL-7.3's tiered operator authority (ADR-044), then Epic B8's gig work, reusing `Job`/`Application` instead of a sibling module (ADR-046, superseding ADR-045 §1-4) |
-| **Next sprint** | 38 — resume monetisation (`BL-1.2`/`BL-1.3`, billing module) per the backlog's own sequence, or owner redirect |
-| **Tests** | 832 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
-| **Migrations** | head `0037`; 46 ADRs |
+| **Last sprint** | 38 — closed ADR-025's structural gate (provider-reported `"enrolled"`, `make monetisation-metrics`) without authorising `BL-1.3` (ADR-047) |
+| **Next sprint** | 39 — owner chose to wait for real traffic rather than override; `BL-1.3` stays not started until then, or the owner redirects |
+| **Tests** | 835 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
+| **Migrations** | head `0038`; 47 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -1482,6 +1486,61 @@ three files.
   `completed`, `no_show` and both review directions are reachable by API only. That is a real
   follow-up story (a gig-specific inbox action plus a rating form), not a label.
 
+### Sprint 38 — closing ADR-025's structural gate, not its volume gate (done 2026-09-29)
+
+Per the backlog's own sequence, next was `BL-1.2`/`BL-1.3`. Checked against the code rather than
+the backlog document: `BL-1.2` (the payment adapter port) was already done in Sprint 34 — the
+document's `[NEXT]` tag was simply stale. `BL-1.3` (the billing module) genuinely is not built, and
+is not a free pick: ADR-025 requires a successor ADR citing three metrics before any billing code is
+written, and ADR-043 (Sprint 34) explicitly declined to claim that gate was passed — precision@5
+was citable, click-through was "joinable, not populated," and enrolment conversion "has no surface
+at all." Asked how to proceed, the owner chose: close the gate first, then build `BL-1.3` — ADR-043's
+own named "Option 4."
+
+- **`course_interests` gained a fourth status, `"enrolled"`, rather than a new table or module**
+  (migration 0038, ADR-047). It slots in beside `"contacted"` in `PROVIDER_STATUSES` at the same
+  unverified, self-reported trust level, reusing the existing `PATCH .../interests/{id}` route with
+  **zero route or handler changes** — the whole surface a provider needed already existed, it just
+  had nowhere to report an enrolment. `LIVE_STATUSES` gained it too, so an enrolled learner's contact
+  stays visible rather than disappearing the way a withdrawal's does.
+- **`scripts/report_conversion_metrics.py` (`make monetisation-metrics`)** is the sibling `make
+  evaluate` never had: click-through from `course_recommended`/`course_opened` pairs already
+  carrying `user_id` and `subject_id` since Sprint 24/33 (nobody had ever queried it), and enrolment
+  conversion from `course_interests.status`. Both filtered to `subject_type="course"` explicitly —
+  the same pre-migration-0025 trap `matching/service.py`'s own docstring already names.
+- **Verified live, not just in pytest — and the numbers are real but small, deliberately reported
+  as such.** Seeded a couple of `"enrolled"` rows into `scripts/seed_candidates.py`'s
+  `COURSE_INTERESTS`, then generated genuine traffic against the running dev server: signed in as
+  `+919000000002`, called `/me/matches/general-duty-assistant-chennai` (which recorded a real
+  `course_recommended` row) and `POST /me/events/course-opened` for the course it suggested —
+  `make monetisation-metrics` then printed a real `1/5 (20.0%)` click-through. Signed in as
+  `admin@nsdc-healthcare-academy.example` and `PATCH`ed a live interest to `"enrolled"` through the
+  actual API (200); the same call against a withdrawn interest still refused with 409, as before.
+  Enrolment conversion read `3/15 (20.0%)` afterward. **Neither number is fabricated, and neither is
+  strong** — this is a handful of seeded actors on a dev database, not real product usage, and the
+  report script says so in its own output rather than only in this file.
+- **`cd web && npx tsc --noEmit` was run this time, unlike Sprint 37's first pass**, and passed
+  clean against the widened `InterestStatus`/`ProviderStatus` unions. The frontend gap is real but
+  benign: `ProviderInbox.tsx` hardcodes `{ status: "contacted" }`, so a provider has no button to
+  mark somebody enrolled through the web UI today — named in ADR-047 as a small follow-up story,
+  not bundled here because it was never part of what the metric needed.
+- **This does not authorise `BL-1.3`.** ADR-047 is explicit that it closes the *structural* gap
+  only; the *volume* gap — real traffic — cannot be closed by writing more code, and the ADR takes
+  no position on whether the owner should override it (the same kind of call already made once this
+  session for Epic B8 over ADR-045) or wait for real usage. That decision is Sprint 39's, not this
+  one's.
+- Verified: `make check` (835 backend tests, 3 new), `ruff`/`mypy` clean, migration 0038 rehearsed
+  down-and-up with `alembic check` reporting zero drift (the two seeded `"enrolled"` rows correctly
+  fell back to `"contacted"` on downgrade, never to `"registered"`), `make evaluate` bit-identical
+  (34/7/16, untouched by this change), and `make gen-api`'s diff purely additive (confirmed by
+  reading the diff, not assumed).
+- **The owner's answer (2026-09-29): wait for real traffic, do not override.** Asked directly which
+  way to resolve the open question above, the instruction was "wait for real traffic before billing
+  code gets written." `BL-1.3` therefore stays not started — this is now a standing decision, not an
+  open question, until real usage moves either metric or the owner says otherwise. Do not treat a
+  future re-run of `make monetisation-metrics` showing a slightly larger denominator as license to
+  start `BL-1.3` without checking back — nothing in this decision named a threshold.
+
 ### Also outstanding, in rough order
 
 - ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
@@ -1503,14 +1562,18 @@ that sells courses, connects jobs, and carries gig work.*
 - **Selling courses — listed and demanded, never sold.** `Course.fee_inr` exists and renders, and
   **nothing downstream reads it as money**: `api/adapters/payments/` (Sprint 34, ADR-043) is a
   protocol and a console implementation with no caller, deliberately — no order, entitlement,
-  enrolment, refund, payout or invoice table in any of 31 migrations. **ADR-025 still forbids
-  writing billing code** until a successor ADR cites precision@5 on the golden set (34 pairs now,
-  up from 5), candidate-to-course click-through (only *joinable* since Sprint 24, with no volume
-  behind it) and provider-reported enrolment conversion (no surface at all). ADR-043 names the
-  first metric as citable and the other two as still thin — it does not claim the gate is passed,
-  only that a port may exist ahead of it. Note also that Sprint 24's "interest, not enrolment"
-  reasoning **inverts** the moment money moves through the platform: if we take the payment, we are
-  the system of record for the enrolment.
+  enrolment, refund, payout or invoice table in any of 38 migrations. **ADR-025 still forbids
+  writing billing code** until a successor ADR cites precision@5 on the golden set (34 pairs,
+  citable since Sprint 29), candidate-to-course click-through and provider-reported enrolment
+  conversion. Sprint 38 (ADR-047) closed the *structural* half of the remaining gap — `make
+  monetisation-metrics` now answers both, reading `analytics_events` and a new provider-reported
+  `"enrolled"` status on `CourseInterest` — but not the *volume* half: verified live, both metrics
+  read real but small on this dev/demo database (`1/5` click-through, `3/15` enrolment conversion),
+  because a handful of seeded actors generated them, not real product usage. **`BL-1.3` is still not
+  authorised** — ADR-047 says explicitly that closing the volume gap needs either real traffic or an
+  explicit owner override, and takes no position on which. Note also that Sprint 24's "interest, not
+  enrolment" reasoning **inverts** the moment money moves through the platform: if we take the
+  payment, we are the system of record for the enrolment.
 - **Gig work — built in Sprint 37 (ADR-046), reusing `Job`/`Application`.** The
   September 2026 assessment above (and ADR-045's original design) argued gig work needed its own
   module because it was a genuinely different market; the owner's direct instruction — "a gig work
@@ -1531,15 +1594,17 @@ expensive assets — 21,303 NSQF standards with role search, one pure determinis
 identity many roles, two working consent-and-revocation disclosure loops, geography to
 sub-district — are exactly what all three pillars need.
 
-Suggested order, re-revised 2026-09-28: the management-facing actor-breadth MVP (Sprint 33), the
+Suggested order, re-revised 2026-09-29: the management-facing actor-breadth MVP (Sprint 33), the
 monetisation ADR with a **payment adapter port only** (Sprint 34), Epic B3's verified evidence
-(Sprint 35), BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36), and BL-7.3 plus Epic B8's gig work
-(Sprint 37) are all behind us now — see each one's entry in §11. Per the backlog's own near-term
-sequence (`docs/IISM-Product-Backlog.docx` §4), next is Order 6: `BL-1.2`/`BL-1.3`, resuming the
-monetisation epic against the payment port already in place — a billing module for orders and
-entitlements, the real gateway implementation. Course checkout, résumé ingestion, the rest of
-Epic B6, and gig work's own frontend (§11's Sprint 37 entry names the gap) remain queued behind
-that.
+(Sprint 35), BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36), BL-7.3 plus Epic B8's gig work
+(Sprint 37), and closing ADR-025's structural gate (Sprint 38, ADR-047) are all behind us now —
+see each one's entry in §11. `BL-1.2` (the payment port) has in fact been done since Sprint 34; the
+backlog document's tag was simply stale and is corrected as of this sprint. **`BL-1.3` (the billing
+module itself) remains genuinely not started**, and is not a free next pick: it needs either real
+traction numbers or an explicit owner override of the volume gap ADR-047 names, the same kind of
+call already made once for Epic B8 over ADR-045. Course checkout, résumé ingestion, the rest of
+Epic B6, and gig work's own frontend controls (§11's Sprint 37 and 38 entries name both gaps)
+remain queued behind whichever the owner picks.
 
 ### Then, in rough order of value
 

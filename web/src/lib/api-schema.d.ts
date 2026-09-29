@@ -2838,7 +2838,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "registered" | "withdrawn" | "contacted";
+            status: "registered" | "withdrawn" | "contacted" | "enrolled";
             /** Message */
             message?: string | null;
             /**
@@ -2874,7 +2874,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "registered" | "withdrawn" | "contacted";
+            status: "registered" | "withdrawn" | "contacted" | "enrolled";
             /**
              * Registered At
              * Format: date-time
@@ -3940,9 +3940,9 @@ export interface components {
         ProviderStatusIn: {
             /**
              * Status
-             * @constant
+             * @enum {string}
              */
-            status: "contacted";
+            status: "contacted" | "enrolled";
         };
         /** QualificationRefOut */
         QualificationRefOut: {
