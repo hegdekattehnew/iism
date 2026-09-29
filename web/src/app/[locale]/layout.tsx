@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Inter, Noto_Sans_Devanagari } from "next/font/google";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -10,6 +11,39 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
+
+/**
+ * **Both faces are self-hosted.** `next/font/google` downloads them at build
+ * time and serves them from this origin -- no request reaches Google from a
+ * visitor's browser, which is why `font-src 'self' data:` in `next.config.ts`
+ * needs no change and the CSP never has to name a third party.
+ *
+ * Until Sprint 26 the stack was `system-ui, -apple-system, "Segoe UI", Roboto,
+ * "Noto Sans Devanagari"`, so the product had no typeface of its own: SF Pro
+ * on macOS, Segoe UI on Windows, Roboto on Android. **Hindi was worse.**
+ * Devanagari resolved to Noto Sans Devanagari on Android, Nirmala UI on
+ * Windows and Devanagari Sangam MN on macOS -- three faces with different
+ * metrics, on a product whose whole point is being bilingual.
+ *
+ * They are two families rather than one stack because the browser falls
+ * through per glyph: Latin takes Inter, Devanagari takes Noto, and **an
+ * English-only page never downloads the Devanagari file** even though both are
+ * declared. That is what makes this affordable on the low-end Android this
+ * product targets, and it is why only Inter is preloaded -- preloading both
+ * would fetch the Devanagari face on every English page.
+ */
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const devanagari = Noto_Sans_Devanagari({
+  subsets: ["devanagari"],
+  variable: "--font-devanagari",
+  display: "swap",
+  preload: false,
+});
 
 /** The address bar and the splash screen, matched to the manifest's colour.
  *  A mismatch here is what makes an installed app look like a web page. */
@@ -60,7 +94,7 @@ export default async function LocaleLayout({
   const tn = await getTranslations({ locale, namespace: "nav" });
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={`${inter.variable} ${devanagari.variable}`}>
       <body className="flex min-h-screen flex-col antialiased">
         {/* First focusable thing on every page: a keyboard or switch user
             otherwise tabs through the whole header on every navigation. */}

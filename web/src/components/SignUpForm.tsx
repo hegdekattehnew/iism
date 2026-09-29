@@ -9,6 +9,7 @@ import { WELCOME_BACK } from "@/components/ReturningNotice";
 import { Button, ButtonLink } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { statusOf } from "@/lib/http";
 import { setTokens, useIsSignedIn } from "@/lib/auth";
 import { PRIVACY_NOTICE_VERSION } from "@/lib/legal";
 import { SEEKER, landingFor, lastContext } from "@/lib/context";
@@ -69,10 +70,14 @@ function AlreadySignedIn({ type }: { type: SignUpType }) {
 
   const create = useMutation({
     mutationFn: async (tenant_type: "employer" | "course_provider") => {
-      const { data: tenant, error } = await api.POST("/me/organisations", {
+      const { data: tenant, error, response } = await api.POST("/me/organisations", {
         body: { organisation_name: organisation, tenant_type },
       });
-      if (error || !tenant) throw new Error("create failed");
+      // `new Error("create failed")` threw the status away, so this screen
+      // showed one generic line while `CreateOrgForm` -- the *other* caller of
+      // this same endpoint -- named a duplicate name and a hit rate cap. Two
+      // paths to one endpoint should not disagree about what it said.
+      if (error || !tenant) throw new Error(String(response.status));
       return tenant;
     },
     onSuccess: async (tenant) => {
@@ -128,8 +133,12 @@ function AlreadySignedIn({ type }: { type: SignUpType }) {
         {create.isPending ? tc("creating") : tc("create")}
       </Button>
       {create.isError && (
-        <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
-          {tc("createError")}
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
+          {statusOf(create.error) === 409
+            ? tc("createErrorDuplicate")
+            : statusOf(create.error) === 429
+              ? tc("createErrorCap")
+              : tc("createError")}
         </p>
       )}
     </form>
@@ -398,7 +407,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
       )}
 
       {error && (
-        <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
           {error}
         </p>
       )}

@@ -90,6 +90,42 @@ async def unpublish_job(
     return schemas.OrgJobOut.model_validate(job)
 
 
+@router.post("/{slug}/close", response_model=schemas.OrgJobOut)
+async def close_job(
+    slug: str,
+    payload: schemas.JobCloseIn | None = None,
+    context: TenantContext = CanPublish,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.OrgJobOut:
+    """Stop taking applications, and keep the page and the inbox.
+
+    Distinct from unpublish, which hides the vacancy entirely: people who
+    already applied still need to see what they applied to, and the employer
+    still has to work through them. Applicants still waiting are told.
+    """
+    job = await publishing.close_job(
+        db,
+        context.tenant.id,
+        slug,
+        actor_user_id=context.user.id,
+        # The default lives on the service, where the other two close reasons
+        # are: an employer who presses Close without saying why has filled it.
+        **({"reason": payload.reason} if payload else {}),
+    )
+    return schemas.OrgJobOut.model_validate(job)
+
+
+@router.post("/{slug}/reopen", response_model=schemas.OrgJobOut)
+async def reopen_job(
+    slug: str,
+    context: TenantContext = CanPublish,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.OrgJobOut:
+    """Take applications again. Clears a closing date already in the past."""
+    job = await publishing.reopen_job(db, context.tenant.id, slug, actor_user_id=context.user.id)
+    return schemas.OrgJobOut.model_validate(job)
+
+
 @router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(
     slug: str,

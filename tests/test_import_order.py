@@ -24,12 +24,16 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 ENTRY_POINTS = [
+    "api.modules.alerts",
     "api.modules.analytics",
     "api.modules.applications",
+    "api.modules.assessment",
     "api.modules.identity",
+    "api.modules.interests",
     "api.modules.marketplace",
     "api.modules.matching",
     "api.modules.notifications",
+    "api.modules.operations",
     "api.modules.privacy",
     "api.modules.skills",
     "api.core.authorization",

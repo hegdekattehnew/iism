@@ -46,14 +46,8 @@ async def update_profile(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
     fields = payload.model_dump(exclude_unset=True)
-
-    # full_name belongs to the identity module, not the profile.
-    if "full_name" in fields:
-        user.full_name = fields.pop("full_name")
-        await db.commit()
-
     profile = (
-        await profile_service.update_profile(db, user.id, **fields)
+        await profile_service.update_profile(db, user, **fields)
         if fields
         else await profile_service.get_or_create_profile(db, user.id)
     )
@@ -88,29 +82,11 @@ async def add_skills_bulk(
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.CandidateProfileFull:
-    # Here, not at the top: `analytics` loads its routes, which load
-    # `marketplace.models`, which runs this package's `__init__` -- and that
-    # imports this module. A module-level import is an ImportError at boot.
-    from api.modules.analytics import record
-
-    profile, added, updated = await profile_service.add_skills_bulk(
+    profile, _added, _updated = await profile_service.add_skills_bulk(
         db,
         user.id,
         [(item.skill_slug, item.proficiency) for item in payload.items],
         payload.preferred_role_title,
-    )
-    # Counts only -- which standards someone holds is a description of them.
-    # Recorded after the service's commit, so `record()` has nothing of the
-    # handler's left to commit alongside it.
-    await record(
-        db,
-        "skills_bulk_added",
-        user_id=user.id,
-        payload={
-            "added": added,
-            "updated": updated,
-            "from_role": bool(payload.preferred_role_title),
-        },
     )
     return await _view(db, user, profile)
 

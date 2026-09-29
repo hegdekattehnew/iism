@@ -57,9 +57,25 @@ seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempoten
 	$(NO_TIMEOUT) $(PY) scripts/seed_marketplace.py
 	$(NO_TIMEOUT) $(PY) scripts/seed_candidates.py
 
+.PHONY: grant-staff
+grant-staff: ## Grant operator authority: make grant-staff ADDRESS=ops@example.com TIER=support [APPLY=1] [REVOKE=1]
+	$(NO_TIMEOUT) $(PY) scripts/grant_staff.py $(ADDRESS) $(if $(TIER),--tier $(TIER),) $(if $(REVOKE),--revoke,) $(if $(APPLY),--apply,)
+
+.PHONY: enrol-programme
+enrol-programme: ## Bulk-enrol a government programme: make enrol-programme CSV=path.csv PROGRAMME="name" [APPLY=1]
+	$(NO_TIMEOUT) $(PY) scripts/bulk_enrol_candidates.py $(CSV) "$(PROGRAMME)" $(if $(APPLY),--apply,)
+
+.PHONY: issue-api-key
+issue-api-key: ## Issue or revoke a partner's API key: make issue-api-key NAME=acme-hr [APPLY=1] [REVOKE=1]
+	$(NO_TIMEOUT) $(PY) scripts/issue_api_key.py "$(NAME)" $(if $(REVOKE),--revoke,) $(if $(APPLY),--apply,)
+
 .PHONY: evaluate
 evaluate: ## Score the matcher against the hand-labelled golden set
 	$(NO_TIMEOUT) $(PY) scripts/evaluate_matching.py
+
+.PHONY: monetisation-metrics
+monetisation-metrics: ## Report ADR-025's click-through and enrolment-conversion metrics (ADR-047)
+	$(NO_TIMEOUT) $(PY) scripts/report_conversion_metrics.py
 
 # ---------------------------------------------------------------- backup
 # Operator scripts share the app's database engine, which now carries a

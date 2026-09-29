@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, useIsSignedIn } from "@/lib/auth";
@@ -36,9 +36,6 @@ export function AccountPanel() {
   );
 }
 
-const ALERT =
-  "mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 " +
-  "dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300";
 
 function SignedIn() {
   const t = useTranslations("account");
@@ -136,9 +133,9 @@ function SignedIn() {
           {download.isPending ? t("exporting") : t("exportButton")}
         </Button>
         {download.isError && (
-          <p role="alert" className={ALERT}>
+          <Alert className="mt-3">
             {t("exportError")}
-          </p>
+          </Alert>
         )}
       </section>
 
@@ -161,9 +158,9 @@ function SignedIn() {
             {preview.isPending ? (
               <p className="mt-2 text-sm text-muted">{t("loadingPreview")}</p>
             ) : preview.isError ? (
-              <p role="alert" className={ALERT}>
+              <Alert className="mt-3">
                 {t("deleteError")}
-              </p>
+              </Alert>
             ) : (
               <>
                 {blocked.length > 0 ? (
@@ -208,9 +205,9 @@ function SignedIn() {
                   </Button>
                 </div>
                 {remove.isError && (
-                  <p role="alert" className={ALERT}>
+                  <Alert className="mt-3">
                     {t("deleteError")}
-                  </p>
+                  </Alert>
                 )}
               </>
             )}

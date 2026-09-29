@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui";
 import { api, type ComponentHealth } from "@/lib/api";
+import { SKILL_COUNT } from "@/lib/counts";
 
 const POLL_MS = 5000;
 const SETTLED = ["complete", "not_found"];
@@ -14,11 +15,11 @@ function Dot({ up }: { up: boolean }) {
   return (
     <span className="relative flex h-2.5 w-2.5" aria-hidden>
       {up && (
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-solid opacity-60" />
       )}
       <span
         className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-          up ? "bg-emerald-500" : "bg-rose-500"
+          up ? "bg-success-solid" : "bg-danger-solid"
         }`}
       />
     </span>
@@ -37,7 +38,7 @@ function Card({ label, component }: { label: string; component: ComponentHealth 
       </div>
       <p
         className={`mt-2 text-lg font-semibold ${
-          up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+          up ? "text-success-text" : "text-danger-text"
         }`}
       >
         {up ? t("up") : t("down")}
@@ -76,7 +77,7 @@ export function SystemStatus() {
   });
 
   const skills = useQuery({
-    queryKey: ["skill-count"],
+    queryKey: SKILL_COUNT,
     queryFn: async () => (await api.GET("/skills/count")).data ?? null,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
@@ -126,8 +127,8 @@ export function SystemStatus() {
           <span
             className={`text-sm font-semibold ${
               allUp
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-rose-700 dark:text-rose-400"
+                ? "text-success-text"
+                : "text-danger-text"
             }`}
           >
             {health.isPending
@@ -182,6 +183,11 @@ export function SystemStatus() {
           >
             {busy ? tt("running") : tt("run")}
           </Button>
+          {enqueue.isError && (
+            <p className="mt-3 text-sm text-danger-text" role="alert">
+              {tt("enqueueFailed")}
+            </p>
+          )}
 
           {jobId && (
             <dl className="mt-4 space-y-1.5 rounded-lg bg-surface-muted p-3 text-xs">

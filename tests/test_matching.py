@@ -18,7 +18,14 @@ from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.geography.models import District, State
 from api.modules.identity.models import Tenant, User
-from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
+from api.modules.marketplace.models import (
+    CandidateProfile,
+    CandidateSkill,
+    Course,
+    CourseSkill,
+    Job,
+    JobSkill,
+)
 from api.modules.matching.scoring import (
     EXPERIENCE_WEIGHT,
     LEVEL_WEIGHT,
@@ -192,6 +199,238 @@ class TestScoring:
             "optional-high",
             "optional-low",
         ]
+
+
+class TestConfigurableWeights:
+    """BL-2.1: a re-tune is a settings change, not a deployment. The default
+    is proved bit-identical to the pre-Sprint-33 scorer by `make evaluate`
+    (all 34 golden pairs, 7 orderings, 16 course expectations); these prove
+    the other half -- that a *different* weights value actually changes the
+    number, and that configuration actually reaches the scorer."""
+
+    def test_a_different_weights_value_changes_the_score(self) -> None:
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS, ScoreWeights
+
+        reqs = [_req("a", importance=5, mandatory=True)]
+        held = [
+            HeldSkill(
+                skill_id=reqs[0].skill_id,
+                concept_id=None,
+                name="a",
+                proficiency=3,
+                source="self_declared",
+            )
+        ]
+
+        default = score_match(reqs, held, weights=DEFAULT_WEIGHTS)
+        zero_coverage = score_match(reqs, held, weights=ScoreWeights(coverage=0.0))
+        assert zero_coverage.score != default.score
+
+        # All four terms zeroed leaves nothing for `raw` to be built from.
+        all_zero = score_match(
+            reqs,
+            held,
+            weights=ScoreWeights(coverage=0.0, level=0.0, experience=0.0, evidence_share=0.0),
+        )
+        assert all_zero.score == 0
+
+    def test_weights_from_settings_reaches_the_scorer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from api.core.config import get_settings
+        from api.modules.matching.service import weights_from_settings
+
+        monkeypatch.setenv("MATCH_WEIGHT_COVERAGE", "0")
+        get_settings.cache_clear()
+        try:
+            weights = weights_from_settings()
+            assert weights.coverage == 0.0
+            # The other five defaults are undisturbed by overriding one.
+            assert weights.level == 0.08
+            assert weights.experience == 0.07
+            assert weights.evidence_share == 0.10
+            assert weights.mandatory_gap_cap == 0.45
+            assert weights.experience_taper_years == 3.0
+        finally:
+            monkeypatch.delenv("MATCH_WEIGHT_COVERAGE")
+            get_settings.cache_clear()
+
+    def test_scoring_module_still_never_reads_settings(self) -> None:
+        """The acceptance criterion, checked rather than trusted: scoring.py
+        must import no configuration, or a re-tune would be reachable from
+        inside the function the golden set depends on being pure. Checked via
+        the parsed import statements, not a string search -- the module's own
+        docstrings talk about `get_settings()` to explain why it is *not*
+        called here, which a naive substring check cannot tell apart."""
+        import ast
+        import inspect
+
+        from api.modules.matching import scoring
+
+        tree = ast.parse(inspect.getsource(scoring))
+        imported_modules = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        } | {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        assert not any("config" in m for m in imported_modules), imported_modules
+
+
+class TestSemanticSimilarity:
+    """BL-5.2: additive, bounded, and off by default. `make evaluate` proves
+    the default is bit-identical to before this weight existed; these prove
+    the mechanism does what the acceptance criteria require when it is
+    deliberately turned on."""
+
+    def _pair(self, *, mandatory_missing: bool = False):
+        matched_req = _req("held-standard", importance=5)
+        reqs = [matched_req]
+        if mandatory_missing:
+            reqs.append(_req("missing-mandatory", importance=5, mandatory=True))
+        held = [_held(matched_req)]
+        return reqs, held
+
+    def test_default_weight_is_zero_regardless_of_embeddings(self) -> None:
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS
+
+        reqs, held = self._pair()
+        without = score_match(reqs, held, weights=DEFAULT_WEIGHTS)
+        with_identical = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=DEFAULT_WEIGHTS,
+        )
+        assert with_identical.score == without.score
+        assert with_identical.semantic_similarity == 1.0
+
+    def test_a_nonzero_weight_adds_to_the_score_for_similar_embeddings(self) -> None:
+        from api.modules.matching.scoring import ScoreWeights
+
+        # Deliberately not a perfect match: a second, optional standard the
+        # candidate does not hold, so coverage is below 1.0 and there is
+        # room for the additive term to actually move the score. A perfect
+        # match is already at the raw ceiling `min(raw, 1.0)` enforces, and
+        # nothing additive could raise it further.
+        matched_req = _req("held-standard", importance=5)
+        unmatched_req = _req("unheld-optional", importance=5)
+        reqs = [matched_req, unmatched_req]
+        held = [_held(matched_req)]
+        weights = ScoreWeights(semantic=0.1)
+        without_embeddings = score_match(reqs, held, weights=weights)
+        with_embeddings = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert with_embeddings.score > without_embeddings.score
+
+    def test_a_missing_embedding_on_either_side_scores_zero_not_a_penalty(self) -> None:
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(semantic=0.2)
+        no_job_embedding = score_match(
+            reqs, held, job_embedding=None, candidate_embedding=[1.0, 0.0, 0.0], weights=weights
+        )
+        no_candidate_embedding = score_match(
+            reqs, held, job_embedding=[1.0, 0.0, 0.0], candidate_embedding=None, weights=weights
+        )
+        neither = score_match(reqs, held, weights=weights)
+        assert (
+            no_job_embedding.score
+            == no_candidate_embedding.score
+            == neither.score
+            == score_match(reqs, held, weights=ScoreWeights()).score
+        )
+
+    def test_dissimilar_embeddings_are_clamped_to_zero_not_negative(self) -> None:
+        """Opposite vectors have cosine -1. A penalty here would violate
+        "additive... never override a hard skill requirement" just as
+        surely as an uncapped bonus would -- it must floor at 0, same as no
+        signal at all, never go below."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(semantic=0.3)
+        opposite = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[-1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        no_signal = score_match(reqs, held, weights=weights)
+        assert opposite.score == no_signal.score
+        assert opposite.semantic_similarity == 0.0
+
+    def test_cannot_escape_the_mandatory_cap(self) -> None:
+        """ADR-036's own bound: "can refine a ranking but never override a
+        missing-mandatory-standard cap." Maximum possible similarity, a large
+        weight, and the cap must still hold."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs, held = self._pair(mandatory_missing=True)
+        weights = ScoreWeights(semantic=0.9)
+        result = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert result.capped_by_mandatory is True
+        assert result.score == round(weights.mandatory_gap_cap * 100)
+
+    def test_score_never_exceeds_100_even_with_an_untuned_weight(self) -> None:
+        """The four original components already sum to 1.0 at their own
+        defaults; a `semantic` weight added on top without lowering another
+        is exactly the "deliberate, separately-measured re-tune" this story
+        defers, but a raw score past 1.0 must still not become a score past
+        100 in the meantime."""
+        from api.modules.matching.scoring import DEFAULT_WEIGHTS, ScoreWeights
+
+        reqs, held = self._pair()
+        weights = ScoreWeights(
+            coverage=DEFAULT_WEIGHTS.coverage,
+            level=DEFAULT_WEIGHTS.level,
+            experience=DEFAULT_WEIGHTS.experience,
+            evidence_share=DEFAULT_WEIGHTS.evidence_share,
+            semantic=0.5,
+        )
+        result = score_match(
+            reqs,
+            held,
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=weights,
+        )
+        assert result.score <= 100
+
+    def test_zero_matched_standards_still_scores_zero(self) -> None:
+        """Sprint 10's own rule, restated for this term: "Zero matched
+        standards scores zero, deliberately." A semantic term must not be
+        the thing that quietly reintroduces the noise that rule was written
+        to prevent."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs = [_req("wanted", importance=5)]
+        result = score_match(
+            reqs,
+            [],
+            job_embedding=[1.0, 0.0, 0.0],
+            candidate_embedding=[1.0, 0.0, 0.0],
+            weights=ScoreWeights(semantic=0.9),
+        )
+        assert result.score == 0
 
 
 async def _auth(client: AsyncClient) -> dict[str, str]:
@@ -652,3 +891,203 @@ class TestLocality:
             )
         ).json()["items"]
         assert [i["job"]["title"][0] for i in only] == ["A"]
+
+
+class TestCourseRecommendationsAreAttributable:
+    """Until Sprint 24 `course_recommended` recorded `subject_type="job"` and a
+    bare count, so which course was recommended could not be recovered -- while
+    `course_opened` had always written `{"from_job": slug}`. The join key
+    existed on one side only, and ADR-025's click-through was uncomputable."""
+
+    @pytest.fixture
+    async def gap(self, db: AsyncSession) -> dict:
+        standard = Skill(
+            slug=f"rec-std-{uuid.uuid4().hex[:6]}",
+            name="Infection control",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code=f"REC/{uuid.uuid4().hex[:6]}",
+            source="nsqf",
+        )
+        held = Skill(
+            slug=f"rec-held-{uuid.uuid4().hex[:6]}",
+            name="Bed making",
+            skill_type="technical",
+            nsqf_level=Decimal("3"),
+            nos_code=f"HLD/{uuid.uuid4().hex[:6]}",
+            source="nsqf",
+        )
+        employer = Tenant(
+            slug=f"rec-emp-{uuid.uuid4().hex[:6]}", name="Rec Co", tenant_type="employer"
+        )
+        provider = Tenant(
+            slug=f"rec-prov-{uuid.uuid4().hex[:6]}",
+            name="Rec Academy",
+            tenant_type="course_provider",
+        )
+        db.add_all([standard, held, employer, provider])
+        await db.flush()
+
+        job = Job(
+            slug=f"rec-job-{uuid.uuid4().hex[:6]}",
+            tenant_id=employer.id,
+            title="Ward Attendant",
+            employment_type="full_time",
+            status="published",
+        )
+        db.add(job)
+        await db.flush()
+        db.add_all(
+            [
+                JobSkill(job_id=job.id, skill_id=held.id, importance=3, is_mandatory=False),
+                JobSkill(job_id=job.id, skill_id=standard.id, importance=5, is_mandatory=False),
+            ]
+        )
+        # Two courses, each closing the one standard the candidate lacks.
+        courses = []
+        for i in range(2):
+            course = Course(
+                slug=f"rec-course-{i}-{uuid.uuid4().hex[:6]}",
+                tenant_id=provider.id,
+                title=f"Infection Control {i}",
+                mode="online",
+                status="published",
+            )
+            db.add(course)
+            await db.flush()
+            db.add(CourseSkill(course_id=course.id, skill_id=standard.id, level_taught=4))
+            courses.append(course)
+        await db.commit()
+        return {"job": job, "held": held, "courses": courses}
+
+    async def test_one_event_per_course_subjected_to_the_course(
+        self, gap: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _auth(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": gap["held"].slug, "proficiency": 4},
+        )
+        await client.get(f"/me/matches/{gap['job'].slug}", headers=headers)
+
+        rows = (
+            (
+                await db.execute(
+                    select(AnalyticsEvent).where(AnalyticsEvent.name == "course_recommended")
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        assert len(rows) == 2, "one row per recommended course, not one bare count"
+        assert {r.subject_type for r in rows} == {"course"}
+        assert {r.subject_id for r in rows} == {c.id for c in gap["courses"]}
+        # The key `course_opened` uses, spelled the same way on both sides.
+        assert {r.payload["from_job"] for r in rows} == {gap["job"].slug}
+
+
+class TestMarketDemand:
+    """BL-2.4: the same `scarce_skills` question, asked market-wide rather
+    than for one employer -- the signal `scope-reconciliation.md` #6 found a
+    course provider had no way to see."""
+
+    @pytest.fixture
+    async def two_employers(self, db: AsyncSession) -> dict:
+        """Two different employers both requiring the same standard, plus one
+        neither requires -- market-wide demand must sum across tenants, which
+        a single-employer fixture cannot prove."""
+        shared = Skill(
+            slug="market-demand-shared",
+            name="Widely wanted standard",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="MKT/N0001",
+            source="nsqf",
+        )
+        lonely = Skill(
+            slug="market-demand-lonely",
+            name="Rarely wanted standard",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="MKT/N0002",
+            source="nsqf",
+        )
+        db.add_all([shared, lonely])
+        await db.flush()
+
+        first = Tenant(slug="market-demand-employer-a", name="Employer A", tenant_type="employer")
+        second = Tenant(slug="market-demand-employer-b", name="Employer B", tenant_type="employer")
+        db.add_all([first, second])
+        await db.flush()
+
+        job_a = Job(
+            slug="market-demand-job-a", tenant_id=first.id, title="Role A", status="published"
+        )
+        job_b = Job(
+            slug="market-demand-job-b", tenant_id=second.id, title="Role B", status="published"
+        )
+        db.add_all([job_a, job_b])
+        await db.flush()
+        db.add_all(
+            [
+                JobSkill(job_id=job_a.id, skill_id=shared.id, importance=4, is_mandatory=True),
+                JobSkill(job_id=job_b.id, skill_id=shared.id, importance=4, is_mandatory=True),
+                JobSkill(job_id=job_a.id, skill_id=lonely.id, importance=2, is_mandatory=False),
+            ]
+        )
+        await db.commit()
+        return {"shared": shared, "lonely": lonely, "employer_a": first}
+
+    async def test_demand_sums_across_every_employer(
+        self, db: AsyncSession, two_employers: dict
+    ) -> None:
+        from api.modules.matching.employer import market_scarce_skills, scarce_skills
+
+        market = {s.nos_code: s for s in await market_scarce_skills(db)}
+        assert market["MKT/N0001"].required_by == 2
+        assert market["MKT/N0002"].required_by == 1
+
+        # The employer-scoped view must be untouched by the refactor: Employer
+        # A required both standards, Employer B required neither's own count.
+        one_employer = {
+            s.nos_code: s for s in await scarce_skills(db, two_employers["employer_a"].id)
+        }
+        assert one_employer["MKT/N0001"].required_by == 1
+        assert one_employer["MKT/N0002"].required_by == 1
+
+    async def test_the_route_is_reachable_by_a_course_provider(
+        self, client: AsyncClient, two_employers: dict
+    ) -> None:
+        """The point of BL-2.4: a provider, not only an employer, can ask."""
+        email = f"market-{uuid.uuid4().hex[:10]}@example.com"
+        code = (
+            await client.post(
+                "/auth/org/register",
+                json={
+                    "email": email,
+                    "organisation_name": "Market Demand Institute",
+                    "tenant_type": "course_provider",
+                    "consent_version": CONSENT,
+                },
+            )
+        ).json()["debug_code"]
+        tokens = (
+            await client.post("/auth/email/otp/verify", json={"email": email, "code": code})
+        ).json()
+        headers = {"authorization": f"Bearer {tokens['access_token']}"}
+        me = (await client.get("/auth/me", headers=headers)).json()
+        org_slug = next(
+            m["tenant"]["slug"]
+            for m in me["memberships"]
+            if m["tenant"]["tenant_type"] != "personal"
+        )
+
+        response = await client.get(f"/org/{org_slug}/market-demand", headers=headers)
+        assert response.status_code == 200, response.text
+        body = {row["nos_code"]: row for row in response.json()}
+        assert body["MKT/N0001"]["required_by"] == 2
+
+    async def test_it_requires_authentication(self, client: AsyncClient) -> None:
+        assert (await client.get("/org/anything/market-demand")).status_code == 401

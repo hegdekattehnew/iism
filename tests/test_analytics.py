@@ -142,3 +142,67 @@ class TestCourseOpened:
         assert event is not None
         assert event.subject_type == "course"
         assert set(event.payload or {}) <= {"from_job"}
+
+
+class TestCourseDismissed:
+    """The negative half of `TestCourseOpened` (Sprint 33, BL-2.2) -- precision
+    measurement's missing class. Same shape, same reasons, mirrored test by
+    test rather than parametrised, so a difference introduced later shows up
+    as a diff against this file, not as a shared helper quietly drifting."""
+
+    async def test_a_signed_in_candidate_can_report_a_dismissal(
+        self, db: AsyncSession, client: AsyncClient, course: Course
+    ) -> None:
+        headers = await _auth(client)
+        response = await client.post(
+            "/me/events/course-dismissed",
+            headers=headers,
+            json={"course_slug": course.slug, "from_job_slug": "some-vacancy"},
+        )
+        assert response.status_code == 204
+        assert await _count(db, "course_dismissed") == 1
+
+    async def test_it_requires_authentication(self, client: AsyncClient, course: Course) -> None:
+        assert (
+            await client.post("/me/events/course-dismissed", json={"course_slug": course.slug})
+        ).status_code == 401
+
+    async def test_an_unknown_course_is_a_404(self, client: AsyncClient) -> None:
+        headers = await _auth(client)
+        assert (
+            await client.post(
+                "/me/events/course-dismissed",
+                headers=headers,
+                json={"course_slug": "no-such-course"},
+            )
+        ).status_code == 404
+
+    async def test_the_payload_carries_slugs_and_nothing_a_person_typed(
+        self, db: AsyncSession, client: AsyncClient, course: Course
+    ) -> None:
+        headers = await _auth(client)
+        await client.post(
+            "/me/events/course-dismissed",
+            headers=headers,
+            json={"course_slug": course.slug, "from_job_slug": "some-vacancy"},
+        )
+        event = await db.scalar(
+            select(AnalyticsEvent).where(AnalyticsEvent.name == "course_dismissed")
+        )
+        assert event is not None
+        assert event.subject_type == "course"
+        assert set(event.payload or {}) <= {"from_job"}
+
+    async def test_opened_and_dismissed_are_counted_separately(
+        self, db: AsyncSession, client: AsyncClient, course: Course
+    ) -> None:
+        """The whole point: the two must never collapse into one signal."""
+        headers = await _auth(client)
+        await client.post(
+            "/me/events/course-opened", headers=headers, json={"course_slug": course.slug}
+        )
+        await client.post(
+            "/me/events/course-dismissed", headers=headers, json={"course_slug": course.slug}
+        )
+        assert await _count(db, "course_opened") == 1
+        assert await _count(db, "course_dismissed") == 1

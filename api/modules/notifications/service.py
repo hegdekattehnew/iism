@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider
 from api.core.config import get_settings
-from api.modules.identity.models import Membership, Tenant, User
+from api.modules.identity.models import Invitation, Membership, Tenant, User
 from api.modules.notifications.models import Notification
 from api.modules.notifications.templates import render
 
@@ -68,6 +68,15 @@ async def _address_for(db: AsyncSession, notification: Notification) -> str | No
     its members, and filling it in on somebody's behalf publishes a personal
     address they never offered.
     """
+    if notification.recipient_kind == "invitation":
+        # The one recipient that may not be a user yet. Resolving through the
+        # row rather than storing the address is what makes a **revoked**
+        # invitation stop sending: `skipped`, not `sent`, with nothing
+        # delivered to somebody whose offer was withdrawn before the drain ran.
+        invitation = await db.get(Invitation, notification.recipient_id)
+        if invitation is None:
+            return None
+        return invitation.email if invitation.is_open(datetime.now(UTC)) else None
     if notification.recipient_kind == "tenant":
         tenant = await db.get(Tenant, notification.recipient_id)
         if tenant is None:

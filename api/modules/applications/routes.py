@@ -5,11 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
 from api.core.localisation import overrides_for, request_locale
-from api.modules.applications import service
+from api.modules.applications import review_service, service
 from api.modules.applications.schemas import (
     ApplicationIn,
     ApplicationOut,
     JobRef,
+    ReviewIn,
+    ReviewOut,
     SavedJobOut,
 )
 from api.modules.identity import User, get_current_candidate
@@ -75,6 +77,24 @@ async def withdraw_application(
     application = await service.withdraw(db, user, application_id)
     overrides = await overrides_for(db, "job", [application.job], ("title",), locale)
     return _out(application, overrides.get(application.job_id))
+
+
+@router.post(
+    "/applications/{application_id}/review",
+    response_model=ReviewOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def review_poster(
+    application_id: uuid.UUID,
+    payload: ReviewIn,
+    user: User = Depends(get_current_candidate),
+    db: AsyncSession = Depends(get_db_session),
+) -> ReviewOut:
+    """Rate the poster of a completed gig engagement (Sprint 37, Epic B8)."""
+    review = await review_service.submit_poster_review(
+        db, user, application_id, rating=payload.rating, comment=payload.comment
+    )
+    return ReviewOut.model_validate(review)
 
 
 @router.post("/saved-jobs", response_model=SavedJobOut, status_code=status.HTTP_201_CREATED)

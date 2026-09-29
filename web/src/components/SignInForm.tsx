@@ -191,7 +191,7 @@ export function SignInForm() {
           {/* Development only: the API returns the code when no SMS provider is
               configured, so the flow is exercisable without one. */}
           {devCode && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+            <p className="rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
               {t("devCodeNotice", { code: devCode })}
             </p>
           )}
@@ -234,7 +234,7 @@ export function SignInForm() {
       {error && (
         <p
           role="alert"
-          className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
+          className="mt-4 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text"
         >
           {error}
         </p>
@@ -243,7 +243,7 @@ export function SignInForm() {
       {unregistered && (
         <div
           role="alert"
-          className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+          className="mt-4 rounded-lg border border-warning-border bg-warning-surface px-3 py-3 text-sm text-warning-text"
         >
           <p>{t("unregistered")}</p>
           <Link

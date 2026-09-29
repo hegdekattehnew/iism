@@ -131,6 +131,53 @@ async def get_skill_by_slug(db: AsyncSession, slug: str) -> Skill | None:
     return await db.scalar(select(Skill).where(Skill.slug == slug))
 
 
+async def get_skill_by_nos_code(db: AsyncSession, nos_code: str) -> Skill | None:
+    """`nos_code` is unique in the corpus (unlike names or sector-local ids,
+    see CLAUDE.md), which is what makes it the right key for an external
+    system to cite a standard by (Sprint 35, BL-3.1) -- a slug is this
+    platform's own identifier and no assessment provider will have one."""
+    return await db.scalar(select(Skill).where(Skill.nos_code == nos_code))
+
+
+async def embedding_text_for_skills(db: AsyncSession, skill_ids: list[uuid.UUID]) -> str:
+    """The text a semantic-similarity embedding is computed from (Sprint 36,
+    BL-5.1): performance criteria, never a skill's own title. "OJT" and
+    "Project" are real unit titles in this corpus and embed to noise on their
+    own -- the assessable content underneath a title is what actually
+    describes the standard. Falls back to a skill's own `description`, then
+    its `name`, only for the ~35% of standards with no recorded performance
+    criteria at all.
+    """
+    if not skill_ids:
+        return ""
+    criteria_rows = (
+        await db.execute(
+            select(PerformanceElement.skill_id, PerformanceCriterion.description)
+            .join(PerformanceCriterion, PerformanceCriterion.element_id == PerformanceElement.id)
+            .where(PerformanceElement.skill_id.in_(skill_ids))
+        )
+    ).all()
+    by_skill: dict[uuid.UUID, list[str]] = {}
+    for skill_id, description in criteria_rows:
+        by_skill.setdefault(skill_id, []).append(description)
+
+    missing = [sid for sid in skill_ids if sid not in by_skill]
+    fallback_rows = (
+        (
+            await db.execute(
+                select(Skill.id, Skill.name, Skill.description).where(Skill.id.in_(missing))
+            )
+        ).all()
+        if missing
+        else []
+    )
+    fallback_text = {row.id: row.description or row.name for row in fallback_rows}
+
+    parts = [text for sid in skill_ids for text in by_skill.get(sid, [])]
+    parts.extend(fallback_text.get(sid, "") for sid in missing)
+    return " ".join(p for p in parts if p)
+
+
 async def list_skills(
     db: AsyncSession,
     *,
@@ -526,6 +573,45 @@ class RoleStandards:
 # groups -- flattening them would turn "choose one of these" into "all of these
 # are required", which is not what the standard says.
 _REQUIREMENT_ORDER = {"compulsory": 0, "elective": 1, "optional": 2}
+
+
+async def standards_for_role_viewed(
+    db: AsyncSession, slug: str, user_id: uuid.UUID | None
+) -> RoleStandards | None:
+    """`standards_for_role`, measured.
+
+    Separate from the plain lookup because `standards_for_role` is also the way
+    the role picker's own tests and any later caller read a qualification, and
+    recording `role_suggested` inside it would count those as somebody being
+    suggested a role. The event belongs to the act of looking, so it lives in
+    the function that is only ever that act.
+
+    Counts only: which role somebody looked at is a fact about the role. The row
+    carries `user_id` and nothing else that identifies them, and it is nullable
+    -- this surface is deliberately open to a signed-out visitor, because a
+    sign-up wizard cannot demand an account before it can help.
+
+    `record()` commits and there is nothing uncommitted here: this is a read.
+
+    Imported inside the function -- `analytics` loads its routes, which load
+    `marketplace.models`, which load `skills`, so a module-level import would
+    make the two wait on each other at boot.
+    """
+    found = await standards_for_role(db, slug)
+    if found is None:
+        return None
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "role_suggested",
+        user_id=user_id,
+        subject_type="qualification",
+        subject_id=found.qp.id,
+        payload={"standards": len(found.standards), "variants": found.variants},
+    )
+    return found
 
 
 async def standards_for_role(db: AsyncSession, slug: str) -> RoleStandards | None:

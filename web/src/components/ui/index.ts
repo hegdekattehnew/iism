@@ -16,12 +16,17 @@
  * rather than shipped unused. Adding one back is a single install.
  */
 
+export { Alert } from "@/components/ui/alert";
 export { Badge } from "@/components/ui/badge";
 export { Button } from "@/components/ui/button";
 // From the non-client module, so server components can style a button too.
 export { buttonVariants } from "@/components/ui/button-variants";
 export { ButtonLink } from "@/components/ui/button-link";
 export { Card, CardBody, CardTitle } from "@/components/ui/card";
+// `Dialog` is deliberately NOT re-exported here. Almost every component
+// imports this barrel for a Button, and Radix's dialog is ~33KB of the
+// first-load budget; re-exporting it put a modal on the first load of every
+// route. Import it from `@/components/ui/dialog` where one is actually shown.
 export { Section, SectionHeading, Logo } from "@/components/ui/layout";
 export { Progress } from "@/components/ui/progress";
 export { Skeleton } from "@/components/ui/skeleton";

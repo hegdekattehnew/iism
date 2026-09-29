@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 
 import { Check, Field, Select, Text } from "@/components/profile/fields";
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
+import { detailOf } from "@/lib/http";
 import {
   EDUCATION_LEVELS,
   EMPLOYMENT_TYPES,
@@ -35,6 +36,10 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
       date_of_birth: s("date_of_birth"),
       gender: s("gender"),
       willing_to_relocate: form.get("willing_to_relocate") === "on",
+      // An unchecked box sends nothing, so `=== "on"` is the whole read. The
+      // preference is here rather than in an account screen because it is
+      // about the profile: the alerts use the standards on it.
+      job_alerts_enabled: form.get("job_alerts_enabled") === "on",
       preferred_employment_type: s("preferred_employment_type"),
       expected_salary_min_inr: n("expected_salary_min_inr"),
       expected_salary_max_inr: n("expected_salary_max_inr"),
@@ -61,10 +66,10 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
             <Text name="headline" defaultValue={profile?.headline ?? ""} placeholder={t("headlinePlaceholder")} maxLength={160} />
           </Field>
           <Field label={t("state")}>
-            <Text name="location_state" defaultValue={profile?.location_state ?? ""} />
+            <Text name="location_state" maxLength={80} defaultValue={profile?.location_state ?? ""} />
           </Field>
           <Field label={t("district")}>
-            <Text name="location_district" defaultValue={profile?.location_district ?? ""} />
+            <Text name="location_district" maxLength={80} defaultValue={profile?.location_district ?? ""} />
           </Field>
           <Field label={t("experience")}>
             <Text type="number" name="years_experience" min={0} max={60} defaultValue={profile?.years_experience ?? 0} />
@@ -118,16 +123,30 @@ export function AboutSection({ profile }: { profile: Profile | null }) {
           </Field>
           <div className="sm:col-span-2">
             <Check name="willing_to_relocate" label={f("relocate")} defaultChecked={profile?.willing_to_relocate ?? false} />
+            <Check
+              name="job_alerts_enabled"
+              label={f("alertsOn")}
+              defaultChecked={profile?.job_alerts_enabled ?? true}
+            />
           </div>
         </div>
       </section>
+
+      {saveDetails.isError && (
+        <Alert role="alert">
+          {/* The server names the field and the rule -- "Minimum salary:
+              Input should be greater than 0". Saving used to fail in total
+              silence: there was a success indicator and no failure one. */}
+          {detailOf(saveDetails.error) ?? t("errors.generic")}
+        </Alert>
+      )}
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={saveDetails.isPending}>
           {saveDetails.isPending ? t("saving") : t("save")}
         </Button>
         {saveDetails.isSuccess && (
-          <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("saved")}</span>
+          <span className="text-sm text-success-text">{t("saved")}</span>
         )}
       </div>
     </form>

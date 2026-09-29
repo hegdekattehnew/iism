@@ -19,6 +19,44 @@ export const api = createClient<paths>({ baseUrl });
  */
 let refreshing: Promise<boolean> | null = null;
 
+/**
+ * Auth endpoints where a 401 is the final answer, not a stale token.
+ *
+ * **`/auth/me` is deliberately absent, and its absence is the point.** The
+ * guard here used to be `request.url.includes("/auth/")`, written to stop a
+ * refresh loop on `/auth/refresh` -- and `/auth/me` matches that substring
+ * too. So the one call every signed-in screen depends on could never trigger
+ * a refresh: fifteen minutes after signing in, `useMemberships` got a 401, the
+ * middleware handed it straight back, and the whole app decided the person was
+ * signed out while a perfectly good thirty-day refresh token sat in
+ * localStorage unused. The API log for a whole day of use contained **zero**
+ * calls to `/auth/refresh`.
+ *
+ * Matched on the exact pathname rather than a substring, because that is the
+ * mistake this list exists to stop repeating.
+ */
+const TERMINAL_401 = [
+  // Refreshing in response to a failed refresh is the loop.
+  "/auth/refresh",
+  // A 401 here means "incorrect or expired code", which no token fixes.
+  "/auth/otp/verify",
+  "/auth/email/otp/verify",
+  // Nothing to retry: the session is being ended on purpose.
+  "/auth/logout",
+  "/auth/logout-all",
+];
+
+/** Whether a 401 from this URL is worth one refresh attempt. */
+export function shouldTryRefresh(url: string): boolean {
+  let pathname: string;
+  try {
+    pathname = new URL(url, baseUrl).pathname;
+  } catch {
+    return false;
+  }
+  return !TERMINAL_401.includes(pathname);
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refresh_token = getRefreshToken();
   if (!refresh_token) return false;
@@ -61,7 +99,7 @@ const authMiddleware: Middleware = {
   async onResponse({ request, response }) {
     if (typeof window === "undefined") return response;
     if (response.status !== 401) return response;
-    if (request.url.includes("/auth/")) return response;
+    if (!shouldTryRefresh(request.url)) return response;
 
     if (!(await tryRefresh())) return response;
 

@@ -16,8 +16,10 @@ account:
 
 import json
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +37,10 @@ from api.core.security import (
     store_otp,
 )
 from api.core.text import slugify
-from api.modules.identity.models import Membership, Tenant, User
+from api.modules.identity.invitations import PENDING_INVITE_KEY
+from api.modules.identity.models import Invitation, Membership, Tenant, User
+
+log = structlog.get_logger("iism.identity")
 
 _CODE_MESSAGE = "Your IISM verification code is {code}. It expires in 5 minutes."
 _CODE_SUBJECT = "Your IISM verification code"
@@ -201,27 +206,63 @@ async def verify_otp_and_sign_in(
 
 
 async def verify_email_and_sign_in(
-    db: AsyncSession, address: str, code: str
+    db: AsyncSession, address: str, code: str, consent_version: str | None = None
 ) -> tuple[User, TokenPair, bool, str | None]:
     """Sign in with an email code.
 
-    Unlike the phone path this does **not** create an account on first success.
-    A candidate signing in by phone is self-service by design; an organisation
-    account carries a tenant and a name, which has to be asked for. An unknown
-    address that somehow held a valid code gets 401, not a blank organisation.
+    **The 401 on an unknown address is load-bearing, and it stays.** This path
+    does not create an account merely because somebody held a valid code: a
+    candidate signing in by phone is self-service by design, but an
+    organisation account carries a tenant and a name that have to be asked for,
+    and a blank organisation minted from a code is worse than a refusal.
+
+    There are exactly **two** exceptions, and both are the same mechanism: a
+    key written into Redis by an earlier, authenticated-enough act, read here
+    with `getdel` so it is consumed once.
+
+    * `_PENDING_ORG_KEY` -- Sprint 18. They registered an organisation against
+      an address that already had an account; it is provisioned now that the
+      code proves the address is theirs, never at request time, which would let
+      anyone who knows an address attach an organisation to somebody else.
+    * `PENDING_INVITE_KEY` -- Sprint 25. Somebody with `MEMBER_INVITE` at a real
+      organisation offered this address membership. **That** is what makes
+      creating the account safe here: it was not the caller's idea, and the
+      invitation is a row this product can point at.
+
+    An address with neither key and no account still gets 401. That case is
+    tested first, because everything else in this function is written around
+    keeping it true.
     """
     if not await check_otp("email", address, code):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
 
     user = await db.scalar(select(User).where(func.lower(User.email) == address.lower()))
-    if user is None:
+    invitation_id = await get_redis().getdel(PENDING_INVITE_KEY.format(address=address.lower()))
+    if user is None and invitation_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
+    minted = False
+    if user is None:
+        # An invited stranger. The account is created here and nowhere else on
+        # this path, and consent is recorded on it -- forget that and every
+        # request the new account makes afterwards is a 428 (Sprint 20).
+        require_current_consent(consent_version, status_code=status.HTTP_428_PRECONDITION_REQUIRED)
+        assert consent_version is not None  # noqa: S101 - narrowed by the check above
+        user = User(email=address.lower(), email_verified_at=datetime.now(UTC))
+        record_consent(user, consent_version)
+        db.add(user)
+        await db.flush()
+        minted = True
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
 
-    # "Created" on this path means *first sign-in*: the account row is written
-    # at registration, but nobody has proved they hold the mailbox until now.
-    created = user.email_verified_at is None
+    # "Created" on this path means *first sign-in*, which for a registered
+    # organisation is not the same moment as the row being written: the account
+    # exists from registration, but nobody has proved they hold the mailbox
+    # until now. `minted` is tracked separately rather than folded into the
+    # check below, because the invited-stranger branch verifies the address in
+    # the same breath as creating the row -- so `email_verified_at is None`
+    # would read False and send a brand-new account past its own onboarding.
+    created = minted or user.email_verified_at is None
     if created:
         user.email_verified_at = datetime.now(UTC)
 
@@ -233,6 +274,14 @@ async def verify_email_and_sign_in(
         wanted = json.loads(pending)
         tenant = await provision_organisation(db, user, wanted["name"], wanted["tenant_type"])
         organisation_slug = tenant.slug
+
+    if invitation_id is not None:
+        accepted = await _accept_pending_invitation(db, user, uuid.UUID(invitation_id))
+        # An invitation that expired or was revoked between the mail and the
+        # code returns None: the account still exists and they are still signed
+        # in, because refusing the sign-in over a stale invitation would strand
+        # somebody who now has an account and no way into it.
+        organisation_slug = accepted or organisation_slug
 
     await db.commit()
     await db.refresh(user)
@@ -259,6 +308,26 @@ async def _only_organisation_slug(db: AsyncSession, user_id: uuid.UUID) -> str |
     return slugs[0] if len(slugs) == 1 else None
 
 
+async def _accept_pending_invitation(
+    db: AsyncSession, user: User, invitation_id: uuid.UUID
+) -> str | None:
+    """Turn the invitation this sign-in was for into a membership.
+
+    Re-checked here rather than trusted from Redis: the key says only which
+    invitation was offered, and between the mail arriving and the code coming
+    back it may have been revoked or run out. `invitations.accept` is the one
+    function that writes a `Membership` from an invitation, so this goes
+    through it rather than adding a second writer.
+    """
+    from api.modules.identity.invitations import accept  # local: see invitations.py
+
+    invitation = await db.get(Invitation, invitation_id)
+    if invitation is None or not invitation.is_open(datetime.now(UTC)):
+        return None
+    await accept(db, invitation=invitation, user=user)
+    return invitation.tenant.slug
+
+
 async def has_personal_membership(db: AsyncSession, user_id: uuid.UUID) -> bool:
     """Whether this person ever signed up to look for work.
 
@@ -275,6 +344,75 @@ async def has_personal_membership(db: AsyncSession, user_id: uuid.UUID) -> bool:
     return found is not None
 
 
+async def _refuse_duplicate_organisation(db: AsyncSession, user: User, name: str) -> None:
+    """Refuse a second organisation this person already has under that name.
+
+    **Not a cap on how many organisations one account may hold.** A staffing
+    agency, a hospital group with several registered entities and a training
+    partner running multiple centres all legitimately need more than one, and
+    the only way round a cap would be a second account -- the fork ADR-038
+    exists to prevent, and the thing Sprint 25 spent a sprint making
+    unnecessary.
+
+    What this refuses is the same organisation twice, which nothing stopped:
+    `_unique_tenant_slug` cheerfully produced `apollo-care-2` and the switcher
+    then offered two identical-looking rows. Compared on the **slug** rather
+    than the raw string, so "Apollo Care" and "apollo care." are one name.
+    """
+    wanted = slugify(name)[:60].strip("-")
+    if not wanted:
+        return  # A name that slugifies to nothing cannot collide meaningfully.
+    existing = await db.scalars(
+        select(Tenant)
+        .join(Membership, Membership.tenant_id == Tenant.id)
+        .where(Membership.user_id == user.id, Tenant.tenant_type != "personal")
+    )
+    for tenant in existing:
+        if slugify(tenant.name)[:60].strip("-") == wanted:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"You already have an organisation called {tenant.name}",
+                # The slug, so the client can offer to switch to it rather
+                # than leaving somebody to find it themselves.
+                headers={"x-existing-organisation": tenant.slug},
+            )
+
+
+async def _within_organisation_cap(db: AsyncSession, user: User) -> None:
+    """Refuse an account creating organisations in bulk.
+
+    Counted over a rolling 24 hours rather than a calendar day, so the limit
+    cannot be doubled by waiting for midnight -- the same shape as
+    `applications` and `interests`, which is the point: this was the only write
+    path in the product that could publish a public page with no limit at all.
+    """
+    limit = get_settings().max_organisations_per_day
+    # **Naive, deliberately.** `tenants.created_at` is a bare `TIMESTAMP`, not
+    # `timestamptz` -- unlike `course_interests.created_at`, which the sibling
+    # cap in `interests/service.py` compares against with an aware value. Pass
+    # an aware datetime here and asyncpg refuses the query outright
+    # ("can't subtract offset-naive and offset-aware datetimes"), which is how
+    # this was found. The column stores UTC; this is the same instant.
+    since = (datetime.now(UTC) - timedelta(days=1)).replace(tzinfo=None)
+    made = await db.scalar(
+        select(func.count())
+        .select_from(Tenant)
+        .join(Membership, Membership.tenant_id == Tenant.id)
+        .where(
+            Membership.user_id == user.id,
+            Tenant.tenant_type != "personal",
+            Tenant.created_at >= since,
+        )
+    )
+    if (made or 0) >= limit:
+        log.warning("organisation.daily_cap_reached", limit=limit)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "You have created a lot of organisations today. Try again tomorrow.",
+            headers={"retry-after": "3600"},
+        )
+
+
 async def provision_organisation(
     db: AsyncSession, user: User, name: str, tenant_type: str
 ) -> Tenant:
@@ -283,7 +421,15 @@ async def provision_organisation(
     Taking the user rather than creating one is what makes the multi-role case
     work: a candidate asked to start hiring gets a second membership, not a
     second account.
+
+    The two guards are here rather than in the route because **three call sites
+    reach this function** -- `POST /me/organisations`, the signed-in branch of
+    `/auth/org/register`, and the pending-organisation hand-off inside
+    `verify_email_and_sign_in`. A check in one handler is a check the other two
+    do not make (Sprint 15).
     """
+    await _refuse_duplicate_organisation(db, user, name)
+    await _within_organisation_cap(db, user)
     tenant = Tenant(
         slug=await _unique_tenant_slug(db, name),
         name=name.strip(),
@@ -295,6 +441,97 @@ async def provision_organisation(
     db.add(Membership(user_id=user.id, tenant_id=tenant.id, role="owner"))
     await db.flush()
     return tenant
+
+
+async def update_organisation(
+    db: AsyncSession, tenant: Tenant, fields: dict[str, object]
+) -> Tenant:
+    """Apply the fields an organisation's owner may change, and commit.
+
+    **`exclude_unset` is the caller's job and the partial-update rule is this
+    one's**: a body carrying only `name` must not blank the description, the
+    website, the logo and the contact address. That was latent for four sprints
+    only because `OrgSettings` happens to send all six every time.
+
+    This was the one write path in the product with **no service layer at all**
+    -- a `setattr` loop and a commit inside the handler. That is how
+    `contact_email` went eight sprints without the normalisation every other
+    address in `schemas.py` has: there was no function for the rule to live in.
+    A field needing resolution or normalisation now has somewhere to go.
+
+    What a member may **not** change is enforced by `OrganisationIn`, not here:
+    `slug` is a published URL, `tenant_type` would strand the listings already
+    published under it, and verification is ours to assert (ADR-042).
+    """
+    for field, value in fields.items():
+        setattr(tenant, field, value)
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+async def add_organisation(db: AsyncSession, user: User, name: str, tenant_type: str) -> Tenant:
+    """Provision an organisation for a signed-in caller, and commit it.
+
+    The thin wrapper `provision_organisation` deliberately is not.
+    `provision_organisation` only flushes, because its **third** caller is the
+    pending-organisation hand-off inside `verify_email_and_sign_in`, which is
+    part of a larger transaction that commits once at the end -- committing
+    there would split one sign-in into two. The two *request* paths that end
+    here do want a commit, and it used to sit in both handlers.
+    """
+    tenant = await provision_organisation(db, user, name, tenant_type)
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+@dataclass(frozen=True)
+class OrgRegistration:
+    """What cold registration did, for the one response that reports it.
+
+    A value object rather than a tuple: the signed-in and signed-out branches
+    return different halves of it, and a four-tuple at the call site would make
+    which-half-is-set a thing the reader has to reconstruct.
+    """
+
+    sent: bool
+    expires_in_seconds: int
+    debug_code: str | None = None
+    organisation_slug: str | None = None
+
+
+async def register_or_add_organisation(
+    db: AsyncSession,
+    user: User | None,
+    *,
+    email: str,
+    name: str,
+    tenant_type: str,
+    consent_version: str,
+) -> OrgRegistration:
+    """`POST /auth/org/register`, both cases, in the layer that owns the rule.
+
+    **Signed in: no new account, ever** -- the organisation becomes a second
+    membership on the identity already calling. That is ADR-038's whole point,
+    and it is a decision about identity rather than a shape of a response, so
+    it belongs here and not in a branch inside a handler. The route ignored who
+    was calling until Sprint 18, and a candidate who opened `/signup/employer`
+    forked into two `User` rows.
+
+    **Signed out:** ordinary cold registration, whose answer is deliberately
+    identical for a known and an unknown address (see `register_organisation`).
+
+    The typed address is never linked to a signed-in account here: linking a
+    credential needs its own verification, and doing it silently would be the
+    takeover-by-typo `confirm_link` exists to refuse.
+    """
+    if user is not None:
+        tenant = await add_organisation(db, user, name, tenant_type)
+        return OrgRegistration(sent=False, expires_in_seconds=0, organisation_slug=tenant.slug)
+
+    ttl, debug_code = await register_organisation(db, email, name, tenant_type, consent_version)
+    return OrgRegistration(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
 
 
 async def register_organisation(

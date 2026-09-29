@@ -14,9 +14,18 @@ after `dictConfig`. `WorkerSettings` below is otherwise `core.tasks`' own,
 re-exported unchanged -- the tasks stay where they are; only the entry point
 moves.
 
-`Makefile`'s `worker` target points here. Pointing it back at
-`api.core.tasks.WorkerSettings` silently restores the duplicate-line behaviour,
-which is why the settings class there is no longer the documented entrypoint.
+`Makefile`'s `worker` target points here, and **that is load-bearing for more
+than logging**. The feature crons are registered *below*, in this composition
+root, because `api/core/` must not import a feature module (ADR-014) -- so
+pointing the Makefile back at `api.core.tasks.WorkerSettings` gives a worker
+that starts cleanly, answers the health probe from the heartbeat, and silently
+runs **none** of `drain_notifications`, `send_job_alerts` or
+`close_expired_jobs`. No notification is ever sent, no candidate is alerted,
+and a closing date never closes anything. This docstring used to say only that
+the wrong entry point "restores the duplicate-line behaviour", which is true
+and a long way short.
+
+`tests/test_worker_schedule.py` is the guard, and it names what stops running.
 """
 
 from typing import Any
@@ -26,7 +35,9 @@ from arq import cron
 from api.core.logging import configure_logging, dict_config
 from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
+from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
+from api.modules.matching.tasks import refresh_embeddings
 from api.modules.notifications.tasks import drain_notifications
 
 # Named on the command line as `arq --custom-log-dict api.worker.LOG_CONFIG`.
@@ -74,6 +85,20 @@ class WorkerSettings:
         # announced at 09:59. Cheap when the queue is empty -- one indexed
         # query returning nothing.
         cron(drain_notifications, minute=set(range(60)), run_at_startup=False),
+        # Every five minutes. A vacancy published at 09:00 should reach the
+        # people it matches that morning, not the next day -- and the sweep is
+        # cheap when there is nothing new: one indexed query on `alerted_at`
+        # returning no rows.
+        cron(send_job_alerts, minute=set(range(0, 60, 5)), run_at_startup=False),
+        # Hourly, on the hour. A closing date is a date, so being up to an hour
+        # late costs nothing, and checking every minute would be a query per
+        # minute forever to catch something that happens rarely.
+        cron(close_expired_jobs, minute={0}, run_at_startup=False),
+        # Every two minutes (Sprint 36, BL-5.1): a published job or a saved
+        # skill set should have a semantic-similarity term within minutes,
+        # not by the next hourly sweep -- and it is cheap when nothing is
+        # NULL, one indexed-ish query per table returning no rows.
+        cron(refresh_embeddings, minute=set(range(0, 60, 2)), run_at_startup=False),
     ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings

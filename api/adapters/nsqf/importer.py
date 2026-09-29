@@ -26,6 +26,7 @@ from api.adapters.nsqf.normalise import (
     version_sort_key,
 )
 from api.adapters.nsqf.records import ImportProblem, McRecord, NosRecord, QpRecord
+from api.modules.geography import load_place_index
 from api.modules.geography.models import District, State, SubDistrict
 from api.modules.marketplace.models import (
     CandidatePreferredLocation,
@@ -74,6 +75,7 @@ class ImportReport:
     entry_routes: int = 0
     concepts: int = 0
     locations_resolved: int = 0
+    locations_updated: int = 0
     nco_unparsed: int = 0
     performance_elements: int = 0
     performance_criteria: int = 0
@@ -94,6 +96,7 @@ class ImportReport:
             f"nco={self.nco_codes} nco_unparsed={self.nco_unparsed} "
             f"entry_routes={self.entry_routes} concepts={self.concepts} "
             f"locations_resolved={self.locations_resolved} "
+            f"locations_updated={self.locations_updated} "
             f"elements={self.performance_elements} criteria={self.performance_criteria} "
             f"knowledge={self.knowledge_params} generic={self.generic_criteria} "
             f"mc_entries_without_code={self.mc_entries_without_code} "
@@ -277,15 +280,6 @@ async def _import_text_content(
     )
 
 
-# Free text as it was seeded against the master's own spelling. Only entries
-# that are genuinely the same place belong here -- this is a spelling bridge,
-# not a way to force a match.
-_DISTRICT_ALIASES = {
-    "bengaluru": "bengaluru urban",
-    "bangalore": "bengaluru urban",
-}
-
-
 def _normalise_concept_name(name: str) -> str:
     """Lower-cased and whitespace-collapsed. Nothing cleverer.
 
@@ -375,28 +369,36 @@ async def _build_concepts(db: AsyncSession) -> int:
     return len(concept_rows)
 
 
-async def _backfill_geography(db: AsyncSession) -> int:
+async def _backfill_geography(db: AsyncSession) -> tuple[int, int]:
     """Point existing free-text locations at the geography master.
 
     The text columns stay: not every value resolves, and a location we cannot
     resolve is still a location. This only fills the foreign key beside it.
-    """
-    states = {
-        name.strip().lower(): sid
-        for name, sid in (await db.execute(select(State.name, State.id))).all()
-    }
-    districts: dict[str, uuid.UUID] = {}
-    for name, did in (await db.execute(select(District.name, District.id))).all():
-        if name:
-            districts.setdefault(name.strip().lower(), did)
 
-    def resolve_district(value: str | None) -> uuid.UUID | None:
-        if not value:
-            return None
-        key = value.strip().lower()
-        return districts.get(key) or districts.get(_DISTRICT_ALIASES.get(key, ""))
+    **It resolves through `PlaceIndex`, not a rule of its own.** It used to keep
+    a private copy of the alias map and a private lookup that kept whichever
+    district an unordered SELECT returned first for a duplicated name -- so the
+    write path and this sweep could pick *different* districts for the same
+    text, and this one could overwrite a correct id with a wrong one.
+
+    **A row is written only when its ids change.** `updated_at` is an `onupdate`
+    column and this is a Core UPDATE, so rewriting identical ids still bumps it
+    -- every `make import-nsqf` made every job and every candidate profile look
+    freshly edited. (`candidate_preferred_locations` has no `updated_at`, so
+    only two of the three tables ever suffered it; the wasted writes were on
+    all three.) Because every writer derives the ids from the same text through
+    the same rule, a difference here is a correction, never somebody's edit
+    being overwritten.
+
+    Returns `(resolved, updated)`: how many rows have a location the master
+    recognises, and how many actually needed writing. They were one number
+    before and are deliberately two now -- the second is the only way to see
+    the churn fix holding.
+    """
+    index = await load_place_index(db)
 
     resolved = 0
+    updated = 0
     for model, state_col, district_col in (
         (Job, "location_state", "location_district"),
         (CandidateProfile, "location_state", "location_district"),
@@ -404,21 +406,28 @@ async def _backfill_geography(db: AsyncSession) -> int:
     ):
         rows = (
             await db.execute(
-                select(model.id, getattr(model, state_col), getattr(model, district_col))
+                select(
+                    model.id,
+                    getattr(model, state_col),
+                    getattr(model, district_col),
+                    model.state_id,
+                    model.district_id,
+                )
             )
         ).all()
-        for row_id, state_name, district_name in rows:
-            state_id = states.get((state_name or "").strip().lower())
-            district_id = resolve_district(district_name)
-            if state_id is None and district_id is None:
+        for row_id, state_name, district_name, held_state, held_district in rows:
+            location = index.resolve(state_name, district_name)
+            if location.state_id is not None or location.district_id is not None:
+                resolved += 1
+            if (location.state_id, location.district_id) == (held_state, held_district):
                 continue
             await db.execute(
                 update(model)
                 .where(model.id == row_id)
-                .values(state_id=state_id, district_id=district_id)
+                .values(state_id=location.state_id, district_id=location.district_id)
             )
-            resolved += 1
-    return resolved
+            updated += 1
+    return resolved, updated
 
 
 async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
@@ -864,7 +873,7 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
 
     report.concepts = await _build_concepts(db)
 
-    report.locations_resolved = await _backfill_geography(db)
+    report.locations_resolved, report.locations_updated = await _backfill_geography(db)
 
     await db.commit()
     return report

@@ -3,7 +3,9 @@
 import { useTranslations } from "next-intl";
 
 import { CoverageBar } from "@/components/CoverageBar";
+import { SessionExpired } from "@/components/SessionExpired";
 import { Badge, Card, CardBody, Skeleton } from "@/components/ui";
+import { isSignedOut } from "@/lib/http";
 import { Link } from "@/i18n/navigation";
 import { useOrgCandidates } from "@/lib/org";
 
@@ -37,6 +39,7 @@ export function CandidateShortlist({
       </ul>
     );
   }
+  if (isSignedOut(q.error)) return <SessionExpired />;
   if (q.isError) return <p className="text-sm text-muted">{t("noAccess")}</p>;
 
   const items = q.data?.items ?? [];
@@ -100,7 +103,7 @@ export function CandidateShortlist({
                   </div>
 
                   {mandatoryGaps.length > 0 && (
-                    <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="mt-2 text-xs text-warning-text">
                       {te("missingMandatory")}:{" "}
                       {mandatoryGaps.map((m) => m.name).join(" · ")}
                     </p>

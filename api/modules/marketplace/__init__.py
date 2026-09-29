@@ -4,6 +4,7 @@ Other modules import from `api.modules.marketplace` only — never from
 `.service` or `.models` directly (ADR-014).
 """
 
+from api.modules.marketplace.course_publishing import get_course as get_org_course
 from api.modules.marketplace.course_publishing_routes import (
     router as course_publishing_router,
 )
@@ -21,12 +22,14 @@ from api.modules.marketplace.models import (
     Job,
     JobSkill,
 )
+from api.modules.marketplace.partner_routes import router as partner_router
 from api.modules.marketplace.profile_routes import router as profile_router
 from api.modules.marketplace.profile_service import (
     add_skill,
     add_skills_bulk,
     ensure_profile,
     get_or_create_profile,
+    record_verified_skill,
     remove_skill,
     update_profile,
 )
@@ -38,7 +41,8 @@ from api.modules.marketplace.routes import (
 )
 from api.modules.marketplace.service import (
     count_courses,
-    count_jobs,
+    count_jobs_open,
+    count_jobs_posted,
     courses_teaching_skill,
     get_course_by_slug,
     get_job_by_slug,
@@ -61,10 +65,12 @@ __all__ = [
     "Job",
     "JobSkill",
     "count_courses",
-    "count_jobs",
+    "count_jobs_open",
+    "count_jobs_posted",
     "courses_router",
     "courses_teaching_skill",
     "get_course_by_slug",
+    "get_org_course",
     "get_job_by_slug",
     "jobs_requiring_skill",
     "jobs_router",
@@ -75,9 +81,11 @@ __all__ = [
     "list_courses",
     "list_jobs",
     "marketplace_router",
+    "partner_router",
     "profile_router",
     "course_publishing_router",
     "publishing_router",
+    "record_verified_skill",
     "remove_skill",
     "update_profile",
 ]

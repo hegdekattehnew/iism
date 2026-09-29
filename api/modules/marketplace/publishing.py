@@ -24,6 +24,7 @@ importer: **geography resolves on write.** `state_id` is what
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import cast
 
 import structlog
@@ -38,7 +39,12 @@ from api.modules.marketplace.listings import (
     resolve_standards,
     unique_slug,
 )
-from api.modules.marketplace.models import Job, JobSkill
+from api.modules.marketplace.models import (
+    CLOSE_REASONS,
+    CandidateProfile,
+    Job,
+    JobSkill,
+)
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
 
 log = structlog.get_logger("iism.marketplace")
@@ -46,6 +52,17 @@ log = structlog.get_logger("iism.marketplace")
 # Fields copied straight from the payload. Listed rather than `model_dump()`ed
 # wholesale so `search_vector` -- GENERATED ALWAYS, and rejected by Postgres on
 # any write -- can never reach an INSERT by way of a schema someone extended.
+#
+# `positions`/`closes_at` were missing here from Sprint 27 (when both columns
+# were added) until Sprint 37 -- `JobIn` accepted and validated both the whole
+# time, but neither `create_job` nor `update_job` ever copied them onto the
+# row, so an employer who filled in "3 positions, closes in 2 weeks" silently
+# got `positions=1, closes_at=NULL`. Harmless for a permanent vacancy (a wrong
+# default nobody who cared would notice); fatal for reusing `Job` as a gig
+# shift (Sprint 37, Epic B8), whose whole premise is that these two columns
+# carry real values. No test exercised either field through the HTTP API --
+# every prior test set them by direct ORM construction -- which is how this
+# went unnoticed for ten sprints.
 _PLAIN_FIELDS = (
     "title",
     "description",
@@ -57,6 +74,8 @@ _PLAIN_FIELDS = (
     "salary_min_inr",
     "salary_max_inr",
     "nsqf_level_min",
+    "positions",
+    "closes_at",
 )
 
 
@@ -96,6 +115,10 @@ async def _write_skills(db: AsyncSession, job: Job, rows: list[JobSkillIn]) -> N
                 is_mandatory=is_mandatory,
             )
         )
+    # What this vacancy requires just changed, so any embedding computed from
+    # the old set no longer describes it (Sprint 36, BL-5.1) -- see
+    # `marketplace.profile_service._write_skills`'s identical note.
+    job.embedding = None
     await db.flush()
 
 
@@ -128,8 +151,23 @@ async def get_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Job:
     return await _load(db, job.id)
 
 
+def _require_gig_has_a_place(payload: JobIn, district_id: uuid.UUID | None) -> None:
+    """The other half of `JobIn._a_gig_has_an_end`'s invariant (Sprint 37,
+    Epic B8): "somewhere in India" is not a postable gig. DB-dependent
+    (`resolve_location` is async and best-effort), so it lives here, after
+    resolution runs, rather than in the schema -- the same reason `set_published`
+    checks for a required standard here rather than in `JobIn` itself.
+    """
+    if payload.employment_type == "gig" and district_id is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "A gig posting needs a resolvable district -- check location_state/location_district",
+        )
+
+
 async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
     location = await resolve_location(db, payload.location_state, payload.location_district)
+    _require_gig_has_a_place(payload, location.district_id)
     job = Job(
         slug=await unique_slug(db, Job.slug, payload.title, payload.location_district),
         tenant_id=tenant_id,
@@ -156,6 +194,7 @@ async def update_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str, payload:
     for field in _PLAIN_FIELDS:
         setattr(job, field, getattr(payload, field))
     location = await resolve_location(db, payload.location_state, payload.location_district)
+    _require_gig_has_a_place(payload, location.district_id)
     job.state_id, job.district_id = location.state_id, location.district_id
     # The slug is not regenerated. It is a published URL as soon as the job goes
     # live, and rewriting it on a title tweak breaks every link to it.
@@ -188,6 +227,144 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
         slug=slug,
     )
     return await _load(db, job.id)
+
+
+async def _record_for_job(
+    db: AsyncSession,
+    name: str,
+    *,
+    job_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    payload: dict[str, object] | None = None,
+) -> None:
+    """Measure a lifecycle event, subjected to the vacancy and never to a person.
+
+    **After the business commit, never before.** `record()` commits, so calling
+    it while the close was still uncommitted would commit it as a side effect,
+    and a failure inside `record()` would roll it back and return silently.
+
+    Imported inside the function: `analytics` loads routes that load
+    `marketplace.models`, so a module-level import is an ImportError at boot --
+    the cycle `tests/test_import_order.py` exists to catch.
+    """
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        name,
+        user_id=actor_user_id,
+        subject_type="job",
+        subject_id=job_id,
+        payload=payload,
+    )
+
+
+async def close_job(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    slug: str,
+    *,
+    actor_user_id: uuid.UUID,
+    reason: str = "filled",
+) -> Job:
+    """Stop taking applications, without taking the vacancy down.
+
+    **Closing is not unpublishing.** An unpublished job was never visible; a
+    closed one was, people applied to it, and those applications still have to
+    be worked through. So a closed vacancy keeps its page, keeps its inbox, and
+    simply stops appearing in browse and in anybody's matches.
+
+    Closing an already-closed vacancy is a no-op rather than a 409: the
+    employer's intent is already satisfied, and a double-click on "close" is
+    not an error worth a red box.
+    """
+    job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    if reason not in CLOSE_REASONS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown reason")
+    if job.closed_at is not None:
+        return await _load(db, job.id)
+
+    job.closed_at = datetime.now(UTC)
+    job.close_reason = reason
+    await _tell_live_applicants(db, job)
+    await db.commit()
+    log.info("marketplace.job_closed", slug=slug, reason=reason)
+    # `automatic` is always False on this path and that is not a guess: the two
+    # closures nobody asks for go elsewhere -- `_close_if_filled` in
+    # `applications/employer_service.py` sets the columns itself and records its
+    # own event, and the hourly expiry sweep never reaches this function.
+    await _record_for_job(
+        db,
+        "job_closed",
+        job_id=job.id,
+        actor_user_id=actor_user_id,
+        payload={"reason": reason, "automatic": False},
+    )
+    return await _load(db, job.id)
+
+
+async def reopen_job(
+    db: AsyncSession, tenant_id: uuid.UUID, slug: str, *, actor_user_id: uuid.UUID
+) -> Job:
+    """Take applications again.
+
+    **Clears `closes_at` if it is in the past**, which is not tidiness: leaving
+    a stale expiry behind means the worker closes the vacancy again within the
+    minute, and the employer sees their own action silently undone.
+    """
+    job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+
+    job.closed_at = None
+    job.close_reason = None
+    if job.closes_at is not None and job.closes_at <= datetime.now(UTC):
+        job.closes_at = None
+    await db.commit()
+    log.info("marketplace.job_reopened", slug=slug)
+    await _record_for_job(db, "job_reopened", job_id=job.id, actor_user_id=actor_user_id)
+    return await _load(db, job.id)
+
+
+async def _tell_live_applicants(db: AsyncSession, job: Job) -> None:
+    """Let the people still waiting know the vacancy is closed.
+
+    **Only the ones still in flight** -- `applied` and `shortlisted`. Somebody
+    already rejected has been told, and somebody hired does not need to hear
+    that the job they got is closed. Withdrawn applicants took themselves out.
+
+    Queued inside the caller's transaction, never sent here (ADR-006): the
+    close must not fail because an SMTP server is slow.
+
+    Imported inside the function because `applications` imports this module's
+    package for `get_job_by_slug`; at module level this is a cycle, which is
+    an ImportError at boot rather than a wrong answer.
+    """
+    from api.modules.applications.models import Application
+    from api.modules.notifications import enqueue
+
+    rows = await db.execute(
+        select(Application.profile_id, CandidateProfile.user_id)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(
+            Application.job_id == job.id,
+            Application.status.in_(("applied", "shortlisted")),
+        )
+    )
+    for _profile_id, user_id in rows.all():
+        await enqueue(
+            db,
+            recipient_kind="user",
+            recipient_id=user_id,
+            channel="in_app",
+            template="vacancy_closed",
+            # The vacancy and a path. Never the reason: "filled" tells an
+            # applicant somebody else got it, which is the employer's business
+            # to say and not ours to announce on their behalf.
+            payload={"vacancy": job.title, "path": "/applications"},
+        )
 
 
 async def delete_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> None:

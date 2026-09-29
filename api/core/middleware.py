@@ -237,6 +237,11 @@ class BodySizeLimitMiddleware:
                 try:
                     declared = int(value)
                 except ValueError:
+                    # A header that is not a number tells us nothing, so it
+                    # cannot be used to reject early -- but it must not be
+                    # read as "no body" and trusted either. `counting_receive`
+                    # below still counts the real bytes, so the limit holds;
+                    # this only skips the cheap pre-check.
                     declared = 0
                 if declared > limit:
                     log.warning("http.body_too_large", declared=declared, limit=limit)
@@ -264,20 +269,36 @@ class BodySizeLimitMiddleware:
         try:
             await self.app(scope, counting_receive, tracking_send)
         except _BodyTooLarge:
+            # Logged either way. The declared-size path above has always
+            # logged; this one did not, so an oversized streamed body that
+            # tripped the limit *after* the response had begun left no trace
+            # at all -- the client saw a truncated response and nothing here
+            # recorded that a limit was the reason.
+            log.warning("http.body_too_large", received=received, limit=limit, started=started)
             if not started:
+                # A 413 cannot be sent once headers have gone; all that is
+                # left is to stop reading, which returning does.
                 await _reject(send, 413, "Request body too large")
 
 
 def _limiter_identity(scope: Scope) -> str:
-    """Who a request counts against: the signed-in user, else the client IP.
+    """Who a request counts against: the signed-in user, a partner's key, or
+    the client IP.
 
     Per user when there is a valid access token, because Indian mobile carriers
     put many subscribers behind one address and a per-IP limit would throttle
     strangers for each other. The token is only *decoded* here -- no database
     read -- and an invalid one falls back to the IP rather than erroring, since
     rejecting it is the route's job, not the limiter's.
+
+    An `X-API-Key` is hashed and used as its own bucket the same way, for the
+    same reason: a partner's calls may all originate from one gateway IP, and
+    bucketing them there would let one partner's traffic throttle another's.
+    The hash is not looked up against `service_accounts` here -- an invalid
+    key still gets a bucket of its own rather than falling through to the IP,
+    and `get_service_account` is what actually decides whether the key works.
     """
-    from api.core.security import decode_token  # local: security imports the DB layer
+    from api.core.security import decode_token, hash_secret  # local: security imports the DB layer
 
     settings = get_settings()
     for name, value in scope["headers"]:
@@ -287,6 +308,10 @@ def _limiter_identity(scope: Scope) -> str:
                 return "u:" + str(decode_token(token, "access")["sub"])
             except Exception:  # noqa: BLE001 - any invalid token counts as anonymous
                 break
+
+    for name, value in scope["headers"]:
+        if name == b"x-api-key":
+            return "k:" + hash_secret(value.decode("latin-1").strip())
 
     client = scope.get("client")
     ip = client[0] if client else "unknown"

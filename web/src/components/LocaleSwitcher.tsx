@@ -41,7 +41,10 @@ export function LocaleSwitcher() {
             router.replace(pathname, { locale: e.target.value }),
           )
         }
-        className="rounded-lg border border-input-border bg-surface px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        // `font-system`: see the token's note in globals.css. One `हिंदी`
+        // here would otherwise pull the Devanagari webfont onto every
+        // English page.
+        className="rounded-lg border border-input-border bg-surface px-2.5 py-1.5 font-system text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >
         {VISIBLE_LOCALES.map((l) => (
           <option key={l.code} value={l.code} lang={l.code}>

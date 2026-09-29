@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
+import { invalidatePublicCounts } from "./counts";
+import { ApiError, readDetail } from "./http";
 
 /**
  * The employer workspace's data layer.
@@ -37,9 +39,13 @@ export function useMemberships() {
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/auth/me");
-      if (error || !data) throw new Error("not signed in");
-      return data;
+      // The status is read *before* the check, not inside it: `/auth/me`
+      // declares no error response, so on the failure branch openapi-fetch
+      // narrows the whole result to `never` and `response` is unreachable.
+      const result = await api.GET("/auth/me");
+      const status = result.response.status;
+      if (result.error || !result.data) throw new Error(String(status));
+      return result.data;
     },
     retry: false,
   });
@@ -76,13 +82,13 @@ export function useOrgJobs(orgSlug: string | null) {
     queryKey: ["org-jobs", orgSlug],
     enabled: orgSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/jobs", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/jobs", {
         params: { path: { org_slug: orgSlug as string } },
       });
       // openapi-fetch resolves rather than throws on a non-2xx, so an
       // unchecked 404 would render as "you have no vacancies" for an
       // organisation the caller simply is not a member of.
-      if (error || !data) throw new Error("could not load listings");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -93,16 +99,28 @@ export function useOrgJobMutations(orgSlug: string) {
   const qc = useQueryClient();
   // Jobs are a list, not one aggregate, so invalidate rather than replace: a
   // publish changes `status` on one row and nothing else on the page.
-  const refresh = () =>
-    qc.invalidateQueries({ queryKey: ["org-jobs", orgSlug] });
+  //
+  // The public counts go with it. Every mutation here can change how many
+  // vacancies the catalogue holds -- create and delete obviously, publish and
+  // unpublish because the count is of published rows, close and reopen because
+  // `open_job()` excludes a closed one -- and until this line none of them told
+  // the homepage. An employer published a vacancy, went back to the front page
+  // and was shown the figure fetched before they did it.
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["org-jobs", orgSlug] });
+    invalidatePublicCounts(qc);
+  };
 
   const create = useMutation({
     mutationFn: async (body: JobPayload) => {
-      const { data, error } = await api.POST("/org/{org_slug}/jobs", {
+      const { data, error, response } = await api.POST("/org/{org_slug}/jobs", {
         params: { path: { org_slug: orgSlug } },
         body,
       });
-      if (error || !data) throw new Error(String(error ?? "create failed"));
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -110,11 +128,14 @@ export function useOrgJobMutations(orgSlug: string) {
 
   const update = useMutation({
     mutationFn: async ({ slug, body }: { slug: string; body: JobPayload }) => {
-      const { data, error } = await api.PUT("/org/{org_slug}/jobs/{slug}", {
+      const { data, error, response } = await api.PUT("/org/{org_slug}/jobs/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
         body,
       });
-      if (error || !data) throw new Error(String(error ?? "update failed"));
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -131,12 +152,43 @@ export function useOrgJobMutations(orgSlug: string) {
       const path = published
         ? "/org/{org_slug}/jobs/{slug}/publish"
         : "/org/{org_slug}/jobs/{slug}/unpublish";
-      const { data, error } = await api.POST(path, {
+      const { data, error, response } = await api.POST(path, {
         params: { path: { org_slug: orgSlug, slug } },
       });
       // The API refuses to publish a job requiring no standards, and that
-      // refusal is the message the employer needs to see.
-      if (error || !data) throw new Error("publish-refused");
+      // refusal is the message the employer needs to see -- so carry it.
+      // This used to throw the sentinel `new Error("publish-refused")`, and
+      // the screen then showed "a vacancy needs at least one standard" for
+      // *every* failure, including an expired session. A sentence that is
+      // wrong about why is worse than one that admits it does not know.
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+    onSuccess: refresh,
+  });
+
+  // Closing is not unpublishing, and the two buttons sit next to each other,
+  // so the distinction is worth stating where somebody will read it:
+  // unpublishing hides the vacancy entirely, closing leaves its page and its
+  // inbox and simply stops it taking applications.
+  const setOpen = useMutation({
+    mutationFn: async ({
+      slug,
+      open,
+      reason,
+    }: {
+      slug: string;
+      open: boolean;
+      reason?: "filled" | "withdrawn";
+    }) => {
+      const path = open
+        ? "/org/{org_slug}/jobs/{slug}/reopen"
+        : "/org/{org_slug}/jobs/{slug}/close";
+      const { data, error, response } = await api.POST(path, {
+        params: { path: { org_slug: orgSlug, slug } },
+        ...(open ? {} : { body: { reason: reason ?? "filled" } }),
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -144,15 +196,18 @@ export function useOrgJobMutations(orgSlug: string) {
 
   const remove = useMutation({
     mutationFn: async (slug: string) => {
-      const { error } = await api.DELETE("/org/{org_slug}/jobs/{slug}", {
+      const { error, response } = await api.DELETE("/org/{org_slug}/jobs/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
       });
-      if (error) throw new Error("delete failed");
+      if (error)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
     },
     onSuccess: refresh,
   });
 
-  return { create, update, setPublished, remove };
+  return { create, update, setPublished, setOpen, remove };
 }
 
 export function useOrgCandidates(
@@ -163,7 +218,7 @@ export function useOrgCandidates(
     queryKey: ["org-candidates", orgSlug, jobSlug],
     enabled: orgSlug !== null && jobSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET(
+      const { data, error, response } = await api.GET(
         "/org/{org_slug}/candidates/{job_slug}",
         {
           params: {
@@ -172,7 +227,7 @@ export function useOrgCandidates(
           },
         },
       );
-      if (error || !data) throw new Error("could not rank candidates");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -190,28 +245,55 @@ export function useOrgCourses(orgSlug: string | null) {
     queryKey: ["org-courses", orgSlug],
     enabled: orgSlug !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}/courses", {
+      const { data, error, response } = await api.GET("/org/{org_slug}/courses", {
         params: { path: { org_slug: orgSlug as string } },
       });
-      if (error || !data) throw new Error("could not load courses");
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
   });
 }
 
+/**
+ * How much interest each of this provider's courses has attracted.
+ *
+ * One request for the whole workspace rather than one per card, and it comes
+ * from the interests module rather than the course itself -- `marketplace` may
+ * not read that table (ADR-014).
+ */
+export function useOrgInterests(orgSlug: string | null) {
+  return useQuery({
+    queryKey: ["org", orgSlug, "interests"],
+    enabled: Boolean(orgSlug),
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/interests", {
+        params: { path: { org_slug: orgSlug as string } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+  });
+}
+
 export function useOrgCourseMutations(orgSlug: string) {
   const qc = useQueryClient();
-  const refresh = () =>
-    qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+  // The public counts go with it, for the reason the job mutations above give.
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+    invalidatePublicCounts(qc);
+  };
 
   const create = useMutation({
     mutationFn: async (body: CoursePayload) => {
-      const { data, error } = await api.POST("/org/{org_slug}/courses", {
+      const { data, error, response } = await api.POST("/org/{org_slug}/courses", {
         params: { path: { org_slug: orgSlug } },
         body,
       });
-      if (error || !data) throw new Error("create failed");
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -225,11 +307,14 @@ export function useOrgCourseMutations(orgSlug: string) {
       slug: string;
       body: CoursePayload;
     }) => {
-      const { data, error } = await api.PUT("/org/{org_slug}/courses/{slug}", {
+      const { data, error, response } = await api.PUT("/org/{org_slug}/courses/{slug}", {
         params: { path: { org_slug: orgSlug, slug } },
         body,
       });
-      if (error || !data) throw new Error("update failed");
+      if (error || !data)
+        // `ApiError`, not a made-up message: the server says which
+        // field is wrong and that is the only useful thing here.
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,
@@ -246,12 +331,13 @@ export function useOrgCourseMutations(orgSlug: string) {
       const path = published
         ? "/org/{org_slug}/courses/{slug}/publish"
         : "/org/{org_slug}/courses/{slug}/unpublish";
-      const { data, error } = await api.POST(path, {
+      const { data, error, response } = await api.POST(path, {
         params: { path: { org_slug: orgSlug, slug } },
       });
       // The API refuses to publish a course teaching nothing, and that refusal
-      // is the message the provider needs to see.
-      if (error || !data) throw new Error("publish-refused");
+      // is the message the provider needs to see -- so carry it, for the
+      // reason the job path above spells out.
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: refresh,

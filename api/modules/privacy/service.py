@@ -20,9 +20,11 @@ from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
+from api.modules.alerts.models import JobAlert
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, SavedJob
-from api.modules.identity import Membership, Tenant, User
+from api.modules.identity import Invitation, Membership, Tenant, User
+from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateProfile,
     CandidateSkill,
@@ -33,7 +35,12 @@ from api.modules.marketplace.models import (
 )
 from api.modules.marketplace.schemas import CandidateProfileFull
 from api.modules.notifications.models import Notification
-from api.modules.privacy.schemas import DeletionPreview, OrganisationFate
+from api.modules.operations.models import TenantVerificationEvent
+from api.modules.privacy.schemas import (
+    DeletionPreview,
+    OrganisationDeletionPreview,
+    OrganisationFate,
+)
 
 log = structlog.get_logger("iism.privacy")
 
@@ -47,62 +54,207 @@ async def _memberships(db: AsyncSession, user_id: uuid.UUID) -> list[tuple[Membe
     return [(m, t) for m, t in rows.all()]
 
 
-async def _listings(db: AsyncSession, tenant_id: uuid.UUID) -> int:
-    jobs = await db.scalar(select(func.count()).select_from(Job).where(Job.tenant_id == tenant_id))
-    courses = await db.scalar(
-        select(func.count()).select_from(Course).where(Course.tenant_id == tenant_id)
+async def _membership_counts(
+    db: AsyncSession, tenant_ids: list[uuid.UUID], user_id: uuid.UUID
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """(other members, other owners) per tenant, in one grouped query.
+
+    Sprint 26 deliberately removed the cap on organisations per account, so a
+    preview that ran two counts per organisation in a loop turned into a
+    round trip per organisation the caller belongs to -- unnoticeable for one,
+    real for the account this feature exists to make safe for.
+    """
+    if not tenant_ids:
+        return {}
+    rows = await db.execute(
+        select(
+            Membership.tenant_id,
+            func.count(),
+            func.count().filter(Membership.role == "owner"),
+        )
+        .where(Membership.tenant_id.in_(tenant_ids), Membership.user_id != user_id)
+        .group_by(Membership.tenant_id)
     )
-    return (jobs or 0) + (courses or 0)
+    return {tenant_id: (total, owners) for tenant_id, total, owners in rows.all()}
+
+
+async def _listings_by_tenant(
+    db: AsyncSession, tenant_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Open listings per tenant, two grouped queries total rather than two
+    counts per organisation the caller belongs to."""
+    if not tenant_ids:
+        return {}
+    counts: dict[uuid.UUID, int] = dict.fromkeys(tenant_ids, 0)
+    for model in (Job, Course):
+        rows = await db.execute(
+            select(model.tenant_id, func.count())
+            .where(model.tenant_id.in_(tenant_ids))
+            .group_by(model.tenant_id)
+        )
+        for tenant_id, count in rows.all():
+            counts[tenant_id] += count
+    return counts
 
 
 async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
+    memberships = [
+        (m, t) for m, t in await _memberships(db, user.id) if t.tenant_type != "personal"
+    ]
+    tenant_ids = [t.id for _, t in memberships]
+    counts = await _membership_counts(db, tenant_ids, user.id)
+    listings = await _listings_by_tenant(db, tenant_ids)
+
     deleted: list[OrganisationFate] = []
     blocked: list[OrganisationFate] = []
-    for membership, tenant in await _memberships(db, user.id):
-        if tenant.tenant_type == "personal":
-            continue
-        others = await db.scalar(
-            select(func.count())
-            .select_from(Membership)
-            .where(Membership.tenant_id == tenant.id, Membership.user_id != user.id)
-        )
+    for membership, tenant in memberships:
         fate = OrganisationFate(
-            slug=tenant.slug, name=tenant.name, listings=await _listings(db, tenant.id)
+            slug=tenant.slug, name=tenant.name, listings=listings.get(tenant.id, 0)
         )
+        others, other_owners = counts.get(tenant.id, (0, 0))
         if not others:
             deleted.append(fate)
-        elif membership.role == "owner":
-            other_owners = await db.scalar(
-                select(func.count())
-                .select_from(Membership)
-                .where(
-                    Membership.tenant_id == tenant.id,
-                    Membership.user_id != user.id,
-                    Membership.role == "owner",
-                )
-            )
-            if not other_owners:
-                blocked.append(fate)
+        elif membership.role == "owner" and not other_owners:
+            blocked.append(fate)
     return DeletionPreview(organisations_deleted=deleted, blocked_by=blocked)
 
 
 async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     job_ids = select(Job.id).where(Job.tenant_id == tenant_id)
     course_ids = select(Course.id).where(Course.tenant_id == tenant_id)
+    # What people did with this organisation's listings, deleted explicitly.
+    # Until Sprint 24 these two went only by the FK cascade from `jobs.id` --
+    # against this module's own rule, and against a comment below claiming they
+    # were already removed "exactly like the applications above", which were
+    # not there. The cascade did the right thing; nothing said so.
+    await db.execute(delete(Application).where(Application.job_id.in_(job_ids)))
+    await db.execute(delete(SavedJob).where(SavedJob.job_id.in_(job_ids)))
+    # Who was told about this organisation's vacancies. Explicitly, like
+    # everything else here -- the FK cascades, and "everything went" is the one
+    # claim an erasure path must never make on assumption.
+    await db.execute(delete(JobAlert).where(JobAlert.job_id.in_(job_ids)))
     await db.execute(delete(JobSkill).where(JobSkill.job_id.in_(job_ids)))
     await db.execute(delete(Job).where(Job.tenant_id == tenant_id))
+    await db.execute(delete(CourseInterest).where(CourseInterest.course_id.in_(course_ids)))
     await db.execute(delete(CourseSkill).where(CourseSkill.course_id.in_(course_ids)))
     await db.execute(delete(Course).where(Course.tenant_id == tenant_id))
     # No foreign key to cascade from -- the outbox names a recipient by id
     # rather than pointing at one (see its module docstring) -- so erasure
-    # removes them explicitly, exactly like the applications above.
+    # removes them explicitly, like the rows above.
     await db.execute(
         delete(Notification).where(
             Notification.recipient_kind == "tenant", Notification.recipient_id == tenant_id
         )
     )
+    # Explicitly, like everything above: the FK cascades, and "everything went"
+    # is the one claim an erasure path must never make on assumption. An
+    # invitation is also the single row in this product that stores somebody
+    # else's address, so leaving one behind would leave a stranger's mailbox in
+    # a table belonging to an organisation that no longer exists.
+    await db.execute(delete(Invitation).where(Invitation.tenant_id == tenant_id))
+    # The twelfth table (Sprint 28). **The organisation is the subject of these
+    # rows, not a third party**: once it is gone, "an organisation that no
+    # longer exists was verified on a date" identifies nobody, defends nothing,
+    # and is data kept without a purpose. Explicitly, like everything above.
+    #
+    # The consequence is real and is not solved here: a verified organisation
+    # can misbehave, delete itself and register again under the same name,
+    # because the duplicate-name guard is per account. Closing that needs a
+    # tombstone that survives erasure, which is a fresh DPDP decision.
+    await db.execute(
+        delete(TenantVerificationEvent).where(TenantVerificationEvent.tenant_id == tenant_id)
+    )
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+
+
+async def organisation_deletion_preview(
+    db: AsyncSession, tenant: Tenant, viewer: User
+) -> OrganisationDeletionPreview:
+    """What deleting this one organisation would take with it. Changes nothing."""
+    job_ids = select(Job.id).where(Job.tenant_id == tenant.id)
+    course_ids = select(Course.id).where(Course.tenant_id == tenant.id)
+
+    async def count(model, *where) -> int:  # type: ignore[no-untyped-def]
+        return (await db.scalar(select(func.count()).select_from(model).where(*where))) or 0
+
+    return OrganisationDeletionPreview(
+        slug=tenant.slug,
+        name=tenant.name,
+        tenant_type=tenant.tenant_type,
+        jobs=await count(Job, Job.tenant_id == tenant.id),
+        courses=await count(Course, Course.tenant_id == tenant.id),
+        applications=await count(Application, Application.job_id.in_(job_ids)),
+        course_interests=await count(CourseInterest, CourseInterest.course_id.in_(course_ids)),
+        # **Excluding the caller.** They are about to delete it; counting
+        # themselves among the people who lose access would tell a sole owner
+        # that one other person is affected, which is nobody.
+        other_members=await count(
+            Membership, Membership.tenant_id == tenant.id, Membership.user_id != viewer.id
+        ),
+    )
+
+
+async def delete_organisation(db: AsyncSession, user: User, tenant: Tenant) -> None:
+    """Delete one organisation, and leave the account and its others alone.
+
+    **This route did not exist until it was reported missing**, and its absence
+    was a trap rather than an omission: `POST /org/{slug}/leave` refuses the
+    only owner (Sprint 25, correctly -- an organisation must not be left with
+    nobody in charge), so somebody who created an organisation by mistake had
+    exactly one way out, `DELETE /me/account`, which takes the account and
+    every *other* organisation with it. Creating was one request; undoing it
+    was impossible.
+
+    **Through `_delete_tenant`, not beside it.** That function is the one place
+    that knows everything a tenant owns -- listings, applications, interests,
+    invitations, notifications, memberships, job alerts -- and a second copy
+    here is how one of them starts being missed.
+
+    Live applicants are told, which closes a gap recorded since Sprint 24:
+    until now an organisation could vanish and the people waiting on it heard
+    nothing at all.
+    """
+    await _tell_applicants_the_organisation_is_gone(db, tenant)
+    await _delete_tenant(db, tenant.id)
+    await db.commit()
+    # WARNING, not INFO: irreversible, owner-only, and it is what somebody goes
+    # looking for after "our organisation disappeared".
+    log.warning("organisation.deleted", org_slug=tenant.slug, by_user=str(user.id))
+
+
+async def _tell_applicants_the_organisation_is_gone(db: AsyncSession, tenant: Tenant) -> None:
+    """Tell the people still waiting on this organisation's vacancies.
+
+    Only `applied` and `shortlisted`: somebody rejected has been told, somebody
+    hired does not need this, and a withdrawn applicant took themselves out.
+
+    **Queued before the delete, in the same transaction.** The notification
+    names a *user*, not the tenant, so it survives the organisation it is about
+    -- which is the point. `vacancy_closed` is reused rather than given a
+    near-identical sibling: what the applicant needs to know is the same in
+    both cases, which is that the vacancy is not coming back.
+    """
+    from api.modules.notifications import enqueue
+
+    rows = await db.execute(
+        select(Job.title, CandidateProfile.user_id)
+        .join(Application, Application.job_id == Job.id)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(
+            Job.tenant_id == tenant.id,
+            Application.status.in_(("applied", "shortlisted")),
+        )
+    )
+    for title, user_id in rows.all():
+        await enqueue(
+            db,
+            recipient_kind="user",
+            recipient_id=user_id,
+            channel="in_app",
+            template="vacancy_closed",
+            payload={"vacancy": title, "path": "/applications"},
+        )
 
 
 async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
@@ -112,7 +264,14 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         names = ", ".join(o.name for o in preview.blocked_by)
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"Pass ownership of {names} to someone else before deleting your account",
+            # Until Sprint 25 this sentence named something the product could
+            # not do: there was no way to make anybody else an owner, because
+            # there was no way to have a second member at all. Worse, the guard
+            # itself was unreachable -- it needs another member to exist -- so
+            # a sole owner deleting their account destroyed the organisation,
+            # its listings and every application to them, silently. Now the
+            # instruction is an action: `PATCH /org/{slug}/members/{user_id}`.
+            f"Make somebody else an owner of {names} before deleting your account",
         )
 
     doomed = {o.slug for o in preview.organisations_deleted}
@@ -131,6 +290,8 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         # applicant entirely is the point.
         await db.execute(delete(Application).where(Application.profile_id == profile.id))
         await db.execute(delete(SavedJob).where(SavedJob.profile_id == profile.id))
+        await db.execute(delete(CourseInterest).where(CourseInterest.profile_id == profile.id))
+        await db.execute(delete(JobAlert).where(JobAlert.profile_id == profile.id))
         await db.delete(profile)
         await db.flush()
 
@@ -144,6 +305,17 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
             Notification.recipient_kind == "user", Notification.recipient_id == user.id
         )
     )
+    # An invitation addressed to an account being erased is withdrawn rather
+    # than left live: accepting it later would recreate a membership for a
+    # person who asked to be forgotten.
+    if user.email:
+        await db.execute(
+            delete(Invitation).where(func.lower(Invitation.email) == user.email.lower())
+        )
+    # Invitations this person *sent* survive -- they belong to the organisation,
+    # which still exists and may still be expecting the people it invited.
+    # `invited_by_user_id` is ON DELETE SET NULL for exactly this, so the row
+    # stops naming them without the offer evaporating mid-flight.
     await db.execute(delete(Membership).where(Membership.user_id == user.id))
     user_id = user.id
     db.expunge(user)
@@ -193,12 +365,34 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         if profile is not None
         else None
     )
+    interests = (
+        await db.scalars(
+            select(CourseInterest)
+            .where(CourseInterest.profile_id == profile.id)
+            .order_by(CourseInterest.created_at)
+        )
+        if profile is not None
+        else None
+    )
 
     events = (
         await db.scalars(
             select(AnalyticsEvent)
             .where(AnalyticsEvent.user_id == user.id)
             .order_by(AnalyticsEvent.occurred_at)
+        )
+    ).all()
+
+    # Invitations this person sent. Theirs to see, because they are the act --
+    # and the addresses are ones they typed themselves. Invitations sent *to*
+    # them are deliberately absent: those are the sending organisation's
+    # record, and listing them here would tell somebody every organisation that
+    # ever considered them.
+    sent_invitations = (
+        await db.scalars(
+            select(Invitation)
+            .where(Invitation.invited_by_user_id == user.id)
+            .order_by(Invitation.created_at)
         )
     ).all()
 
@@ -249,6 +443,36 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         "saved_jobs": [
             {"vacancy": row.job.title, "saved_at": _iso(row.created_at)}
             for row in (saved.all() if saved is not None else [])
+        ],
+        # The disclosure is part of the learner's own record, not only the
+        # provider's -- the same reason applications carry their two timestamps.
+        "course_interests": [
+            {
+                "course": interest.course.title,
+                "provider": cast(Tenant, interest.course.tenant).name,
+                "status": interest.status,
+                "message": interest.message,
+                "registered_at": _iso(interest.created_at),
+                "contact_shared_at": _iso(interest.contact_shared_at),
+                "contact_revoked_at": _iso(interest.contact_revoked_at),
+            }
+            for interest in (interests.all() if interests is not None else [])
+        ],
+        # Invitations this person sent, with what became of each. The state is
+        # derived from the timestamps by the model, so this export cannot
+        # disagree with what the organisation's own screen shows.
+        "invitations_sent": [
+            {
+                "organisation": invitation.tenant.name,
+                "email": invitation.email,
+                "role": invitation.role,
+                "state": invitation.state(datetime.now(UTC)),
+                "sent_at": _iso(invitation.created_at),
+                "expires_at": _iso(invitation.expires_at),
+                "accepted_at": _iso(invitation.accepted_at),
+                "revoked_at": _iso(invitation.revoked_at),
+            }
+            for invitation in sent_invitations
         ],
         "activity": [
             {

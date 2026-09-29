@@ -100,6 +100,16 @@ def test_publishing_ships_everywhere() -> None:
         assert "/org/{org_slug}/jobs" in _paths(environment), environment
 
 
+def test_the_back_office_ships_everywhere() -> None:
+    """The mirror of the console tests above, and the distinction that matters:
+    the *demonstration* console is gated because it is **unauthenticated**, not
+    because it is non-production. Verifying an organisation is a production
+    activity, and a badge grantable only on a laptop is the absent writer this
+    sprint removed, in a new costume (ADR-042)."""
+    for environment in ("development", "staging", "production"):
+        assert "/ops/organisations" in _paths(environment), environment
+
+
 # ------------------------------------------------ OTP never reaches a log sink
 
 

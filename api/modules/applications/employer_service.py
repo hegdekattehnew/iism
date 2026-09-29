@@ -7,16 +7,16 @@ own history, and the contact details go.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
-from api.modules.applications.models import Application
+from api.modules.applications.models import FILLED_STATUSES, Application
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job
 from api.modules.matching import score_profiles
@@ -80,7 +80,8 @@ async def set_status(
     application_id: uuid.UUID,
     new_status: str,
 ) -> Application:
-    """Move an application along: shortlisted, rejected, hired."""
+    """Move an application along: shortlisted, rejected, hired -- or, for a
+    gig engagement only, completed/no_show (Sprint 37, Epic B8)."""
     job = await _job_of(db, tenant_id, job_slug)
     application = await db.scalar(
         select(Application).where(Application.id == application_id, Application.job_id == job.id)
@@ -93,8 +94,25 @@ async def set_status(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "This application has been withdrawn by the candidate"
         )
+    if new_status in ("completed", "no_show"):
+        # A narrower rule than shortlist/reject/hire, which have no ordering
+        # enforced at all today -- deliberately so, unlike these two: they gate
+        # whether a review can ever be written (review_service.py) and name a
+        # real-world event that either happened or did not, which "completing"
+        # an application nobody hired does not mean anything about.
+        if application.status != "hired":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Only a hired application can be marked completed or no-show",
+            )
+        if job.employment_type != "gig":
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Only a gig engagement can be marked completed or no-show",
+            )
 
     application.status = new_status
+    filled = await _close_if_filled(db, job)
 
     # The candidate hears about it. In-app always -- most signed up with a
     # phone and have no email, and SMS waits on DLT registration -- plus email
@@ -128,7 +146,72 @@ async def set_status(
         # candidate, the same rule the console's own events follow.
         payload={"status": new_status},
     )
+    if filled:
+        await record(
+            db,
+            "job_closed",
+            subject_type="job",
+            subject_id=job.id,
+            payload={"reason": "filled", "automatic": True},
+        )
     return application
+
+
+async def set_status_and_reload(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    job_slug: str,
+    application_id: uuid.UUID,
+    new_status: str,
+) -> tuple[Application, CandidateProfile, User, MatchResult]:
+    """Move an application along, and return the row the screen re-renders.
+
+    The row, not just the `Application`: the card beside it carries a score, and
+    a score comes from the scorer with the profile and the requirements in hand.
+    The route used to call `inbox()` afterwards and pick its row out with a bare
+    `next(...)`, which raises `StopIteration` -- a RuntimeError and a 500 inside
+    a coroutine -- if the row is ever filtered out. It cannot be today; doing the
+    lookup here means the day it can, this function answers it instead of
+    crashing.
+    """
+    application = await set_status(db, tenant_id, job_slug, application_id, new_status)
+    _job, rows = await inbox(db, tenant_id, job_slug)
+    for row in rows:
+        if row[0].id == application.id:
+            return row
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+
+async def _close_if_filled(db: AsyncSession, job: Job) -> bool:
+    """Close the vacancy once every position is taken. Returns whether it did.
+
+    **This is what "hired" means.** For twenty-six sprints marking somebody
+    hired changed one row and nothing else: the vacancy stayed published, kept
+    ranking in strangers' matches and kept taking applications nobody would
+    ever read. An employer said how many people they were hiring; when that
+    many are hired, the vacancy is done.
+
+    Counted from the rows rather than incremented, so it is correct after an
+    un-hire, a withdrawal, or two hires landing at once. **Not** a 409 path:
+    an employer may still hire a sixth person against five positions -- the
+    vacancy simply closes at five and they reopen it if they meant more.
+    """
+    if job.closed_at is not None:
+        return False
+    hired = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(Application.job_id == job.id, Application.status.in_(FILLED_STATUSES))
+        )
+    ) or 0
+    if hired < job.positions:
+        return False
+
+    job.closed_at = datetime.now(UTC)
+    job.close_reason = "filled"
+    log.info("marketplace.job_closed", slug=job.slug, reason="filled", automatic=True)
+    return True
 
 
 def contact_for(user: User, application: Application) -> dict[str, str | None] | None:

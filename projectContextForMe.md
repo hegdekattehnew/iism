@@ -4,13 +4,62 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-17 · Sprints 1–22 built and pushed. Sprint 20 ("safe to deploy") closed the
-non-functional gaps that need no outside account; Sprint 21 is the first deployment.
+**Last updated:** 2026-09-29 · **Sprints 1–38 built.** Sprint 35 gave three of four
+`SKILL_SOURCES` a real writer outside the seed; Sprint 36 added semantic similarity (off by
+default) and the `SkillRelation` foundation; Sprint 37 built BL-7.3's tiered operator authority
+(ADR-044) and then Epic B8's gig work — reusing `Job`/`Application` rather than the sibling module
+ADR-045 had proposed, on the owner's own instruction (ADR-046). Sprint 38 closed the *structural*
+half of ADR-025's monetisation gate (ADR-047) — a provider-reported `"enrolled"` status and a
+report script — without authorising `BL-1.3`. Asked to override the remaining volume gap or wait,
+the owner chose to **wait for real traffic** — `BL-1.3` stays not started, and this is a decision,
+not an open question, until real usage or the owner says otherwise. Deployment is deferred by the
+owner, deliberately.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
 > "Sprints 1–5" through nine further sprints, which is how §10 came to assert the branch was
 > pushed while four sprints sat on one laptop.
+
+---
+
+## 0. Status at a glance
+
+*Everything here is checkable in under two minutes. Check it rather than trusting it — this file
+has been wrong before, and §10 explains how.*
+
+| | |
+|---|---|
+| **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
+| **Last sprint** | 38 — closed ADR-025's structural gate (provider-reported `"enrolled"`, `make monetisation-metrics`) without authorising `BL-1.3` (ADR-047) |
+| **Next sprint** | 39 — owner chose to wait for real traffic rather than override; `BL-1.3` stays not started until then, or the owner redirects |
+| **Tests** | 835 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
+| **Migrations** | head `0038`; 47 ADRs |
+| **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
+| **Deployment** | deferred by the owner; nothing is deployed anywhere |
+
+**To get running** (Docker must be up; ports are non-default — 5433 / 6380 / 27018):
+
+```
+make up && make migrate && make import-nsqf && make seed    # first time, ~2 minutes
+make api        # :8000   — reloads on change
+make worker     # does NOT reload: restart it after any api/ change
+make web        # :3000
+```
+
+**Demo logins** (all seeded, `OTP_EXPOSE_IN_RESPONSE=true` returns the code in the response):
+`hiring@apollo-care.example` (employer, 5 applicants, **and a three-person team**),
+`admin@skillbridge-institute.example` (provider, interested learners), `+919000000001`
+(candidate with matches and a gap). Never sign in as the owner's real number, `+919880663641`.
+Apollo Care is the only seeded organisation with more than one member — a second owner, an admin
+and one pending invitation — so `/employer/apollo-care-hospitals/team` is where Sprint 25 demos.
+
+**Sessions last 15 minutes and now refresh silently** — before 2026-09-23 they did not, because
+the refresh guard matched `/auth/me` by substring. If a signed-in screen ever looks like it has
+revoked your rights, check `/auth/refresh` is being called before believing it.
+
+**The three things most likely to waste an hour**, all in §8: the worker not reloading, a stale
+API process serving old code, and `make check | grep` reporting grep's exit status rather than
+the suite's.
 
 ---
 
@@ -30,11 +79,12 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **40 ADRs — the source of truth for every design decision.** Read before any structural change. |
-| `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. |
+| `docs/adr/architecture-decisions.md` | **42 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. **Read the next row with it.** |
+| `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
-| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprint 20's is the latest). Lives outside the repo. |
+| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprints 30–31's is the latest). Lives outside the repo. |
 | `docs/nsqf-source-data-findings.md` | **Everything measured about the NSQF corpus** — field-naming traps, level distributions, content volumes, deduplication rates, translation costs, data-quality issues. Read before touching the importer. |
 | This file | Session-to-session continuity, environment quirks, hard-won gotchas. |
 
@@ -78,6 +128,25 @@ Decided while planning Sprints 3 and 4 (not yet ADRs — write them if they surv
   models only, `User` and `Membership` layered on in Sprint 4.
 
 ## 4. Current state
+
+*This section's sprint-by-sprint record stops at Sprint 24. Sprints 25–27 are written up in
+`CLAUDE.md` → Current state; Sprints 28 onward are in §11 below. Read those for anything recent.*
+
+**Sprint 24 (somebody is interested) — complete, 2026-09-21.** Deployment deferred; the question was
+which functionality is worth most, and a scan across all three actors found one that got nothing at
+all. A learner shown "the courses that close your gap" could not act on one — no enrol, no enquiry,
+not even the provider's website that the API already returned — and providers published into
+silence. Now a learner registers interest (sharing name, contact, district and a note with that
+provider, revoked on withdrawal), the provider gets an inbox, a roll-up of which courses people
+want, and the first notification they have ever received. `api/modules/interests/` is a sibling of
+`applications/`; the provider payload has **no score**, because a course publishes what it teaches
+and inventing a scorer for it is what ADR-037 forbids. Migration 0025. Two defects fixed alongside:
+`course_recommended` was recorded against the job with a bare count (ADR-025's click-through has
+been uncomputable since Sprint 10 — now one row per course, carrying `from_job`), and
+`_delete_tenant` never deleted applications explicitly. 527 backend and 89 web tests. **Still open:**
+teammate invitations and the sole-owner trap (agreed as the next sprint — a sole owner deleting
+their account still destroys the organisation and every application to it); a learner-facing notice
+when a provider marks "contacted"; vacancy lifecycle; `is_verified` still has no writer.
 
 **Sprint 23 (say what you do, and we'll name the standards) — complete, 2026-09-18.** Asked as "should
 a CV populate the profile?"; answered by finding that only `candidate_skills` changes a score, and
@@ -492,9 +561,9 @@ observability, the encryption path, and **Hindi for the national corpus** (§12)
 
 ## 5. Repository map
 
-*Refreshed 2026-09-15.* Authored code: `api/` 78 files / 11,579 lines · `scripts/` 8 / 2,553 ·
-`tests/` 23 / 5,751 · `migrations/` 19 / 1,750 · `web/src/` 117 / 10,234 (excluding the generated
-client).
+*Refreshed 2026-09-24 (after Sprint 32).* Authored code: `api/` 113 files / 18,597 lines ·
+`scripts/` 9 / 4,056 · `tests/` 35 / 10,813 · `migrations/` 29 / 2,945 · `web/src/` 178 / 18,174
+(excluding the generated client, which is another ~7,523 lines and is never counted here).
 
 ```
 api/                    FastAPI modular monolith
@@ -517,19 +586,49 @@ api/                    FastAPI modular monolith
                         employer.py (the same scorer reversed, batched per employer),
                         schemas, routes. No model client, by ADR-036.
   modules/analytics/    analytics_events (ADR-025). record() commits.
-  modules/geography/    State, District, SubDistrict. Its own module because jobs
-                        and profiles reference it and neither is a skill. No routes
-                        yet -- nothing consumes it over HTTP.
+  modules/geography/    State, District, SubDistrict, plus `PlaceIndex` -- the
+                        state-constrained resolver Sprint 28 gave the service layer
+                        after an ambiguous district name (Bilaspur, Hamirpur,
+                        Pratapgarh) resolved to the wrong state's row. Its own module
+                        because jobs and profiles reference it and neither is a skill.
+                        `GET /geography/states` and `/districts` are its only routes.
   modules/marketplace/  Job, JobSkill, Course, CourseSkill, CandidateProfile + collections;
                         publishing.py (jobs) and course_publishing.py (courses) are siblings,
                         listings.py their shared policy
-  modules/identity/     User, Tenant, Membership, OTP sign-in by phone or email, credential
-                        linking, organisations and their profile, consent record
+  modules/identity/     User, Tenant, Membership, Invitation. OTP sign-in by phone or email,
+                        credential linking, organisations and their profile, consent record.
+                        invitations.py holds the **three rules about who may do what to a
+                        team** -- escalation, the last owner, and enumeration-safety -- each
+                        in one function, because Sprint 15's finding was that a guard every
+                        handler must remember is one that eventually is not there.
+                        member_routes.py carries two routers: the org-scoped one, and a
+                        public one keyed on the invitation token, because somebody accepting
+                        is not yet a member and `require()` would 404 them out of their own
+                        invitation.
   modules/privacy/      DPDP export, deletion preview and erasure. Depends on every module;
                         nothing depends on it.
   modules/applications/ Applying, withdrawing, saving, and the employer's inbox. Holds the
-                        product's one deliberate disclosure: contact reaches an employer
+                        product's first deliberate disclosure: contact reaches an employer
                         because the candidate applied, and goes when they withdraw.
+  modules/interests/    Registering interest in a course, and the provider's view of who did.
+                        The **second** disclosure, on the same terms. A sibling of
+                        applications/, never an extension: a course publishes what it teaches,
+                        so a learner cannot be scored against it, and the provider inbox
+                        therefore carries no card and no score at all (ADR-037).
+  modules/notifications/  The outbox (ADR-006): queued in the request, sent by the worker.
+                        The row names a recipient by id and never holds an address --
+                        that is resolved at send time, so contact stays out of a dumped
+                        table and out of every log line (ADR-023).
+  modules/alerts/       Telling a candidate about a vacancy they never went looking for,
+                        and closing one whose date has passed -- both run in the worker,
+                        never a request. Reaches the one scorer through
+                        `matching.candidates_for_job` (ADR-037); no second, looser rule
+                        for "close enough to email about".
+  modules/operations/   The back office (ADR-042, Sprint 28): `tenant_verification_events`,
+                        the verification queue, `require_operator()`'s permissions. A
+                        second leaf beside privacy/ -- depends on identity and marketplace,
+                        nothing depends on it. `scripts/grant_staff.py` is the only writer
+                        of `users.is_staff`, ever, by decision.
   adapters/notifications/  NotificationProvider protocol + console impl
   adapters/nsqf/        base.py       NsqfSource port (6 iterators)
                         documents.py  ALL document parsing, shared by every source
@@ -537,10 +636,13 @@ api/                    FastAPI modular monolith
                         normalise.py  levels, HH:MM, credits, slugs, NCO codes
                         importer.py   phased projection into Postgres
 web/                    Next.js 16 PWA
-  src/app/[locale]/     27 routes, all bilingual: browse (skills, jobs, courses), signin,
+  src/app/[locale]/     39 routes, all bilingual: browse (skills, jobs, courses), signin,
                         signup/[type], profile, matches, account, employer/[org] (+ settings,
-                        candidates/[job]), audience pages, privacy/terms/grievance, status
-                        (local only), error.tsx, not-found.tsx, a catch-all
+                        team, candidates/[job], jobs/[job]/applications,
+                        courses/[course]/interests, interests), admin + admin/[slug] (the
+                        back office, ADR-042), invite/[token], audience pages,
+                        privacy/terms/grievance, status (local only), error.tsx,
+                        not-found.tsx, a catch-all
   src/lib/legal.ts      PRIVACY_NOTICE_VERSION (must match api/core/config.py) + grievance officer
   src/test/harness.tsx  the three mocked seams for Vitest component tests
   src/components/       Header, Hero, HowItWorks, Audiences, BrowsePanels, CtaBand,
@@ -563,11 +665,20 @@ migrations/versions/    0001 (pgvector + skills), 0002 (taxonomy + search),
                         0018 (user consent), 0019 (applications + saved jobs),
                         0020 (application analytics events),
                         0021 (content translations), 0022 (locale base columns),
-                        0023 (notification outbox)
+                        0023 (notification outbox), 0024 (job_role trigram index +
+                        role analytics names), 0025 (course interests + two widened CHECKs),
+                        0026 (invitations), 0027 (vacancy lifecycle + alerts, `alerted_at`
+                        backfill), 0028 (operator authority: `users.is_staff`, `verified_at`
+                        + evidence CHECK, `tenant_verification_events`)
 scripts/                seed_skills.py, seed_marketplace.py, import_nsqf.py,
                         legacy_skill_map.py (hand-authored, the only curated->NOS map),
-                        retire_legacy_skills.py, seed_candidates.py (demo profiles +
-                        the golden pairs), evaluate_matching.py — all idempotent
+                        retire_legacy_skills.py, seed_candidates.py (demo profiles,
+                        the golden pairs -- 34/7/16 as of Sprint 29), evaluate_matching.py,
+                        grant_staff.py (the only writer of `users.is_staff`; refuses to
+                        create an account it cannot find), clean_fixtures.py (named
+                        fixture slugs only, `--dry-run` by default, never touches an
+                        account) — all idempotent except clean_fixtures and grant_staff,
+                        which are one-shot by design
 tests/fixtures/         nsqf_sample.json — the corpus in miniature, so tests need no Mongo
 backups/                schema.sql (committed DDL) + README.md (restore paths, drill record).
                         Dumps are encrypted and live in ~/iism-backups, never here.
@@ -795,7 +906,9 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Pushed 2026-09-11**, at the end of Sprint 20 — verified with the command below, not assumed.
+**Merged 2026-09-21.** `v2/foundations` reached `origin`, PR #1 was opened and merged into `main`
+(merge commit `7b6337a`), and **CI ran green on it** — the first time CI had ever run on this work.
+Verified with the API, not assumed.
 
 This section was wrong in the most expensive possible way, and the shape of the mistake is worth
 keeping. It said "Pushed 2026-09-07 … that risk is closed", because the last commit to actually
@@ -804,13 +917,26 @@ reach the remote was one called *"Correct the git section: the branch is pushed"
 went on asserting they were safe. **A claim about the remote is only true at the moment it is
 checked**; re-check it, do not read it here.
 
-- Branch **`v2/foundations`**, tracking `origin/v2/foundations`.
+- Branch **`v2/foundations`**, tracking `origin/v2/foundations`. Work continues on it; `main`
+  contains everything through Sprint 24 **and nothing after**. As of 2026-09-28 the branch was 38
+  commits ahead — Sprints 25–37 — and **CI had not run on any of them**, because it triggers on
+  pull requests and `main` only. That is how Sprint 37 pushed a branch whose web build failed
+  (see its follow-up in §11). The fix is a second pull request to `main`, opened by the owner
+  in the browser (`gh` is not installed); check whether it exists rather than trusting this line.
 - Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
   branch tip against the document is what failed for four sprints.
-- **No pull request is open yet, so CI has never run on this branch** — it triggers on `main`
-  and on pull requests. Sprint 20's audit steps and bundle budget are untested in CI until it is.
-  `gh` is not installed on this machine, so the PR has to be opened in the browser:
-  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`
+- **CI runs on pull requests and on `main`.** Both jobs — *API: lint, types, tests* and *Web: lint,
+  types, build* — passed on the merge commit, which is what finally exercised Sprint 20's
+  dependency audits and the first-load budget outside this laptop.
+- **`gh` is still not installed**, so PRs are opened in the browser at
+  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations`, and their title and
+  description have to be pasted by the owner. Two consequences worth knowing: the session cannot
+  read CI itself without the GitHub API (unauthenticated reads work for this public repo), and
+  **pasting a rendered Markdown file loses its formatting** — send raw text, not a `.md` the
+  client will render.
+- **Dependabot is live on `main`** and opened 5 PRs the moment it merged (16 web updates, 4 Python,
+  three GitHub Actions bumps). Its `uv` update job fails; the npm and actions jobs succeed. That is
+  Dependabot's own infrastructure, not this repo's CI.
 - Two things a reviewer needs telling: it is a 211-file, +35,107-line change spanning eight
   sprints and is not reviewable as a single unit, and it **contains a deliberate rollback**
   (`c10829f` discards `a62d964`), so reading commit-by-commit means passing through work that was
@@ -843,57 +969,719 @@ checked**; re-check it, do not read it here.
 
 ## 11. What comes next
 
-**Sprint 22 — first deployment** (moved from Sprint 21, which closed the loop instead: deploying a
-product that could not produce an outcome would have bought nothing, and job-seeker sign-in is
-blocked on DLT registration regardless). AWS **Mumbai (ap-south-1)** for data residency: Dockerfiles, ECS
-Fargate for api and worker, RDS Postgres with encryption at rest and automated backups,
-ElastiCache, CloudWatch with a set log retention, secrets in Secrets Manager. Organisation sign-in
-works on day one through **Amazon SES**; job-seeker sign-in waits for a **DLT-registered SMS
-sender**, which takes weeks — start it now. Deployment settings that must not be forgotten:
-`RATE_LIMIT_TRUST_FORWARDED=true` behind the ALB (and never without it), `PYTHONUNBUFFERED=1`,
-`IISM_BACKUP_PASSPHRASE` in Secrets Manager, and the CSP header switched from report-only to
-enforced once a production build runs clean. Field-level encryption (ADR-023) lands before résumés
-or Aadhaar are collected; neither is today.
+*Rewritten 2026-09-22. The previous version had gone stale in the way that misleads rather than
+merely ages: it called deployment "Sprint 22" (Sprint 22 was languages and notifications), and
+listed course-provider self-serve publishing and organisation email sign-in as upcoming when both
+shipped in Sprints 12–14. **Delete an item here when it ships; do not let it drift.***
 
-**Before any real user:** a named grievance officer, legal review of the privacy notice and terms,
-and the pull request opened so CI — including the new audit steps — actually runs on this branch.
+**Deployment is deferred by the owner.** It is not blocked on design — §13 lists what it needs —
+and it stays out of the sprint queue until they say otherwise.
 
-Matching works, is measured, and is now visible from both sides. What is missing is mostly
-**evidence and reach**, not mechanism.
+### The homepage counts (reported twice, 2026-09-23, fixed the same day)
 
-**Confirm the PWA installs on a real device.** The manifest, icons and service worker are in place
-and tested for existence and correctness, but the in-app browser pane will not register a worker,
-so nothing has yet proved Chrome offers "Install". One phone, five minutes — and until it is done,
-say "installable" with that caveat rather than as a fact.
+"I added a job listing and the numbers under the marketplace section are not updated." Two
+distinct causes, a day apart, and the second is the more interesting one.
 
-**Tune against the golden set, and grow it.** Five labelled pairs is enough to catch a regression
-and nowhere near enough to trust a weighting. The plan called for 50–100. Growing it is the
-cheapest way to make every later scoring change safe.
+**First: two caches, neither invalidated.** The figures are computed live, but
+`useOrgJobMutations` refreshed `["org-jobs", slug]` and nothing else, and `sw.js` served
+`/marketplace/` stale-while-revalidate — so on a production build the number was permanently one
+visit behind. Probed against the committed worker: all three count endpoints answered from cache
+while online. `web/src/lib/counts.ts` now holds the keys and `LIVE_DATA` in `sw.js` makes the
+counts network-first.
 
-**Semantic similarity** is the deliberate omission from Sprint 10 (ADR-007 names it; ADR-036 says
-deterministic overlap ships first so there is a baseline). Embeddings over performance criteria
-rather than titles — titles like `OJT` and `Project` embed to noise — with sentence-transformers
-self-hosted, so no per-request cost.
+**Second: the number was right and its definition was not the reader's.** The panel counted
+**open** vacancies, and `scripts/seed_marketplace.py` closes `inventory-clerk-nagpur` on every run
+— so publishing a twenty-first vacancy moved the figure 19 → 20. Nothing was broken and nothing a
+cache fix could reach. The panel now leads with `jobs_posted` and names `jobs_open` underneath
+when they differ.
 
-**Hindi for the corpus** (Sprint 13): ~$5 for the navigable surface, blocked on credentials rather
-than design. Worth stating plainly in any demo: the interface is fully bilingual today, the *corpus*
-is not — standard names and descriptions are still English.
+- `posted_job()` is the count's predicate, `open_job()` stays the listings'. A bare
+  `status == "published"` in a count is deliberate; the docstring says so, because the rule beside
+  it says every public listing must use `open_job()` and the next reader would file this as the
+  one that was missed.
+- **Both payloads carry both names.** `jobs` meaning "open" in one response and "posted" in
+  another is the trap; the rename made `tsc` fail on the one stale reader, which is the whole
+  reason it was a rename and not a redefinition.
+- **Not monotonic, and that is the honest shape.** Unpublishing removes the page and removes the
+  row, so the figure never names a vacancy a visitor cannot open. A true lifetime tally needs
+  `first_published_at` and would advertise vacancies that exist nowhere on the site. Walked
+  through every state against the live API: draft 21/20 → published 22/21 → closed 22/20 →
+  reopened 22/21 → unpublished 21/20.
+- **The second line hides when the two figures converge** — the branch a seeded database never
+  shows, because the seed always closes one. It has its own test for exactly that reason.
 
-**Teammate invitations.** One owner per organisation today. The model already allows many
-memberships per tenant, so this is an invitation token, an email and an acceptance path — no
-restructuring, which is exactly why the context model was built for many memberships from the start.
+No migration: `ix_jobs_status_closed` is on `(status, closed_at)`, so the posted count uses the
+leading column and gets the same index-only scan.
 
-**Course-provider self-serve publishing**, on the same rails as jobs. `publishing.py` and the
-authorization dependency generalise; `Course` has no geography, which is the only real difference.
+### Sprint 28 — clear the decks (done 2026-09-23)
 
-**The parked résumé builder and extractor**, deferred because correct Devanagari in PDF needs
-complex-script shaping and therefore Pango/HarfBuzz. Still the best answer to profile-completion
-friction, which is now the binding constraint on matching: a candidate with no declared skills
-gets no matches, correctly, and nothing yet makes declaring them easy.
+The monetisation ADR and payment port are **deferred by the owner**; the gate ADR-025 sets cannot be
+cited honestly yet (five golden pairs, all candidate→job where ADR-025 means course; click-through
+computable since Sprint 24 and computed nowhere; enrolment conversion at zero and deliberately not
+modelled). Scoped as one sprint this came to ~44 files, so it is two — Sprint 29 carries the admin
+pages and the golden-set expansion.
 
-Also outstanding: career paths (ADR-008, and the NCO codes for it now exist), typed `SkillRelation`
-edges, organisation/email login and self-serve publishing, a real SMS provider, observability, and
-the ADR-023 encryption path.
+**Geography — done 2026-09-23.**
+
+- **`PlaceIndex` is the one resolution rule**, pure and session-free, with two loaders:
+  `resolve_location` narrows to the names one write could reach, `load_place_index` loads the master
+  for the import sweep. `resolve_location`'s signature is unchanged, so none of its six callers moved.
+- **The importer's private alias map and private lookup are gone.** A test asserting the two maps
+  were identical had kept the letters in step and not the algorithm.
+- **The churn is fixed and measured.** Two consecutive `make import-nsqf` runs:
+  `locations_updated=20` then `locations_updated=0`, with sha256 digests over
+  `(id, state_id, district_id, updated_at)` on `jobs` and `candidate_profiles` **identical before
+  and after both**.
+- **A second defect found while measuring**: `scripts/seed_candidates.py` never resolved geography
+  at all, so all twenty seeded preferred locations carried NULL on both FKs and `candidate_facts` —
+  which reads exactly those columns — saw nothing. Half of Sprint 23's locality tie-break had no
+  input. Fixed the way Sprint 15 fixed the marketplace seed; probed by clearing the twenty and
+  running the seed alone, 20 unresolved before and 0 after.
+- `make evaluate` still prints **88 / 45 CAPPED / 86 / 100 / 0**, bit-identical, which matters
+  because resolving preferred locations changes what the tie-break sees.
+- 606 backend tests (was 598). Non-vacuity: neutering the state filter fails six of the seven new
+  tests; reverting the change-guard fails the seventh on `assert 1 == 0`.
+
+**The operator surface — done 2026-09-23.** `tenants.is_verified` had existed since Sprint 12 with
+**no writer of any kind**. A marketplace whose verified badge nobody can grant has no verified
+organisations.
+
+- **ADR-042** records a second authority beside ADR-039's: global, granted by `users.is_staff`
+  alone, expressed as `OPS_*` members of the same closed `Permission` enum. `require_operator()`
+  sits beside `require()` and returns an `OperatorContext` with **no tenant on it**.
+  `ROLE_PERMISSIONS` may never hold an `OPS_` member — `owner` is the widest role there is.
+- **No HTTP writer for `is_staff`, ever.** `scripts/grant_staff.py` (`make grant-staff`) is the only
+  one; it needs database credentials, refuses to create an account, and prints the full roster after
+  every run including the dry one.
+- **Migration 0028 dropped `is_verified`** and derives it from `verified_at`. Free only in this
+  sprint: nothing had ever written the boolean, so no row could disagree. `verified_at` +
+  `verified_by` + a ≥10-character `verification_note`, with a CHECK making an unevidenced badge
+  **unrepresentable**. Down-and-up rehearsed; `alembic check` clean.
+- **`tenant_verification_events` is append-only** and revocation is a new row. On revoke the
+  tenant's three columns go NULL, so a revocation's reason survives only in the log — which is why
+  both exist. `_delete_tenant` went from eleven tables to twelve.
+- **Exercised live, not inferred**: granted MedLife through the API and watched `is_verified` flip
+  to true on the public `/jobs` payload for both its vacancies; granted Apollo Care and read
+  **"Verified"** on `/en/employer/apollo-care-hospitals/settings` in the browser; revoked it and
+  read **"Not yet verified"**. Anonymous 401, non-staff 404 with a body byte-identical to
+  `/ops/nonsense`, operator 200 on the same URL.
+- **`hiring@apollo-care.example` is now an operator** on the dev database, and the verification
+  events from those demonstrations are still there — they are append-only by design, so deleting
+  them to tidy up would contradict the thing being demonstrated.
+- 628 backend tests (was 606). Four probes: removing a route's guard fails four tests including the
+  route walk; letting `_OWNER` reach `OPS_ORG_VERIFY` fails the disjointness test; removing the
+  CHECK **from migration 0028** fails the database test (removing it from the model does not — the
+  test database is built from migrations, which is the point).
+- **A finding worth keeping**: this FastAPI keeps included routers nested, so `app.routes` holds
+  `_IncludedRouter` objects and exactly two bare `APIRoute`s. The first route-guard test found zero
+  `/ops` routes and **failed on its own anti-vacuity assertion** rather than passing against an
+  unguarded back office.
+
+**Still to do in Sprint 28:** nothing. Sprint 29 carries the `/admin` pages and the golden set.
+
+### Sprint 29 — a back office you can see, and a matcher you can defend (done 2026-09-23)
+
+**The `/admin` pages.** `OperatorOnly` keeps three answers apart that a permission gate usually
+collapses: not-found for a signed-in non-operator (the same answer the API gives), a sign-in prompt
+for somebody signed out, and **nothing at all while the answer is in flight** — the branch that
+rots, because it is invisible on a fast connection and 404s every operator on a slow one. It has
+its own test, and the first version of that test passed against the bug: it asserted the children
+were absent, which is also true when the signed-out prompt is showing. It now asserts the prompt is
+absent too.
+
+- `is_staff` rides on `/auth/me`, so the gate costs no extra request.
+- **The harness was lying about signed-out.** `derived()` returned a populated account regardless of
+  `world.signedIn`, so every signed-out branch was untestable through that seam. Fixed; the whole
+  suite still passed, which says the old behaviour was never load-bearing.
+- Budget unchanged at **672/684 KB** — admin routes are route-local, not in the header or the barrel.
+- Exercised in a browser: granted MedLife through the UI and watched the badge reach the public
+  `/jobs` payload, then withdrew it. **The withdrawal note corrects the grant**: the note I typed
+  when granting claimed a lab licence had been checked and nothing had been, and a false evidence
+  note undermines the one field the whole feature exists for. Both decisions are in the history.
+- `/hi/admin/...` at 360×640: no overflow, dates localised, the operator's own note left in the
+  language they wrote it in.
+
+**The golden set: 5 pairs → 34 pairs, 7 orderings, 16 course expectations.**
+
+- **Nine labels failed on the first run and all nine were mine.** Three claimed
+  `capped_missing_mandatory` for candidates already scoring below 45 (`capped` is
+  `raw > MANDATORY_GAP_CAP`, so it was correctly False — they get `missing_mandatory` now); four
+  named `inventory-clerk-nagpur`, which the seed closes as filled; one ordering was written
+  backwards. The scorer was right every time.
+- **`below_assessed_peer` is gone as a per-pair label**, and the reason is structural rather than an
+  oversight: "ranks below that other candidate" names a *pair*, and a per-pair label has nowhere to
+  put the peer. It lives in `GOLDEN_ORDERINGS` now. The `if/elif` chain gained the `else` it never
+  had, so an unrecognised label fails instead of asserting nothing.
+- **Course recommendation has labelled data for the first time** — ADR-025's precision@5 is about
+  course recommendation, and `courses_closing_gap` had none of any kind. That is one third of
+  Sprint 28's uncitable gate now citable.
+- **`make evaluate` is still not in CI and should not be.** It needs the corpus, which is not in the
+  repository, so a scheduled workflow would be red every morning for a reason nobody could fix.
+  `tests/test_golden_set.py` (19 tests) runs in CI instead and catches both classes of mistake above
+  **statically** — probed by re-introducing each and watching the named test fail.
+- Probes on the scoring run itself: making `self_declared` score like `certified` fails the evidence
+  ordering by name; removing the mandatory cap fails fourteen expectations by name.
+
+### Sprints 30 and 31 — the audit, and acting on it (done 2026-09-24)
+
+No new functionality, by instruction: *"check the Scope from our baseline documents and the reality
+of completed items."* Three axes audited — route-handler delegation, tenant scoping, swallowed
+exceptions — and the result is worth stating as a whole: **the server is in better shape than the
+documents claim, and the client was in worse shape than its tests suggested.**
+
+- **Tenant scoping audited clean, and no security work followed.** All 29 `{org_slug}` routes
+  carry `require(...)`; every service reachable from them re-filters on `tenant_id` in the same
+  `WHERE` as the slug or id, including both classic IDOR shapes. The one auth-free surface is the
+  demonstration console, behind an allowlist that fails closed. Saying so *is* the result.
+- **Eleven frontend writes failed in silence, and the worst were not obscure.** `SkillsSection` --
+  the file whose own docstring calls it "the only part of a profile that changes a match score" --
+  had no `error`, `isError` or `onError` anywhere. `Notices.markRead` never read `error` at all,
+  and openapi-fetch resolves on a non-2xx, so `onSuccess` ran on a 500 and the button did nothing
+  for ever. See the frontend conventions in `CLAUDE.md`.
+- **One was actively misleading**: an expired session was told its vacancy needed a required
+  standard it already had. Fixed and verified in a browser against the real API.
+- **`ProviderWorkspace`'s docstring described a fix the file never contained** -- past tense, four
+  sprints old, `isSignedOut` never imported there. Found while writing the tests, not by the audit.
+- **`web/src/lib/mutation-errors.test.ts`** reads the source and fails when a `useMutation` has
+  neither an `onError` nor anything reading its `.isError`. **`tests/test_worker_schedule.py`**
+  asserts the four feature crons are registered where arq actually reads them.
+- **`docs/scope-reconciliation.md`** is the ledger: seven places the product definition and the
+  tree disagree, each naming the file that proves it. The `.docx` is deliberately not amended.
+  Its sharpest finding is in no other document: **three of the four `SKILL_SOURCES` have no writer
+  outside the seed**, so `EVIDENCE_WEIGHT_SHARE = 0.10` is a constant for every real candidate --
+  a tenth of the match score carries no information in production.
+
+### Sprint 32 — every handler delegates (done 2026-09-24)
+
+The audit recorded 17 route-handler violations as accepted; the owner reversed that and asked for
+them fixed before any other work. All 17 moved, plus two the audit had classed as borderline, so
+the route layer now makes **zero** calls to `db.*`, `select()` or `record()`.
+
+- **The point was to preserve the ordering, not bury it.** Fifteen of the seventeen existed because
+  `record()` commits and therefore has to run after the business commit. Each service function now
+  commits and then records, with the reason written beside it -- one function owns the sequence
+  instead of every handler remembering it.
+- **`tests/test_route_delegation.py` is the guard**, and it names the module, the handler and the
+  call when it fails. Probed by restoring `update_organisation`'s old shape.
+- **One deliberate behaviour change**: `member_removed` now fires when somebody *leaves*, not only
+  when an owner removes them. Moving the record into the single writer is what exposed it -- the
+  leave path had never been measured. `{"self": true}` keeps the two apart.
+- Also found and fixed while doing it: `update_organisation` had **no service layer at all**, which
+  is how `contact_email` went eight sprints without the normalisation every other address has.
+
+### Sprint 33 — a management-facing MVP push (done 2026-09-26)
+
+The owner's instruction superseded the monetisation-first plan below before any of it was built:
+optimise the next sprint for demonstrating the platform's full actor breadth to higher management,
+ahead of revenue. Full stories, acceptance criteria and sizing are in
+`docs/IISM-Product-Backlog.docx` (Epic B7 and BL-2.3, sequence in §4) — this entry is the decision
+record, not the detail.
+
+- **Government agency and external-system actors, thin slice.** Shipped: an ops-run CSV enrolment
+  (`scripts/bulk_enrol_candidates.py`, reusing `identity.provision_candidate` rather than a second
+  construction path), a programme-scoped reporting view (`GET /ops/programmes/{name}`), and API-key
+  auth (`ServiceAccount`, a fourth credential beside JWT) on a partner-facing `GET /partners/jobs`
+  route. The super-admin tier stayed cut, per the original decision — no audience-visible payoff and
+  ADR-042 already argues against speculative admin escalation paths.
+- **The course-to-role alignment score, pulled forward to run alongside it.** Shipped:
+  `course_role_alignment` and `GET /org/{slug}/courses/{slug}/alignment/{role_slug}`, independent of
+  any candidate (ADR-037 does not apply the way it does to `candidates_for_job`, because there is no
+  candidate in this comparison at all). `docs/scope-reconciliation.md` #4 is now closed.
+- **The rest of Epic B2, pulled forward again once B7 and BL-2.3 landed**, on the owner's
+  instruction to keep going rather than stop at the originally-scoped slice:
+  - **BL-2.1, configurable match weights.** `ScoreWeights` is a value object built by
+    `weights_from_settings()` and passed into `score_match`; `scoring.py` still reads no
+    configuration at all (an AST-based test checks this, not a substring search — a naive one
+    false-positived on `ScoreWeights`'s own docstring). `make evaluate` printed the identical
+    baseline with default weights, confirming bit-for-bit equivalence.
+  - **BL-2.2, `course_dismissed`.** `course_opened`'s negative half — precision@5's missing class,
+    named in `docs/scope-reconciliation.md` #3 as absent. Migration 0031 widens the CHECK by hand,
+    per the established pattern; the two events are counted separately, not collapsed.
+  - **BL-2.4, market-wide scarce skills.** `market_scarce_skills` reuses `scarce_skills`'s query
+    with `tenant_id=None` via a shared `_scarce_skills` helper, rather than a second copy of the
+    demand query — the same "one construction site" discipline as `candidate_card()`. New
+    `GET /org/{slug}/market-demand`, reachable by a course provider for the first time.
+- **B7 alone is not "all actors."** Assessment Provider is a separate epic (B3, Sprint 35 in the
+  backlog's sequence) — a demo must not claim full actor coverage before it lands too.
+- 724 backend tests (was 606 at the start of Sprint 28). `make gen-api` regenerated twice, both
+  purely additive diffs. Every feature verified live against the running dev server and seeded data,
+  not only through pytest.
+
+### Sprint 34 — ADR-043, and a payment adapter port (done 2026-09-26)
+
+The owner's stated direction is a marketplace that also **sells courses** and carries **gig work**;
+Sprint 33 demonstrated the platform to management with no monetisation story at all, which made
+continued deferral's cost visible rather than theoretical.
+
+- **ADR-043 supersedes ADR-025's deferral clause — carried forward, not declared satisfied.**
+  ADR-025 named three gate metrics. Precision@5 is now citable (34 golden pairs, up from 5, per
+  Sprint 29). Click-through is joinable since Sprint 24 but has near-zero real volume. Enrolment
+  conversion has **no surface at all** — Sprint 24 deliberately modelled interest, not enrolment,
+  because a provider's own system is the source of truth for whether somebody enrolled. The ADR
+  says this plainly rather than treating the port's existence as having passed the gate.
+- **The port, and only the port.** `api/adapters/payments/` — a `PaymentProvider` protocol
+  (`create_payment(amount_paise, currency, reference) -> transaction_id`) and
+  `ConsolePaymentProvider`. No gateway, no `Order`/`Entitlement`/`Payout` table, no route or service
+  calls it — `tests/test_payment_adapter.py` statically asserts nothing under `api/modules/` imports
+  it, which is the ADR's whole premise and the thing to re-check if it ever fails.
+- **It differs from its `notifications/`/`email/` siblings in one respect, deliberately.** Those
+  have a real development-mode success path because real features call them today. This one has no
+  caller anywhere — course checkout does not exist — so `ConsolePaymentProvider.create_payment`
+  refuses **unconditionally**, not only in production; succeeding would fabricate a transaction for
+  a flow that is not built. The production check stays anyway, in the same shape as its siblings, so
+  the day a real provider replaces this one, the line that must never be deleted is already the one
+  being overwritten.
+- 729 backend tests (was 724). `make check` clean.
+- **Sequencing after this** is in the pillar assessment below: course checkout (~2 sprints, its own
+  ADR for `Order`/`Entitlement` and the real gateway implementation), then gig as its own module with
+  its own ADR. Neither is started.
+
+### Sprint 35 — Epic B3, verified evidence (done 2026-09-26)
+
+`docs/scope-reconciliation.md`'s postscript named the sharpest, cheapest finding of the whole
+ledger: three of four `SKILL_SOURCES` had no writer outside `scripts/seed_candidates.py`, so
+`EVIDENCE_WEIGHT_SHARE = 0.10` was a constant for every real candidate. This gives two of them one.
+
+- **BL-3.1, the assessment-provider webhook.** `api/adapters/assessment/` is a `AssessmentProvider`
+  protocol (`parse_result`, turning one vendor's payload into a normalised phone/standard-code/
+  pass-fail) plus `ConsoleAssessmentProvider`, the reference implementation BL-3.1's own acceptance
+  criteria call for pending "a signed provider partnership" (a business dependency, not an
+  engineering one). `POST /partners/assessment-results` resolves the phone to a candidate (lazily
+  creating their profile if they have never opened it, the same rule `/me/matches` follows) and the
+  standard code to a `Skill` via the new `get_skill_by_nos_code` (nos_code is unique in the corpus,
+  unlike names or sector-local ids), then writes through `record_verified_skill` -- never a second
+  construction site. A failed attempt writes nothing and is not an error; an unknown candidate or
+  standard is a 404, not a silent 200, because a real partner needs to know a result did not land.
+- **No new table, deliberately.** ADR-023 names "assessment results" among the data an encryption
+  path must exist for before it is collected, and that path is unbuilt (§13.4 below). The webhook
+  persists only a coarse pass/fail through the already-plaintext `CandidateSkill.source` column --
+  never a score, a transcript, or free text -- and answers synchronously with what happened instead
+  of writing an audit trail, which is also what a real integration partner actually needs.
+- **`ServiceAccount.scope` stopped being a set of one.** `assessment:write` joins `read`
+  (migration 0032, hand-written CHECK widen, the established pattern); `require_service_scope()` is
+  a second question beside `get_service_account`'s -- not just which partner, but what they may do.
+  A read-only key against the webhook is a 403, not a 401: the key is real, ADR-038's rule that an
+  authenticated identity's insufficient permission is a 403 applies to a service account too.
+- **BL-3.2, an operator-verified certification.** `CandidateCertification` gained
+  `verified_at`/`verified_by`/`verification_note` (migration 0033), with the same evidence CHECK
+  ADR-042 put on `tenants.verified_at` -- a badge with no evidence must not be representable,
+  whichever table it lives on. Deliberately simpler than `tenant_verification_events`: a candidate's
+  own certification is theirs to edit or delete at any time, unlike an organisation's badge, so
+  there is no symmetrical need for an append-only history an operator must consult before acting.
+  `OPS_CANDIDATE_VERIFY` is a new operator permission; `GET /ops/candidates/certifications` is the
+  queue (certifications naming a standard, not yet verified) and `POST .../verify` the decision,
+  which writes through `record_verified_skill` in the same transaction as the certification's own
+  columns.
+- **`_write_skills` gained a `source` parameter and an upgrade-only rule.** Re-adding a
+  self-declared skill can never downgrade one already `assessed` or `certified` --
+  `SKILL_SOURCES.index(new) > SKILL_SOURCES.index(existing)` before overwriting, and a test cross-
+  checks that tuple's order against `matching.scoring.EVIDENCE_WEIGHT`'s own ascending order, since
+  the two silently drifting apart would be a scoring regression nothing else would catch.
+- **Verified live against the seeded database, not only pytest**: issued a real `assessment:write`
+  API key, POSTed a pass for the seeded candidate `+919000000001` against a real NOS code
+  (`MSME/ASC/N1514`) and watched `CandidateSkill.source` land as `assessed`; a read-only key against
+  the same route came back 403, and against the pre-existing `/partners/jobs` still 200. Signed in
+  as the existing operator (`hiring@apollo-care.example`), added a certification against the same
+  candidate, verified it through `/ops/candidates/certifications/{id}/verify`, and confirmed
+  `source='certified'`, `proficiency=4`, and the row leaving the queue. Both demo API keys revoked
+  afterwards.
+- 759 backend tests (was 729). `make check` clean; migrations 0032/0033 rehearsed down and up with
+  zero further autogenerate drift; `make gen-api` regenerated, purely additive.
+
+### Sprint 36 — semantic similarity, and the skill graph's foundation (done 2026-09-27)
+
+BL-5.1/5.2 per `docs/HLD` §9.2 and ADR-036's own deferral ("deterministic overlap ships first so
+there is a baseline to measure any addition against"); BL-6.1 alongside it, both NEXT in the
+backlog's near-term sequence.
+
+- **`api/adapters/embeddings/`** — an `EmbeddingProvider` protocol pinned to 384 dimensions
+  (ADR-031) and `HashingEmbeddingProvider`, an honestly-labelled placeholder: deterministic feature
+  hashing over lower-cased word tokens, not the ADR-013/031-mandated self-hosted
+  sentence-transformers model. **Not silently substituted** — that model needs `sentence-
+  transformers` added to `pyproject.toml` (torch, a ~470 MB download), which is an infrastructure
+  decision flagged rather than made inside this story. Swapping it in later touches only
+  `get_embedding_provider()`; nothing else in the pipeline knows which provider is behind the port.
+- **`Job.embedding`/`CandidateProfile.embedding`**, migration 0034 — plus `embedding_provider`,
+  `embedding_model`, `embedding_computed_at` on both (ADR-031: "every stored vector records the
+  provider, model identifier and model version"). `NULL` means "needs (re)computing", not "has
+  none" — a skill write sets it back to `NULL` (`marketplace.profile_service._write_skills` /
+  `remove_skill`; `marketplace.publishing._write_skills`) rather than leaving a vector that no
+  longer describes what the row now holds.
+- **`matching.tasks.refresh_embeddings`** is the only thing that ever fills a `NULL` back in — a
+  worker cron every two minutes, the same "claim by writing, cheap when nothing is NULL" shape the
+  alert sweep uses, never inside a request or inside `scoring.py` (ADR-036). Text comes from
+  `skills.embedding_text_for_skills`: performance criteria, never a skill's own title ("OJT" and
+  "Project" are real unit titles that embed to noise on their own, per the outstanding-work note
+  this closes); falls back to a skill's `description`, then its `name`, for the ~35% of standards
+  with none.
+- **`score_match` gained `job_embedding`/`candidate_embedding` and a `semantic` weight, default 0.0
+  in both `ScoreWeights` and `Settings.match_weight_semantic`.** Cosine similarity, clamped to
+  `[0, 1]` (never a penalty for a dissimilar or missing embedding), added into `raw` *before* the
+  mandatory cap so it narrows toward the cap like every other component rather than escaping it —
+  and `raw = min(raw, 1.0)` is a new safety clamp, since the four original weights already sum to
+  1.0 and `semantic` is additive on top rather than carved from an existing share. `make evaluate`
+  prints the identical baseline — bit-for-bit, because the default weight is 0.
+- **`SkillRelation`** (`api/modules/skills/graph.py`, migration 0035) — a typed (`implies`,
+  `related_to`), weighted, directed edge between two skills. Explicitly the foundation only: no
+  inference and no career-path output reads it yet (BL-6.2/6.3, held for the next planning cycle,
+  per the backlog's own reprioritisation note). Left `skill_concepts` (Sprint 9's equivalence
+  grouping) untouched — a different structure answering a different question.
+- **Verified live against the seeded database**: ran `refresh_embeddings` directly — 20 published
+  jobs and 20 of 40 candidate profiles got a real 384-dim vector (the other 20 have no declared
+  skills, correctly left `NULL` rather than a meaningless zero vector); confirmed
+  `embedding_provider='hashing'`, `embedding_model='feature-hash-word-v1'`. Re-fetched
+  `/me/matches` for the seeded candidate with matches (`+919000000001`) and confirmed the known
+  score (88) is unchanged. Worker restarted and its startup line lists `cron:refresh_embeddings`
+  alongside the other four.
+- 793 backend tests (was 759). `make check` clean; migrations 0034/0035 rehearsed down and up with
+  zero autogenerate drift; `make gen-api` shows no new routes (this sprint is entirely internal to
+  matching — no schema or endpoint changed).
+
+### Sprint 37 — tiered operator authority, then gig work as a `Job` (done 2026-09-28)
+
+Two pieces of direct owner instruction, in sequence, not a story picked off the backlog. First:
+"reprioritise what is left in B7 and take up Epic B8 post that" — so BL-7.3, the only unbuilt piece
+of Epic B7, shipped first. Second, arriving mid-design-review for Epic B8: "a gig work can also be
+considered as a temporary job assignment and should be treated like a job in our system" — which
+overrode ADR-045's own design (a wholly separate sibling module, written and reviewed but never
+built) before a line of BL-8.2 was written.
+
+**BL-7.3 — tiered operator authority (ADR-044).**
+
+- `users.staff_tier` (`support`/`admin`) sits beside `is_staff`, with a CHECK pairing them
+  (`is_staff` true iff `staff_tier` is not null). `TIER_PERMISSIONS` in `core/authorization.py`
+  maps each tier to a `frozenset[Permission]`, with `assert TIER_PERMISSIONS["support"] <
+  TIER_PERMISSIONS["admin"] == OPERATOR_PERMISSIONS` holding the two in a known relationship.
+- `require_operator()`'s single 404 split into two answers, generalising ADR-038's rule one level
+  up from tenant membership to operator tier: **404** if the caller is not staff at all (the same
+  refusal a stranger gets), **403** if they are staff but this tier lacks the specific permission
+  (they have already established standing as an operator, so the refusal can say so).
+- `scripts/grant_staff.py --tier {support,admin}` is still the only writer of either column — no
+  HTTP route grants either, the standing rule since Sprint 13 unrelaxed.
+- Hit the harness's own permission-grant safety gate once while writing `STAFF_TIERS` into
+  `identity/models.py` — a classifier distinct from normal tool-use permissions, triggered by
+  defining new privilege-escalation logic. Stopped, explained, and re-implemented from a
+  user-approved design rather than working around it.
+- Migration 0036 backfills every existing `is_staff=true` row to `staff_tier='admin'`. Verified
+  live: a fresh `support` operator reads the verification queue (200) but gets 403 on
+  `OPS_ORG_VERIFY`; a stranger gets 404 on the identical URL; the pre-existing `admin` operator
+  was backfilled and unaffected.
+
+**Epic B8 — gig work reuses `Job`/`Application` (ADR-046, superseding ADR-045 §1-4).**
+
+ADR-045 had argued from first principles that a gig is a different *kind* of market — a scheduled
+need rather than a standing offer, proximity as a hard filter rather than a tie-break, a real
+completion event, bidirectional reputation — and proposed four new tables in a new sibling module,
+`api/modules/gig/`, with its own scorer. None of it was ever built. The owner's instruction
+rejected the premise, not just the conclusion: the physics ADR-045 named are properties a `Job`
+row can be given, not proof it cannot hold them. Verified against the actual code before writing
+anything, not assumed: `open_job()`, `match_jobs`'s retrieval SQL, `score_match`, and the hourly
+`close_expired_jobs` worker cron contain **zero references to `employment_type`** — a `Job` row
+with `employment_type="gig"`, a real `closes_at` and a real `positions` count already flows
+through the existing matching, ranking and auto-close pipeline with no code change to any of those
+three files.
+
+- **A genuine pre-existing bug, found while grounding the redesign and fixed as a prerequisite**:
+  `publishing.py`'s `_PLAIN_FIELDS` tuple never included `"positions"` or `"closes_at"`, even
+  though `JobIn` has always accepted both with real validation. `create_job`/`update_job` silently
+  dropped whatever an employer submitted for either field — ten sprints latent, harmless for a
+  permanent vacancy (nothing read them), fatal for a gig (both are load-bearing). No test anywhere
+  exercised either field through the HTTP API; every existing test used direct ORM construction.
+  Added a regression test that failed against the old code first, then fixed it.
+- **`EMPLOYMENT_TYPES` gains `"gig"`**, shared by `Job.employment_type` and
+  `CandidateProfile.preferred_employment_type` — the owner's own second decision, when asked
+  directly whether a candidate should be able to state gig work as a preference. Two new
+  invariants close the actual gap: `publishing._require_gig_has_a_place` refuses a gig whose
+  district does not resolve (422, service-layer, same place `resolve_location` already runs — not
+  a schema `NOT NULL`, because a permanent vacancy's district may still be null); `JobIn`'s
+  validator refuses `employment_type="gig"` with `closes_at=None` ("a shift with no end is not a
+  gig").
+- **No second scorer — this satisfies ADR-037 rather than testing it.** ADR-045's case for a
+  separate scorer rested entirely on gig-against-candidate being a different comparison from
+  job-against-candidate. Once a gig is a `Job`, that premise is gone: `score_match` never asked
+  what kind of `Job` it was scoring, and `matching._locality` keeps its existing tie-break role for
+  gigs exactly as it does for permanent vacancies — the owner's instruction was to treat a gig as a
+  job, not to give proximity a different role for one `employment_type`.
+- **`Application` gains `completed`/`no_show`**, reachable only from `hired`, and only when the
+  underlying `Job.employment_type == "gig"` — enforced in `employer_service.set_status` as a
+  service-layer refusal (409/422), not a CHECK, since the rule spans two tables. A permanent
+  vacancy's `hired` stays terminal exactly as before.
+- **Full two-sided rating, not status-only** — the owner's explicit scope choice when asked
+  directly. New table `application_reviews`: `subject_role ∈ {poster, worker}` names who the
+  rating is *about*, never who wrote it, so `UNIQUE (application_id, subject_role)` makes each
+  direction write-once without one party's review waiting on the other's row to exist. Reviewable
+  only once `Application.status == "completed"` — `no_show` is deliberately not reviewable,
+  ADR-045's own reasoning carried forward unchanged: a no-show is evidence about the cancellation,
+  which the status already carries. `review_service.py` sits beside `service.py`/
+  `employer_service.py` in `applications/`, reused from both identity contexts (`POST
+  /me/applications/{id}/review` and `POST .../applications/{id}/review`).
+- **No new module.** Everything landed in the two modules that already own the concepts —
+  `marketplace/` for the posting-side invariant, `applications/` for the outcome and the review.
+  This formally supersedes BL-8.2's original acceptance criteria ("does not extend
+  `marketplace.Job`") and ADR-045 §1-4; ADR-045's §5 (no payment, no payout) is untouched.
+- **One `Job` row per shift/date, stated as the shape rather than deferred as a gap.** A recurring
+  gig ("every Saturday for a month") is multiple postings, the same way a staffing agency books
+  each shift separately — building a multi-shift sub-model would reintroduce the complexity the
+  owner's steer was deliberately avoiding.
+- **Foundation only, by the same discipline `SkillRelation` shipped under**: `application_reviews`
+  has a writer and no reader. No aggregate rating, no completion-count badge, and reputation must
+  never feed `score_match` without its own design pass following `weights_from_settings()`'s
+  precedent (a value passed in, never read inside the scorer).
+- ~~**The frontend gap is named, not routed around.**~~ **Closed the same day — see the
+  follow-up below.** It was worse than "named": the gap broke the web build.
+- **Live-verified end to end against the running dev server and seeded data**, not just pytest:
+  posted a real gig via `curl` in Chennai/Tamil Nadu requiring a skill the seeded candidate
+  `+919000000001` actually holds — `positions`/`closes_at` persisted (the bug-fix proof), and the
+  gig ranked at the top of that candidate's real `GET /me/matches` (score 96, district match) with
+  zero code changes to `matching/service.py` or `scoring.py`. Walked a second real application
+  through `applied → shortlisted → hired → completed`, submitted both review directions (201 each),
+  confirmed a duplicate direction (409), a review before `completed` (409), and a review on a
+  `no_show` application (409) are all refused. `make gen-api`'s diff widened three unions and
+  removed nothing — which was reported here as "purely additive", and was not: a widened union
+  breaks every hand-written narrower copy of it downstream (see the follow-up).
+- 827 backend tests (was 793), 259 web tests unchanged (backend-only sprint). `make check` clean;
+  migration 0036 (tiers) and 0037 (gig + outcomes + reviews) each rehearsed down and up with zero
+  autogenerate drift; `make evaluate` printed the identical 34 pairs/7 orderings/16 course
+  expectations — bit-for-bit, since nothing in `matching/` or `scoring.py` changed.
+- ADR-044 (operator tiers) and ADR-046 (gig reuses `Job`, superseding ADR-045 §1-4) both written to
+  `docs/adr/architecture-decisions.md`, with amendment-record bullets at the top of the file.
+  `docs/IISM-Product-Backlog.docx` updated: BL-7.3, BL-8.1 and BL-8.2 marked done, the Epic B8
+  intro and the "Following This Window" sequence table both rewritten to describe what was
+  actually built rather than what was originally proposed.
+
+**Follow-up, 2026-09-28 — a pre-sprint architecture audit found Sprint 37 had shipped broken.**
+
+- **The pushed branch did not build.** `npx tsc --noEmit` failed in `SearchResults.tsx`: the
+  regenerated client typed `employment_type` with `"gig"`, and `JobBrowser.tsx` still declared a
+  four-value copy. `npm test` was green because Vitest does not type-check, and CI never ran
+  because it triggers on pull requests and `main` only (§10). The sprint's own claim that the
+  client diff was "purely additive" was the error — additive to the schema, breaking downstream.
+- **Fixed by deleting copies, not by adding a value to each.** `lib/profile.ts`'s
+  `EMPLOYMENT_TYPES` is now the one list; `JobBrowser` and `JobEditor` import it.
+  `ApplicationList` had `application.status as Status` onto a hand-written five-value union —
+  the cast is what hid `completed`/`no_show` from the compiler — and now derives `Status` from
+  `components["schemas"]["ApplicationOut"]["status"]`, so its colour map is exhaustive and the
+  next status is a compile error. Labels for `gig`, `completed` and `no_show` in `en`/`hi`/`ms`;
+  `ApplicationList.test.tsx` renders both statuses and **fails against the previous messages**
+  (`MISSING_MESSAGE`), checked before trusting it. The "completed" hint does not promise a
+  rating screen, because none exists yet.
+- **Two counts were wrong in Sprint 37's own backend.** A finished gig worker moves `hired` →
+  `completed`, and both `_close_if_filled` and the programme report counted `status == "hired"`
+  alone — so a two-position gig took a third person once the first had finished, and the report
+  dropped everybody whose gig ended. Two named sets in `applications/models.py`, because they are
+  different questions: `FILLED_STATUSES = (hired, completed)` for "occupies a position" — a
+  **no-show leaves the seat empty** (the owner's call) — and `WAS_HIRED_STATUSES` adding
+  `no_show` for "was this person ever hired". Both regression tests fail against the old code.
+- **The module-boundary rule in `CLAUDE.md` was half fiction.** "Never import another module's
+  `.models`" — about sixty imports do, enforced by nothing. The half that *is* true everywhere —
+  no module imports another's `service`/`*_service`/`routes`/`*_routes` — is now
+  `tests/test_module_boundaries.py`, which asserts it found the modules and the cross-module
+  imports first, and feeds its detector a known-bad snippet. `CLAUDE.md` states the real rule
+  and names the shared-models debt an ADR-014 split would have to pay.
+- Verified: `tsc`, `eslint`, `next build` and the first-load budget clean; 832 backend and 260 web
+  tests; the seeded candidate's `/en/applications` and `/hi/applications` show "Completed" /
+  "काम पूरा हुआ" and "Did not attend" / "उपस्थित नहीं हुए" in the list and in the notices, and
+  the gig's job page shows its employment type in both languages with no raw key anywhere.
+- **Still open, deliberately:** the employer inbox offers only shortlist / not suitable / hire, so
+  `completed`, `no_show` and both review directions are reachable by API only. That is a real
+  follow-up story (a gig-specific inbox action plus a rating form), not a label.
+
+### Sprint 38 — closing ADR-025's structural gate, not its volume gate (done 2026-09-29)
+
+Per the backlog's own sequence, next was `BL-1.2`/`BL-1.3`. Checked against the code rather than
+the backlog document: `BL-1.2` (the payment adapter port) was already done in Sprint 34 — the
+document's `[NEXT]` tag was simply stale. `BL-1.3` (the billing module) genuinely is not built, and
+is not a free pick: ADR-025 requires a successor ADR citing three metrics before any billing code is
+written, and ADR-043 (Sprint 34) explicitly declined to claim that gate was passed — precision@5
+was citable, click-through was "joinable, not populated," and enrolment conversion "has no surface
+at all." Asked how to proceed, the owner chose: close the gate first, then build `BL-1.3` — ADR-043's
+own named "Option 4."
+
+- **`course_interests` gained a fourth status, `"enrolled"`, rather than a new table or module**
+  (migration 0038, ADR-047). It slots in beside `"contacted"` in `PROVIDER_STATUSES` at the same
+  unverified, self-reported trust level, reusing the existing `PATCH .../interests/{id}` route with
+  **zero route or handler changes** — the whole surface a provider needed already existed, it just
+  had nowhere to report an enrolment. `LIVE_STATUSES` gained it too, so an enrolled learner's contact
+  stays visible rather than disappearing the way a withdrawal's does.
+- **`scripts/report_conversion_metrics.py` (`make monetisation-metrics`)** is the sibling `make
+  evaluate` never had: click-through from `course_recommended`/`course_opened` pairs already
+  carrying `user_id` and `subject_id` since Sprint 24/33 (nobody had ever queried it), and enrolment
+  conversion from `course_interests.status`. Both filtered to `subject_type="course"` explicitly —
+  the same pre-migration-0025 trap `matching/service.py`'s own docstring already names.
+- **Verified live, not just in pytest — and the numbers are real but small, deliberately reported
+  as such.** Seeded a couple of `"enrolled"` rows into `scripts/seed_candidates.py`'s
+  `COURSE_INTERESTS`, then generated genuine traffic against the running dev server: signed in as
+  `+919000000002`, called `/me/matches/general-duty-assistant-chennai` (which recorded a real
+  `course_recommended` row) and `POST /me/events/course-opened` for the course it suggested —
+  `make monetisation-metrics` then printed a real `1/5 (20.0%)` click-through. Signed in as
+  `admin@nsdc-healthcare-academy.example` and `PATCH`ed a live interest to `"enrolled"` through the
+  actual API (200); the same call against a withdrawn interest still refused with 409, as before.
+  Enrolment conversion read `3/15 (20.0%)` afterward. **Neither number is fabricated, and neither is
+  strong** — this is a handful of seeded actors on a dev database, not real product usage, and the
+  report script says so in its own output rather than only in this file.
+- **`cd web && npx tsc --noEmit` was run this time, unlike Sprint 37's first pass**, and passed
+  clean against the widened `InterestStatus`/`ProviderStatus` unions. The frontend gap is real but
+  benign: `ProviderInbox.tsx` hardcodes `{ status: "contacted" }`, so a provider has no button to
+  mark somebody enrolled through the web UI today — named in ADR-047 as a small follow-up story,
+  not bundled here because it was never part of what the metric needed.
+- **This does not authorise `BL-1.3`.** ADR-047 is explicit that it closes the *structural* gap
+  only; the *volume* gap — real traffic — cannot be closed by writing more code, and the ADR takes
+  no position on whether the owner should override it (the same kind of call already made once this
+  session for Epic B8 over ADR-045) or wait for real usage. That decision is Sprint 39's, not this
+  one's.
+- Verified: `make check` (835 backend tests, 3 new), `ruff`/`mypy` clean, migration 0038 rehearsed
+  down-and-up with `alembic check` reporting zero drift (the two seeded `"enrolled"` rows correctly
+  fell back to `"contacted"` on downgrade, never to `"registered"`), `make evaluate` bit-identical
+  (34/7/16, untouched by this change), and `make gen-api`'s diff purely additive (confirmed by
+  reading the diff, not assumed).
+- **The owner's answer (2026-09-29): wait for real traffic, do not override.** Asked directly which
+  way to resolve the open question above, the instruction was "wait for real traffic before billing
+  code gets written." `BL-1.3` therefore stays not started — this is now a standing decision, not an
+  open question, until real usage moves either metric or the owner says otherwise. Do not treat a
+  future re-run of `make monetisation-metrics` showing a slightly larger denominator as license to
+  start `BL-1.3` without checking back — nothing in this decision named a threshold.
+
+### Also outstanding, in rough order
+
+- ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
+  expectations, including the first labelled data course recommendation has ever had. The
+  monetisation ADR can now cite one of ADR-025's three metrics honestly; the other two still need
+  users rather than code.
+- **SMS, which is what job alerts actually need.** Sprint 27 shipped in-app plus email; 39 of 40
+  candidates are phone-only, so most alerts land only when somebody opens the site. This is
+  blocked on DLT registration, not on design.
+- ~~**`is_verified` still has no writer.**~~ **Closed 2026-09-23 (Sprint 28)**: `users.is_staff`, `/ops/*` and `make grant-staff`. See the Sprint 28 entry above.
+
+### The three pillars, and where each actually stands
+
+*Assessed 2026-09-22 against the tree, not from memory. The owner's stated goal is a marketplace
+that sells courses, connects jobs, and carries gig work.*
+
+- **Job connect — built, end to end**, and ahead of the other two. Publish → NSQF-scored match →
+  apply → employer inbox → contact disclosed. What remains is Sprint 26's lifecycle and reach.
+- **Selling courses — listed and demanded, never sold.** `Course.fee_inr` exists and renders, and
+  **nothing downstream reads it as money**: `api/adapters/payments/` (Sprint 34, ADR-043) is a
+  protocol and a console implementation with no caller, deliberately — no order, entitlement,
+  enrolment, refund, payout or invoice table in any of 38 migrations. **ADR-025 still forbids
+  writing billing code** until a successor ADR cites precision@5 on the golden set (34 pairs,
+  citable since Sprint 29), candidate-to-course click-through and provider-reported enrolment
+  conversion. Sprint 38 (ADR-047) closed the *structural* half of the remaining gap — `make
+  monetisation-metrics` now answers both, reading `analytics_events` and a new provider-reported
+  `"enrolled"` status on `CourseInterest` — but not the *volume* half: verified live, both metrics
+  read real but small on this dev/demo database (`1/5` click-through, `3/15` enrolment conversion),
+  because a handful of seeded actors generated them, not real product usage. **`BL-1.3` is still not
+  authorised** — ADR-047 says explicitly that closing the volume gap needs either real traffic or an
+  explicit owner override, and takes no position on which. Note also that Sprint 24's "interest, not
+  enrolment" reasoning **inverts** the moment money moves through the platform: if we take the
+  payment, we are the system of record for the enrolment.
+- **Gig work — built in Sprint 37 (ADR-046), reusing `Job`/`Application`.** The
+  September 2026 assessment above (and ADR-045's original design) argued gig work needed its own
+  module because it was a genuinely different market; the owner's direct instruction — "a gig work
+  can also be considered as a temporary job assignment" — rejected that premise before BL-8.2 was
+  built. `employment_type="gig"` plus a real `closes_at`/`positions`/`district_id` on the existing
+  `Job` gives matching, ranking and auto-close everything they need, with zero changes to
+  `matching/service.py` or `scoring.py` — verified live, not just in pytest (§11, Sprint 37).
+  `Application` carries the completion event (`completed`/`no_show`, reachable only from `hired`)
+  and a full two-sided `application_reviews` table is the reputation layer, foundation-only (a
+  writer, no reader yet, the `SkillRelation` shape). An employer can post a gig and a candidate
+  can find, apply to and track one in the interface. What is genuinely still missing: the
+  employer's controls to mark a gig completed or a no-show and both sides' rating form (API only
+  today), and any payment/payout, which ADR-045 §5 and ADR-025/ADR-043's billing gate both still
+  forbid.
+
+**Nothing built so far has to be undone for any of it**, which is the important finding. The
+expensive assets — 21,303 NSQF standards with role search, one pure deterministic scorer, one
+identity many roles, two working consent-and-revocation disclosure loops, geography to
+sub-district — are exactly what all three pillars need.
+
+Suggested order, re-revised 2026-09-29: the management-facing actor-breadth MVP (Sprint 33), the
+monetisation ADR with a **payment adapter port only** (Sprint 34), Epic B3's verified evidence
+(Sprint 35), BL-5.1/5.2 plus BL-6.1's foundation (Sprint 36), BL-7.3 plus Epic B8's gig work
+(Sprint 37), and closing ADR-025's structural gate (Sprint 38, ADR-047) are all behind us now —
+see each one's entry in §11. `BL-1.2` (the payment port) has in fact been done since Sprint 34; the
+backlog document's tag was simply stale and is corrected as of this sprint. **`BL-1.3` (the billing
+module itself) remains genuinely not started**, and is not a free next pick: it needs either real
+traction numbers or an explicit owner override of the volume gap ADR-047 names, the same kind of
+call already made once for Epic B8 over ADR-045. Course checkout, résumé ingestion, the rest of
+Epic B6, and gig work's own frontend controls (§11's Sprint 37 and 38 entries name both gaps)
+remain queued behind whichever the owner picks.
+
+### Then, in rough order of value
+
+- ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29).** 34 pairs against 20 vacancies, plus
+  orderings and course expectations. Still short of the 50–100 the original plan named, and the
+  remaining gap is labelling effort rather than machinery.
+- ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** The API half is done —
+  `users.is_staff`, `/ops/*`, `make grant-staff`, ADR-042. **The `/admin` pages are Sprint 29**;
+  until they land an operator uses `/docs` or `curl`, which is fine for a handful of internal
+  people and is why the UI was the half that could be cut.
+- **CV upload and LLM extraction.** Deferred in Sprint 23 after establishing that it fills
+  experiences and education, which no scorer reads, and needs multipart, object storage, a documents
+  table, PDF/DOCX extraction, AES-256-GCM with KMS (ADR-023) and an `LLMProvider` adapter (ADR-031)
+  before one skill reaches a profile. Revisit once role-led suggestion shows what gap remains.
+- ~~**Semantic similarity**~~ **Closed 2026-09-27 (Sprint 36).** The mechanism exists end to end
+  (`api/adapters/embeddings/`, the two embedding columns, the worker sweep, the additive bounded
+  term in `score_match`) and is off by default (`match_weight_semantic=0.0`) — turning it up is a
+  deliberate, separately-measured re-tune, not yet done, and the embedding provider itself is a
+  placeholder (feature hashing, not the ADR-013/031 sentence-transformers model — see Sprint 36's
+  entry). Still the answer if role search ever proves too weak; the plumbing no longer needs to
+  be built first.
+- **Hindi for the corpus.** The interface is fully bilingual; the *corpus* is not. Say that plainly
+  in any demo. ~$5 for the navigable surface, blocked on credentials rather than design.
+- **Confirm the PWA installs on a real device.** Manifest, icons and worker are in place and tested
+  for correctness, but the in-app browser pane will not register a worker, so nothing has proved
+  Chrome offers "Install". One phone, five minutes — until then say "installable" with the caveat.
+- **A learner-facing notice when a provider marks "contacted"**. Found in Sprint 24 and
+  deliberately not built. *(Its sibling — notifying applicants when an organisation deletes itself
+  — was closed on 2026-09-23 along with the organisation-deletion route.)*
+- **Ownership transfer as one act.** Sprint 25 makes it possible — promote, then leave — but it is
+  two steps and the second can fail on its own. A single "hand over and leave" would be safer.
+- **`CLAUDE.md` cites ADR-026 for the siblings-not-generalisations rule.** ADR-026 is *Supply
+  Acquisition Strategy*; that rule has no ADR and lives only in `CLAUDE.md`. Either write it as one
+  or stop citing a number for it.
+- Still unbuilt and ADR'd: career paths (ADR-008, and the NCO codes now exist) -- the graph it would
+  traverse now has its foundation table (`SkillRelation`, Sprint 36, BL-6.1) but no edges, no
+  inference and no route yet (BL-6.2/6.3) -- observability (ADR-019), the ADR-023 encryption path,
+  caching as caching (ADR-020).
+
+### Measured in Sprint 27 (performance and security)
+
+- **The lifecycle predicate costs nothing.** A/B of the same queries with and without
+  `closed_at IS NULL`, 200 iterations each: browse `+0.001ms`, homepage count `-0.001ms`, matching
+  retrieval `-0.001ms`. The homepage count uses an index-only scan on the new
+  `ix_jobs_status_closed`. All five new query shapes plan sub-millisecond.
+- **Do not compare raw throughput against §12a without checking the box.** A re-run measured
+  `/skills?limit=24` at 72 rps against §12a's 350 — but `/skills` is **untouched** by Sprint 27
+  and degraded 4.9×, while `/jobs`, which the sprint *did* change, degraded only 2×. Docker
+  Desktop was at 56% CPU, Spotlight at 34%, load 3.38 on 8 cores, and the API was running with
+  `--reload`. The database is ~0.1ms of a ~126ms request, which is §12a's own conclusion intact:
+  **the bottleneck is Python CPU, not the database.**
+- **Security spot-checks all held**: the new close/reopen endpoints answer 401 anonymous and
+  **404 (never 403)** to a non-member; the public job payload still carries no `contact_email`;
+  the rate limiter still returns 429 under a burst; nothing in `api/` reads the `ssc` collection;
+  and the alert sweep logs four integers and no identity. 103 security-focused tests pass.
+
+### Left behind by Sprint 26, worth knowing
+
+- **The first-load budget has 16 KB of headroom** (668 KB against 684). Radix Dialog took ~33 KB
+  and `next/dynamic` made it *worse* rather than better, because the header mounts the dialog on
+  every route anyway. **The next component added to the header will breach it**, and the answer
+  then is either a hand-rolled portal (~2 KB, but a focus trap is genuinely hard) or raising the
+  budget deliberately with a reason.
+- **Fonts cost 47 KB on an English page and 166 KB on a Hindi one**, measured against a production
+  build. That is the price of Hindi rendering the same on every platform; it is worth it, and it
+  should be said out loud rather than discovered.
+- **`is_verified` had no writer until Sprint 28**, so anybody may create an organisation under any
+  name and nothing vouched for it. The duplicate guard added this sprint is per account, not
+  global — two accounts may still both
+  create "Apollo Care", which is correct (two employers may share a name) and is *not* a substitute
+  for verification.
+
+### In flight, not on the branch
+
+*Nothing. The geography fix that sat here for five sprints landed in Sprint 28, rewritten against
+current code rather than carried from the stale worktree — see the Sprint 28 entry above. The
+`claude/angry-jackson-46292c` worktree and branch are deleted.*
 
 ## 12a. Measured performance (re-audited 2026-09-05, after the corpus landed)
 
@@ -968,23 +1756,40 @@ the logs. CORS is restricted to one origin.
 - ~~The work exists in one place.~~ **Re-closed 2026-09-09** — and it had quietly re-opened:
   this line said "Closed 2026-09-07" while Sprints 11–14 sat unpushed. See §10. MongoDB,
   which it named as unbacked, gained encrypted dumps and a passed restore drill in Sprint 20 — but
-  the dumps are on this laptop, so a lost laptop still loses both copies until Sprint 21 puts them
-  somewhere else.
+  **the dumps are still on this laptop**, so a lost laptop loses both copies. Off-machine storage
+  has not been scheduled; it was assigned to Sprint 21 and that sprint closed the application loop
+  instead.
 
 - Two-sided cold start is unsolved; hybrid supply is a bet, not a solution.
 - No revenue model, and free may become the permanent default by inertia.
 - Multi-sector dilutes GTM focus — a knowing trade, reversible by narrowing GTM only.
-- Recommendation quality is **unproven and unmeasured**. Every claim about it is a hypothesis
-  until the golden-set harness exists.
-- Self-declared skills are unreliable until assessment integration lands.
+- Recommendation quality is **measured, and not continuously**. Sprint 29 took the set from five
+  pairs to **34 pairs, 7 orderings and 16 course expectations**, which is enough to defend a
+  weighting — the five never were. Two things still qualify every claim. `make evaluate` **cannot
+  run in CI** (it needs the 21,303-standard corpus, which is not in the repository), so the number
+  is produced by hand rather than on every change. ~~And **precision has no negative class**~~
+  **Closed in Sprint 33.** `course_dismissed` gives `course_recommended`/`course_opened` a negative
+  signal for the first time -- "shown and ignored" and "shown and rejected" are no longer the same
+  rows. What remains is volume: near-zero real dismissals exist yet to measure against.
+- ~~Self-declared skills are unreliable until assessment integration lands. Three of the four
+  `SKILL_SOURCES` have no writer at all.~~ **Two of three closed in Sprint 35.**
+  `api/adapters/assessment/` plus a webhook writes `assessed`; an operator-verified certification
+  path writes `certified`. Neither has *volume* yet -- no real assessment partnership is signed, and
+  the certification-verification queue depends on candidates adding certifications with a
+  `skill_slug`, which is not a step the profile wizard currently prompts for -- so
+  `EVIDENCE_WEIGHT_SHARE` is no longer *structurally* a constant, but it may still be one in practice
+  until either happens. `inferred` remains unwritten anywhere; that is BL-4.1/4.2's résumé-ingestion
+  territory, deliberately still separate.
 - Employer-side supply is the weakest link in Indian vocational markets.
 - ~~Two vocabularies coexist.~~ **Closed in Sprint 9.** The 52 curated skills are retired and
   every link points at a National Occupational Standard. What replaced it is a smaller, honest
   debt: the curated→NOS map is hand-authored, so some anchors are judgement calls. The uncertain
   ones are marked in `scripts/legacy_skill_map.py`.
-- **The national taxonomy is English-only.** The carried aliases (298 rows as of 2026-09-09)
-  are the only Hindi reaching it, covering a few dozen standards out of 21,355. Say this
-  plainly.
+- **The national taxonomy is English-only.** The carried aliases (298 rows as of 2026-09-09) are
+  the only Hindi reaching it, covering a few dozen standards out of 21,355. Sprint 23's role search
+  narrows the practical damage — a learner types "ward boy" or "ड्राइवर" and the alias map bridges
+  to the English role name — but the standards, course titles and role names a provider publishes
+  are still English on a Hindi page. Say this plainly.
 - ~~4,784 imported skills are unreachable by sector navigation.~~ **Resolved in Sprint 8** — every
   standard states its own sector, so the hierarchy no longer depends on the qualification side.
   They still belong to no current qualification, which is a fact about the corpus, not a defect.
@@ -996,10 +1801,20 @@ the logs. CORS is restricted to one origin.
 - **Only 45 of 21,303 titles are section-numbered course fragments** ("10.1. Case Studies") but
   they are indistinguishable from real units in the schema. Prominence ordering hides them; it
   does not fix them.
+- **A quarter of the corpus shares a name.** 1,778 standard names are borne by 4,838 rows, and some
+  twins are near-identical reissues differing only by code and level. Sprint 24's search cards name
+  the qualification, body and code and flag lookalikes; nothing can make two identically-named
+  standards meaningfully distinguishable when the source itself does not distinguish them.
+- ~~**Three district names exist in two states each** (Pratapgarh, Hamirpur, Bilaspur) and resolve
+  arbitrarily.~~ **Closed 2026-09-23 (Sprint 28).** `PlaceIndex` constrains an ambiguous name to its
+  written state and resolves it to nothing when there is no state to choose by. Verified against the
+  imported corpus: exactly three names are ambiguous, and zero live rows held a district outside
+  their resolved state.
 
 ## 13. What it would take to run this for a real customer
 
-Written down on 2026-09-09 so the answer exists before it is asked in a meeting. **Nothing here
+Written down on 2026-09-09, re-checked 2026-09-22, so the answer exists before it is asked in a
+meeting. **Nothing here
 is a defect** — every item is a deliberate stage-appropriate choice, and each one is load-bearing
 for a demo precisely because it is absent. But a live pilot needs all of it, and the first three
 are hard blockers rather than gaps.
@@ -1016,8 +1831,8 @@ are hard blockers rather than gaps.
    Postgres, Redis and Mongo. There is no application image, no Terraform (ADR-028 defers it), and
    CI runs lint, typecheck, tests and the web build with nothing to ship them to.
 3. ~~MongoDB is backed up by nothing.~~ **Closed in Sprint 20**: encrypted dumps of both
-   databases and a passed restore drill (§10a). What remains is off-machine storage, which is
-   Sprint 21's.
+   databases and a passed restore drill (§10a). **What remains is off-machine storage** — the dumps
+   are still on this laptop, so a lost laptop loses both copies. Not yet scheduled.
 
 Also closed in Sprint 20, and would have been blockers: consent, export and erasure (DPDP Act
 2023), privacy notice / terms / grievance pages — **still drafts pending legal review, and the
@@ -1032,16 +1847,22 @@ grievance officer is not yet named** — rate limiting, and security headers.
 5. **ADR-019 observability is unbuilt.** No OpenTelemetry, no Prometheus, no Grafana; structlog
    and `/health/deep` are the whole story. Adequate for one laptop, not for diagnosing a customer's
    report.
-6. **`is_verified` has no writer.** Deliberate — it is an operator decision and absent from
-   `OrganisationIn` so no request shape can set it — but "deliberate seam" and "shipped feature"
-   are different things, and a marketplace whose verified badge nobody can grant has no verified
-   organisations.
-7. **No teammate invitations.** `Membership.role` supports owner/admin/member and the permission
-   model reads it (ADR-039), but the only way to gain a membership is to create the organisation.
-   One person per organisation, in a product about organisations.
+6. ~~**`is_verified` has no writer.**~~ **Closed 2026-09-23 (Sprint 28).** `users.is_staff`,
+   `/ops/*` and `make grant-staff` (ADR-042). It is still absent from `OrganisationIn` — no request
+   shape can set it, and none can set `is_staff` either. The `/admin` pages landed in Sprint 29. What remains
+   for a pilot is a notification when a badge changes, **so a revocation is currently silent**.
+7. ~~**No teammate invitations.**~~ **Closed in Sprint 25.** Invitations, roles, the last-owner
+   guard and the escalation rule all ship, and the sole-owner data loss this line described is
+   refused with a 409 that is now reachable. `admin` and `member` are live roles.
 
 **Would embarrass in a pilot, cheap to fix.**
 
-8. Five of six rich-profile collections are empty (§4) — no seeded candidate has a work history.
-9. The golden set is five pairs. Every claim about match quality rests on them (§12).
-10. The corpus is English-only (§12), in a product whose thesis is Hindi-first.
+8. ~~Five of six rich-profile collections are empty.~~ **Closed in Sprint 21** — the seed now
+   writes work histories, education, languages, certifications and preferences (21/20/40/20/21/20
+   rows as of 2026-09-22).
+9. ~~The golden set is five pairs.~~ **34 pairs, 7 orderings and 16 course expectations as of
+   Sprint 29.** What remains is that `make evaluate` cannot run in CI — it needs the 21,303-standard
+   corpus, which is not in the repository — so the number is real and is produced by hand.
+   `tests/test_golden_set.py` guards everything about the set that is checkable without a scorer.
+10. The corpus is English-only (§12), in a product whose thesis is Hindi-first. The *interface* is
+   fully bilingual, including everything Sprints 23–24 added; the standards themselves are not.

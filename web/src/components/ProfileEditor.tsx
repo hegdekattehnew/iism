@@ -59,6 +59,7 @@ export function ProfileEditor() {
         label={f("roleTitleWanted")}
         toBody={(a) => ({ title: a })}
         render={(e) => e.title as string}
+        maxLength={120}
       />
       <TagSection
         collection="preferred_locations"
@@ -68,6 +69,8 @@ export function ProfileEditor() {
         secondLabel={f("district")}
         toSecond
         toBody={(a, b) => ({ state: a, district: b || null })}
+        maxLength={80}
+        secondMaxLength={80}
         render={(e) => [e.district, e.state].filter(Boolean).join(", ")}
       />
 

@@ -1,7 +1,15 @@
 @import "tailwindcss";
 
 /* Design tokens. Light is the base; dark overrides only what changes, so a new
-   colour can never be defined for one theme and missing in the other. */
+   colour can never be defined for one theme and missing in the other.
+
+   **This file is the only place in `web/src` that may name a colour.** Sprint
+   26 found that rule broken 305 times across 38 files: every one of those
+   sites re-derived its own light/dark pair by hand, which is exactly how one
+   gets missed and renders invisible in one theme. The semantic tones below are
+   what those sites now use. `ui/badge.tsx` was the single place that already
+   did this correctly; these tokens are that pattern, extended rather than
+   replaced. */
 :root {
   --background: #ffffff;
   --surface: #ffffff;
@@ -16,6 +24,38 @@
   --brand-strong: #163a5a;
   --brand-contrast: #ffffff;
   --accent-soft: #eff5fb;
+
+  /* Semantic tones. Three values each, because that is what the two shapes
+     using them need: a badge takes surface + text, an alert takes all three.
+     Never reach past these for a raw palette value. */
+  --success-surface: #d1fae5;
+  --success-border: #6ee7b7;
+  --success-text: #064e3b;
+  --warning-surface: #fef3c7;
+  --warning-border: #fcd34d;
+  --warning-text: #78350f;
+  --danger-surface: #ffe4e6;
+  --danger-border: #fda4af;
+  --danger-text: #881337;
+  --info-surface: #e0f2fe;
+  --info-border: #7dd3fc;
+  --info-text: #0c4a6e;
+
+  /* Solid fills. A progress bar and a status dot need a colour that reads at
+     a few pixels, which a `surface` tint does not. Kept separate rather than
+     letting call sites reach for a palette number again. */
+  --success-solid: #10b981;
+  --warning-solid: #f59e0b;
+  --danger-solid: #f43f5e;
+
+  /* Behind a modal. Its own token because the dialog is the one surface that
+     has to darken whatever is under it, whichever theme that is. */
+  --overlay: rgb(15 23 42 / 0.45);
+
+  /* Elevation, as a scale rather than a `shadow-lg` sprinkled where it was
+     noticed. Two steps is all this product has needed. */
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,6 +71,27 @@
     --brand-strong: #7db3e3;
     --brand-contrast: #041022;
     --accent-soft: #0e1c2d;
+
+    --success-surface: #022c22;
+    --success-border: #065f46;
+    --success-text: #6ee7b7;
+    --warning-surface: #451a03;
+    --warning-border: #92400e;
+    --warning-text: #fcd34d;
+    --danger-surface: #4c0519;
+    --danger-border: #9f1239;
+    --danger-text: #fda4af;
+    --info-surface: #082f49;
+    --info-border: #075985;
+    --info-text: #7dd3fc;
+
+    --success-solid: #34d399;
+    --warning-solid: #fbbf24;
+    --danger-solid: #fb7185;
+
+    --overlay: rgb(2 6 23 / 0.7);
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.55);
   }
 }
 
@@ -46,16 +107,69 @@
   --color-brand-strong: var(--brand-strong);
   --color-brand-contrast: var(--brand-contrast);
   --color-accent-soft: var(--accent-soft);
+
+  --color-success-surface: var(--success-surface);
+  --color-success-border: var(--success-border);
+  --color-success-text: var(--success-text);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-border: var(--danger-border);
+  --color-danger-text: var(--danger-text);
+  --color-info-surface: var(--info-surface);
+  --color-info-border: var(--info-border);
+  --color-info-text: var(--info-text);
+  --color-success-solid: var(--success-solid);
+  --color-warning-solid: var(--warning-solid);
+  --color-danger-solid: var(--danger-solid);
+  --color-overlay: var(--overlay);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-raised: var(--shadow-raised);
+
+  /* The type scale. Sprint 26 found 34 arbitrary sizes -- `text-[11px]` thirty
+     -one times -- sitting beside the Tailwind steps. `2xs` exists because that
+     size is real and used (badges, eyebrow labels); it is named here so it
+     stops being spelled in pixels at each call site. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Latin only. The Devanagari face is added by `html[lang="hi"]` below and
+     nowhere else -- see the note there. */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  /* The platform's own fonts. Exactly one element uses this -- the language
+     switcher, whose options carry each language's name in its own script. A
+     single `हिंदी` in a dropdown was enough to make every English page fetch
+     the 121KB Devanagari face, which is the opposite of what splitting the
+     two families was for. Native `<option>` text is rendered by the OS on
+     most platforms anyway, so nothing is lost by saying so. */
+  --font-system: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Devanagari",
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
 }
 
-/* Devanagari needs slightly more line height than Latin at the same size. */
+/* Hindi pages, and only Hindi pages, load the Devanagari face.
+ *
+ * Declaring both families on `body` looked right and was not: **Noto Sans
+ * Devanagari ships three subsets, one of which is Latin**, so having it in the
+ * stack at all had English pages fetching ~80KB of a font whose Devanagari
+ * range nothing on the page used. Scoping it by `lang` is the only version of
+ * this that is actually true, and it is measurable: an English page requests
+ * one font file, a Hindi page two.
+ *
+ * Inter stays first even here, so Latin text on a Hindi page -- the brand
+ * name, an NOS code, a URL -- keeps the same face it has everywhere else.
+ *
+ * Devanagari also needs more line height than Latin at the same size. Sprint
+ * 16's hero fold budget depends on it: Devanagari runs ~15% taller, and the
+ * Search button sat below the fold at 360x640 in Hindi while passing in
+ * English. Measure before changing either line. */
 html[lang="hi"] body {
+  font-family: var(--font-inter), var(--font-devanagari), system-ui, sans-serif;
   line-height: 1.7;
 }

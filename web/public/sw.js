@@ -41,11 +41,27 @@ const DENY = [
   "/signin",
   // Sprint 20: the account page shows consent and deletion state.
   "/account",
+  // Sprint 29: the back office. `/ops` is the API and `/admin` the pages.
+  // A cached verification queue on a shared laptop is a list of organisations
+  // under review, and a cached decision is one an operator cannot see they
+  // have already made.
+  "/ops/",
+  "/admin",
 ];
 
 // Public taxonomy and marketplace reads. Slow-moving, identical for everyone,
 // and the part of the app worth having on a stalled connection.
 const CACHEABLE_DATA = ["/skills", "/jobs", "/courses", "/marketplace/"];
+
+// A count is not a catalogue. These are small, cheap, and the homepage says
+// in its own subtitle that they are "counted live from the platform database"
+// -- which stale-while-revalidate made untrue: the figure came from the cache
+// and the fresh one only landed on the *next* visit, so an employer who had
+// just published a vacancy was shown the number from before they did it, with
+// no way to make it correct itself. Network first, cache only when offline.
+// Checked ahead of CACHEABLE_DATA, which `/skills/count` would otherwise
+// match on the `/skills` prefix.
+const LIVE_DATA = ["/marketplace/counts", "/marketplace/stats", "/skills/count"];
 
 const denied = (url) => DENY.some((p) => url.pathname.includes(p));
 
@@ -84,6 +100,21 @@ async function cacheFirst(request, cacheName) {
   return response;
 }
 
+/** Current whenever there is a network, and the last known answer when there
+ *  is not. The cache is the offline fallback here, never the first answer. */
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (err) {
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    throw err;
+  }
+}
+
 /** Show what we have immediately, and refresh it for next time. */
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName);
@@ -111,6 +142,14 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/_next/static/")
   ) {
     event.respondWith(cacheFirst(request, ASSETS));
+    return;
+  }
+
+  if (
+    LIVE_DATA.some((p) => url.pathname.startsWith(p)) &&
+    request.destination === ""
+  ) {
+    event.respondWith(networkFirst(request, DATA));
     return;
   }
 

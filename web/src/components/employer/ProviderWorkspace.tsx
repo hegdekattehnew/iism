@@ -4,14 +4,9 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
-import {
-  Badge,
-  Button,
-  ButtonLink,
-  Card,
-  CardBody,
-  Skeleton,
-} from "@/components/ui";
+import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { SessionExpired } from "@/components/SessionExpired";
+import { detailOf, isSignedOut } from "@/lib/http";
 import { Link } from "@/i18n/navigation";
 import {
   type CoursePayload,
@@ -19,6 +14,7 @@ import {
   useMemberships,
   useOrgCourseMutations,
   useOrgCourses,
+  useOrgInterests,
 } from "@/lib/org";
 
 /**
@@ -36,20 +32,36 @@ import {
  * refused" for something that had never been attempted; and there was no
  * signed-out branch at all, so a provider whose token had expired was told they
  * had no access to their own organisation rather than being asked to sign in.
+ *
+ * **That second paragraph described a fix this file did not contain.** It was
+ * written as though done; `isSignedOut` was never imported here and
+ * `courses.isError` still answered "no access" to a 401. The branch below is
+ * the real one. A docstring that claims a fix is worse than one that admits
+ * the gap, because it stops anybody looking.
  */
 export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("providerWorkspace");
   const te = useTranslations("employerWorkspace");
   const me = useMemberships();
   const courses = useOrgCourses(orgSlug);
+  // One request for the whole list, joined by slug -- not one per card.
+  const interest = useOrgInterests(orgSlug);
+  const interestBySlug = new Map(
+    (interest.data ?? []).map((row) => [row.course_slug, row.live]),
+  );
   const { create, update, setPublished } = useOrgCourseMutations(orgSlug);
 
   // null = closed, "new" = creating, otherwise the slug being edited.
   const [editing, setEditing] = useState<string | null>(null);
   // Two states, not one: they are shown on different screens and mean
   // different things.
-  const [refused, setRefused] = useState<string | null>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
+  // What the server said when publishing was refused -- its own sentence,
+  // not one fixed line about missing standards shown for every failure.
+  const [actionFailed, setActionFailed] = useState<string | true | null>(null);
+  // The server's own words, like the employer's workspace.
+  const [saveFailed, setSaveFailed] = useState<string | true | null>(null);
+  // A 401 from a mutation: the session expires while the page is already open.
+  const [signedOut, setSignedOut] = useState(false);
 
   if (me.isError) {
     return (
@@ -69,9 +81,13 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
     );
   }
 
+  if (signedOut || isSignedOut(courses.error) || isSignedOut(me.error))
+    return <SessionExpired />;
+
   if (courses.isError) {
     // A 404 here means "not a member of this organisation", which is
-    // deliberately indistinguishable from "no such organisation".
+    // deliberately indistinguishable from "no such organisation". A 401 is
+    // handled above: it means signed out, not unwelcome.
     return (
       <Card>
         <CardBody>
@@ -86,9 +102,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
     editing && editing !== "new" ? items.find((c) => c.slug === editing) : null;
 
   const save = (payload: CoursePayload) => {
-    setSaveFailed(false);
+    setSaveFailed(null);
     const done = () => setEditing(null);
-    const onError = () => setSaveFailed(true);
+    const onError = (e: unknown) => setSaveFailed(detailOf(e) ?? true);
     if (editing === "new") create.mutate(payload, { onSuccess: done, onError });
     else if (current)
       update.mutate(
@@ -104,9 +120,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
           {editing === "new" ? t("newCourse") : t("editCourse")}
         </h2>
         {saveFailed && (
-          <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
-            {t("saveFailed")}
-          </p>
+          <Alert role="alert">
+            {typeof saveFailed === "string" ? saveFailed : t("saveFailed")}
+          </Alert>
         )}
         <CourseEditor
           course={current ?? null}
@@ -128,10 +144,12 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
         <Button onClick={() => setEditing("new")}>{t("newCourse")}</Button>
       </div>
 
-      {refused && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          {t("publishRefused")}
-        </p>
+      {actionFailed && (
+        <Alert role="alert">
+          {/* The server's own words -- "Add at least one standard this course
+              teaches before publishing" -- when it sent any. */}
+          {typeof actionFailed === "string" ? actionFailed : t("actionFailed")}
+        </Alert>
       )}
 
       {courses.isPending && (
@@ -193,13 +211,21 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                     type="button"
                     disabled={setPublished.isPending}
                     onClick={() => {
-                      setRefused(null);
+                      setActionFailed(null);
                       setPublished.mutate(
                         {
                           slug: course.slug,
                           published: course.status !== "published",
                         },
-                        { onError: () => setRefused(course.slug) },
+                        {
+                          onError: (e) => {
+                            if (isSignedOut(e)) {
+                              setSignedOut(true);
+                              return;
+                            }
+                            setActionFailed(detailOf(e) ?? true);
+                          },
+                        },
                       );
                     }}
                     className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
@@ -208,6 +234,14 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                       ? te("unpublish")
                       : te("publish")}
                   </button>
+                  <Link
+                    href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
+                    className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+                  >
+                    {t("interestedLearners", {
+                      count: interestBySlug.get(course.slug) ?? 0,
+                    })}
+                  </Link>
                   {course.status === "published" && (
                     <Link
                       href={`/courses/${course.slug}`}

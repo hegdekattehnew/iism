@@ -33,6 +33,9 @@ export const world = {
   pathname: "/",
   signedIn: true,
   pending: false,
+  // Operator authority (ADR-042). Global, granted by nothing a membership can
+  // give, so it is a field of its own rather than a role in `memberships`.
+  isStaff: false,
   memberships: [] as TestMembership[],
   push: vi.fn(),
 };
@@ -42,6 +45,7 @@ export function resetWorld(): void {
   world.pathname = "/";
   world.signedIn = true;
   world.pending = false;
+  world.isStaff = false;
   world.memberships = [];
   world.push = vi.fn();
 }
@@ -69,13 +73,26 @@ export const authMock = {
 };
 
 function derived() {
-  const memberships = world.pending ? [] : world.memberships;
+  // Signed out means `/auth/me` answered 401, so the query has no data and is
+  // in error -- not "an account with no memberships". The two were the same
+  // here until Sprint 29, which made every signed-out branch untestable
+  // through this seam: a component reading `me.data` saw a populated account
+  // for somebody who was not signed in.
+  const signedOut = !world.signedIn;
+  const memberships = world.pending || signedOut ? [] : world.memberships;
   return {
-    data: world.pending
-      ? undefined
-      : { memberships, full_name: null, phone: "+919812349999", email: null },
+    data:
+      world.pending || signedOut
+        ? undefined
+        : {
+            memberships,
+            full_name: null,
+            phone: "+919812349999",
+            email: null,
+            is_staff: world.isStaff,
+          },
     isPending: world.pending,
-    isError: false,
+    isError: signedOut,
     memberships,
     organisations: memberships.filter((m) => m.tenant.tenant_type !== "personal"),
     isJobSeeker: memberships.some((m) => m.tenant.tenant_type === "personal"),

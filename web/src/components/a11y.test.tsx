@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountPanel } from "@/components/AccountPanel";
 import { ApplyPanel } from "@/components/ApplyPanel";
 import { AuthNav } from "@/components/AuthNav";
+import { CreateOrgForm } from "@/components/CreateOrgForm";
 import { SignInForm } from "@/components/SignInForm";
 import { SignUpForm } from "@/components/SignUpForm";
 import { org, personal, renderUi, resetWorld, world } from "@/test/harness";
@@ -84,5 +85,20 @@ describe("accessibility — signed in", () => {
     world.memberships = [personal()];
     const { container } = renderUi(<AccountPanel />);
     expect(await violations(container)).toEqual([]);
+  });
+});
+
+describe("accessibility — the modal dialog", () => {
+  it("is a labelled, described dialog with nothing axe objects to", async () => {
+    // Sprint 26's dialog claimed `aria-modal="true"` and never moved focus,
+    // locked scroll or handled Escape. The primitive under it now does all
+    // three; this is the mechanical half -- that it is named, described and
+    // wired correctly.
+    //
+    // **The container is `document.body`, not the render container.** The
+    // dialog portals out, so scanning the render container would scan an
+    // empty div and report nothing wrong with a screen it never saw.
+    renderUi(<CreateOrgForm onClose={() => {}} onCreated={() => {}} />);
+    expect(await violations(document.body)).toEqual([]);
   });
 });

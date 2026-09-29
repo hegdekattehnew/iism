@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.analytics import AnalyticsEvent
+from api.modules.identity.models import User
 from api.modules.marketplace.models import CandidateSkill
 from api.modules.marketplace.profile_service import MAX_SKILLS_PER_PROFILE
 from api.modules.skills import Skill
@@ -312,3 +313,93 @@ class TestAddingSeveralAtOnce:
             .order_by(AnalyticsEvent.occurred_at.desc())
         )
         assert event.payload == {"added": 3, "updated": 0, "from_role": True}
+
+
+# --------------------------- Sprint 35, BL-3.1/BL-3.2: evidence outranks a claim
+
+
+class TestVerifiedEvidenceNeverDowngrades:
+    """`record_verified_skill` (Sprint 35) is the second caller `_write_skills`
+    ever had. This is the property its whole design depends on: an evidenced
+    source can raise what a self-declared row says, and a later self-declared
+    re-add can never lower it back down."""
+
+    async def test_an_assessed_result_upgrades_a_self_declared_skill(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        from api.modules.marketplace import get_or_create_profile, record_verified_skill
+
+        skill = await _skill(db, "wound-care")
+        headers = await _auth(client)
+        me = (await client.get("/auth/me", headers=headers)).json()
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": "wound-care", "proficiency": 2},
+        )
+
+        profile = await get_or_create_profile(db, uuid.UUID(me["id"]))
+        await record_verified_skill(db, profile, "wound-care", source="assessed")
+
+        row = await db.scalar(
+            select(CandidateSkill).where(
+                CandidateSkill.profile_id == profile.id, CandidateSkill.skill_id == skill.id
+            )
+        )
+        assert row is not None
+        assert row.source == "assessed"
+
+    async def test_re_adding_self_declared_never_downgrades_a_verified_skill(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        from api.modules.marketplace import get_or_create_profile, record_verified_skill
+
+        skill = await _skill(db, "sterilisation")
+        headers = await _auth(client)
+        me = (await client.get("/auth/me", headers=headers)).json()
+
+        profile = await get_or_create_profile(db, uuid.UUID(me["id"]))
+        await record_verified_skill(db, profile, "sterilisation", source="certified")
+
+        # The candidate edits their own proficiency afterwards -- a
+        # self-declared write on the same standard.
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": "sterilisation", "proficiency": 5},
+        )
+
+        row = await db.scalar(
+            select(CandidateSkill).where(
+                CandidateSkill.profile_id == profile.id, CandidateSkill.skill_id == skill.id
+            )
+        )
+        assert row is not None
+        assert row.source == "certified"
+        assert row.proficiency == 5  # the proficiency itself still updates
+
+    async def test_record_verified_skill_refuses_a_self_declared_source(
+        self, db: AsyncSession
+    ) -> None:
+        import pytest
+
+        from api.modules.marketplace import get_or_create_profile, record_verified_skill
+
+        headers_user_id = uuid.uuid4()
+        db.add(User(id=headers_user_id, phone=f"+9199{uuid.uuid4().int % 100000000:08d}"))
+        await db.flush()
+        profile = await get_or_create_profile(db, headers_user_id)
+        with pytest.raises(ValueError, match="evidenced sources only"):
+            await record_verified_skill(db, profile, "anything", source="self_declared")
+
+
+def test_skill_sources_are_ordered_by_evidentiary_strength() -> None:
+    """`_write_skills`'s upgrade check compares `SKILL_SOURCES.index(...)`
+    directly, so this tuple's order **is** the evidence ladder -- it must
+    stay in step with `EVIDENCE_WEIGHT`'s own ascending order, or an upgrade
+    could silently downgrade a candidate's actual score."""
+    from api.modules.marketplace.models import SKILL_SOURCES
+    from api.modules.matching.scoring import EVIDENCE_WEIGHT
+
+    by_weight = tuple(sorted(EVIDENCE_WEIGHT, key=lambda source: EVIDENCE_WEIGHT[source]))
+    assert by_weight == SKILL_SOURCES

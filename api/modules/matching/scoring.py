@@ -60,10 +60,54 @@ EVIDENCE_WEIGHT_SHARE = 0.10
 LEVEL_WEIGHT = 0.08
 EXPERIENCE_WEIGHT = 0.07
 
+# Semantic similarity (Sprint 36, BL-5.2). Zero on purpose, not a tuned business
+# number like the four above: coverage + level + experience + evidence_share
+# already sum to 1.0, so this is additive on top rather than carved out of an
+# existing share, and turning it up is a "deliberate, separately-measured
+# re-tune" the acceptance criteria explicitly defer -- not this story's job.
+# At zero, `make evaluate`'s orderings are bit-identical to before this weight
+# existed, whether or not a job or candidate has an embedding at all.
+SEMANTIC_WEIGHT = 0.0
+
 # Years short of the job's minimum at which the experience component reaches
 # zero. A tapering judgement, not a sourced number: being a year short of three
 # is not the same as having none.
 EXPERIENCE_TAPER_YEARS = 3.0
+
+# What counts as a serious candidate, not merely a technical match: no
+# mandatory standard missing scores well above this, and a near-miss still
+# clears it. Lives here, not in a caller, so the alert sweep and the
+# operator-facing programme report agree on one number rather than two
+# modules independently deciding 60 is enough.
+SERIOUS_MATCH_SCORE = 60
+
+
+@dataclass(frozen=True)
+class ScoreWeights:
+    """The business's dials on the scorer, gathered into one value (Sprint 33,
+    BL-2.1) so re-tuning them is a configuration change, not a deployment.
+
+    A *value passed in*, never read here: `score_match` stays pure (ADR-036)
+    precisely because nothing inside this module calls `get_settings()`.
+    `matching.service.weights_from_settings()` is where configuration and the
+    scorer actually meet, and it lives there rather than here for that reason.
+
+    Defaults are every number this scorer has used since Sprint 10 -- calling
+    `score_match` with no `weights` argument at all reproduces every score
+    from before this change, exactly, which is what keeps `make evaluate`
+    bit-identical.
+    """
+
+    coverage: float = COVERAGE_WEIGHT
+    level: float = LEVEL_WEIGHT
+    experience: float = EXPERIENCE_WEIGHT
+    evidence_share: float = EVIDENCE_WEIGHT_SHARE
+    mandatory_gap_cap: float = MANDATORY_GAP_CAP
+    experience_taper_years: float = EXPERIENCE_TAPER_YEARS
+    semantic: float = SEMANTIC_WEIGHT
+
+
+DEFAULT_WEIGHTS = ScoreWeights()
 
 
 @dataclass(frozen=True)
@@ -127,6 +171,11 @@ class MatchResult:
     level_shortfall: Decimal | None = None
     experience_shortfall: int | None = None
     capped_by_mandatory: bool = False
+    # 0.0 whenever either side has no embedding yet, or `weights.semantic` is
+    # 0 -- present on every result regardless, so the reason structure never
+    # silently omits a component that contributed to the number (Sprint 36,
+    # BL-5.2).
+    semantic_similarity: float = 0.0
 
     @property
     def is_eligible_shape(self) -> bool:
@@ -143,6 +192,29 @@ def _key(skill_id: uuid.UUID, concept_id: uuid.UUID | None) -> uuid.UUID:
     return concept_id or skill_id
 
 
+def _semantic_similarity(
+    job_embedding: list[float] | None, candidate_embedding: list[float] | None
+) -> float:
+    """Cosine similarity, clamped to [0, 1] (Sprint 36, BL-5.2).
+
+    Bounded on both ends: `None` on either side (nothing computed yet, or a
+    profile/job with no declared skills at all) scores 0 rather than raising
+    or being treated as a perfect or worst match -- absence of a signal is not
+    itself a signal. Negative cosine similarity is clamped to 0 too, so this
+    term can only ever *add*, never subtract from, the deterministic
+    components -- the bound ADR-036 requires: "additive... never override a
+    hard skill requirement".
+    """
+    if job_embedding is None or candidate_embedding is None:
+        return 0.0
+    dot = sum(a * b for a, b in zip(job_embedding, candidate_embedding, strict=True))
+    job_norm = sum(a * a for a in job_embedding) ** 0.5
+    candidate_norm = sum(b * b for b in candidate_embedding) ** 0.5
+    if job_norm == 0.0 or candidate_norm == 0.0:
+        return 0.0
+    return max(0.0, dot / (job_norm * candidate_norm))
+
+
 def score_match(
     required: list[RequiredSkill],
     held: list[HeldSkill],
@@ -151,8 +223,17 @@ def score_match(
     candidate_level: Decimal | None = None,
     job_min_years: int | None = None,
     candidate_years: int | None = None,
+    job_embedding: list[float] | None = None,
+    candidate_embedding: list[float] | None = None,
+    weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> MatchResult:
-    """Score one candidate against one job. Pure: no I/O, no clock, no model."""
+    """Score one candidate against one job. Pure: no I/O, no clock, no model.
+
+    `weights` defaults to every number this scorer has always used; a caller
+    passes its own only to re-tune deliberately (BL-2.1). `job_embedding`/
+    `candidate_embedding` default to `None`, which scores the semantic term at
+    0 regardless of `weights.semantic` -- the same "absent means neutral, not
+    unqualified" rule `job_level_min`/`candidate_level` already use."""
     if not required:
         # A job that lists no requirements cannot be matched against. Returning
         # zero is honest; returning 100 would rank empty jobs top.
@@ -242,20 +323,31 @@ def score_match(
     years_short: int | None = None
     if job_min_years and candidate_years is not None and candidate_years < job_min_years:
         years_short = job_min_years - candidate_years
-        experience_score = max(0.0, 1.0 - years_short / EXPERIENCE_TAPER_YEARS)
+        experience_score = max(0.0, 1.0 - years_short / weights.experience_taper_years)
+
+    semantic_score = _semantic_similarity(job_embedding, candidate_embedding)
 
     raw = (
-        COVERAGE_WEIGHT * coverage
-        + LEVEL_WEIGHT * level_score
-        + EXPERIENCE_WEIGHT * experience_score
-        + EVIDENCE_WEIGHT_SHARE * evidence_score
+        weights.coverage * coverage
+        + weights.level * level_score
+        + weights.experience * experience_score
+        + weights.evidence_share * evidence_score
+        + weights.semantic * semantic_score
     )
+    # The four original components already sum to 1.0 at their defaults, so
+    # `semantic` is genuinely additive on top rather than carved from an
+    # existing share (unlike level/experience's split, see above) -- safe at
+    # its default of 0, but a future re-tune that raises it without lowering
+    # another weight must not be able to push a score past 100. Applied before
+    # the mandatory cap, so it narrows towards the cap exactly like every
+    # other component rather than being able to escape it.
+    raw = min(raw, 1.0)
 
     missing_mandatory = sum(1 for m in missing if m.is_mandatory)
     capped = False
     if missing_mandatory:
-        capped = raw > MANDATORY_GAP_CAP
-        raw = min(raw, MANDATORY_GAP_CAP)
+        capped = raw > weights.mandatory_gap_cap
+        raw = min(raw, weights.mandatory_gap_cap)
 
     # Most important first, so the reason reads in the order a person cares
     # about: what is mandatory and missing, then what matters most.
@@ -271,4 +363,5 @@ def score_match(
         level_shortfall=shortfall,
         experience_shortfall=years_short,
         capped_by_mandatory=capped,
+        semantic_similarity=semantic_score,
     )

@@ -23,10 +23,10 @@ function ScoreDial({ score }: { score: number }) {
   // encoding for scanning, never the only one.
   const tone =
     score >= 75
-      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+      ? "bg-success-surface text-success-text"
       : score >= 45
-        ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
-        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        ? "bg-warning-surface text-warning-text"
+        : "bg-surface-muted text-foreground";
   return (
     <span
       className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${tone}`}
@@ -48,7 +48,7 @@ function SkillChip({
     <span
       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${
         held
-          ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+          ? "border-success-border bg-success-surface text-success-text"
           : "border-border-token bg-surface text-muted"
       }`}
     >
@@ -117,7 +117,7 @@ export function MatchBrowser() {
 
   if (matches.isError) {
     return (
-      <p className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+      <p className="rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
         {t("loadError")}
       </p>
     );
@@ -198,7 +198,7 @@ export function MatchBrowser() {
             </div>
 
             {m.capped_by_mandatory && (
-              <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+              <p className="mt-3 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
                 {t("capped")}
               </p>
             )}

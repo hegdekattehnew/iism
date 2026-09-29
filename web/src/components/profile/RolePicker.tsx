@@ -126,7 +126,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
         <p className="mt-3 text-sm">{t("tickPrompt")}</p>
 
         {standards.isPending && <p className="mt-3 text-sm text-muted">{t("loading")}</p>}
-        {standards.isError && <p className="mt-3 text-sm text-rose-700">{t("loadError")}</p>}
+        {standards.isError && <p className="mt-3 text-sm text-danger-text">{t("loadError")}</p>}
 
         {groups.map((group) => (
           <fieldset key={group.key} className="mt-4">
@@ -204,10 +204,10 @@ export function RolePicker({ held }: { held: Set<string> }) {
               {addSkillsBulk.isPending ? t("adding") : t("confirm", { count: ticked.size })}
             </Button>
             {addSkillsBulk.isError && (
-              <p className="text-sm text-rose-700">{t("saveError")}</p>
+              <p className="text-sm text-danger-text">{t("saveError")}</p>
             )}
             {added !== null && !addSkillsBulk.isError && (
-              <p className="text-sm text-emerald-700 dark:text-emerald-400" role="status">
+              <p className="text-sm text-success-text" role="status">
                 {t("added", { count: added })}
               </p>
             )}

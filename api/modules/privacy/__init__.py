@@ -6,6 +6,6 @@ any one of those reach into the others would break the boundaries ADR-014
 relies on; this module depends on them, and nothing depends on it.
 """
 
-from api.modules.privacy.routes import router
+from api.modules.privacy.routes import org_router, router
 
-__all__ = ["router"]
+__all__ = ["org_router", "router"]

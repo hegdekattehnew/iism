@@ -7,8 +7,7 @@ import { useDeferredValue, useState } from "react";
 import { Button } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-
-const TYPES = ["full_time", "part_time", "contract", "apprenticeship"] as const;
+import { EMPLOYMENT_TYPES as TYPES } from "@/lib/profile";
 
 type Job = {
   slug: string;
@@ -149,7 +148,7 @@ export function JobBrowser({
       </p>
 
       {results.isError && (
-        <p className="mt-6 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <p className="mt-6 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
           {t("loadError")}
         </p>
       )}

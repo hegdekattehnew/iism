@@ -7,7 +7,8 @@ import { AboutSection } from "@/components/profile/AboutSection";
 import { SectionEditor, useSectionDefs } from "@/components/profile/SectionEditor";
 import { SkillsSection } from "@/components/profile/SkillsSection";
 import { TagSection } from "@/components/profile/TagSection";
-import { Button } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
+import { detailOf } from "@/lib/http";
 import { type Profile, useProfileMutations } from "@/lib/profile";
 
 const TOTAL = 5;
@@ -19,6 +20,8 @@ const TOTAL = 5;
  */
 export function OnboardingWizard({ profile }: { profile: Profile | null }) {
   const t = useTranslations("profilePage.wizard");
+  // The shared error copy lives one level up, beside every other section's.
+  const tp = useTranslations("profilePage");
   const f = useTranslations("profilePage.fields");
   const { finishOnboarding } = useProfileMutations();
   const defs = useSectionDefs(profile);
@@ -106,6 +109,14 @@ export function OnboardingWizard({ profile }: { profile: Profile | null }) {
       </div>
 
       {body()}
+
+      {finishOnboarding.isError && (
+        <Alert role="alert" className="mt-6">
+          {/* Both "Skip" and "Finish" call this, and neither said anything
+              when it failed -- so the wizard simply did not close. */}
+          {detailOf(finishOnboarding.error) ?? tp("errors.generic")}
+        </Alert>
+      )}
 
       <div className="mt-8 flex items-center justify-between gap-3 border-t border-border-token pt-6">
         <Button

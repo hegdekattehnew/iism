@@ -83,6 +83,21 @@ class CourseSuggestionOut(BaseModel):
     covers_mandatory: int
 
 
+class CourseRoleAlignmentOut(BaseModel):
+    """A course measured against one role, with no candidate in the request
+    (Sprint 33, BL-2.3)."""
+
+    course_slug: str
+    course_title: str
+    role_slug: str
+    role_name: str
+    qualification_code: str | None = None
+    covered: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    required_count: int
+    coverage_percent: int
+
+
 class EntryRouteOut(BaseModel):
     qp_code: str
     qp_name: str

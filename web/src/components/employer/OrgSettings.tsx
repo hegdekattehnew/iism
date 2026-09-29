@@ -5,7 +5,9 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Area, Field, Text } from "@/components/profile/fields";
+import { SessionExpired } from "@/components/SessionExpired";
 import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 import { api } from "@/lib/api";
 
 /**
@@ -26,10 +28,13 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
   const org = useQuery({
     queryKey: ["org", orgSlug],
     queryFn: async () => {
-      const { data, error } = await api.GET("/org/{org_slug}", {
+      const { data, error, response } = await api.GET("/org/{org_slug}", {
         params: { path: { org_slug: orgSlug } },
       });
-      if (error || !data) throw new Error("could not load the organisation");
+      // The status, not a sentence: `isSignedOut(org.error)` below reads it,
+      // and a fixed message made that check dead code -- the 401 branch it
+      // guards could never fire.
+      if (error || !data) throw new Error(String(response.status));
       return data;
     },
     retry: false,
@@ -44,11 +49,11 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
       logo_url: string | null;
       contact_email: string | null;
     }) => {
-      const { data, error } = await api.PUT("/org/{org_slug}", {
+      const { data, error, response } = await api.PUT("/org/{org_slug}", {
         params: { path: { org_slug: orgSlug } },
         body,
       });
-      if (error || !data) throw new Error("save failed");
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: async (data) => {
@@ -60,6 +65,9 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
   });
 
   if (org.isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
+  // 401 is not "no access" -- it is "your session ran out", and saying the
+  // former sends an owner looking for a permission they never lost.
+  if (isSignedOut(org.error)) return <SessionExpired />;
   if (org.isError) return <p className="text-sm text-muted">{t("noAccess")}</p>;
 
   const d = org.data;
@@ -99,6 +107,7 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
             <Field label={t("name")} className="sm:col-span-2">
               <Text
                 name="name"
+                maxLength={120}
                 required
                 minLength={2}
                 defaultValue={d?.name ?? ""}
@@ -116,14 +125,17 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
               />
             </Field>
             <Field label={t("city")}>
-              <Text name="city" defaultValue={d?.city ?? ""} />
+              <Text name="city"
+                maxLength={120} defaultValue={d?.city ?? ""} />
             </Field>
             <Field label={t("website")}>
-              <Text name="website" type="url" defaultValue={d?.website ?? ""} />
+              <Text name="website"
+                maxLength={500} type="url" defaultValue={d?.website ?? ""} />
             </Field>
             <Field label={t("logoUrl")}>
               <Text
                 name="logo_url"
+                maxLength={500}
                 type="url"
                 defaultValue={d?.logo_url ?? ""}
               />
@@ -147,7 +159,12 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
             </Button>
             {saved && <span className="text-sm text-brand">{t("saved")}</span>}
             {save.isError && (
-              <span className="text-sm text-rose-600">{t("saveError")}</span>
+              <span className="text-sm text-danger-text">
+                {/* What the server said -- "Website: URL should have a scheme"
+                    beats "Only an owner can edit the organisation" when the
+                    caller *is* the owner and the URL is simply malformed. */}
+                {detailOf(save.error) ?? t("saveError")}
+              </span>
             )}
           </div>
         </form>

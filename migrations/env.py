@@ -12,12 +12,15 @@ from api.core.localisation import ContentTranslation as _ContentTranslation  # n
 
 # Importing every module's models registers them on Base.metadata so that
 # autogenerate sees them. New modules must be added here.
+from api.modules.alerts import models as _alerts_models  # noqa: F401
 from api.modules.analytics import models as _analytics_models  # noqa: F401
 from api.modules.applications import models as _applications_models  # noqa: F401
 from api.modules.geography import models as _geography_models  # noqa: F401
 from api.modules.identity import models as _identity_models  # noqa: F401
+from api.modules.interests import models as _interest_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401
 from api.modules.notifications import models as _notification_models  # noqa: F401
+from api.modules.operations import models as _operations_models  # noqa: F401
 from api.modules.skills import concepts as _skills_concepts  # noqa: F401
 from api.modules.skills import content as _skills_content  # noqa: F401
 from api.modules.skills import hierarchy as _skills_hierarchy  # noqa: F401
@@ -49,6 +52,11 @@ MANUALLY_MANAGED_INDEXES = {
     "ix_jobs_search_vector",
     "ix_courses_search_vector",
     "ix_qualification_packs_job_role_trgm",
+    # Partial (WHERE accepted_at IS NULL AND revoked_at IS NULL), created with
+    # op.execute() in 0026. Autogenerate cannot see the predicate and would
+    # propose dropping the index that stops one address holding two live
+    # invitations to the same organisation.
+    "uq_invitations_live",
 }
 
 

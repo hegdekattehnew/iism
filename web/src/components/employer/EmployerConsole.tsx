@@ -130,7 +130,7 @@ function CandidateList({
             </div>
 
             {mandatoryGaps.length > 0 && (
-              <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
+              <p className="mt-2 text-xs text-warning-text">
                 {t("missingMandatory")}:{" "}
                 {mandatoryGaps.map((m) => m.name).join(" · ")}
               </p>
@@ -177,7 +177,7 @@ export function EmployerConsole() {
 
   if (employers.isError || overview.isError) {
     return (
-      <p className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+      <p className="rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
         {t("loadError")}
       </p>
     );
@@ -190,7 +190,7 @@ export function EmployerConsole() {
     <div className="space-y-6">
       {/* Visible without scrolling, and above the data rather than beneath it:
           nobody should read a shortlist and only afterwards learn what it is. */}
-      <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      <div className="rounded-xl border border-warning-border bg-warning-surface px-4 py-3 text-sm text-warning-text">
         <p className="font-semibold">{t("demoTitle")}</p>
         <p className="mt-1">{t("demoBody")}</p>
       </div>

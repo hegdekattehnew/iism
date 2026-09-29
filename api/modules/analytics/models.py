@@ -48,6 +48,39 @@ EVENT_NAMES = (
     # description of a person.
     "role_suggested",
     "skills_bulk_added",
+    # Sprint 24, the course loop. `course_interest_status_changed` carries
+    # the status in its payload, so a second provider status later costs no
+    # migration.
+    "course_interest_registered",
+    "course_interest_withdrawn",
+    "course_interest_status_changed",
+    # Sprint 25, the team. The subject is the **organisation**, never the
+    # person invited: an address is an identity, and this table carries none.
+    # `member_role_changed` carries the new role in its payload, so a fourth
+    # role later costs no migration -- the `course_interest_status_changed`
+    # move.
+    "member_invited",
+    "member_invitation_accepted",
+    "member_removed",
+    "member_role_changed",
+    # Sprint 27, the vacancy lifecycle. `job_closed` carries its reason in the
+    # payload -- and whether a human or the worker did it -- so a fourth reason
+    # later costs no migration.
+    "job_closed",
+    "job_reopened",
+    # One row per sweep, not per person told: the subject is the vacancy, and
+    # counting recipients here would be a headcount of candidates on an event
+    # that must name none.
+    "job_alerts_sent",
+    # Sprint 33, BL-2.2. `course_opened`'s missing half: precision@5 (ADR-025)
+    # had a positive signal only -- "shown and opened" and "shown, opened and
+    # four explicitly rejected" were the same rows. Same shape as
+    # `course_opened`, subject to the course, `from_job_slug` in the payload.
+    "course_dismissed",
+    # Sprint 37, Epic B8. Subject to the job (a gig, always, since a review is
+    # only ever reachable through a `completed` application), payload carries
+    # `subject_role` and `rating` -- never the candidate's identity.
+    "application_review_submitted",
 )
 
 

@@ -11,7 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from api.core.localisation import ContentTranslation
-from api.modules.marketplace.models import Course, CourseSkill, Job, JobSkill
+from api.modules.marketplace.models import (
+    Course,
+    CourseSkill,
+    Job,
+    JobSkill,
+    open_job,
+    posted_job,
+)
 from api.modules.skills.models import Skill
 
 PUBLISHED = "published"
@@ -70,7 +77,7 @@ async def list_jobs(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Job], int]:
-    stmt = select(Job).where(Job.status == PUBLISHED)
+    stmt = select(Job).where(open_job())
 
     if q:
         stmt = _text_filter(stmt, Job, q)
@@ -102,13 +109,32 @@ async def get_job_by_slug(db: AsyncSession, slug: str) -> Job | None:
     survived. The owner's own view goes through `job_publishing.get_job`,
     which is scoped to their tenant and shows drafts on purpose.
     """
+    # **Not** `open_job()`. A closed vacancy keeps its page: people have
+    # it bookmarked, it is in their application list, and a 404 on a row we
+    # deliberately kept would be a broken link of our own making -- the same
+    # rule retired skills follow. The page says it is closed; `is_open` on
+    # the payload is what the client renders that from.
     return await db.scalar(select(Job).where(Job.slug == slug, Job.status == PUBLISHED))
 
 
-async def count_jobs(db: AsyncSession) -> int:
-    return (
-        await db.scalar(select(func.count()).select_from(Job).where(Job.status == PUBLISHED)) or 0
-    )
+async def count_jobs_posted(db: AsyncSession) -> int:
+    """How many vacancies have been posted -- the homepage's headline figure.
+
+    Two functions rather than one taking a flag, and **renamed** rather than
+    redefined, so nothing that used to mean "open" quietly starts meaning
+    "posted": every caller had to be revisited to compile.
+
+    Two index-only counts where there was one. Both use the leading column of
+    `ix_jobs_status_closed`, so the cost is the same shape as before. A single
+    `count(*) FILTER (WHERE closed_at IS NULL)` would collapse them into one
+    query -- and into one name, which is the thing being split here.
+    """
+    return await db.scalar(select(func.count()).select_from(Job).where(posted_job())) or 0
+
+
+async def count_jobs_open(db: AsyncSession) -> int:
+    """How many are still taking applications -- what `/jobs` will list."""
+    return await db.scalar(select(func.count()).select_from(Job).where(open_job())) or 0
 
 
 async def jobs_requiring_skill(
@@ -121,7 +147,7 @@ async def jobs_requiring_skill(
     stmt = (
         select(Job)
         .join(JobSkill, JobSkill.job_id == Job.id)
-        .where(JobSkill.skill_id == skill_id, Job.status == PUBLISHED)
+        .where(JobSkill.skill_id == skill_id, open_job())
         .order_by(JobSkill.is_mandatory.desc(), JobSkill.importance.desc(), Job.title)
         .limit(limit)
     )

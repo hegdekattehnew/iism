@@ -4,20 +4,29 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.modules.applications.models import APPLICATION_STATUSES, EMPLOYER_STATUSES
+from api.modules.applications.models import (
+    APPLICATION_STATUSES,
+    EMPLOYER_STATUSES,
+    REVIEW_SUBJECT_ROLES,
+)
 from api.modules.identity import TenantOut
 from api.modules.matching import CandidateCardOut
 
 # Closed on the way out so the generated TypeScript client types a status as a
 # union rather than `string`; `tests/test_enumerations.py` holds it to the CHECK.
-ApplicationStatus = Literal["applied", "withdrawn", "shortlisted", "rejected", "hired"]
-EmployerStatus = Literal["shortlisted", "rejected", "hired"]
+# `completed`/`no_show` (Sprint 37, Epic B8) are a gig engagement's outcome.
+ApplicationStatus = Literal[
+    "applied", "withdrawn", "shortlisted", "rejected", "hired", "completed", "no_show"
+]
+EmployerStatus = Literal["shortlisted", "rejected", "hired", "completed", "no_show"]
+ReviewSubjectRole = Literal["poster", "worker"]
 
 # The unions above and the tuples the CHECK is generated from must agree. A
 # closed union on an output model is a latent 500 the moment the database holds
 # a value it does not list -- twice already in this project.
 assert set(get_args(ApplicationStatus)) == set(APPLICATION_STATUSES)  # noqa: S101
 assert set(get_args(EmployerStatus)) == set(EMPLOYER_STATUSES)  # noqa: S101
+assert set(get_args(ReviewSubjectRole)) == set(REVIEW_SUBJECT_ROLES)  # noqa: S101
 
 
 class JobRef(BaseModel):
@@ -101,3 +110,22 @@ class StatusIn(BaseModel):
     """What an employer may set. `applied` and `withdrawn` are the candidate's."""
 
     status: EmployerStatus
+
+
+class ReviewIn(BaseModel):
+    """One direction of a completed gig engagement's rating (Sprint 37, Epic
+    B8). `subject_role` is never accepted here -- it is fixed by which of the
+    two routes a caller reaches, never a value the caller states."""
+
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(None, max_length=1_000)
+
+
+class ReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    subject_role: ReviewSubjectRole
+    rating: int
+    comment: str | None = None
+    created_at: datetime

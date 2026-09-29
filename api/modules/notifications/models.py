@@ -24,7 +24,14 @@ from api.core.database import Base, one_of
 
 # Who it is for. A `tenant` recipient resolves to the organisation's contact
 # address -- organisations have one, and their members may not all want it.
-RECIPIENT_KINDS = ("user", "tenant")
+#
+# `invitation` is the third because an invitee **may have no account**, so
+# there is no user id to name. It points at the invitation row, which is the
+# one table in the product that legitimately stores an address (see its
+# docstring), and the rule below survives intact: this row still holds no
+# address and still resolves one at send time. It also buys something storing
+# the address would not -- revoking an invitation stops its mail.
+RECIPIENT_KINDS = ("user", "tenant", "invitation")
 
 # `in_app` is not a delivery channel so much as an absence of one: most
 # candidates signed up with a phone, have no email, and SMS waits on DLT
@@ -33,7 +40,21 @@ CHANNELS = ("email", "in_app")
 
 # Closed, like every other set here. The template decides the words; the
 # payload carries only what the words need.
-TEMPLATES = ("application_received", "application_status_changed")
+TEMPLATES = (
+    "application_received",
+    "application_status_changed",
+    # Sprint 24. The first thing a course provider is ever told.
+    "course_interest_registered",
+    # Sprint 25. The only message this product sends to somebody who may not
+    # be a user yet.
+    "organisation_invitation",
+    # Sprint 27. The first message this product sends to somebody who did not
+    # ask for it in the moment -- which is why it is the only one with an
+    # opt-out (`CandidateProfile.job_alerts_enabled`).
+    "job_alert",
+    # Told to the applicants still waiting, never to the ones already answered.
+    "vacancy_closed",
+)
 
 STATUSES = ("pending", "sent", "failed", "skipped")
 

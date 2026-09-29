@@ -16,6 +16,21 @@
 
 const LAST = "iism.last_context";
 
+/**
+ * The last few contexts used, most recent first.
+ *
+ * Kept beside `LAST` rather than replacing it, so `landingFor` keeps its exact
+ * meaning and its tests keep their exact subject: landing is about **one**
+ * answer, and this is about **ordering a list**. The switcher uses it so that
+ * somebody holding ten organisations finds the two they actually move between
+ * at the top, instead of scanning an alphabetical wall every time.
+ */
+const RECENT = "iism.recent_contexts";
+
+/** How many to remember. Beyond a handful it stops being recency and starts
+ *  being a second copy of the list, which is what the filter box is for. */
+const RECENT_LIMIT = 5;
+
 /** The job-seeker context. Organisations are remembered by slug. */
 export const SEEKER = "seeker";
 
@@ -32,6 +47,31 @@ function safe<T>(fn: () => T, fallback: T): T {
 
 export function rememberContext(context: string): void {
   safe(() => localStorage.setItem(LAST, context), undefined);
+  safe(() => {
+    const kept = recentContexts().filter((c) => c !== context);
+    localStorage.setItem(
+      RECENT,
+      JSON.stringify([context, ...kept].slice(0, RECENT_LIMIT)),
+    );
+  }, undefined);
+}
+
+/**
+ * The contexts this browser has used, most recent first.
+ *
+ * Returns `[]` rather than throwing on anything unexpected -- a corrupted or
+ * hand-edited value is a reason to fall back to alphabetical order, never a
+ * reason for the header to fail to render.
+ */
+export function recentContexts(): string[] {
+  return safe(() => {
+    const raw = localStorage.getItem(RECENT);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((c): c is string => typeof c === "string")
+      : [];
+  }, []);
 }
 
 export function lastContext(): string | null {
@@ -40,6 +80,9 @@ export function lastContext(): string | null {
 
 export function forgetContext(): void {
   safe(() => localStorage.removeItem(LAST), undefined);
+  // Signing out clears this too. It is a list of organisation slugs, which on
+  // a shared phone says who the previous person worked for.
+  safe(() => localStorage.removeItem(RECENT), undefined);
 }
 
 /**

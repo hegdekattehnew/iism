@@ -40,7 +40,11 @@ class Settings(BaseSettings):
 
     # --- auth (ADR-009, ADR-032) ---
     jwt_secret_key: str = _DEFAULT_SECRET
-    jwt_algorithm: str = "HS256"
+    # A closed set, not a bare `str`: `jwt.decode` is called with whatever this
+    # says, and PyJWT accepts "none" as a literal algorithm name. A bare `str`
+    # makes a misconfigured environment variable an unsigned-token hole rather
+    # than a startup validation error.
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
 
@@ -90,6 +94,34 @@ class Settings(BaseSettings):
     # the inbox. The per-minute write limit stops a script; this stops a day of
     # patient spraying, which is what actually ruins an inbox.
     max_applications_per_day: int = 50
+    max_course_interests_per_day: int = 50
+    # Creating a tenant publishes a public organisation page and can
+    # publish listings, and until Sprint 26 it was the one write path
+    # here with no cap at all. Rolling 24 hours, like its siblings.
+    max_organisations_per_day: int = 5
+    # Job alerts (Sprint 27). Both caps exist so a busy Monday does not
+    # become the reason somebody stops reading their notifications: at
+    # most this many people hear about any one vacancy, and at most this
+    # many vacancies reach any one person in a rolling day.
+    max_alerts_per_job: int = 25
+    max_alerts_per_candidate_per_day: int = 5
+
+    # --- matching weights (Sprint 33, BL-2.1) ---
+    # `scoring.py` stays pure and never reads these -- `ScoreWeights` is a
+    # value `matching.service.weights_from_settings()` builds from them and
+    # passes in. Defaults are the numbers the scorer has used since Sprint 10;
+    # `make evaluate` is bit-identical against them.
+    match_weight_coverage: float = 0.75
+    match_weight_level: float = 0.08
+    match_weight_experience: float = 0.07
+    match_weight_evidence_share: float = 0.10
+    match_mandatory_gap_cap: float = 0.45
+    match_experience_taper_years: float = 3.0
+    # Sprint 36, BL-5.2. Zero: additive on top of the four above, not carved
+    # out of them, and turning it up is a deliberate, separately-measured
+    # re-tune this story explicitly defers -- `make evaluate` must stay
+    # bit-identical while this is 0.
+    match_weight_semantic: float = 0.0
 
     # --- database pool ---
     db_pool_size: int = 5

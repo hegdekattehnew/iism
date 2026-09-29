@@ -14,11 +14,12 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.adapters.nsqf.importer import _DISTRICT_ALIASES
+from api.adapters.nsqf import importer
+from api.adapters.nsqf.importer import _backfill_geography
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.geography import resolve_location
 from api.modules.geography.models import District, State
-from api.modules.geography.service import DISTRICT_ALIASES
+from api.modules.identity.models import User
 from api.modules.marketplace.models import CandidatePreferredLocation, CandidateProfile
 
 
@@ -28,7 +29,13 @@ async def master(db: AsyncSession) -> dict[str, object]:
     for: the corpus says BENGALURU URBAN, an employer writes Bengaluru."""
     karnataka = State(state_code=29, slug="karnataka", name="Karnataka")
     maharashtra = State(state_code=27, slug="maharashtra", name="Maharashtra")
-    db.add_all([karnataka, maharashtra])
+    # Bilaspur is one of exactly three district names the real master gives to
+    # two districts each -- with Hamirpur (Himachal / Uttar Pradesh) and
+    # Pratapgarh (Rajasthan / Uttar Pradesh). Verified against the imported
+    # corpus, not assumed.
+    himachal = State(state_code=2, slug="himachal-pradesh", name="Himachal Pradesh")
+    chhattisgarh = State(state_code=22, slug="chhattisgarh", name="Chhattisgarh")
+    db.add_all([karnataka, maharashtra, himachal, chhattisgarh])
     await db.flush()
 
     bengaluru = District(district_code=572, name="BENGALURU URBAN", state_id=karnataka.id)
@@ -36,9 +43,23 @@ async def master(db: AsyncSession) -> dict[str, object]:
     # Eight of the 766 districts carry no name; they are imported by code
     # because the code is still a valid reference.
     unnamed = District(district_code=999, name=None, state_id=karnataka.id)
-    db.add_all([bengaluru, pune, unnamed])
+    # Himachal's inserted first deliberately: a lookup that ignores the state
+    # returns whichever row Postgres reaches first, so the wrong answer for a
+    # Chhattisgarh candidate is the *likely* one rather than a coin flip.
+    bilaspur_hp = District(district_code=24, name="Bilaspur", state_id=himachal.id)
+    bilaspur_cg = District(district_code=376, name="Bilaspur", state_id=chhattisgarh.id)
+    db.add_all([bengaluru, pune, unnamed, bilaspur_hp, bilaspur_cg])
     await db.commit()
-    return {"karnataka": karnataka, "bengaluru": bengaluru, "pune": pune}
+    return {
+        "karnataka": karnataka,
+        "maharashtra": maharashtra,
+        "himachal": himachal,
+        "chhattisgarh": chhattisgarh,
+        "bengaluru": bengaluru,
+        "pune": pune,
+        "bilaspur_hp": bilaspur_hp,
+        "bilaspur_cg": bilaspur_cg,
+    }
 
 
 class TestResolvingAPlaceName:
@@ -76,14 +97,110 @@ class TestResolvingAPlaceName:
         assert found.state_id is None and found.district_id is None
 
 
-class TestTheAliasMapsAgree:
-    def test_the_two_copies_are_identical(self) -> None:
-        """`DISTRICT_ALIASES` exists twice — in the geography service and in the
-        NSQF importer, which resolves the same master for rows that predate the
-        service. The service's own comment says it is "kept in step with the
-        importer's copy"; nothing enforced that until now.
+class TestAnAmbiguousDistrictName:
+    """Three names in the master belong to two districts each.
+
+    `resolve_location` looked a district up by name with `.limit(1)` and no
+    ORDER BY, so "Bilaspur, Chhattisgarh" could carry Himachal's id --
+    and `matching._locality` compares ids and nothing else, so it would score
+    that vacancy 2, "in your district", for somebody 1,500 km away.
+    """
+
+    async def test_the_state_written_beside_it_decides(self, db, master) -> None:
+        cg = await resolve_location(db, "Chhattisgarh", "Bilaspur")
+        hp = await resolve_location(db, "Himachal Pradesh", "Bilaspur")
+        assert cg.district_id == master["bilaspur_cg"].id
+        assert hp.district_id == master["bilaspur_hp"].id
+        assert cg.district_id != hp.district_id
+
+    async def test_without_a_state_it_resolves_to_nothing(self, db, master) -> None:
+        """No id is better than a wrong one. The free text is kept either way,
+        so the page still reads correctly; only the unsupportable claim goes."""
+        found = await resolve_location(db, None, "Bilaspur")
+        assert found.district_id is None
+
+    async def test_a_state_that_does_not_resolve_cannot_disambiguate(self, db, master) -> None:
+        found = await resolve_location(db, "Atlantis", "Bilaspur")
+        assert found.state_id is None and found.district_id is None
+
+    async def test_an_unambiguous_name_still_resolves_without_a_state(self, db, master) -> None:
+        """Only the ambiguous case got stricter. One district bears this name,
+        so there is nothing to disambiguate and nothing to refuse."""
+        assert (await resolve_location(db, None, "Pune")).district_id == master["pune"].id
+
+    async def test_a_district_in_another_state_is_not_taken(self, db, master) -> None:
+        """Pune is in Maharashtra; "Pune, Karnataka" is a contradiction, not a
+        Pune. The state resolves and the district deliberately does not."""
+        found = await resolve_location(db, "Karnataka", "Pune")
+        assert found.state_id == master["karnataka"].id
+        assert found.district_id is None
+
+    async def test_an_alias_cannot_reach_across_a_border(self, db, master) -> None:
+        """The alias is applied *inside* the state filter. Resolving it first
+        and checking the state afterwards would let `Bengaluru` land on
+        Karnataka's district while the writer said Maharashtra."""
+        found = await resolve_location(db, "Maharashtra", "Bengaluru")
+        assert found.state_id == master["maharashtra"].id
+        assert found.district_id is None
+
+
+async def _bare_profile(db: AsyncSession, state: str, district: str, **ids) -> CandidateProfile:
+    """A profile with a location and nothing else. `user_id` is NOT NULL, so
+    the sweep cannot be exercised without an owning row."""
+    user = User(phone=f"+9190000{uuid.uuid4().int % 100000:05d}")
+    db.add(user)
+    await db.flush()
+    profile = CandidateProfile(
+        user_id=user.id, location_state=state, location_district=district, **ids
+    )
+    db.add(profile)
+    await db.flush()
+    return profile
+
+
+class TestTheImportBackfill:
+    """`_backfill_geography` had no test of any kind, from any angle."""
+
+    def test_the_importer_has_no_resolution_rule_of_its_own(self) -> None:
+        """It used to keep a private `_DISTRICT_ALIASES` and a private lookup,
+        and a test asserted the two maps were identical -- which kept the
+        *letters* in step and not the algorithm. Both now resolve through
+        `PlaceIndex`, so there is one map and one rule.
         """
-        assert DISTRICT_ALIASES == _DISTRICT_ALIASES
+        assert not hasattr(importer, "_DISTRICT_ALIASES")
+
+    async def test_it_corrects_an_id_pointing_at_the_wrong_state(self, db, master) -> None:
+        """The sweep's own lookup kept whichever district an unordered SELECT
+        returned first, so it could overwrite a correct id with a wrong one.
+        Here it has to do the reverse."""
+        profile = await _bare_profile(
+            db,
+            "Chhattisgarh",
+            "Bilaspur",
+            state_id=master["himachal"].id,
+            district_id=master["bilaspur_hp"].id,
+        )
+
+        resolved, updated = await _backfill_geography(db)
+        assert updated >= 1
+        await db.refresh(profile)
+        assert profile.district_id == master["bilaspur_cg"].id
+        assert resolved >= 1
+
+    async def test_a_second_run_writes_nothing(self, db, master) -> None:
+        """`updated_at` is an `onupdate` column, so rewriting identical ids
+        still bumps it -- every `make import-nsqf` made every job and every
+        candidate profile look freshly edited."""
+        await _bare_profile(db, "Maharashtra", "Pune")
+
+        first_resolved, first_updated = await _backfill_geography(db)
+        assert first_updated >= 1, "the first run must write, or the second proves nothing"
+
+        second_resolved, second_updated = await _backfill_geography(db)
+        assert second_updated == 0
+        # Resolution is unchanged; only the writing stopped. The two numbers
+        # were one before and are deliberately two now.
+        assert second_resolved == first_resolved
 
 
 class TestGeographyEndpoints:

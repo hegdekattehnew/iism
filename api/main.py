@@ -3,11 +3,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from arq.jobs import Job, JobStatus
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from api.core import tasks
 from api.core.cache import close_redis
 from api.core.config import get_settings
 from api.core.database import dispose_engine
@@ -19,24 +19,40 @@ from api.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from api.core.tasks import close_task_pool, get_task_pool
+from api.core.tasks import close_task_pool
 from api.modules.analytics import router as analytics_router
 from api.modules.applications import employer_router as applications_employer_router
 from api.modules.applications import router as applications_router
+from api.modules.assessment import router as assessment_router
 from api.modules.geography import router as geography_router
-from api.modules.identity import account_router, organisation_router
+from api.modules.identity import (
+    account_router,
+    invitation_router,
+    organisation_router,
+    team_router,
+)
 from api.modules.identity import router as auth_router
+from api.modules.interests import provider_router as interests_provider_router
+from api.modules.interests import router as interests_router
 from api.modules.marketplace import (
     course_publishing_router,
     courses_router,
     jobs_router,
     marketplace_router,
+    partner_router,
     profile_router,
     publishing_router,
 )
-from api.modules.matching import employer_org_router, mount_employer_console
+from api.modules.matching import (
+    employer_org_router,
+    mount_employer_console,
+    provider_market_router,
+    provider_org_router,
+)
 from api.modules.matching import router as matching_router
 from api.modules.notifications import router as notifications_router
+from api.modules.operations import router as operations_router
+from api.modules.privacy import org_router as privacy_org_router
 from api.modules.privacy import router as privacy_router
 from api.modules.skills import roles_router
 from api.modules.skills import router as skills_router
@@ -123,20 +139,35 @@ app.include_router(geography_router)
 app.include_router(jobs_router)
 app.include_router(courses_router)
 app.include_router(marketplace_router)
+app.include_router(partner_router)
 app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(organisation_router)
+app.include_router(team_router)
+app.include_router(invitation_router)
 app.include_router(profile_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)
 app.include_router(analytics_router)
+app.include_router(assessment_router)
 app.include_router(applications_router)
 app.include_router(applications_employer_router)
+app.include_router(interests_router)
+app.include_router(interests_provider_router)
 app.include_router(notifications_router)
 app.include_router(privacy_router)
+app.include_router(privacy_org_router)
+
+# The back office, and it mounts **everywhere** (ADR-042). The demonstration
+# console below is guarded because it is *unauthenticated*, not because it is
+# non-production -- verifying an organisation is a production activity, and a
+# badge grantable only on a laptop is the absent writer in a new costume.
+app.include_router(operations_router)
 
 app.include_router(employer_org_router)
+app.include_router(provider_org_router)
+app.include_router(provider_market_router)
 
 # The *demonstration* console is unauthenticated, so it mounts in local
 # environments only. The authenticated one above needs no guard. The flag is
@@ -196,25 +227,13 @@ class TaskStatus(BaseModel):
 
 @tasks_router.post("/tasks/ping", response_model=TaskEnqueued, tags=["tasks"])
 async def enqueue_ping(note: str = "") -> TaskEnqueued:
-    pool = await get_task_pool()
-    job = await pool.enqueue_job("ping", note)
-    if job is None:  # pragma: no cover - only on a duplicate job id
-        raise RuntimeError("could not enqueue job")
-    return TaskEnqueued(job_id=job.job_id)
+    return TaskEnqueued(job_id=await tasks.enqueue_ping(note))
 
 
 @tasks_router.get("/tasks/{job_id}", response_model=TaskStatus, tags=["tasks"])
 async def task_status(job_id: str) -> TaskStatus:
-    pool = await get_task_pool()
-    job = Job(job_id, pool)
-    status = await job.status()
-    result: dict[str, Any] | None = None
-    if status is JobStatus.complete:
-        try:
-            result = await job.result(timeout=1)
-        except Exception:
-            result = None
-    return TaskStatus(job_id=job_id, status=status.value, result=result)
+    state, result = await tasks.task_result(job_id)
+    return TaskStatus(job_id=job_id, status=state, result=result)
 
 
 # Only mounted locally; in any other environment these paths do not exist.

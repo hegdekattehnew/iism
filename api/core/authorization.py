@@ -51,6 +51,10 @@ class Permission(StrEnum):
 
     ORG_READ = "org:read"
     ORG_UPDATE = "org:update"
+    # Deleting the organisation itself. Owner only, and separate from
+    # ORG_UPDATE for the reason JOB_DELETE is separate from JOB_UPDATE: an
+    # update reverses and this does not.
+    ORG_DELETE = "org:delete"
     JOB_CREATE = "job:create"
     JOB_UPDATE = "job:update"
     JOB_PUBLISH = "job:publish"
@@ -60,9 +64,36 @@ class Permission(StrEnum):
     COURSE_PUBLISH = "course:publish"
     COURSE_DELETE = "course:delete"
     CANDIDATE_SHORTLIST = "candidate:shortlist"
+    # A provider seeing who wants their course. The mirror of
+    # CANDIDATE_SHORTLIST, and separate from it because the two disclose
+    # different things to different kinds of organisation.
+    LEARNER_CONTACT = "learner:contact"
+    # Sprint 25, the team. Declared **without** a `publishes` argument at every
+    # call site: who works here is orthogonal to what the organisation may
+    # publish, so unlike LEARNER_CONTACT these ask no tenant-type question.
+    MEMBER_READ = "member:read"
+    MEMBER_INVITE = "member:invite"
+    MEMBER_MANAGE = "member:manage"
+
+    # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
+    # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
+    # thing a role can widen, and an organisation's owner must not be able to
+    # verify their own organisation. A test asserts the two sets are disjoint.
+    OPS_ORG_READ = "ops:org:read"
+    OPS_ORG_VERIFY = "ops:org:verify"
+    # Sprint 33, BL-7.1b: the government-agency actor's thin slice stands in
+    # for an agency login that does not exist yet (an operator views the
+    # report on the agency's behalf).
+    OPS_PROGRAMME_READ = "ops:programme:read"
+    # Sprint 35, BL-3.2: the same evidence pattern ADR-042 gives an
+    # organisation's badge, for a candidate's own certification claim.
+    OPS_CANDIDATE_VERIFY = "ops:candidate:verify"
 
 
-_MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ})
+# Seeing who else works here is the one thing every member may do. It names
+# colleagues, not candidates: no contact detail, no listing, nothing about
+# anybody outside the organisation.
+_MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ, Permission.MEMBER_READ})
 # Roles stay type-agnostic: an admin of any organisation holds both publishing
 # sets, and the `publishes` half of `require()` decides which one their tenant
 # may actually use. Splitting the role map by tenant type instead would mean two
@@ -76,6 +107,12 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.COURSE_UPDATE,
     Permission.COURSE_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
+    Permission.LEARNER_CONTACT,
+    # An admin may bring someone in, and `invite()` decides at what role: a
+    # `member` only. That ceiling is enforced in the service, once, rather
+    # than by a fourth permission -- it is a rule about the *argument*, and a
+    # permission set cannot express one.
+    Permission.MEMBER_INVITE,
 }
 # Deletion is the owner's alone, and so is editing the organisation itself. An
 # admin can unpublish, which reverses; neither of these does.
@@ -83,6 +120,10 @@ _OWNER: frozenset[Permission] = _ADMIN | {
     Permission.JOB_DELETE,
     Permission.COURSE_DELETE,
     Permission.ORG_UPDATE,
+    Permission.ORG_DELETE,
+    # Changing somebody's role or removing them outright is the owner's, for
+    # the reason the two above are: neither reverses by itself.
+    Permission.MEMBER_MANAGE,
 }
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
@@ -90,6 +131,40 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "admin": _ADMIN,
     "owner": _OWNER,
 }
+
+# What `users.is_staff` grants, and the only route to an `OPS_` permission
+# (ADR-042) -- every permission any operator tier may hold. `TIER_PERMISSIONS`
+# below is the function ADR-042 already anticipated: "when operator authority
+# stops being a boolean... this becomes a function of the user and no route
+# changes" (Sprint 37, BL-7.3, ADR-044).
+OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
+    {
+        Permission.OPS_ORG_READ,
+        Permission.OPS_ORG_VERIFY,
+        Permission.OPS_PROGRAMME_READ,
+        Permission.OPS_CANDIDATE_VERIFY,
+    }
+)
+
+# The two tiers (ADR-044). `support` is every read-only or single-subject
+# decision; `admin` adds the one action with public blast radius --
+# `OPS_ORG_VERIFY` grants an organisation's own "Verified" badge, which every
+# visitor sees, not just the person whose evidence was reviewed.
+# `admin` is a strict superset of `support`, asserted below rather than
+# merely intended: a route asking for a permission neither tier grants is
+# still caught at import time by `require_operator`'s existing check against
+# `OPERATOR_PERMISSIONS`, which this mapping must never fall short of.
+TIER_PERMISSIONS: dict[str, frozenset[Permission]] = {
+    "support": frozenset(
+        {
+            Permission.OPS_ORG_READ,
+            Permission.OPS_PROGRAMME_READ,
+            Permission.OPS_CANDIDATE_VERIFY,
+        }
+    ),
+    "admin": OPERATOR_PERMISSIONS,
+}
+assert TIER_PERMISSIONS["support"] < TIER_PERMISSIONS["admin"] == OPERATOR_PERMISSIONS  # noqa: S101
 
 
 @dataclass(frozen=True)
@@ -214,8 +289,91 @@ def require(
                 )
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
-                    f"Only a {expected.replace('_', ' ')} can publish a {publishes}",
+                    # Names the tenant type rather than the verb: this same
+                    # gate gates reads too, and "can publish a course" is
+                    # the wrong sentence for a provider reading their own
+                    # interested learners.
+                    f"This is for a {expected.replace('_', ' ')} organisation",
                 )
         return context
+
+    return dependency
+
+
+@dataclass(frozen=True)
+class OperatorContext:
+    """Who is acting, and what they may do. **There is no tenant.**
+
+    Frozen for the reason `TenantContext` is, and separate from it for a
+    different one: `require()`'s contract is that every org-scoped query filters
+    on `context.tenant.id`. A nullable tenant there would make that invariant
+    conditional at every existing call site, and a `None` would be aimed at
+    exactly the queries that must never be unfiltered.
+    """
+
+    user: "User"
+    permissions: frozenset[Permission]
+
+    def allows(self, permission: Permission) -> bool:
+        return permission in self.permissions
+
+
+def require_operator(
+    permission: Permission,
+) -> Callable[..., Coroutine[Any, Any, OperatorContext]]:
+    """A dependency granting one operator permission. No path parameter (ADR-042).
+
+    Operator authority belongs to nobody's organisation, so there is no slug to
+    resolve and no membership to read -- only `users.is_staff`, which **no HTTP
+    route anywhere in this product writes**. It is set by
+    `scripts/grant_staff.py`, which needs database credentials: a capability
+    strictly greater than anything the API grants.
+
+    **404, not 403, for a non-operator** -- and with FastAPI's own wording.
+    ADR-039's enumeration argument does not carry here -- there is one back
+    office and its path is not guessable -- but its other half does: a 403
+    acknowledges standing the caller has already proved, and a non-operator has
+    proved none. A 403 would tell somebody poking at `/ops` that they had found
+    the back office and that one flag on their row was all that stood in the
+    way. A *different* detail string would be just as good an oracle, so the
+    body matches an unrouted path exactly and a test compares the two.
+
+    **403, not 404, for an operator whose tier lacks this permission**
+    (Sprint 37, BL-7.3, ADR-044). That caller has already proved operator
+    standing -- they are staff, the same fact a 200 on any other `/ops` route
+    would confirm -- so refusing this one action tells them nothing a stranger
+    could not already see by trying. This is ADR-038's own rule
+    (an established identity's insufficient permission is a 403) applied one
+    level up from a tenant membership to operator authority.
+    """
+    if permission not in OPERATOR_PERMISSIONS:
+        # At import time, not per request. A route asking for JOB_PUBLISH here
+        # would otherwise 404 for ever and read as a missing route rather than
+        # as a mistake; the app refusing to boot is the honest answer.
+        raise ValueError(f"{permission.value} is not an operator permission")
+
+    async def dependency(user: "User" = Depends(get_current_user)) -> OperatorContext:
+        if not user.is_staff:
+            # Anonymous never reaches here: `get_current_user` has already
+            # answered 401, which is the opposite question and must stay
+            # distinguishable from this one.
+            log.warning("authz.operator_denied", permission=permission.value)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+        granted = TIER_PERMISSIONS.get(user.staff_tier or "", frozenset())
+        if permission not in granted:
+            # Staff standing is already proven; this is the tier question, not
+            # the operator one, so the answer is 403 -- see the docstring above.
+            log.warning(
+                "authz.operator_tier_denied",
+                permission=permission.value,
+                staff_tier=user.staff_tier,
+            )
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "Your operator tier does not include this action"
+            )
+        # Opaque and non-personal, like `tenant_id` above. `user_id` is already
+        # bound by `get_current_user`, so the access line says who acted.
+        structlog.contextvars.bind_contextvars(operator=True, staff_tier=user.staff_tier)
+        return OperatorContext(user=user, permissions=granted)
 
     return dependency

@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { useCallback, useRef, useState } from "react";
 
 import { useActiveOrg } from "@/components/ContextSwitcher";
 import { ButtonLink, buttonVariants } from "@/components/ui";
@@ -11,6 +12,7 @@ import { clearTokens, getRefreshToken, useIsSignedIn } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { forgetContext } from "@/lib/context";
 import { useMemberships } from "@/lib/org";
+import { useDismiss } from "@/lib/use-dismiss";
 
 /**
  * Header auth controls. Rendered client-side, because whether someone is
@@ -26,6 +28,17 @@ import { useMemberships } from "@/lib/org";
  * Inside an organisation you belong to: that organisation's profile. Outside
  * one: matches and profile, but only for an account that signed up to look for
  * work. An organisation-only account never sees the job-seeker side.
+ *
+ * **One visible action, and a menu for the rest.** Sprint 26 counted ten
+ * controls in a single flat header row, three of which were account plumbing
+ * and one of which -- "My matches" -- was a filled brand button competing with
+ * whatever the page's own primary action was. A brand fill should mean one
+ * thing per screen. The destinations are unchanged; only how many of them
+ * shout at once.
+ *
+ * `stacked` (the mobile nav) keeps the flat list: a dropdown inside an
+ * already-expanded menu is a second thing to open for no gain, and on a phone
+ * the row is not competing for space with anything.
  */
 export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("auth");
@@ -36,6 +49,13 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const signedIn = useIsSignedIn();
   const active = useActiveOrg();
   const { organisations, isJobSeeker, isPending } = useMemberships();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useDismiss(
+    menuRef,
+    menuOpen,
+    useCallback(() => setMenuOpen(false), []),
+  );
 
   const signOut = async () => {
     const refresh_token = getRefreshToken();
@@ -63,56 +83,107 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
       active !== null && organisations.some((m) => m.tenant.slug === active);
     const onlyOrg = organisations.length === 1 ? organisations[0] : null;
 
+    // The one destination worth a button. Everything else is in the menu.
+    const primary = isPending ? null : inOrg ? (
+      <ButtonLink href={`/employer/${active}/settings`} variant="secondary" size={size}>
+        {t("orgProfile")}
+      </ButtonLink>
+    ) : isJobSeeker ? (
+      <ButtonLink href="/matches" variant="secondary" size={size}>
+        {t("myMatches")}
+      </ButtonLink>
+    ) : onlyOrg ? (
+      <ButtonLink href={`/employer/${onlyOrg.tenant.slug}`} variant="secondary" size={size}>
+        {t("myWorkspace")}
+      </ButtonLink>
+    ) : null;
+
+    // The job-seeker destinations, offered only to an account that asked to
+    // look for work and only outside an organisation -- the rule this
+    // component exists to keep.
+    const seekerItems =
+      !isPending && !inOrg && isJobSeeker
+        ? [
+            { href: "/applications", label: ta("navApplications") },
+            { href: "/profile", label: t("myProfile") },
+          ]
+        : [];
+
+    if (stacked) {
+      // Mobile: the flat list, unchanged.
+      return (
+        <>
+          {primary}
+          {seekerItems.map((i) => (
+            <ButtonLink key={i.href} href={i.href} variant="secondary" size={size}>
+              {i.label}
+            </ButtonLink>
+          ))}
+          <Link
+            href="/account"
+            className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
+          >
+            {t("account")}
+          </Link>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
+          >
+            {t("signOut")}
+          </button>
+        </>
+      );
+    }
+
     return (
       <>
-        {/* Nothing while `/auth/me` is in flight: an empty slot for a moment is
-            better than the wrong person's buttons for a moment. */}
-        {isPending ? null : inOrg ? (
-          <ButtonLink
-            href={`/employer/${active}/settings`}
-            variant="secondary"
-            size={size}
+        {primary}
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
           >
-            {t("orgProfile")}
-          </ButtonLink>
-        ) : isJobSeeker ? (
-          <>
-            <ButtonLink href="/matches" size={size}>
-              {t("myMatches")}
-            </ButtonLink>
-            <ButtonLink href="/applications" variant="secondary" size={size}>
-              {ta("navApplications")}
-            </ButtonLink>
-            <ButtonLink href="/profile" variant="secondary" size={size}>
-              {t("myProfile")}
-            </ButtonLink>
-          </>
-        ) : onlyOrg ? (
-          <ButtonLink href={`/employer/${onlyOrg.tenant.slug}`} size={size}>
-            {t("myWorkspace")}
-          </ButtonLink>
-        ) : null}
-        {/* Every signed-in account, whatever it holds: the DPDP rights --
-            download, delete, see what was agreed -- belong to the person. */}
-        <Link
-          href="/account"
-          className={cn(
-            buttonVariants({ variant: "ghost", size }),
-            "text-foreground",
+            {t("account")}
+          </button>
+          {menuOpen && (
+            // A disclosure, not an ARIA `menu`. `role="menu"` promises
+            // arrow-key navigation and typeahead, and an `<a role="menuitem">`
+            // stops being a link to assistive technology -- which is both a
+            // worse experience for a list of destinations and a promise this
+            // component does not keep. Plain links in a revealed panel.
+            <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-border-token bg-surface p-1 shadow-raised">
+              {seekerItems.map((i) => (
+                <Link
+                  key={i.href}
+                  href={i.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm hover:bg-surface-muted"
+                >
+                  {i.label}
+                </Link>
+              ))}
+              {/* Every signed-in account, whatever it holds: the DPDP rights --
+                  download, delete, see what was agreed -- belong to the person. */}
+              <Link
+                href="/account"
+                onClick={() => setMenuOpen(false)}
+                className="block rounded-md px-3 py-2 text-sm hover:bg-surface-muted"
+              >
+                {t("accountSettings")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted"
+              >
+                {t("signOut")}
+              </button>
+            </div>
           )}
-        >
-          {t("account")}
-        </Link>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className={cn(
-            buttonVariants({ variant: "ghost", size }),
-            "text-foreground",
-          )}
-        >
-          {t("signOut")}
-        </button>
+        </div>
       </>
     );
   }

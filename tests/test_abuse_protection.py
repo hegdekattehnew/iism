@@ -213,6 +213,21 @@ def test_a_forged_token_counts_as_anonymous() -> None:
     assert _limiter_identity(scope) == "ip:10.0.0.2"
 
 
+def test_an_api_key_gets_its_own_bucket_not_the_gateway_ip() -> None:
+    """A partner's calls may all share one gateway address; bucketing them
+    there would let one partner throttle another's traffic. No database read
+    here -- an invalid key still gets a bucket of its own rather than falling
+    through to the shared IP bucket."""
+    from api.core.middleware import _limiter_identity
+
+    same_ip = {"client": ("10.0.0.3", 1)}
+    a = {**same_ip, "headers": [(b"x-api-key", b"key-a")]}
+    b = {**same_ip, "headers": [(b"x-api-key", b"key-b")]}
+    assert _limiter_identity(a) != _limiter_identity(b)
+    assert _limiter_identity(a).startswith("k:")
+    assert _limiter_identity(a) == _limiter_identity(a)
+
+
 # ----------------------------------------------------------------- exposure
 
 

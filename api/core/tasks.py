@@ -8,10 +8,14 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from arq import cron
 from arq.connections import ArqRedis, RedisSettings, create_pool
+from arq.jobs import Job, JobStatus
 
 from api.core.config import get_settings
+
+log = structlog.get_logger("iism.tasks")
 
 # Worker liveness is published here and read by /health/deep. TTL is longer than
 # the heartbeat interval so a single missed beat does not report a false outage.
@@ -42,6 +46,41 @@ async def close_task_pool() -> None:
 
 
 # ----------------------------------------------------------------- tasks
+
+
+async def enqueue_ping(note: str = "") -> str:
+    """Put a demonstration job on the queue and return its id.
+
+    Here rather than in the route because talking to the queue is this module's
+    job -- `api/main.py` held the only two handlers in the product with no
+    service behind them at all.
+    """
+    pool = await get_task_pool()
+    job = await pool.enqueue_job("ping", note)
+    if job is None:  # pragma: no cover - only on a duplicate job id
+        raise RuntimeError("could not enqueue job")
+    return job.job_id
+
+
+async def task_result(job_id: str) -> tuple[str, dict[str, Any] | None]:
+    """A queued job's status, and its result once there is one.
+
+    The result is fetched only for a completed job, and a failure to fetch it is
+    **logged and swallowed**: a demonstration endpoint must not 500 because a
+    result expired out of Redis. It is logged because a job that *raised* is
+    otherwise indistinguishable here from one that returned nothing, and for two
+    sprints there was no line anywhere saying which had happened.
+    """
+    pool = await get_task_pool()
+    job = Job(job_id, pool)
+    state = await job.status()
+    if state is not JobStatus.complete:
+        return state.value, None
+    try:
+        return state.value, await job.result(timeout=1)
+    except Exception:
+        log.warning("tasks.result_unavailable", job_id=job_id, exc_info=True)
+        return state.value, None
 
 
 async def ping(ctx: dict[str, Any], note: str = "") -> dict[str, Any]:

@@ -25,7 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
-from api.modules.matching.service import RETRIEVAL_LIMIT, attained_level, requirements_for
+from api.modules.matching.service import (
+    RETRIEVAL_LIMIT,
+    attained_level,
+    requirements_for,
+    weights_from_settings,
+)
 from api.modules.skills.models import Skill
 
 
@@ -164,6 +169,7 @@ async def _candidates_for_jobs(
         else {}
     )
 
+    weights = weights_from_settings()
     out: dict[uuid.UUID, list[ScoredCandidate]] = {}
     for job in jobs:
         reqs = requirements.get(job.id, [])
@@ -177,6 +183,9 @@ async def _candidates_for_jobs(
                     candidate_level=attained_level(held_by_profile.get(pid, []), reqs),
                     job_min_years=job.experience_min_years,
                     candidate_years=profiles[pid].years_experience,
+                    job_embedding=job.embedding,
+                    candidate_embedding=profiles[pid].embedding,
+                    weights=weights,
                 ),
             )
             for pid in pools[job.id]
@@ -191,6 +200,21 @@ async def _candidates_for_jobs(
 
 async def _candidates_for(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
     return (await _candidates_for_jobs(db, [job]))[job.id]
+
+
+async def candidates_for_job(db: AsyncSession, job: Job) -> list[ScoredCandidate]:
+    """The scored pool for one vacancy, ranked best first.
+
+    Exported for the alert sweep (Sprint 27), which needs exactly this and must
+    not grow its own idea of "close enough to tell somebody about" -- that
+    would be the second scorer ADR-037 forbids, and the first time the two
+    disagreed neither number could be defended.
+
+    Still de-identified in the sense that matters: it returns profiles, and
+    what reaches an employer is `candidate_card()`. The sweep uses it to decide
+    who to write to, and writes to them through the outbox by user id.
+    """
+    return await _candidates_for(db, job)
 
 
 async def score_profiles(
@@ -210,16 +234,19 @@ async def score_profiles(
         return {}
     requirements = (await requirements_for(db, [job.id])).get(job.id, [])
     held_by_profile = await _pool_held(db, profile_ids)
-    years: dict[uuid.UUID, int] = {
-        row.id: row.years_experience
+    facts: dict[uuid.UUID, tuple[int | None, list[float] | None]] = {
+        row.id: (row.years_experience, row.embedding)
         for row in (
             await db.execute(
-                select(CandidateProfile.id, CandidateProfile.years_experience).where(
-                    CandidateProfile.id.in_(profile_ids)
-                )
+                select(
+                    CandidateProfile.id,
+                    CandidateProfile.years_experience,
+                    CandidateProfile.embedding,
+                ).where(CandidateProfile.id.in_(profile_ids))
             )
         ).all()
     }
+    weights = weights_from_settings()
     return {
         pid: score_match(
             requirements,
@@ -227,7 +254,10 @@ async def score_profiles(
             job_level_min=job.nsqf_level_min,
             candidate_level=attained_level(held_by_profile.get(pid, []), requirements),
             job_min_years=job.experience_min_years,
-            candidate_years=years.get(pid),
+            candidate_years=facts.get(pid, (None, None))[0],
+            job_embedding=job.embedding,
+            candidate_embedding=facts.get(pid, (None, None))[1],
+            weights=weights,
         )
         for pid in profile_ids
     }
@@ -348,21 +378,44 @@ async def scarce_skills(
     scarcity is a market fact, and narrowing it to people who already matched
     would make every standard look plentiful.
     """
-    required = (
-        await db.execute(
-            select(
-                Skill.id,
-                Skill.concept_id,
-                Skill.nos_code,
-                Skill.name,
-                func.count(func.distinct(Job.id)).label("required_by"),
-            )
-            .join(JobSkill, JobSkill.skill_id == Skill.id)
-            .join(Job, Job.id == JobSkill.job_id)
-            .where(Job.tenant_id == tenant_id, Job.status == "published")
-            .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
+    return await _scarce_skills(db, tenant_id=tenant_id, limit=limit)
+
+
+async def market_scarce_skills(db: AsyncSession, *, limit: int = 8) -> list[ScarceSkill]:
+    """The same shortage, demanded by the whole market rather than one
+    employer (Sprint 33, BL-2.4).
+
+    A course provider has no vacancies of its own to ask "what do *I* need" --
+    the question a training provider actually has is which standards the
+    market broadly wants and the candidate pool broadly lacks, mirroring the
+    employer-facing view rather than a second, looser metric.
+    """
+    return await _scarce_skills(db, tenant_id=None, limit=limit)
+
+
+async def _scarce_skills(
+    db: AsyncSession, *, tenant_id: uuid.UUID | None, limit: int
+) -> list[ScarceSkill]:
+    """Shared query: `tenant_id=None` is every employer's demand, one tenant's
+    id is that employer's alone. One construction site for the same reason
+    `candidate_card()` is -- two copies of "what counts as demand" is how they
+    would eventually disagree."""
+    demand = (
+        select(
+            Skill.id,
+            Skill.concept_id,
+            Skill.nos_code,
+            Skill.name,
+            func.count(func.distinct(Job.id)).label("required_by"),
         )
-    ).all()
+        .join(JobSkill, JobSkill.skill_id == Skill.id)
+        .join(Job, Job.id == JobSkill.job_id)
+        .where(Job.status == "published")
+        .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
+    )
+    if tenant_id is not None:
+        demand = demand.where(Job.tenant_id == tenant_id)
+    required = (await db.execute(demand)).all()
     if not required:
         return []
 
@@ -399,3 +452,75 @@ async def scarce_skills(
     # Most demanded and least supplied first.
     scarce.sort(key=lambda s: (-s.required_by, s.held_by, s.name))
     return scarce[:limit]
+
+
+@dataclass(frozen=True)
+class ConsoleOverview:
+    """Everything the employer overview answers, in one read.
+
+    Assembled here rather than in a route module, which used to own the third
+    number and query for it inline -- the only inline `select(...)` left on a
+    shipping request path.
+    """
+
+    pools: list[JobPool]
+    scarce: list[ScarceSkill]
+    candidates_total: int
+
+
+async def console_overview(db: AsyncSession, tenant_id: uuid.UUID) -> ConsoleOverview:
+    """The overview, measured once, for both the demo and the real console.
+
+    `candidates_total` counts **profiles that have declared a standard**, not
+    registered accounts: an empty profile is not a candidate anybody could be
+    shown. It is deliberately **not** tenant-filtered -- it is a platform-wide
+    figure, one of the two aggregates in this module that are not scoped to the
+    caller (the other is `scarce_skills`' supply side, because scarcity is a
+    market fact). Both are counts; neither returns a row about a person, which
+    is what keeps them inside ADR-037.
+
+    `record()` commits, and there is nothing uncommitted here to sweep up: this
+    function is three reads.
+    """
+    pools = await job_pools(db, tenant_id)
+    scarce = await scarce_skills(db, tenant_id)
+    total = await db.scalar(select(func.count(func.distinct(CandidateSkill.profile_id)))) or 0
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "employer_overview_viewed",
+        subject_type="tenant",
+        subject_id=tenant_id,
+        payload={"jobs": len(pools)},
+    )
+    return ConsoleOverview(pools=pools, scarce=scarce, candidates_total=total)
+
+
+async def console_ranking(
+    db: AsyncSession, tenant_id: uuid.UUID, job_slug: str, *, limit: int
+) -> tuple[Job, list[ScoredCandidate]] | None:
+    """Ranked candidates for one vacancy, measured. `None` when there is no
+    such open vacancy in this tenant, which the caller answers with a 404.
+
+    Separate from `rank_candidates` because that function is also the one the
+    alert sweep reaches through `candidates_for_job` (ADR-037 -- there is no
+    second, looser scorer), and a cron must not record that somebody looked at
+    a shortlist.
+    """
+    found = await rank_candidates(db, tenant_id, job_slug, limit=limit)
+    if found is None:
+        return None
+    job, scored = found
+
+    from api.modules.analytics import record
+
+    await record(
+        db,
+        "employer_shortlist_viewed",
+        subject_type="job",
+        subject_id=job.id,
+        payload={"returned": len(scored)},
+    )
+    return job, scored

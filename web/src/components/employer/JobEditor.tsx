@@ -7,6 +7,7 @@ import { Area, Field, Select, Text } from "@/components/profile/fields";
 import { type Standard, StandardPicker } from "@/components/StandardPicker";
 import { Badge, Button, Card, CardBody } from "@/components/ui";
 import type { JobPayload, OrgJob } from "@/lib/org";
+import { EMPLOYMENT_TYPES } from "@/lib/profile";
 
 /**
  * Composing a vacancy against the national taxonomy.
@@ -95,6 +96,10 @@ export function JobEditor({
       salary_min_inr: n("salary_min_inr"),
       salary_max_inr: n("salary_max_inr"),
       nsqf_level_min: n("nsqf_level_min"),
+      positions: n("positions") ?? 1,
+      // An empty date input is "", which the API would reject as a datetime.
+      // Null means "no closing date", which is most vacancies.
+      closes_at: s("closes_at") ? `${s("closes_at")}T23:59:59Z` : null,
       skills: requirements.map((r) => ({
         skill_slug: r.skill_slug,
         importance: r.importance,
@@ -109,27 +114,37 @@ export function JobEditor({
         <form onSubmit={submit} key={job?.slug ?? "new"}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("titleEn")} className="sm:col-span-2">
+              {/* `minLength` mirrors `JobIn.title`'s `min_length=3`. Without
+                  it the browser accepted a two-character title, the server
+                  refused it, and the only thing on screen was "Could not
+                  save". A constraint the form does not know about is one the
+                  person finds out about the hard way. */}
               <Text
                 name="title"
                 required
+                minLength={3}
+                maxLength={200}
                 defaultValue={job?.title ?? ""}
               />
             </Field>
             <Field label={t("descriptionEn")} className="sm:col-span-2">
               <Area
                 name="description"
+                maxLength={10000}
                 defaultValue={job?.description ?? ""}
               />
             </Field>
             <Field label={t("state")}>
               <Text
                 name="location_state"
+                maxLength={120}
                 defaultValue={job?.location_state ?? ""}
               />
             </Field>
             <Field label={t("district")}>
               <Text
                 name="location_district"
+                maxLength={120}
                 defaultValue={job?.location_district ?? ""}
               />
             </Field>
@@ -138,7 +153,7 @@ export function JobEditor({
                 name="employment_type"
                 defaultValue={job?.employment_type ?? "full_time"}
               >
-                {["full_time", "part_time", "contract", "apprenticeship"].map(
+                {EMPLOYMENT_TYPES.map(
                   (v) => (
                     <option key={v} value={v}>
                       {t(`employment.${v}`)}
@@ -157,6 +172,22 @@ export function JobEditor({
                 max={10}
                 step={0.5}
                 defaultValue={job?.nsqf_level_min ?? ""}
+              />
+            </Field>
+            <Field label={t("positions")} hint={t("positionsHint")}>
+              <Text
+                name="positions"
+                type="number"
+                min={1}
+                max={999}
+                defaultValue={job?.positions ?? 1}
+              />
+            </Field>
+            <Field label={t("closesAt")} hint={t("closesAtHint")}>
+              <Text
+                name="closes_at"
+                type="date"
+                defaultValue={job?.closes_at ? job.closes_at.slice(0, 10) : ""}
               />
             </Field>
             <Field label={t("experienceMin")}>
@@ -209,7 +240,7 @@ export function JobEditor({
             </div>
 
             {requirements.length === 0 ? (
-              <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+              <p className="mt-4 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
                 {t("noStandardsWarning")}
               </p>
             ) : (
@@ -271,7 +302,7 @@ export function JobEditor({
                             rs.filter((x) => x.skill_slug !== r.skill_slug),
                           )
                         }
-                        className="ml-auto text-xs text-muted hover:text-rose-600 hover:underline"
+                        className="ml-auto text-xs text-muted hover:text-danger-text hover:underline"
                       >
                         {t("remove")}
                       </button>

@@ -326,6 +326,71 @@ class TestApplicationsAreTheirsToo:
         assert body["applications"][0]["contact_shared_at"] is not None
         assert [s["vacancy"] for s in body["saved_jobs"]] == ["Exported Role"]
 
+    async def test_export_carries_course_interests(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Sprint 24's disclosure belongs to the learner too."""
+        from api.modules.identity import Tenant as TenantModel
+        from api.modules.marketplace.models import Course as CourseModel
+
+        provider = TenantModel(
+            slug="export-academy", name="Export Academy", tenant_type="course_provider"
+        )
+        db.add(provider)
+        await db.flush()
+        db.add(
+            CourseModel(
+                slug="export-course",
+                tenant_id=provider.id,
+                title="Exported Course",
+                status="published",
+            )
+        )
+        await db.commit()
+
+        headers, _ = await _candidate(client)
+        await client.post(
+            "/me/course-interests", headers=headers, json={"course_slug": "export-course"}
+        )
+
+        body = (await client.get("/me/account/export", headers=headers)).json()
+        assert [i["course"] for i in body["course_interests"]] == ["Exported Course"]
+        assert body["course_interests"][0]["provider"] == "Export Academy"
+        assert body["course_interests"][0]["contact_shared_at"] is not None
+
+    async def test_erasure_removes_course_interests(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        from sqlalchemy import func as sql_func
+
+        from api.modules.identity import Tenant as TenantModel
+        from api.modules.interests import CourseInterest
+        from api.modules.marketplace.models import Course as CourseModel
+
+        provider = TenantModel(
+            slug="erase-academy", name="Erase Academy", tenant_type="course_provider"
+        )
+        db.add(provider)
+        await db.flush()
+        db.add(
+            CourseModel(
+                slug="erase-course",
+                tenant_id=provider.id,
+                title="Erased Course",
+                status="published",
+            )
+        )
+        await db.commit()
+
+        headers, _ = await _candidate(client)
+        await client.post(
+            "/me/course-interests", headers=headers, json={"course_slug": "erase-course"}
+        )
+        assert await db.scalar(select(sql_func.count()).select_from(CourseInterest)) == 1
+
+        await client.delete("/me/account", headers=headers)
+        assert await db.scalar(select(sql_func.count()).select_from(CourseInterest)) == 0
+
     async def test_deleting_the_account_empties_the_employers_inbox(
         self, client: AsyncClient, db: AsyncSession
     ) -> None:

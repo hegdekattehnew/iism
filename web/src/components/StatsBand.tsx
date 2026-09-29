@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
+import { CORPUS_STATS } from "@/lib/counts";
 
 /** What the platform actually holds, counted live.
  *
@@ -17,7 +18,7 @@ export function StatsBand() {
   const locale = useLocale();
 
   const stats = useQuery({
-    queryKey: ["corpus-stats"],
+    queryKey: CORPUS_STATS,
     staleTime: 10 * 60_000,
     queryFn: async () => {
       const { data, error } = await api.GET("/marketplace/stats", {});

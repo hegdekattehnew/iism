@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import get_settings
 from api.modules.marketplace.models import (
     CandidatePreferredLocation,
     CandidateProfile,
@@ -22,20 +23,40 @@ from api.modules.marketplace.models import (
     CourseSkill,
     Job,
     JobSkill,
+    open_job,
 )
 from api.modules.matching.scoring import (
     HeldSkill,
     MatchResult,
     MissingSkill,
     RequiredSkill,
+    ScoreWeights,
     score_match,
 )
+from api.modules.skills import standards_for_role
 from api.modules.skills.hierarchy import QpEntryRoute, QpSkill, QualificationPack
 from api.modules.skills.models import Skill
 
 # How many jobs survive retrieval to be scored. Generous relative to the current
 # catalogue and cheap to raise; it exists so the shape is right, not to ration.
 RETRIEVAL_LIMIT = 500
+
+
+def weights_from_settings() -> ScoreWeights:
+    """Where configuration and the pure scorer actually meet (Sprint 33,
+    BL-2.1). `scoring.py` may never call `get_settings()`; this does, once per
+    scoring pass, so a re-tune is an environment variable, not a deploy.
+    """
+    settings = get_settings()
+    return ScoreWeights(
+        coverage=settings.match_weight_coverage,
+        level=settings.match_weight_level,
+        experience=settings.match_weight_experience,
+        evidence_share=settings.match_weight_evidence_share,
+        mandatory_gap_cap=settings.match_mandatory_gap_cap,
+        experience_taper_years=settings.match_experience_taper_years,
+        semantic=settings.match_weight_semantic,
+    )
 
 
 @dataclass(frozen=True)
@@ -54,6 +75,9 @@ class CandidateFacts:
     years_experience: int | None
     states: frozenset[uuid.UUID]
     districts: frozenset[uuid.UUID]
+    # `None` until the worker sweep has computed one (Sprint 36, BL-5.1);
+    # `score_match` treats `None` as "no semantic signal", never as a penalty.
+    embedding: list[float] | None = None
 
 
 async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateFacts:
@@ -82,6 +106,7 @@ async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateF
         years_experience=profile.years_experience if profile is not None else None,
         states=frozenset(states),
         districts=frozenset(districts),
+        embedding=profile.embedding if profile is not None else None,
     )
 
 
@@ -219,7 +244,7 @@ async def match_jobs(
         select(Job.id)
         .join(JobSkill, JobSkill.job_id == Job.id)
         .join(Skill, Skill.id == JobSkill.skill_id)
-        .where(Job.status == "published")
+        .where(open_job())
         .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
     )
     if state_id is not None:
@@ -237,6 +262,7 @@ async def match_jobs(
 
     requirements = await requirements_for(db, job_ids)
     jobs = {j.id: j for j in (await db.scalars(select(Job).where(Job.id.in_(job_ids)))).all()}
+    weights = weights_from_settings()
 
     scored = [
         ScoredJob(
@@ -248,6 +274,9 @@ async def match_jobs(
                 candidate_level=attained_level(held, requirements.get(job_id, [])),
                 job_min_years=jobs[job_id].experience_min_years,
                 candidate_years=facts.years_experience,
+                job_embedding=jobs[job_id].embedding,
+                candidate_embedding=facts.embedding,
+                weights=weights,
             ),
             locality=_locality(jobs[job_id], facts),
         )
@@ -332,6 +361,81 @@ async def courses_closing_gap(
     return suggestions[:limit]
 
 
+@dataclass(frozen=True)
+class RoleAlignment:
+    """How much of one role's requirement one course actually teaches.
+
+    Independent of any candidate -- a provider's own question, "does my course
+    cover this occupation", not "would this candidate get hired" (ADR-037 does
+    not apply here for the reason it applies to `candidates_for_job`: nothing
+    here identifies a person, because no person is in the comparison at all).
+    """
+
+    course: Course
+    qp: QualificationPack
+    role_name: str
+    covered: list[str]
+    missing: list[str]
+    required_count: int
+    coverage_ratio: float
+
+
+async def course_role_alignment(
+    db: AsyncSession, course: Course, role_slug: str
+) -> RoleAlignment | None:
+    """Coverage against the role's **compulsory** standards only.
+
+    Electives are deliberately excluded, the same distinction
+    `standards_for_role` itself draws: "choose one of these" is not "all of
+    these are required", and folding electives in would inflate a course's
+    apparent coverage of a requirement it does not fully address. Compared at
+    concept level (`Skill.concept_id or Skill.id`), the same key
+    `courses_closing_gap` uses, so a course and a qualification that picked
+    different but equivalent rows for the same standard still meet.
+    """
+    role = await standards_for_role(db, role_slug)
+    if role is None:
+        return None
+
+    wanted = {
+        s.skill.concept_id or s.skill.id: s.skill.name
+        for s in role.standards
+        if s.requirement == "compulsory"
+    }
+    role_name = role.qp.job_role or role.qp.name
+    if not wanted:
+        return RoleAlignment(
+            course=course,
+            qp=role.qp,
+            role_name=role_name,
+            covered=[],
+            missing=[],
+            required_count=0,
+            coverage_ratio=0.0,
+        )
+
+    taught_rows = (
+        await db.execute(
+            select(Skill.concept_id, Skill.id)
+            .join(CourseSkill, CourseSkill.skill_id == Skill.id)
+            .where(CourseSkill.course_id == course.id)
+        )
+    ).all()
+    taught_keys = {r.concept_id or r.id for r in taught_rows}
+
+    covered = sorted(name for key, name in wanted.items() if key in taught_keys)
+    missing = sorted(name for key, name in wanted.items() if key not in taught_keys)
+    return RoleAlignment(
+        course=course,
+        qp=role.qp,
+        role_name=role_name,
+        covered=covered,
+        missing=missing,
+        required_count=len(wanted),
+        coverage_ratio=len(covered) / len(wanted),
+    )
+
+
 async def entry_routes_for_job(db: AsyncSession, job_id: uuid.UUID) -> EntryRouteFit | None:
     """The qualification behind a job, and the ways in to it.
 
@@ -410,7 +514,9 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
     A candidate who follows a link to a job sharing nothing with their profile
     should see an honest zero and the full gap, not a 404.
     """
-    job = await db.scalar(select(Job).where(Job.slug == slug, Job.status == "published"))
+    # `open_job()`: a closed vacancy must not keep producing a gap
+    # analysis and a course plan for a job nobody can apply to.
+    job = await db.scalar(select(Job).where(Job.slug == slug, open_job()))
     if job is None:
         return None
     held = await _held_skills(db, profile_id)
@@ -425,6 +531,140 @@ async def match_job_by_slug(db: AsyncSession, profile_id: uuid.UUID, slug: str) 
             candidate_level=attained_level(held, requirements),
             job_min_years=job.experience_min_years,
             candidate_years=facts.years_experience,
+            job_embedding=job.embedding,
+            candidate_embedding=facts.embedding,
+            weights=weights_from_settings(),
         ),
         locality=_locality(job, facts),
     )
+
+
+@dataclass(frozen=True)
+class MatchPage:
+    """A candidate's ranked vacancies, and whether they have declared anything.
+
+    `has_skills` is here rather than fetched separately by the caller because
+    an empty list means two different things -- nothing matched, or nothing was
+    declared to match against -- and the screen has to tell them apart.
+    """
+
+    items: list[ScoredJob]
+    has_skills: bool
+
+
+async def matches_for(
+    db: AsyncSession,
+    profile_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    limit: int = 20,
+    state_id: uuid.UUID | None = None,
+) -> MatchPage:
+    """The ranked page, measured once.
+
+    Separate from `match_jobs` deliberately: that function is also called by the
+    golden-set harness and by the alert sweep, and recording `matches_viewed`
+    inside it would count a nightly cron and a test run as somebody looking at
+    their matches. The event belongs to *this* act, so it lives in the function
+    that is only ever that act.
+    """
+    scored = await match_jobs(db, profile_id, limit=limit, state_id=state_id)
+    has_skills = await has_declared_skills(db, profile_id)
+
+    from api.modules.analytics import record
+
+    await record(db, "matches_viewed", user_id=user_id, payload={"returned": len(scored)})
+    return MatchPage(items=scored, has_skills=has_skills)
+
+
+@dataclass(frozen=True)
+class ScoredJobDetail:
+    """One scored vacancy with everything the detail screen shows.
+
+    A value object rather than three returns, because the three are one answer:
+    the score, the courses that close its gap, and how somebody becomes
+    qualified. Assembling them was 99 lines inside a route handler, along with
+    two conditional measurement rules -- which is the shape this module exists
+    to keep out of handlers (ADR-036: the scorer is pure, and everything around
+    it is testable service code).
+    """
+
+    scored: ScoredJob
+    courses: list["CourseSuggestion"]
+    entry: "EntryRouteFit | None"
+
+
+async def match_detail(
+    db: AsyncSession, profile_id: uuid.UUID, user_id: uuid.UUID, slug: str
+) -> ScoredJobDetail | None:
+    """Everything one match screen needs, measured as it is assembled.
+
+    `None` when the vacancy is not open, which the caller answers with a 404.
+
+    **The three measurements live here** because each is conditional on what the
+    score turned out to be, and "we recorded a gap view only when there was a
+    gap" is a fact about matching rather than about HTTP. They run after every
+    read and before nothing: `record()` commits, and there is no uncommitted
+    work of ours for it to take with it -- this whole function is reads.
+    """
+    scored = await match_job_by_slug(db, profile_id, slug)
+    if scored is None:
+        return None
+
+    courses = await courses_closing_gap(db, scored.result.missing)
+    entry = await entry_routes_for_job(db, scored.job.id)
+
+    from api.modules.analytics import record, record_many
+
+    await record(
+        db,
+        "match_opened",
+        user_id=user_id,
+        subject_type="job",
+        subject_id=scored.job.id,
+        payload={"score": scored.result.score, "missing": len(scored.result.missing)},
+    )
+    if scored.result.missing:
+        await record(
+            db,
+            "gap_viewed",
+            user_id=user_id,
+            subject_type="job",
+            subject_id=scored.job.id,
+            payload={
+                "missing": len(scored.result.missing),
+                "mandatory": scored.result.missing_mandatory,
+            },
+        )
+    if courses:
+        # Subjected to the **course**, not the job. It recorded
+        # `subject_type="job"` and a bare count until Sprint 24, so which course
+        # was recommended could not be recovered -- and `course_opened` has
+        # always written `{"from_job": slug}`, so the join key existed on one
+        # side only and ADR-025's click-through was uncomputable from Sprint 10
+        # to Sprint 24. `from_job` is spelled exactly as that handler spells it.
+        #
+        # Rows written before migration 0025 carry this name with
+        # `subject_type="job"`. They are not backfilled -- an event is a fact
+        # about what happened -- so any query must filter on the subject type.
+        await record_many(
+            db,
+            [
+                (
+                    "course_recommended",
+                    {
+                        "user_id": user_id,
+                        "subject_type": "course",
+                        "subject_id": suggestion.course.id,
+                        "payload": {
+                            "from_job": scored.job.slug,
+                            "closes": suggestion.closes_count,
+                            "rank": rank,
+                        },
+                    },
+                )
+                for rank, suggestion in enumerate(courses)
+            ],
+        )
+
+    return ScoredJobDetail(scored=scored, courses=courses, entry=entry)

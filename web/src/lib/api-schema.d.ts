@@ -333,6 +333,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/partners/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Partner Jobs
+         * @description Open vacancies, for a partner holding a valid API key.
+         *
+         *     `account` is unused beyond authenticating the call — there is no
+         *     per-partner filter yet (`SERVICE_ACCOUNT_SCOPES` is a set of one), so
+         *     naming it in the signature is what makes the dependency run, not a value
+         *     this handler reads.
+         */
+        get: operations["partner_jobs_partners_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/otp/request": {
         parameters: {
             query?: never;
@@ -633,6 +658,262 @@ export interface paths {
          */
         put: operations["update_organisation_org__org_slug__put"];
         post?: never;
+        /**
+         * Delete Organisation
+         * @description Delete this organisation. **The account and its other organisations are
+         *     untouched.**
+         *
+         *     Owner only, and irreversible. The client shows the preview first, because
+         *     the part an owner does not think of is the applications -- those belong to
+         *     somebody else, and the people still waiting are told.
+         */
+        delete: operations["delete_organisation_org__org_slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description Everybody in this organisation. Any member may see this.
+         *
+         *     It names colleagues, not candidates: nothing here crosses the line
+         *     ADR-037 draws around the people outside the organisation.
+         */
+        get: operations["list_members_org__org_slug__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Member
+         * @description Owner only. The last owner cannot be removed (409).
+         */
+        delete: operations["remove_member_org__org_slug__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Set Member Role
+         * @description Owner only. Refuses to demote the organisation's last owner (409).
+         */
+        patch: operations["set_member_role_org__org_slug__members__user_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Organisation
+         * @description Show yourself out.
+         *
+         *     Gated on `MEMBER_READ` -- the weakest thing every member holds -- because
+         *     leaving is not a management act. It runs through the **same** last-owner
+         *     guard as removal: the question "would this leave nobody in charge?" does
+         *     not change depending on who is asking it.
+         */
+        post: operations["leave_organisation_org__org_slug__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invitations
+         * @description Every invitation this organisation has sent, spent ones included.
+         *
+         *     Spent ones are kept on screen because "did we ever invite her, and what
+         *     happened?" is the question this list exists to answer, and a filter that
+         *     hides the answer makes it useless on the one day somebody needs it.
+         */
+        get: operations["list_invitations_org__org_slug__invitations_get"];
+        put?: never;
+        /**
+         * Create Invitation
+         * @description Invite somebody by email.
+         *
+         *     **The response is identical whether or not that address already has an
+         *     account** -- Sprint 12's lesson, which was learned by shipping the
+         *     opposite. The difference between the two cases reaches the mailbox, not the
+         *     caller: an existing account is asked to sign in and accept, a stranger is
+         *     walked through creating one.
+         *
+         *     An admin may invite a `member` only; asking for more is a 403.
+         */
+        post: operations["create_invitation_org__org_slug__invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invitation
+         * @description Withdraw an offer. An already-accepted one is a 409: that membership is
+         *     a separate fact with its own guard, and undoing it here would be a way past
+         *     the last-owner check.
+         */
+        delete: operations["revoke_invitation_org__org_slug__invitations__invitation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Invitation
+         * @description What am I being asked to join?
+         *
+         *     Unauthenticated: the holder of the token has not signed in yet, and may
+         *     have no account at all. It returns the organisation and the role and
+         *     **nothing else** -- not who invited them, not who else is a member, not
+         *     what the organisation has published.
+         */
+        get: operations["preview_invitation_invitations__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Invitation
+         * @description I hold this invitation and have no account. Send me a code.
+         *
+         *     This is the path for an address with no account at all, and it is the
+         *     **only** thing that permits `verify_email_and_sign_in` to create one --
+         *     which is the riskiest seam in the product, so it is worth being explicit
+         *     about what makes it safe:
+         *
+         *     * the address is taken from the invitation, never from the request, so a
+         *       forwarded link cannot mint an account at an address of the holder's
+         *       choosing;
+         *     * the invitation was written by somebody who holds `MEMBER_INVITE` at a
+         *       real organisation, so the account is not the caller's own idea;
+         *     * they still have to read the code out of that mailbox.
+         *
+         *     An address that already has an account may use this too -- it simply signs
+         *     them in and accepts. One flow, both cases, which also means the response
+         *     does not say which this was.
+         */
+        post: operations["claim_invitation_invitations__token__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Invitation Code
+         * @description Finish the stranger's path: code in, signed-in account out.
+         *
+         *     **The address is never in the request.** It is read off the invitation,
+         *     which is why this route exists at all rather than the client calling
+         *     `/auth/email/otp/verify` directly -- the preview deliberately does not
+         *     disclose the address, and a form that asked for one would let a forwarded
+         *     link mint an account at an address of the holder's choosing.
+         *
+         *     It delegates to `verify_email_and_sign_in` rather than reimplementing it:
+         *     the `PENDING_INVITE_KEY` that `claim` wrote is what permits that function
+         *     to create an account, and the acceptance happens inside it. One creation
+         *     path, one acceptance path, both already tested.
+         */
+        post: operations["verify_invitation_code_invitations__token__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Invitation
+         * @description Join, as the signed-in identity. One more membership, never a second
+         *     account (ADR-038).
+         *
+         *     The **other** acceptance path -- an address with no account at all -- runs
+         *     through `verify_email_and_sign_in`, because creating the account is what
+         *     that endpoint does and forking a second one here is what ADR-038 forbids.
+         */
+        post: operations["accept_invitation_invitations__token__accept_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -841,6 +1122,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/jobs/{slug}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Job
+         * @description Stop taking applications, and keep the page and the inbox.
+         *
+         *     Distinct from unpublish, which hides the vacancy entirely: people who
+         *     already applied still need to see what they applied to, and the employer
+         *     still has to work through them. Applicants still waiting are told.
+         */
+        post: operations["close_job_org__org_slug__jobs__slug__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{slug}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen Job
+         * @description Take applications again. Clears a closing date already in the past.
+         */
+        post: operations["reopen_job_org__org_slug__jobs__slug__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/courses": {
         parameters: {
             query?: never;
@@ -976,6 +1301,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/events/course-dismissed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Course Dismissed
+         * @description The "not interested" signal (Sprint 33, BL-2.2) -- a client-side act
+         *     the server cannot infer any other way, the same reason `course-opened`
+         *     has its own endpoint rather than being derived from a later request.
+         */
+        post: operations["course_dismissed_me_events_course_dismissed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/partners/assessment-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Assessment Result */
+        post: operations["submit_assessment_result_partners_assessment_results_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/applications": {
         parameters: {
             query?: never;
@@ -1011,6 +1375,26 @@ export interface paths {
          * @description Take it back. The employer keeps the fact and loses the contact details.
          */
         post: operations["withdraw_application_me_applications__application_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/applications/{application_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Poster
+         * @description Rate the poster of a completed gig engagement (Sprint 37, Epic B8).
+         */
+        post: operations["review_poster_me_applications__application_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1087,9 +1471,131 @@ export interface paths {
         head?: never;
         /**
          * Set Application Status
-         * @description Shortlist, reject or hire. A withdrawn application cannot be moved.
+         * @description Shortlist, reject, hire -- or, for a gig, complete/no-show. A withdrawn
+         *     application cannot be moved.
          */
         patch: operations["set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Worker
+         * @description Rate the worker of a completed gig engagement (Sprint 37, Epic B8).
+         */
+        post: operations["review_worker_org__org_slug__jobs__job_slug__applications__application_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/course-interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Interests */
+        get: operations["my_interests_me_course_interests_get"];
+        put?: never;
+        /**
+         * Register Interest
+         * @description Tell a provider you want this course, sharing your name and contact.
+         */
+        post: operations["register_interest_me_course_interests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/course-interests/{interest_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Interest
+         * @description Take it back. The provider keeps the fact and loses the contact details.
+         */
+        post: operations["withdraw_interest_me_course_interests__interest_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{course_slug}/interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Interested Learners
+         * @description Who wants this course, with how to reach them while each interest is live.
+         */
+        get: operations["list_interested_learners_org__org_slug__courses__course_slug__interests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{course_slug}/interests/{interest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Interest Status
+         * @description Mark that you have been in touch. A withdrawn interest cannot be moved.
+         */
+        patch: operations["set_interest_status_org__org_slug__courses__course_slug__interests__interest_id__patch"];
+        trace?: never;
+    };
+    "/org/{org_slug}/interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interest By Course
+         * @description How much interest each of this provider's courses has attracted.
+         */
+        get: operations["interest_by_course_org__org_slug__interests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/me/notifications": {
@@ -1191,6 +1697,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Organisation Deletion
+         * @description What deleting this organisation would take with it. Changes nothing.
+         */
+        get: operations["preview_organisation_deletion_org__org_slug__deletion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/organisations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verification Queue
+         * @description Organisations awaiting a verification decision, oldest first.
+         */
+        get: operations["verification_queue_ops_organisations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/organisations/{org_slug}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verification Detail
+         * @description The current badge and every decision behind it.
+         */
+        get: operations["verification_detail_ops_organisations__org_slug__verification_get"];
+        put?: never;
+        /**
+         * Decide Verification
+         * @description Grant or revoke, with the evidence.
+         *
+         *     One route rather than two, because they are one decision with two values:
+         *     a second endpoint would carry a second copy of the note and a second way to
+         *     forget it.
+         */
+        post: operations["decide_verification_ops_organisations__org_slug__verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/candidates/certifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Certification Queue
+         * @description Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2).
+         */
+        get: operations["certification_queue_ops_candidates_certifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/candidates/certifications/{certification_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Certification
+         * @description Sets `CandidateSkill.source='certified'` for the standard this
+         *     certification names (Sprint 35, BL-3.2) -- the non-seed writer
+         *     `docs/scope-reconciliation.md`'s postscript asks for.
+         */
+        post: operations["verify_certification_ops_candidates_certifications__certification_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/programmes/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Programme Report
+         * @description Outcomes for one government-agency programme, by name (Sprint 33).
+         *
+         *     Stands in for an agency's own login, which does not exist yet -- an
+         *     operator views this on the agency's behalf. Always 200: a programme name
+         *     is free text (`CandidateProfile.enrolled_via_programme`'s docstring), not
+         *     a resource with its own row to 404 against, so an unrecognised name simply
+         *     reports zero.
+         */
+        get: operations["programme_report_ops_programmes__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates": {
         parameters: {
             query?: never;
@@ -1225,6 +1867,58 @@ export interface paths {
         };
         /** Org Candidates */
         get: operations["org_candidates_org__org_slug__candidates__job_slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/{course_slug}/alignment/{role_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alignment With Role
+         * @description How much of one role's compulsory requirement this course teaches.
+         *
+         *     Independent of any candidate (BL-2.3): a provider deciding whether to
+         *     build or adjust a course, not a hiring decision. `role_slug` is a
+         *     qualification pack's slug, the same one `GET /roles/{slug}/standards`
+         *     already resolves.
+         */
+        get: operations["alignment_with_role_org__org_slug__courses__course_slug__alignment__role_slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/market-demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Market Demand
+         * @description Which standards the whole market wants that the candidate pool cannot
+         *     supply (Sprint 33, BL-2.4) -- the demand-side mirror of the employer
+         *     console's `scarce_skills`, not scoped to this provider's own courses.
+         *
+         *     `context` establishes that a signed-in member of *some* organisation is
+         *     asking; the answer itself is the same for every caller, employer or
+         *     provider alike, because market scarcity is a fact about the platform, not
+         *     about who is looking at it.
+         */
+        get: operations["market_demand_org__org_slug__market_demand_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1395,7 +2089,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
             /**
              * Applied At
              * Format: date-time
@@ -1436,7 +2130,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired";
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
             /** Message */
             message?: string | null;
             /**
@@ -1449,6 +2143,23 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * AssessmentWebhookOut
+         * @description `written` is `True` iff a `CandidateSkill` was added or upgraded.
+         *
+         *     A failed assessment attempt is a legitimate, successful call to this
+         *     endpoint that writes nothing -- `written=False` with no error -- not a
+         *     4xx. The route reserves 4xx for a payload this platform cannot act on at
+         *     all: an unparseable body, an unknown candidate, an unknown standard.
+         */
+        AssessmentWebhookOut: {
+            /** Written */
+            written: boolean;
+            /** Added */
+            added: number;
+            /** Updated */
+            updated: number;
         };
         /**
          * CandidateCardOut
@@ -1519,13 +2230,18 @@ export interface components {
              */
             willing_to_relocate: boolean;
             /** Preferred Employment Type */
-            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
             /** Expected Salary Min Inr */
             expected_salary_min_inr?: number | null;
             /** Expected Salary Max Inr */
             expected_salary_max_inr?: number | null;
             /** Notice Period */
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
+            /**
+             * Job Alerts Enabled
+             * @default true
+             */
+            job_alerts_enabled: boolean;
             /** Onboarding Completed At */
             onboarding_completed_at?: string | null;
             /** Skills */
@@ -1569,13 +2285,15 @@ export interface components {
             /** Willing To Relocate */
             willing_to_relocate?: boolean | null;
             /** Preferred Employment Type */
-            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+            preferred_employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
             /** Expected Salary Min Inr */
             expected_salary_min_inr?: number | null;
             /** Expected Salary Max Inr */
             expected_salary_max_inr?: number | null;
             /** Notice Period */
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
+            /** Job Alerts Enabled */
+            job_alerts_enabled?: boolean | null;
         };
         /** CandidateRanking */
         CandidateRanking: {
@@ -1641,6 +2359,16 @@ export interface components {
             nsqf_level?: number | null;
             skill?: components["schemas"]["SkillOut"] | null;
         };
+        /**
+         * CertificationVerifyIn
+         * @description The evidence for a decision. No `decision` field, unlike organisation
+         *     verification: a certification has no revoke path yet (the candidate's own
+         *     edit/delete controls that row), so there is only ever one direction.
+         */
+        CertificationVerifyIn: {
+            /** Note */
+            note: string;
+        };
         /** ComponentHealth */
         ComponentHealth: {
             /** Name */
@@ -1693,8 +2421,10 @@ export interface components {
             districts: number;
             /** Entry Routes */
             entry_routes: number;
-            /** Jobs */
-            jobs: number;
+            /** Jobs Posted */
+            jobs_posted: number;
+            /** Jobs Open */
+            jobs_open: number;
             /** Courses */
             courses: number;
         };
@@ -1734,6 +2464,18 @@ export interface components {
             skills?: components["schemas"]["CourseSkillOut"][];
         };
         /**
+         * CourseDismissedIn
+         * @description The negative half of `CourseOpenedIn` (Sprint 33, BL-2.2). Same shape,
+         *     same reason for `from_job_slug`: a dismissal only means something against
+         *     the recommendation it was shown alongside.
+         */
+        CourseDismissedIn: {
+            /** Course Slug */
+            course_slug: string;
+            /** From Job Slug */
+            from_job_slug?: string | null;
+        };
+        /**
          * CourseIn
          * @description A course as its provider describes it.
          *
@@ -1765,6 +2507,20 @@ export interface components {
             nsqf_level?: number | null;
             /** Skills */
             skills?: components["schemas"]["CourseSkillIn"][];
+        };
+        /**
+         * CourseInterestCount
+         * @description How many learners want one course, for the provider's own list.
+         */
+        CourseInterestCount: {
+            /** Course Slug */
+            course_slug: string;
+            /** Course Title */
+            course_title: string;
+            /** Live */
+            live: number;
+            /** Total */
+            total: number;
         };
         /** CourseOpenedIn */
         CourseOpenedIn: {
@@ -1816,6 +2572,48 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /**
+         * CourseRef
+         * @description Enough of a course to recognise it in a list of your own interests.
+         */
+        CourseRef: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Mode */
+            mode: string;
+            /** Duration Hours */
+            duration_hours?: number | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            tenant: components["schemas"]["TenantOut"];
+        };
+        /**
+         * CourseRoleAlignmentOut
+         * @description A course measured against one role, with no candidate in the request
+         *     (Sprint 33, BL-2.3).
+         */
+        CourseRoleAlignmentOut: {
+            /** Course Slug */
+            course_slug: string;
+            /** Course Title */
+            course_title: string;
+            /** Role Slug */
+            role_slug: string;
+            /** Role Name */
+            role_name: string;
+            /** Qualification Code */
+            qualification_code?: string | null;
+            /** Covered */
+            covered?: string[];
+            /** Missing */
+            missing?: string[];
+            /** Required Count */
+            required_count: number;
+            /** Coverage Percent */
+            coverage_percent: number;
         };
         /**
          * CourseSkillIn
@@ -1952,6 +2750,8 @@ export interface components {
             email: string;
             /** Code */
             code: string;
+            /** Consent Version */
+            consent_version?: string | null;
         };
         /** EmployerOut */
         EmployerOut: {
@@ -2016,6 +2816,223 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InterestIn */
+        InterestIn: {
+            /** Course Slug */
+            course_slug: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * InterestOut
+         * @description The learner's own view of an interest.
+         */
+        InterestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            course: components["schemas"]["CourseRef"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted" | "enrolled";
+            /** Message */
+            message?: string | null;
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * InterestedLearnerOut
+         * @description One interest, as the provider sees it.
+         *
+         *     **There is no candidate card here, and that is deliberate.** An employer's
+         *     applicant carries `candidate_card()` because a vacancy has required
+         *     standards to score against; a course has none, and inventing a second
+         *     scorer to fill this screen is exactly what ADR-037 forbids. So a provider
+         *     is told who wants the course, how to reach them, and where they are --
+         *     never how good they are, nor which vacancy the gap came from, which would
+         *     name a third party and the learner's job-search intent.
+         */
+        InterestedLearnerOut: {
+            /**
+             * Interest Id
+             * Format: uuid
+             */
+            interest_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted" | "enrolled";
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /** Message */
+            message?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            contact?: components["schemas"]["LearnerContactOut"] | null;
+        };
+        /** InterestedLearnerPage */
+        InterestedLearnerPage: {
+            course: components["schemas"]["CourseRef"];
+            /** Items */
+            items?: components["schemas"]["InterestedLearnerOut"][];
+            /** Total */
+            total: number;
+        };
+        /** InvitationAccepted */
+        InvitationAccepted: {
+            /** Organisation Slug */
+            organisation_slug: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
+        };
+        /**
+         * InvitationClaimed
+         * @description A code has been sent to the address the invitation was written to.
+         *
+         *     The address is **masked**. The person holding the token got it from that
+         *     mailbox and already knows it; a forwarded link should not hand it to
+         *     somebody else in full, and the hint is enough to recognise your own.
+         */
+        InvitationClaimed: {
+            /** Sent */
+            sent: boolean;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Email Hint */
+            email_hint: string;
+            /** Debug Code */
+            debug_code?: string | null;
+        };
+        /**
+         * InvitationOut
+         * @description An invitation, as the organisation that sent it sees it.
+         *
+         *     Carries the address, because the people reading this screen are the ones
+         *     who typed it and need to see whether they typed it right. It does **not**
+         *     carry the token: that reached one mailbox, and a member list is not a place
+         *     to hand it to everybody else with `MEMBER_INVITE`.
+         */
+        InvitationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "accepted" | "revoked" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Invited By */
+            invited_by?: string | null;
+        };
+        /**
+         * InvitationPreview
+         * @description What the holder of a token is told **before** they accept.
+         *
+         *     The organisation and the role, and nothing else. The token is a capability
+         *     to *join*, not a capability to read: who else is a member, who sent it and
+         *     what the organisation has published all stay behind the acceptance.
+         */
+        InvitationPreview: {
+            /** Organisation */
+            organisation: string;
+            /** Organisation Slug */
+            organisation_slug: string;
+            /**
+             * Tenant Type
+             * @enum {string}
+             */
+            tenant_type: "employer" | "course_provider";
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+        };
+        /**
+         * InvitationVerify
+         * @description The code, and consent. **No address** -- it comes off the invitation.
+         */
+        InvitationVerify: {
+            /** Code */
+            code: string;
+            /** Consent Version */
+            consent_version?: string | null;
+        };
+        /**
+         * InviteIn
+         * @description Offer somebody membership.
+         *
+         *     `EmailStr`, and lowercased, for the reason every other address here is:
+         *     `Admin@clinic.in` and `admin@clinic.in` are one mailbox, and two
+         *     invitations to one person is a confusing thing to receive.
+         */
+        InviteIn: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Role
+             * @default member
+             * @enum {string}
+             */
+            role: "admin" | "member";
+        };
+        /**
+         * JobCloseIn
+         * @description Why a vacancy is closing. `expired` is absent: that one is the worker's,
+         *     written when a closing date passes, and an employer claiming it would make
+         *     the reason a vacancy closed untrue.
+         */
+        JobCloseIn: {
+            /**
+             * Reason
+             * @default filled
+             * @enum {string}
+             */
+            reason: "filled" | "withdrawn";
+        };
         /** JobDetail */
         JobDetail: {
             /**
@@ -2037,7 +3054,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -2049,6 +3066,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillOut"][];
         };
@@ -2075,7 +3108,7 @@ export interface components {
              * @default full_time
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /**
              * Experience Min Years
              * @default 0
@@ -2089,6 +3122,13 @@ export interface components {
             salary_max_inr?: number | null;
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillIn"][];
         };
@@ -2113,7 +3153,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -2125,6 +3165,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
         };
         /** JobPage */
         JobPage: {
@@ -2245,6 +3301,22 @@ export interface components {
              */
             id: string;
         };
+        /**
+         * LearnerContactOut
+         * @description The disclosure itself.
+         *
+         *     Present only while an interest is live. Defined here rather than imported
+         *     from `applications`, which states that nothing depends on it -- and that
+         *     has to stay true.
+         */
+        LearnerContactOut: {
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+        };
         /** LevelFacet */
         LevelFacet: {
             /** Level */
@@ -2269,6 +3341,8 @@ export interface components {
             email: string;
             /** Code */
             code: string;
+            /** Consent Version */
+            consent_version?: string | null;
         };
         /** LinkPhoneRequest */
         LinkPhoneRequest: {
@@ -2282,10 +3356,20 @@ export interface components {
             /** Code */
             code: string;
         };
-        /** MarketplaceCounts */
+        /**
+         * MarketplaceCounts
+         * @description The homepage panels' figures.
+         *
+         *     Jobs is two numbers and courses is one, and the asymmetry is the honest
+         *     shape rather than an oversight: a course has no closed state -- `status`
+         *     is its whole lifecycle -- so "published" and "still on offer" are the same
+         *     question there and two different ones for a vacancy.
+         */
         MarketplaceCounts: {
-            /** Jobs */
-            jobs: number;
+            /** Jobs Posted */
+            jobs_posted: number;
+            /** Jobs Open */
+            jobs_open: number;
             /** Courses */
             courses: number;
         };
@@ -2383,6 +3467,48 @@ export interface components {
             evidence: string;
             /** Proficiency */
             proficiency: number;
+        };
+        /**
+         * MemberOut
+         * @description A colleague.
+         *
+         *     The address is here and the phone is not: an organisation's members need to
+         *     reach each other by mail, and a personal mobile number is a different
+         *     disclosure that nobody made by accepting an invitation.
+         */
+        MemberOut: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
+            /** Full Name */
+            full_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Is You
+             * @default false
+             */
+            is_you: boolean;
+        };
+        /** MemberRoleIn */
+        MemberRoleIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "admin" | "member";
         };
         /** MembershipOut */
         MembershipOut: {
@@ -2531,7 +3657,7 @@ export interface components {
              * Employment Type
              * @enum {string}
              */
-            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship";
+            employment_type: "full_time" | "part_time" | "contract" | "apprenticeship" | "gig";
             /** Experience Min Years */
             experience_min_years: number;
             /** Experience Max Years */
@@ -2543,6 +3669,22 @@ export interface components {
             /** Nsqf Level Min */
             nsqf_level_min?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Is Open
+             * @default true
+             */
+            is_open: boolean;
+            /**
+             * Positions
+             * @default 1
+             */
+            positions: number;
+            /** Closes At */
+            closes_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
             /** Skills */
             skills?: components["schemas"]["JobSkillOut"][];
             /**
@@ -2595,6 +3737,34 @@ export interface components {
             debug_code?: string | null;
             /** Organisation Slug */
             organisation_slug?: string | null;
+        };
+        /**
+         * OrganisationDeletionPreview
+         * @description What deleting **one organisation** takes with it.
+         *
+         *     Distinct from `DeletionPreview`, which is about an account. This one is
+         *     the answer to "I made an organisation by mistake, how do I get rid of just
+         *     that?" -- a question the product had no answer to at all until now: there
+         *     was no delete route, and `leave` refuses the only owner, so the sole escape
+         *     was deleting the entire account and every other organisation with it.
+         */
+        OrganisationDeletionPreview: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Tenant Type */
+            tenant_type: string;
+            /** Jobs */
+            jobs: number;
+            /** Courses */
+            courses: number;
+            /** Applications */
+            applications: number;
+            /** Course Interests */
+            course_interests: number;
+            /** Other Members */
+            other_members: number;
         };
         /** OrganisationFate */
         OrganisationFate: {
@@ -2661,6 +3831,24 @@ export interface components {
             is_verified: boolean;
             /** Contact Email */
             contact_email?: string | null;
+        };
+        /**
+         * OrganisationVerificationOut
+         * @description The organisation's current badge, and every decision behind it.
+         */
+        OrganisationVerificationOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Is Verified */
+            is_verified: boolean;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Verification Note */
+            verification_note?: string | null;
+            /** History */
+            history: components["schemas"]["VerificationEventOut"][];
         };
         /** OtpRequest */
         OtpRequest: {
@@ -2729,6 +3917,33 @@ export interface components {
             /** Missing */
             missing?: string[];
         };
+        /**
+         * ProgrammeReportOut
+         * @description Outcomes for one government-agency programme (Sprint 33, BL-7.1b).
+         */
+        ProgrammeReportOut: {
+            /** Programme */
+            programme: string;
+            /** Enrolled */
+            enrolled: number;
+            /** Matched */
+            matched: number;
+            /** Applied */
+            applied: number;
+            /** Hired */
+            hired: number;
+        };
+        /**
+         * ProviderStatusIn
+         * @description What a provider may set. `registered` and `withdrawn` are the learner's.
+         */
+        ProviderStatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "contacted" | "enrolled";
+        };
         /** QualificationRefOut */
         QualificationRefOut: {
             /** Qp Code */
@@ -2759,6 +3974,40 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * ReviewIn
+         * @description One direction of a completed gig engagement's rating (Sprint 37, Epic
+         *     B8). `subject_role` is never accepted here -- it is fixed by which of the
+         *     two routes a caller reaches, never a value the caller states.
+         */
+        ReviewIn: {
+            /** Rating */
+            rating: number;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** ReviewOut */
+        ReviewOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Subject Role
+             * @enum {string}
+             */
+            subject_role: "poster" | "worker";
+            /** Rating */
+            rating: number;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * RoleHit
@@ -3111,7 +4360,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "shortlisted" | "rejected" | "hired";
+            status: "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -3191,6 +4440,57 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * UnverifiedCertification
+         * @description One row of the certification queue (Sprint 35, BL-3.2): enough to
+         *     decide without opening anything else.
+         */
+        UnverifiedCertification: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Candidate Name */
+            candidate_name?: string | null;
+            /** Name */
+            name: string;
+            /** Issuing Body */
+            issuing_body?: string | null;
+            /** Credential Id */
+            credential_id?: string | null;
+            /** Skill Slug */
+            skill_slug: string;
+            /** Skill Name */
+            skill_name: string;
+        };
+        /**
+         * UnverifiedOrganisation
+         * @description One row of the queue: enough to decide without opening anything else.
+         */
+        UnverifiedOrganisation: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Tenant Type */
+            tenant_type: string;
+            /** City */
+            city?: string | null;
+            /** Website */
+            website?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Jobs */
+            jobs: number;
+            /** Courses */
+            courses: number;
+            /** Members */
+            members: number;
+        };
         /** UserOut */
         UserOut: {
             /**
@@ -3214,6 +4514,13 @@ export interface components {
             consented_at?: string | null;
             /** Preferred Locale */
             preferred_locale: string;
+            /**
+             * Is Staff
+             * @default false
+             */
+            is_staff: boolean;
+            /** Staff Tier */
+            staff_tier?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipOut"][];
         };
@@ -3229,6 +4536,61 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerificationEventOut */
+        VerificationEventOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "granted" | "revoked";
+            /** Note */
+            note: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Actor Name */
+            actor_name?: string | null;
+        };
+        /**
+         * VerificationIn
+         * @description Grant or revoke, with the evidence. One route, because they are one
+         *     decision with two values and a second endpoint would duplicate the note.
+         */
+        VerificationIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "granted" | "revoked";
+            /** Note */
+            note: string;
+        };
+        /** VerifiedCertificationOut */
+        VerifiedCertificationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Skill Slug */
+            skill_slug: string;
+            /**
+             * Verified At
+             * Format: date-time
+             */
+            verified_at: string;
+            /** Verification Note */
+            verification_note: string;
         };
     };
     responses: never;
@@ -3571,7 +4933,7 @@ export interface operations {
                 /** @description Filter by skill slug */
                 skill?: string | null;
                 location_state?: string | null;
-                employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship") | null;
+                employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
                 nsqf_level_max?: number | null;
                 limit?: number;
                 offset?: number;
@@ -3805,6 +5167,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CourseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    partner_jobs_partners_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobPage"];
                 };
             };
             /** @description Validation Error */
@@ -4303,6 +5699,385 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_organisation_org__org_slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_org__org_slug__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_org__org_slug__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_role_org__org_slug__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_organisation_org__org_slug__leave_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invitations_org__org_slug__invitations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invitation_org__org_slug__invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invitation_org__org_slug__invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_invitation_invitations__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_invitation_invitations__token__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationClaimed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_invitation_code_invitations__token__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invitation_invitations__token__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAccepted"];
                 };
             };
             /** @description Validation Error */
@@ -4821,6 +6596,74 @@ export interface operations {
             };
         };
     };
+    close_job_org__org_slug__jobs__slug__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JobCloseIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_job_org__org_slug__jobs__slug__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_courses_org__org_slug__courses_get: {
         parameters: {
             query?: never;
@@ -5144,6 +6987,72 @@ export interface operations {
             };
         };
     };
+    course_dismissed_me_events_course_dismissed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseDismissedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_assessment_result_partners_assessment_results_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentWebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_applications_me_applications_get: {
         parameters: {
             query?: {
@@ -5233,6 +7142,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_poster_me_applications__application_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
                 };
             };
             /** @description Validation Error */
@@ -5403,6 +7347,251 @@ export interface operations {
             };
         };
     };
+    review_worker_org__org_slug__jobs__job_slug__applications__application_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                application_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_interests_me_course_interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_interest_me_course_interests_post: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_interest_me_course_interests__interest_id__withdraw_post: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                interest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_interested_learners_org__org_slug__courses__course_slug__interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                course_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestedLearnerPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_interest_status_org__org_slug__courses__course_slug__interests__interest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_slug: string;
+                interest_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterestedLearnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interest_by_course_org__org_slug__interests_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseInterestCount"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_notifications_me_notifications_get: {
         parameters: {
             query?: never;
@@ -5505,6 +7694,231 @@ export interface operations {
             };
         };
     };
+    preview_organisation_deletion_org__org_slug__deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationDeletionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verification_queue_ops_organisations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnverifiedOrganisation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verification_detail_ops_organisations__org_slug__verification_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_verification_ops_organisations__org_slug__verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    certification_queue_ops_candidates_certifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnverifiedCertification"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_certification_ops_candidates_certifications__certification_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CertificationVerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedCertificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programme_report_ops_programmes__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     org_overview_org__org_slug__candidates_get: {
         parameters: {
             query?: never;
@@ -5557,6 +7971,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    alignment_with_role_org__org_slug__courses__course_slug__alignment__role_slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_slug: string;
+                role_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRoleAlignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    market_demand_org__org_slug__market_demand_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScarceSkillOut"][];
                 };
             };
             /** @description Validation Error */

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { ApiError, readDetail } from "@/lib/http";
 import type { paths } from "@/lib/api-schema";
 
 export type Collection =
@@ -46,6 +47,7 @@ export const EMPLOYMENT_TYPES = [
   "part_time",
   "contract",
   "apprenticeship",
+  "gig",
 ] as const;
 
 export function useProfile(enabled = true) {
@@ -67,11 +69,11 @@ export function useProfileMutations() {
 
   const saveDetails = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
-      const { data, error } = await api.PUT("/me/profile", {
+      const { data, error, response } = await api.PUT("/me/profile", {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: body as any,
       });
-      if (error) throw error;
+      if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -84,7 +86,10 @@ export function useProfileMutations() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: v.body as any,
       });
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -104,7 +109,10 @@ export function useProfileMutations() {
           body: v.body as any,
         },
       );
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -112,10 +120,11 @@ export function useProfileMutations() {
 
   const removeEntry = useMutation({
     mutationFn: async (v: { collection: Collection; id: string }) => {
-      const { data, error } = await api.DELETE("/me/profile/{collection}/{entry_id}", {
-        params: { path: { collection: v.collection, entry_id: v.id } },
-      });
-      if (error) throw error;
+      const { data, error, response } = await api.DELETE(
+        "/me/profile/{collection}/{entry_id}",
+        { params: { path: { collection: v.collection, entry_id: v.id } } },
+      );
+      if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -123,8 +132,8 @@ export function useProfileMutations() {
 
   const addSkill = useMutation({
     mutationFn: async (v: { skill_slug: string; proficiency: number }) => {
-      const { data, error } = await api.POST("/me/profile/skills", { body: v });
-      if (error) throw error;
+      const { data, error, response } = await api.POST("/me/profile/skills", { body: v });
+      if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -140,7 +149,10 @@ export function useProfileMutations() {
       const { data, error, response } = await api.POST("/me/profile/skills/bulk", {
         body: v,
       });
-      if (error) throw new Error(String(response.status));
+      if (error)
+        // `ApiError`, so the screen can say which field the server
+        // refused instead of "Could not save. Please check the fields."
+        throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -148,10 +160,11 @@ export function useProfileMutations() {
 
   const removeSkill = useMutation({
     mutationFn: async (slug: string) => {
-      const { data, error } = await api.DELETE("/me/profile/skills/{skill_slug}", {
-        params: { path: { skill_slug: slug } },
-      });
-      if (error) throw error;
+      const { data, error, response } = await api.DELETE(
+        "/me/profile/skills/{skill_slug}",
+        { params: { path: { skill_slug: slug } } },
+      );
+      if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
     onSuccess: write,
@@ -159,8 +172,13 @@ export function useProfileMutations() {
 
   const finishOnboarding = useMutation({
     mutationFn: async () => {
-      const { data, error } = await api.POST("/me/profile/onboarding/complete", {});
-      if (error) throw error;
+      const { data, error, response } = await api.POST(
+        "/me/profile/onboarding/complete",
+        {},
+      );
+      // See `Notices.tsx`: the status is read before the narrowing.
+      const status = response.status;
+      if (error) throw new ApiError(status, readDetail(error));
       return data;
     },
     onSuccess: write,
