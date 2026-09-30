@@ -625,9 +625,14 @@ split would have to turn into interfaces first; do not add to it casually.
 > conversion) on this dev/demo database, and ADR-047 says plainly that closing the volume gap needs
 > real traffic or an explicit owner override. Asked which, the owner chose to **wait for real
 > traffic** (2026-09-29) — `BL-1.3` is a standing not-started, not an open question, until usage
-> moves the numbers or the owner says otherwise. §11 also carries a standing assessment of the three
-> pillars the owner is building toward — jobs, sellable courses, gig work — and what each actually
-> needs.
+> moves the numbers or the owner says otherwise. **Sprint 39 is next**: Epic B10, Actor Dashboards
+> (`docs/IISM-Product-Backlog.docx` §3/§4.3) — `BL-10.1`–`BL-10.5`, one dashboard per actor
+> (candidate, employer, course provider, operator, government agency), each composed from numbers
+> its own module already computes rather than a new cross-module "dashboard" service (ADR-014).
+> `BL-10.6` (a partner/external-system summary) is recorded `[LATER]` and explicitly out of Sprint
+> 39: an API-key actor has no session to land a dashboard on. §11 also carries a standing assessment
+> of the three pillars the owner is building toward — jobs, sellable courses, gig work — and what
+> each actually needs.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one
