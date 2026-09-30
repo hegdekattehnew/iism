@@ -109,6 +109,17 @@ class CourseInterestCount(BaseModel):
     total: int
 
 
+class ProviderDashboardOut(BaseModel):
+    """A course provider's landing numbers (Sprint 39, BL-10.3)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    published_courses: int
+    interested_live: int
+    interested_total: int
+    enrolled: int
+
+
 class ProviderStatusIn(BaseModel):
     """What a provider may set. `registered` and `withdrawn` are the learner's."""
 

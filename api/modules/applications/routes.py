@@ -9,6 +9,7 @@ from api.modules.applications import review_service, service
 from api.modules.applications.schemas import (
     ApplicationIn,
     ApplicationOut,
+    CandidateDashboardOut,
     JobRef,
     ReviewIn,
     ReviewOut,
@@ -40,6 +41,15 @@ def _out(application, titles: dict | None = None) -> ApplicationOut:  # type: ig
         applied_at=application.created_at,
         updated_at=application.updated_at,
     )
+
+
+@router.get("/dashboard", response_model=CandidateDashboardOut)
+async def candidate_dashboard(
+    user: User = Depends(get_current_candidate),
+    db: AsyncSession = Depends(get_db_session),
+) -> CandidateDashboardOut:
+    """A candidate's landing numbers (Sprint 39, BL-10.1)."""
+    return CandidateDashboardOut.model_validate(await service.dashboard(db, user))
 
 
 @router.post("/applications", response_model=ApplicationOut, status_code=status.HTTP_201_CREATED)

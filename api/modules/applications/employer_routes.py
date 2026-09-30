@@ -11,6 +11,7 @@ from api.modules.applications.schemas import (
     ApplicantOut,
     ApplicantPage,
     ContactOut,
+    EmployerDashboardOut,
     JobRef,
     ReviewIn,
     ReviewOut,
@@ -23,6 +24,26 @@ from api.modules.matching import candidate_card
 # eventually is not called (Sprint 15).
 router = APIRouter(prefix="/org/{org_slug}/jobs/{job_slug}/applications", tags=["applications"])
 CanShortlist = Depends(require(Permission.CANDIDATE_SHORTLIST, "job"))
+
+# A separate router, not a route on the one above: that one requires a
+# `job_slug` in its own prefix, and a dashboard is aggregated across every job
+# a tenant owns, not scoped to one. Bare `/org/{org_slug}` -- checked against
+# every other router sharing that prefix before picking `/dashboard`, since
+# `course_publishing_routes.py`'s `/org/{org_slug}/courses/{slug}` already
+# proved a dynamic single-segment route elsewhere in `main.py` can intercept a
+# literal one here regardless of registration order within this file alone.
+dashboard_router = APIRouter(prefix="/org/{org_slug}", tags=["applications"])
+
+
+@dashboard_router.get("/dashboard", response_model=EmployerDashboardOut)
+async def employer_dashboard(
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> EmployerDashboardOut:
+    """An employer's landing numbers (Sprint 39, BL-10.2)."""
+    return EmployerDashboardOut.model_validate(
+        await employer_service.dashboard(db, context.tenant.id)
+    )
 
 
 def _applicant(application, profile, user, result) -> ApplicantOut:  # type: ignore[no-untyped-def]

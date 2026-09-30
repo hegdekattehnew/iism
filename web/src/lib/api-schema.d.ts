@@ -1340,6 +1340,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidate Dashboard
+         * @description A candidate's landing numbers (Sprint 39, BL-10.1).
+         */
+        get: operations["candidate_dashboard_me_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/applications": {
         parameters: {
             query?: never;
@@ -1497,6 +1517,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Employer Dashboard
+         * @description An employer's landing numbers (Sprint 39, BL-10.2).
+         */
+        get: operations["employer_dashboard_org__org_slug__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/course-interests": {
         parameters: {
             query?: never;
@@ -1532,6 +1572,39 @@ export interface paths {
          * @description Take it back. The provider keeps the fact and loses the contact details.
          */
         post: operations["withdraw_interest_me_course_interests__interest_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/interests/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Provider Dashboard
+         * @description A course provider's landing numbers (Sprint 39, BL-10.3).
+         *
+         *     **Not** `/org/{org_slug}/courses/dashboard`: `course_publishing_routes.py`
+         *     (registered earlier in `main.py`) already owns `/org/{org_slug}/courses/
+         *     {slug}` as a catch-all single-course lookup, and a literal segment
+         *     declared first *within this router* cannot rescue a path a different
+         *     router's dynamic route already intercepts app-wide -- route matching is
+         *     ordered across every included router, not per module. `/interests/...`
+         *     is this module's own path segment, with no such collision.
+         *
+         *     A distinct path from the employer's own `/org/{org_slug}/dashboard`
+         *     either way, since one route cannot serve both without branching on
+         *     tenant type mid-handler, which `require(..., "course")` already exists
+         *     to avoid.
+         */
+        get: operations["provider_dashboard_org__org_slug__interests_dashboard_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1737,6 +1810,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard
+         * @description An operator's landing numbers (Sprint 39, BL-10.4) -- today there is
+         *     none; sign-in opens straight onto the verification queue.
+         */
+        get: operations["dashboard_ops_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ops/organisations/{org_slug}/verification": {
         parameters: {
             query?: never;
@@ -1801,6 +1895,28 @@ export interface paths {
          *     `docs/scope-reconciliation.md`'s postscript asks for.
          */
         post: operations["verify_certification_ops_candidates_certifications__certification_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/programmes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Programmes
+         * @description Every programme name worth offering as a starting point (Sprint 39,
+         *     BL-10.5). Declared before `/programmes/{name}` or the literal path would be
+         *     captured as a name.
+         */
+        get: operations["list_programmes_ops_programmes_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2200,6 +2316,24 @@ export interface components {
              * @default false
              */
             capped_by_mandatory: boolean;
+        };
+        /**
+         * CandidateDashboardOut
+         * @description A candidate's landing numbers (Sprint 39, BL-10.1).
+         */
+        CandidateDashboardOut: {
+            /** Match Count */
+            match_count: number;
+            /** Best Score */
+            best_score?: number | null;
+            /** Applied */
+            applied: number;
+            /** Shortlisted */
+            shortlisted: number;
+            /** Hired */
+            hired: number;
+            /** Profile Completeness */
+            profile_completeness: number;
         };
         /** CandidateProfileFull */
         CandidateProfileFull: {
@@ -2753,6 +2887,22 @@ export interface components {
             /** Consent Version */
             consent_version?: string | null;
         };
+        /**
+         * EmployerDashboardOut
+         * @description An employer's landing numbers (Sprint 39, BL-10.2).
+         */
+        EmployerDashboardOut: {
+            /** Posted Jobs */
+            posted_jobs: number;
+            /** Open Jobs */
+            open_jobs: number;
+            /** Applied */
+            applied: number;
+            /** Shortlisted */
+            shortlisted: number;
+            /** Hired */
+            hired: number;
+        };
         /** EmployerOut */
         EmployerOut: {
             /** Slug */
@@ -3274,6 +3424,16 @@ export interface components {
             salary_min_inr?: number | null;
             /** Salary Max Inr */
             salary_max_inr?: number | null;
+        };
+        /**
+         * KnownProgrammesOut
+         * @description Every programme name a candidate is actually enrolled under (Sprint 39,
+         *     BL-10.5) -- a starting point for `programme_report`'s free-text name, not a
+         *     second source of truth for what a "real" programme is.
+         */
+        KnownProgrammesOut: {
+            /** Programmes */
+            programmes: string[];
         };
         /** LanguageOut */
         LanguageOut: {
@@ -3882,6 +4042,24 @@ export interface components {
             /** Criteria */
             criteria?: components["schemas"]["CriterionOut"][];
         };
+        /**
+         * PlatformDashboardOut
+         * @description An operator's landing numbers (Sprint 39, BL-10.4).
+         */
+        PlatformDashboardOut: {
+            /** Unverified Organisations */
+            unverified_organisations: number;
+            /** Unverified Certifications */
+            unverified_certifications: number;
+            /** Organisations */
+            organisations: number;
+            /** Candidates */
+            candidates: number;
+            /** Published Jobs */
+            published_jobs: number;
+            /** Published Courses */
+            published_courses: number;
+        };
         /** PreferredLocationOut */
         PreferredLocationOut: {
             /** State */
@@ -3932,6 +4110,20 @@ export interface components {
             applied: number;
             /** Hired */
             hired: number;
+        };
+        /**
+         * ProviderDashboardOut
+         * @description A course provider's landing numbers (Sprint 39, BL-10.3).
+         */
+        ProviderDashboardOut: {
+            /** Published Courses */
+            published_courses: number;
+            /** Interested Live */
+            interested_live: number;
+            /** Interested Total */
+            interested_total: number;
+            /** Enrolled */
+            enrolled: number;
         };
         /**
          * ProviderStatusIn
@@ -7053,6 +7245,26 @@ export interface operations {
             };
         };
     };
+    candidate_dashboard_me_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDashboardOut"];
+                };
+            };
+        };
+    };
     my_applications_me_applications_get: {
         parameters: {
             query?: {
@@ -7384,6 +7596,37 @@ export interface operations {
             };
         };
     };
+    employer_dashboard_org__org_slug__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerDashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_interests_me_course_interests_get: {
         parameters: {
             query?: {
@@ -7473,6 +7716,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provider_dashboard_org__org_slug__interests_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderDashboardOut"];
                 };
             };
             /** @description Validation Error */
@@ -7756,6 +8030,26 @@ export interface operations {
             };
         };
     };
+    dashboard_ops_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformDashboardOut"];
+                };
+            };
+        };
+    };
     verification_detail_ops_organisations__org_slug__verification_get: {
         parameters: {
             query?: never;
@@ -7884,6 +8178,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_programmes_ops_programmes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnownProgrammesOut"];
                 };
             };
         };

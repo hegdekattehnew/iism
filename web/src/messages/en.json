@@ -515,7 +515,17 @@
     "hours": "{hours} hours",
     "nearDistrict": "In your district",
     "nearState": "In your state",
-    "experienceShort": "{years, plural, one {# year} other {# years}} short of the experience this role asks for"
+    "experienceShort": "{years, plural, one {# year} other {# years}} short of the experience this role asks for",
+    "dashboard": {
+      "title": "Your matches at a glance",
+      "liveMatches": "Live matches",
+      "bestScore": "Best match score",
+      "applied": "Applied",
+      "shortlisted": "Shortlisted",
+      "hired": "Hired",
+      "profileCompleteness": "Profile completeness (%)",
+      "failed": "The dashboard could not be loaded."
+    }
   },
   "stats": {
     "heading": "Built on the national framework, not a guess",
@@ -694,7 +704,16 @@
     "confirmClose": "Close {title}? It stops taking applications and leaves browse. You can reopen it.",
     "closed_filled": "Filled",
     "closed_withdrawn": "Closed",
-    "closed_expired": "Expired"
+    "closed_expired": "Expired",
+    "dashboard": {
+      "title": "Overview",
+      "postedJobs": "Posted vacancies",
+      "openJobs": "Open vacancies",
+      "applied": "Applied",
+      "shortlisted": "Shortlisted",
+      "hired": "Hired",
+      "failed": "The dashboard could not be loaded."
+    }
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -865,7 +884,15 @@
     "cancel": "Cancel",
     "title": "Your workspace",
     "subtitle": "Publish courses against the National Occupational Standards they teach, and reach the candidates whose gap they close.",
-    "interestedLearners": "Interested learners ({count})"
+    "interestedLearners": "Interested learners ({count})",
+    "dashboard": {
+      "title": "Overview",
+      "publishedCourses": "Published courses",
+      "interestedLive": "Learners interested",
+      "interestedTotal": "Total interest, ever",
+      "enrolled": "Enrolled (provider-reported)",
+      "failed": "The dashboard could not be loaded."
+    }
   },
   "chooser": {
     "title": "I'm here to…",
@@ -1351,6 +1378,27 @@
     "detailFailed": "That organisation could not be loaded.",
     "signedOutTitle": "Sign in to continue",
     "signedOutBody": "This area needs an account.",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "dashboard": {
+      "title": "Overview",
+      "organisations": "Organisations",
+      "candidates": "Candidates",
+      "publishedJobs": "Published vacancies",
+      "publishedCourses": "Published courses",
+      "unverifiedOrganisations": "Awaiting verification",
+      "unverifiedCertifications": "Certifications to review",
+      "failed": "The dashboard could not be loaded."
+    },
+    "programmeDashboard": {
+      "title": "Programme outcomes",
+      "subtitle": "Outcomes for a government-agency programme, viewed on its behalf.",
+      "choose": "Choose a programme",
+      "none": "No programme has enrolled anyone yet.",
+      "enrolled": "Enrolled",
+      "matched": "Matched",
+      "applied": "Applied",
+      "hired": "Hired",
+      "failed": "That programme could not be loaded."
+    }
   }
 }

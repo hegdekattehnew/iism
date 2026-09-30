@@ -13,6 +13,7 @@ Newest first is the honest order.
 """
 
 import uuid
+from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -77,6 +78,62 @@ async def counts_by_course(db: AsyncSession, tenant_id: uuid.UUID) -> list[tuple
         )
     ).all()
     return [(course, int(live or 0), int(total or 0)) for course, live, total in rows]
+
+
+async def enrolment_conversion(
+    db: AsyncSession, *, tenant_id: uuid.UUID | None = None
+) -> tuple[int, int]:
+    """`(total, enrolled)` course interests -- platform-wide when `tenant_id`
+    is omitted (ADR-025/ADR-047's own metric, `make monetisation-metrics`),
+    scoped to one provider when given (Sprint 39, BL-10.3's dashboard).
+
+    One query, two callers: `scripts/report_conversion_metrics.py` calls this
+    with no `tenant_id` rather than holding a second copy of the same count,
+    the same reason `market_scarce_skills` has exactly one home.
+    """
+    total_stmt = select(func.count()).select_from(CourseInterest)
+    enrolled_stmt = (
+        select(func.count()).select_from(CourseInterest).where(CourseInterest.status == "enrolled")
+    )
+    if tenant_id is not None:
+        total_stmt = total_stmt.join(Course, Course.id == CourseInterest.course_id).where(
+            Course.tenant_id == tenant_id
+        )
+        enrolled_stmt = enrolled_stmt.join(Course, Course.id == CourseInterest.course_id).where(
+            Course.tenant_id == tenant_id
+        )
+    total = await db.scalar(total_stmt)
+    enrolled = await db.scalar(enrolled_stmt)
+    return total or 0, enrolled or 0
+
+
+@dataclass(frozen=True)
+class ProviderDashboard:
+    """A course provider's landing numbers (Sprint 39, BL-10.3) -- the direct
+    payoff of ADR-047's `"enrolled"` status finally having a screen."""
+
+    published_courses: int
+    interested_live: int
+    interested_total: int
+    enrolled: int
+
+
+async def provider_dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> ProviderDashboard:
+    published = await db.scalar(
+        select(func.count())
+        .select_from(Course)
+        .where(Course.tenant_id == tenant_id, Course.status == "published")
+    )
+    rows = await counts_by_course(db, tenant_id)
+    interested_live = sum(live for _course, live, _total in rows)
+    interested_total = sum(total for _course, _live, total in rows)
+    _total_interests, enrolled = await enrolment_conversion(db, tenant_id=tenant_id)
+    return ProviderDashboard(
+        published_courses=published or 0,
+        interested_live=interested_live,
+        interested_total=interested_total,
+        enrolled=enrolled,
+    )
 
 
 async def set_status(

@@ -11,6 +11,7 @@ way:
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -24,8 +25,14 @@ from api.modules.analytics import record
 from api.modules.applications.models import Application, SavedJob
 from api.modules.identity import User
 from api.modules.identity.models import Tenant
-from api.modules.marketplace import ensure_profile, get_job_by_slug
+from api.modules.marketplace import (
+    compute_completeness,
+    ensure_profile,
+    get_job_by_slug,
+    get_or_create_profile,
+)
 from api.modules.marketplace.models import Job
+from api.modules.matching import match_jobs
 from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.applications")
@@ -176,6 +183,49 @@ async def list_applications(db: AsyncSession, user: User) -> list[Application]:
         .order_by(Application.created_at.desc())
     )
     return list(rows.all())
+
+
+@dataclass(frozen=True)
+class CandidateDashboard:
+    """A candidate's landing numbers (Sprint 39, BL-10.1) -- no aggregate of
+    any of this exists on `/matches` today, which renders one card per job
+    with no summary above it.
+
+    `match_jobs`, never `matches_for`: the latter records `matches_viewed`
+    (Sprint 10), and a dashboard tile is not the same act as opening the
+    matches page -- the same reason `matches_for` exists as a wrapper at all
+    (`match_jobs` is also called by the golden-set harness and the alert
+    sweep, neither of which is a candidate looking at anything).
+    """
+
+    match_count: int
+    best_score: int | None
+    applied: int
+    shortlisted: int
+    hired: int
+    profile_completeness: int
+
+
+async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
+    profile = await get_or_create_profile(db, user.id)
+    scored = await match_jobs(db, profile.id)
+
+    rows = await db.execute(
+        select(Application.status, func.count())
+        .where(Application.profile_id == profile.id)
+        .group_by(Application.status)
+    )
+    by_status: dict[str, int] = dict(rows.all())  # type: ignore[arg-type]
+
+    percent, _missing = compute_completeness(profile, user.full_name)
+    return CandidateDashboard(
+        match_count=len(scored),
+        best_score=max((s.result.score for s in scored), default=None),
+        applied=by_status.get("applied", 0),
+        shortlisted=by_status.get("shortlisted", 0),
+        hired=by_status.get("hired", 0),
+        profile_completeness=percent,
+    )
 
 
 async def withdraw(db: AsyncSession, user: User, application_id: uuid.UUID) -> Application:
