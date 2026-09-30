@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import AnalyticsEvent
 from api.modules.skills import Skill
-from api.modules.skills.hierarchy import QpSkill, QualificationPack, Sector
-from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX, ROLE_ALIASES, alias_scores
+from api.modules.skills.hierarchy import QpSkill, QualificationPack, RoleAlias, Sector
+from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX, ROLE_ALIASES
 
 TIER = {"exact": 4, "alias": 4, "prefix": 3, "contains": 2, "fuzzy": 1}
 
@@ -119,6 +119,11 @@ async def corpus(db: AsyncSession) -> dict[str, QualificationPack]:
                     weightage=Decimal(weightage) if weightage else None,
                 )
             )
+    # The real aliases, seeded exactly as `scripts/seed_skills.py` seeds them --
+    # `_ROLE_SEARCH_SQL` now joins against the `role_aliases` table, not the
+    # `ROLE_ALIASES` dict directly, so a test exercising an alias needs the row
+    # to exist the same way production does.
+    db.add_all(RoleAlias(surface_form=k, job_role=v) for k, v in ROLE_ALIASES.items())
     await db.commit()
     return packs
 
@@ -194,10 +199,80 @@ class TestTheAliasMap:
             assert key == " ".join(key.lower().split()), key
             assert value.strip(), key
 
-    def test_two_letters_are_not_enough_to_claim_a_role(self) -> None:
-        assert alias_scores("wa") == {}
-        assert alias_scores("war")  # MIN_ALIAS_PREFIX characters is enough
+    async def test_two_letters_are_not_enough_to_claim_a_role(self, client, corpus) -> None:
         assert MIN_ALIAS_PREFIX == 3
+        # "wa" is a 2-character prefix of the "ward boy" alias -- too short to
+        # count, so it must not resolve to General Duty Assistant via alias.
+        hits = await _search(client, "wa")
+        assert not any(h["job_role"] == "General Duty Assistant" for h in hits)
+
+        # "war" is exactly MIN_ALIAS_PREFIX characters -- enough.
+        hits = await _search(client, "war")
+        assert hits[0]["job_role"] == "General Duty Assistant"
+        assert hits[0]["match_kind"] == "alias"
+
+    def test_tech_reaches_a_software_role_over_an_unrelated_technician(self) -> None:
+        """ "tech" is a literal substring of "Technician" -- without an alias,
+        `_ROLE_SEARCH_SQL`'s plain contains-tier surfaces AC/dialysis/solar
+        technicians from unrelated sectors before anything IT-related, since
+        none of the real IT-ITeS job roles happen to contain that word.
+
+        This checks the dictionary itself, not the live search: the fixture
+        `corpus` in this file is hand-built and carries no IT-sector packs, so
+        whether each value names a *real, current* qualification is instead
+        `scripts/check_role_aliases.py`'s job (`make check-role-aliases`),
+        against the actual corpus."""
+        for term in ("software developer", "web developer", "it support"):
+            assert term in ROLE_ALIASES, term
+            assert ROLE_ALIASES[term].strip()
+
+    def test_engineer_is_a_different_target_from_developer(self) -> None:
+        """ "Software Development" (NSQF 6: architecture, DSA, testing & QA,
+        DevOps) over the NSQF-5 entry-level coding certificate "developer"/
+        "coder" point to -- checked against the corpus, not assumed the two
+        words are interchangeable (this session's own first pass got it
+        wrong)."""
+        assert ROLE_ALIASES["software engineer"] == "Software Development"
+        assert ROLE_ALIASES["software engineer"] != ROLE_ALIASES["software developer"]
+
+
+class TestTheSemanticTier:
+    """Sprint 40, foundation: gated behind a real (non-hashing) embedding
+    provider. Proven with a stub, not the real ~470 MB model -- that needs an
+    actual download and stays out of the ordinary test run, the same carve-out
+    `make evaluate` already has for needing the real corpus."""
+
+    async def test_admits_a_role_with_no_literal_overlap_at_all(
+        self, client, corpus, db, monkeypatch
+    ) -> None:
+        from api.modules.skills import service as skills_service
+
+        fixed_vector = [1.0] + [0.0] * 383
+
+        class _StubProvider:
+            name = "sentence_transformer"
+            model = "stub"
+
+            def embed(self, text: str) -> list[float]:
+                return fixed_vector
+
+        monkeypatch.setattr(skills_service, "get_embedding_provider", lambda: _StubProvider())
+
+        beautician = corpus["beautician"]
+        beautician.embedding = fixed_vector
+        await db.commit()
+
+        # Shares no letters, no trigram, and is not an alias -- only the
+        # (stubbed) semantic tier can find it.
+        hits = await _search(client, "zzzznotmatchinganythingliteral")
+        assert any(h["job_role"] == "Beautician" for h in hits)
+
+    async def test_the_hashing_placeholder_never_reaches_this_branch(self, client, corpus) -> None:
+        """No monkeypatch here: the real default provider is the hashing
+        placeholder, and its "similarity" is token overlap, not signal -- the
+        semantic branch must stay off, not merely low-scoring."""
+        hits = await _search(client, "zzzznotmatchinganythingliteral")
+        assert hits == []
 
 
 class TestOneRowPerRole:

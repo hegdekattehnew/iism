@@ -38,6 +38,8 @@ EXPECTED_CRONS = {
     "cron:purge_expired_analytics": "events are kept past their retention period",
     "cron:refresh_embeddings": "a published job or a saved skill set never gets "
     "a semantic-similarity term, and BL-5.2's whole ranking refinement is inert",
+    "cron:refresh_role_embeddings": "a qualification pack imported or reissued never "
+    "gets a semantic-similarity vector, and role search's semantic tier stays inert",
 }
 
 REPO = Path(__file__).resolve().parent.parent

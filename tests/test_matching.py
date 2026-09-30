@@ -111,6 +111,44 @@ class TestScoring:
 
         assert held_strong.score > held_none.score
 
+    def test_the_cap_tapers_down_when_the_real_overlap_behind_it_is_thin(self) -> None:
+        """A single shared, non-distinctive standard (the seed data's own
+        "Employability Skills", reused as mandatory across dozens of
+        unrelated sectors) should not read as the same near-miss an honest
+        one-standard-short strong match gets, even though both clear the flat
+        cap on the strength of the "unknown, not zero" level/evidence
+        defaults alone."""
+        # High coverage: 5 of 6 required standards held, one mandatory
+        # missing -- an honest near-miss, unaffected by the taper.
+        strong = [_req(f"s{i}", importance=5) for i in range(5)]
+        strong.append(_req("gate", importance=5, mandatory=True))
+        strong_result = score_match(strong, [_held(r, source="self_declared") for r in strong[:5]])
+
+        # Thin coverage: the *only* held standard, out of three, alongside a
+        # missing mandatory one -- coverage well under MIN_COVERAGE_FOR_CAP.
+        thin = [_req("generic", importance=5), _req("gate", importance=5, mandatory=True)]
+        thin.append(_req("other", importance=5, mandatory=True))
+        thin_result = score_match(thin, [_held(thin[0], source="self_declared")])
+
+        assert strong_result.capped_by_mandatory
+        assert thin_result.capped_by_mandatory
+        assert strong_result.score == round(MANDATORY_GAP_CAP * 100)
+        assert thin_result.score < strong_result.score
+
+    def test_the_cap_does_not_taper_at_or_above_the_coverage_floor(self) -> None:
+        """Coverage exactly at `min_coverage_for_cap` gets the full cap, not a
+        tapered one -- the taper is for *below* the floor, not at it."""
+        from api.modules.matching.scoring import ScoreWeights
+
+        reqs = [_req("held", importance=2), _req("gate", importance=3, mandatory=True)]
+        weights = ScoreWeights(min_coverage_for_cap=0.40)
+        # coverage = 2 / 5 = 0.40, exactly the floor.
+        result = score_match(reqs, [_held(reqs[0], source="certified")], weights=weights)
+
+        assert result.coverage == 0.4
+        assert result.capped_by_mandatory
+        assert result.score == round(weights.mandatory_gap_cap * 100)
+
     def test_evidence_outranks_self_declaration(self) -> None:
         """What `candidate_skills.source` was added for in Sprint 4."""
         reqs = [_req("a"), _req("b")]

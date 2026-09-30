@@ -22,8 +22,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Numeric,
@@ -34,6 +36,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from api.adapters.embeddings.base import EMBEDDING_DIMENSIONS
 from api.core.database import Base
 
 # How a NOS is attached to a Qualification Pack. Elective and optional NOS are
@@ -185,6 +188,21 @@ class QualificationPack(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
+    # Semantic-similarity vector for role search (Sprint 40, foundation only --
+    # nothing computes or reads this until `refresh_role_embeddings` and
+    # `search_roles()`'s semantic tier exist). Same shape and same "NULL means
+    # needs computing" convention migration 0034 already uses for `Job`/
+    # `CandidateProfile.embedding` -- see that migration and
+    # `matching/tasks.py`'s docstring for why.
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSIONS), default=None
+    )
+    embedding_provider: Mapped[str | None] = mapped_column(default=None)
+    embedding_model: Mapped[str | None] = mapped_column(default=None)
+    embedding_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
     sector: Mapped["Sector | None"] = relationship(lazy="selectin")
     skills: Mapped[list["QpSkill"]] = relationship(
         back_populates="qualification_pack", cascade="all, delete-orphan"
@@ -329,3 +347,30 @@ class ModelCurriculum(Base):
     # a unitCode that is present but blank, so such a table only ever covered 424
     # of 1,950 curricula: a twenty-unit curriculum rendered as two, which
     # misinforms rather than under-informs. The totals below are complete.
+
+
+class RoleAlias(Base):
+    """A lay term that resolves onto a qualification's `job_role` (Sprint 23,
+    moved from a Python dict to a table for the same reason `SkillAlias`
+    already is: `_ROLE_SEARCH_SQL` can join against this directly rather than
+    computing scores in Python and passing them back in as `unnest()` arrays.
+
+    `job_role` is free text, matched case-insensitively against
+    `qualification_packs.job_role` -- not a foreign key, because one role name
+    spans multiple QP rows (reissues, `-SI` variants) and the search query's
+    own `pick=1` ranking already picks the representative one at read time.
+
+    `role_aliases.py`'s `ROLE_ALIASES` dict stays the authored source of
+    truth -- reviewable in a diff, exactly like `seed_skills.py`'s `SKILLS`
+    tuple is for `SkillAlias` -- and `scripts/seed_skills.py` replaces this
+    table's rows from it on every run. A row here with no matching
+    `job_role` "matches nothing, silently", exactly as the dict-based version
+    always could; `scripts/check_role_aliases.py` is unchanged in that regard.
+    """
+
+    __tablename__ = "role_aliases"
+    __table_args__ = (UniqueConstraint("surface_form", name="uq_role_alias_surface_form"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    surface_form: Mapped[str] = mapped_column(Text())
+    job_role: Mapped[str] = mapped_column(Text())

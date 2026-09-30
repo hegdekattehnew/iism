@@ -186,6 +186,30 @@ async def test_job_search_by_devanagari_title(seeded: dict, client: AsyncClient)
     assert [i["slug"] for i in body["items"]] == ["gda"]
 
 
+async def test_job_search_expands_generic_synonyms(client: AsyncClient, db: AsyncSession) -> None:
+    """ "tech" and "technology" share no common stem -- `websearch_to_tsquery`'s
+    English stemmer does not reduce "technology" down to "tech" -- so a job
+    naming the word only in full, in its description, would otherwise be
+    invisible to the literal query. This is what left real IT-sector listings
+    unfindable by that name (`api/core/text.py`'s `WORD_SYNONYMS`)."""
+    employer = Tenant(slug="synonym-employer", name="Synonym Co", tenant_type="employer")
+    db.add(employer)
+    await db.flush()
+    db.add(
+        Job(
+            slug="synonym-job",
+            tenant_id=employer.id,
+            title="Business Analyst",
+            description="An entry point into the Information Technology sector.",
+            experience_min_years=0,
+        )
+    )
+    await db.flush()
+
+    body = (await client.get("/jobs", params={"q": "tech"})).json()
+    assert "synonym-job" in [i["slug"] for i in body["items"]]
+
+
 # ------------------------------------------------------------------- detail
 
 

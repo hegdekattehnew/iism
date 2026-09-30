@@ -116,12 +116,27 @@ class Settings(BaseSettings):
     match_weight_experience: float = 0.07
     match_weight_evidence_share: float = 0.10
     match_mandatory_gap_cap: float = 0.45
+    # Below this coverage, the mandatory-gap cap itself tapers down rather
+    # than holding flat -- a job whose only overlap is one generic,
+    # non-distinctive standard should not read as the same near-miss a
+    # genuinely one-standard-short strong match gets.
+    match_min_coverage_for_cap: float = 0.40
     match_experience_taper_years: float = 3.0
     # Sprint 36, BL-5.2. Zero: additive on top of the four above, not carved
     # out of them, and turning it up is a deliberate, separately-measured
     # re-tune this story explicitly defers -- `make evaluate` must stay
     # bit-identical while this is 0.
     match_weight_semantic: float = 0.0
+
+    # --- embeddings (ADR-013, ADR-031) ---
+    # `"hashing"` (the placeholder, `HashingEmbeddingProvider`) is the default
+    # everywhere -- dev, test, CI -- so adding the real model's dependency does
+    # not by itself change any environment's behaviour. Set to
+    # `"sentence_transformer"` to load the real, ADR-mandated model; that pulls
+    # in a ~470 MB download on first use, so it is an explicit, separate
+    # decision per environment, not something this setting's own default makes
+    # for anyone.
+    embedding_provider: str = "hashing"
 
     # --- database pool ---
     db_pool_size: int = 5

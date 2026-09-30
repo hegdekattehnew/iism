@@ -18,7 +18,9 @@ from sqlalchemy import delete, select
 
 from api.core import localisation
 from api.core.database import dispose_engine, get_sessionmaker
+from api.modules.skills.hierarchy import RoleAlias
 from api.modules.skills.models import Skill, SkillAlias
+from api.modules.skills.role_aliases import ROLE_ALIASES
 
 # slug, en, hi, desc_en, desc_hi, type, nsqf, [(alias, script)]
 # script: l = latin, d = devanagari, t = transliteration (Hindi in Latin script)
@@ -556,10 +558,23 @@ SKILLS: list[tuple] = [
 SCRIPT_NAMES = {"l": "latin", "d": "devanagari", "t": "transliteration"}
 
 
-async def seed() -> tuple[int, int, int]:
+async def _seed_role_aliases(db) -> int:  # type: ignore[no-untyped-def]
+    """Replace `role_aliases` wholesale from `ROLE_ALIASES` (Sprint 23, moved
+    to a table this session) -- `role_aliases.py`'s dict is the authored
+    source of truth, the same relationship `SKILLS` above has to
+    `skill_aliases`, so a run of this script is what keeps the table current."""
+    await db.execute(delete(RoleAlias))
+    for surface_form, job_role in ROLE_ALIASES.items():
+        db.add(RoleAlias(surface_form=surface_form, job_role=job_role))
+    await db.commit()
+    return len(ROLE_ALIASES)
+
+
+async def seed() -> tuple[int, int, int, int]:
     created = updated = alias_count = 0
 
     async with get_sessionmaker()() as db:
+        role_alias_count = await _seed_role_aliases(db)
         for slug, en, hi, d_en, d_hi, stype, level, aliases in SKILLS:
             skill = await db.scalar(select(Skill).where(Skill.slug == slug))
             if skill is None:
@@ -602,9 +617,9 @@ async def seed() -> tuple[int, int, int]:
         await db.commit()
 
     await dispose_engine()
-    return created, updated, alias_count
+    return created, updated, alias_count, role_alias_count
 
 
 if __name__ == "__main__":
-    c, u, a = asyncio.run(seed())
-    print(f"skills created: {c}  updated: {u}  aliases: {a}")
+    c, u, a, r = asyncio.run(seed())
+    print(f"skills created: {c}  updated: {u}  aliases: {a}  role aliases: {r}")

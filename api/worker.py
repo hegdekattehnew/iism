@@ -39,6 +39,7 @@ from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
 from api.modules.matching.tasks import refresh_embeddings
 from api.modules.notifications.tasks import drain_notifications
+from api.modules.skills.tasks import refresh_role_embeddings
 
 # Named on the command line as `arq --custom-log-dict api.worker.LOG_CONFIG`.
 # arq applies exactly one logging config and it applies it *before* the worker
@@ -99,6 +100,12 @@ class WorkerSettings:
         # not by the next hourly sweep -- and it is cheap when nothing is
         # NULL, one indexed-ish query per table returning no rows.
         cron(refresh_embeddings, minute=set(range(0, 60, 2)), run_at_startup=False),
+        # Every five minutes (Sprint 40, foundation): a qualification pack only
+        # ever gets a new embedding after `make import-nsqf`, never on a
+        # candidate/employer request, so this needs nowhere near
+        # `refresh_embeddings`' two-minute cadence -- cheap when nothing is
+        # NULL, the same one-indexed-query-returning-nothing shape.
+        cron(refresh_role_embeddings, minute=set(range(0, 60, 5)), run_at_startup=False),
     ]
     on_startup = _startup
     redis_settings = _Tasks.redis_settings

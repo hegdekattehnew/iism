@@ -54,6 +54,7 @@ def weights_from_settings() -> ScoreWeights:
         experience=settings.match_weight_experience,
         evidence_share=settings.match_weight_evidence_share,
         mandatory_gap_cap=settings.match_mandatory_gap_cap,
+        min_coverage_for_cap=settings.match_min_coverage_for_cap,
         experience_taper_years=settings.match_experience_taper_years,
         semantic=settings.match_weight_semantic,
     )

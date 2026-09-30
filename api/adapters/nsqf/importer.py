@@ -741,6 +741,24 @@ async def import_nsqf(db: AsyncSession, source: NsqfSource) -> ImportReport:
         ).all()
     }
 
+    # `_chunked_upsert`'s `ON CONFLICT DO UPDATE` only sets columns present in
+    # `qp_rows`, which never includes `embedding` -- an existing pack's vector
+    # would otherwise survive untouched even though its `qp_skills` linkage is
+    # rewritten wholesale below, silently going stale the same way a `Job`'s
+    # or `CandidateProfile`'s would without `_write_skills`'s own null-out.
+    # Sprint 40, foundation only -- nothing reads this column yet.
+    if qp_ids:
+        await db.execute(
+            update(QualificationPack)
+            .where(QualificationPack.id.in_(qp_ids.values()))
+            .values(
+                embedding=None,
+                embedding_provider=None,
+                embedding_model=None,
+                embedding_computed_at=None,
+            )
+        )
+
     # ------------------------------------------------------------- qp -> skills
     link_rows, level_votes = [], defaultdict(list)
     qp_counts: Counter[uuid.UUID] = Counter()

@@ -340,6 +340,29 @@ class TestIdempotency:
         titles = (await db.scalars(select(Skill.name).where(Skill.nos_code == "HC/N0001"))).all()
         assert titles == ["Collect samples"]
 
+    async def test_a_reimport_nulls_a_stale_embedding(self, db, source) -> None:
+        """`_chunked_upsert`'s `ON CONFLICT DO UPDATE` only sets columns
+        present in `qp_rows`, which never includes `embedding` -- so a pack's
+        vector would otherwise survive untouched even though its `qp_skills`
+        linkage is rewritten wholesale on every import, going stale silently
+        the same way a `Job`'s would without `_write_skills`'s own null-out
+        (Sprint 40, foundation only; nothing computes a real vector here)."""
+        await _import(db, source)
+        qp = await db.scalar(select(QualificationPack).limit(1))
+        assert qp is not None
+        qp.embedding = [0.1] * 384
+        qp.embedding_provider = "hashing"
+        qp.embedding_model = "feature-hash-word-v1"
+        await db.commit()
+
+        await _import(db, JsonFileNsqfSource(FIXTURE))
+
+        await db.refresh(qp)
+        assert qp.embedding is None
+        assert qp.embedding_provider is None
+        assert qp.embedding_model is None
+        assert qp.embedding_computed_at is None
+
 
 class TestApiSurface:
     """The half-level path through the API, which is where it broke in practice:
