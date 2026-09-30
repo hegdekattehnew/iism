@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
+import { ProviderDashboard } from "@/components/employer/ProviderDashboard";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { SessionExpired } from "@/components/SessionExpired";
 import { detailOf, isSignedOut } from "@/lib/http";
@@ -136,6 +137,8 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="space-y-6">
+      <ProviderDashboard orgSlug={orgSlug} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t("yourCourses")}</h2>

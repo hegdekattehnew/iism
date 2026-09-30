@@ -30,3 +30,4 @@ export { Card, CardBody, CardTitle } from "@/components/ui/card";
 export { Section, SectionHeading, Logo } from "@/components/ui/layout";
 export { Progress } from "@/components/ui/progress";
 export { Skeleton } from "@/components/ui/skeleton";
+export { StatTile } from "@/components/ui/stat-tile";

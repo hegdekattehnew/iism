@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { EmployerDashboard } from "@/components/employer/EmployerDashboard";
 import { JobEditor } from "@/components/employer/JobEditor";
 import { SessionExpired } from "@/components/SessionExpired";
 import { detailOf, isSignedOut } from "@/lib/http";
@@ -143,6 +144,8 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="space-y-6">
+      <EmployerDashboard orgSlug={orgSlug} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t("yourVacancies")}</h2>

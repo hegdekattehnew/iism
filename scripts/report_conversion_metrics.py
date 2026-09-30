@@ -18,11 +18,11 @@ correct, not whether the answer is impressive yet.
 
 import asyncio
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.analytics.models import AnalyticsEvent
-from api.modules.interests.models import CourseInterest
+from api.modules.interests.provider_service import enrolment_conversion  # noqa: F401
 
 
 async def _course_pairs(db, event_name: str) -> set[tuple]:  # type: ignore[no-untyped-def]
@@ -51,20 +51,6 @@ async def click_through(db) -> tuple[int, int]:  # type: ignore[no-untyped-def]
     recommended_pairs = await _course_pairs(db, "course_recommended")
     opened_pairs = await _course_pairs(db, "course_opened")
     return len(recommended_pairs), len(recommended_pairs & opened_pairs)
-
-
-async def enrolment_conversion(db) -> tuple[int, int]:  # type: ignore[no-untyped-def]
-    """`(total, enrolled)` `CourseInterest` rows, platform-wide.
-
-    `enrolled` is provider-reported and unverified -- the same trust level
-    `contacted` already carries (`interests/models.py`) -- so this counts
-    what providers claimed, not a fact the platform independently confirmed.
-    """
-    total = await db.scalar(select(func.count()).select_from(CourseInterest))
-    enrolled = await db.scalar(
-        select(func.count()).select_from(CourseInterest).where(CourseInterest.status == "enrolled")
-    )
-    return total or 0, enrolled or 0
 
 
 async def main() -> None:

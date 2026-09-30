@@ -12,6 +12,7 @@ from api.modules.interests.schemas import (
     CourseRef,
     InterestedLearnerOut,
     InterestedLearnerPage,
+    ProviderDashboardOut,
     ProviderStatusIn,
 )
 
@@ -45,6 +46,30 @@ def _learner(interest, profile, user) -> InterestedLearnerOut:  # type: ignore[n
             if live
             else None
         ),
+    )
+
+
+@router.get("/interests/dashboard", response_model=ProviderDashboardOut)
+async def provider_dashboard(
+    context: TenantContext = CanContactLearners,
+    db: AsyncSession = Depends(get_db_session),
+) -> ProviderDashboardOut:
+    """A course provider's landing numbers (Sprint 39, BL-10.3).
+
+    **Not** `/org/{org_slug}/courses/dashboard`: `course_publishing_routes.py`
+    (registered earlier in `main.py`) already owns `/org/{org_slug}/courses/
+    {slug}` as a catch-all single-course lookup, and a literal segment
+    declared first *within this router* cannot rescue a path a different
+    router's dynamic route already intercepts app-wide -- route matching is
+    ordered across every included router, not per module. `/interests/...`
+    is this module's own path segment, with no such collision.
+
+    A distinct path from the employer's own `/org/{org_slug}/dashboard`
+    either way, since one route cannot serve both without branching on
+    tenant type mid-handler, which `require(..., "course")` already exists
+    to avoid."""
+    return ProviderDashboardOut.model_validate(
+        await provider_service.provider_dashboard(db, context.tenant.id)
     )
 
 

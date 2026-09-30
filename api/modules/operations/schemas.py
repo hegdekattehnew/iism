@@ -32,6 +32,19 @@ class UnverifiedOrganisation(BaseModel):
     members: int
 
 
+class PlatformDashboardOut(BaseModel):
+    """An operator's landing numbers (Sprint 39, BL-10.4)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    unverified_organisations: int
+    unverified_certifications: int
+    organisations: int
+    candidates: int
+    published_jobs: int
+    published_courses: int
+
+
 class VerificationIn(BaseModel):
     """Grant or revoke, with the evidence. One route, because they are one
     decision with two values and a second endpoint would duplicate the note."""
@@ -105,3 +118,11 @@ class ProgrammeReportOut(BaseModel):
     matched: int
     applied: int
     hired: int
+
+
+class KnownProgrammesOut(BaseModel):
+    """Every programme name a candidate is actually enrolled under (Sprint 39,
+    BL-10.5) -- a starting point for `programme_report`'s free-text name, not a
+    second source of truth for what a "real" programme is."""
+
+    programmes: list[str]

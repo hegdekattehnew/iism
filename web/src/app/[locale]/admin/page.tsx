@@ -1,6 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { OperatorDashboard } from "@/components/ops/OperatorDashboard";
 import { OperatorOnly } from "@/components/ops/OperatorOnly";
+import { ProgrammeDashboard } from "@/components/ops/ProgrammeDashboard";
 import { VerificationQueue } from "@/components/ops/VerificationQueue";
 
 /**
@@ -23,9 +25,15 @@ export default async function Page({
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
       <OperatorOnly>
-        <h1 className="text-3xl font-bold tracking-tight">{t("queueTitle")}</h1>
-        <p className="mt-2 text-muted">{t("queueSubtitle")}</p>
-        <VerificationQueue />
+        <OperatorDashboard />
+        <div className="mt-10">
+          <ProgrammeDashboard />
+        </div>
+        <div className="mt-10">
+          <h1 className="text-3xl font-bold tracking-tight">{t("queueTitle")}</h1>
+          <p className="mt-2 text-muted">{t("queueSubtitle")}</p>
+          <VerificationQueue />
+        </div>
       </OperatorOnly>
     </div>
   );

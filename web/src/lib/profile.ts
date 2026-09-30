@@ -58,6 +58,25 @@ export function useProfile(enabled = true) {
   });
 }
 
+export function useCandidateDashboard() {
+  return useQuery({
+    queryKey: ["dashboard"],
+    retry: false,
+    queryFn: async () => {
+      // Status read before the check, not inside it: this route takes no
+      // parameters at all, so its schema carries only a 200 -- on the
+      // failure branch openapi-fetch narrows the whole result to `never` and
+      // `response` becomes unreachable there (`useMemberships`'s own fix for
+      // `/auth/me`, the same shape).
+      const result = await api.GET("/me/dashboard", {});
+      const status = result.response.status;
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      return result.data;
+    },
+  });
+}
+
 /**
  * Every mutation returns the whole profile, so the cache is replaced from the
  * server response rather than invalidated. One round trip, and the completeness

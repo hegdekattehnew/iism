@@ -95,6 +95,21 @@ export function useOrgJobs(orgSlug: string | null) {
   });
 }
 
+export function useEmployerDashboard(orgSlug: string | null) {
+  return useQuery({
+    queryKey: ["org-dashboard", orgSlug],
+    enabled: orgSlug !== null,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/dashboard", {
+        params: { path: { org_slug: orgSlug as string } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+  });
+}
+
 export function useOrgJobMutations(orgSlug: string) {
   const qc = useQueryClient();
   // Jobs are a list, not one aggregate, so invalidate rather than replace: a
@@ -268,6 +283,21 @@ export function useOrgInterests(orgSlug: string | null) {
     enabled: Boolean(orgSlug),
     queryFn: async () => {
       const { data, error, response } = await api.GET("/org/{org_slug}/interests", {
+        params: { path: { org_slug: orgSlug as string } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+  });
+}
+
+export function useProviderDashboard(orgSlug: string | null) {
+  return useQuery({
+    queryKey: ["org", orgSlug, "dashboard"],
+    enabled: Boolean(orgSlug),
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/interests/dashboard", {
         params: { path: { org_slug: orgSlug as string } },
       });
       if (error || !data) throw new Error(String(response.status));

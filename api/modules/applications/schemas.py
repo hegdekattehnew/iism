@@ -129,3 +129,28 @@ class ReviewOut(BaseModel):
     rating: int
     comment: str | None = None
     created_at: datetime
+
+
+class EmployerDashboardOut(BaseModel):
+    """An employer's landing numbers (Sprint 39, BL-10.2)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    posted_jobs: int
+    open_jobs: int
+    applied: int
+    shortlisted: int
+    hired: int
+
+
+class CandidateDashboardOut(BaseModel):
+    """A candidate's landing numbers (Sprint 39, BL-10.1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    match_count: int
+    best_score: int | None = None
+    applied: int
+    shortlisted: int
+    hired: int
+    profile_completeness: int

@@ -493,3 +493,61 @@ class TestTheProviderIsTold:
             ).all()
         )
         assert {"course_interest_registered", "course_interest_withdrawn"} <= names
+
+
+class TestProviderDashboard:
+    """A course provider's landing numbers (Sprint 39, BL-10.3) -- the direct
+    payoff of ADR-047's `"enrolled"` status finally having a screen."""
+
+    async def test_counts_this_provider_alone(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        one = await _candidate(client)
+        two = await _candidate(client)
+        created_one = (
+            await client.post(
+                "/me/course-interests", headers=one, json={"course_slug": "open-phlebotomy"}
+            )
+        ).json()
+        await client.post(
+            "/me/course-interests", headers=two, json={"course_slug": "open-phlebotomy"}
+        )
+
+        provider = await _owner_of(client, db, catalogue["provider"])
+        listed = (
+            await client.get("/org/learn-co/courses/open-phlebotomy/interests", headers=provider)
+        ).json()["items"]
+        target = next(r for r in listed if r["contact"]["phone"] is not None)
+        await client.patch(
+            f"/org/learn-co/courses/open-phlebotomy/interests/{target['interest_id']}",
+            headers=provider,
+            json={"status": "enrolled"},
+        )
+
+        response = await client.get("/org/learn-co/interests/dashboard", headers=provider)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["published_courses"] == 1
+        assert body["interested_total"] == 2
+        assert body["interested_live"] == 2
+        assert body["enrolled"] == 1
+
+        # A rival provider's own courses/interests must not leak into this one's
+        # numbers (ADR-038's tenant-isolation rule, restated for a dashboard).
+        rival_tenant = await db.scalar(select(Tenant).where(Tenant.slug == "rival-academy"))
+        assert rival_tenant is not None
+        rival = await _owner_of(client, db, rival_tenant)
+        rival_dashboard = (
+            await client.get("/org/rival-academy/interests/dashboard", headers=rival)
+        ).json()
+        assert rival_dashboard["published_courses"] == 1
+        assert rival_dashboard["interested_total"] == 0
+        assert created_one["status"] == "registered"
+
+    async def test_an_employer_is_refused(self, catalogue: dict, client: AsyncClient) -> None:
+        employer = await _organisation(client, "employer", "Dashboard Co")
+        response = await client.get(
+            f"/org/{employer['slug']}/interests/dashboard",
+            headers={"authorization": employer["authorization"]},
+        )
+        assert response.status_code == 403

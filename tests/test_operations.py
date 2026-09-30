@@ -27,6 +27,7 @@ from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.applications.models import Application
 from api.modules.identity.models import STAFF_TIERS, Tenant, User
 from api.modules.marketplace.models import (
+    CandidateCertification,
     CandidateProfile,
     CandidateSkill,
     Job,
@@ -631,6 +632,90 @@ class TestProgrammeReport:
         body = allowed.json()
         assert body["programme"] == "PMKVY-TEST"
         assert set(body) == {"programme", "enrolled", "matched", "applied", "hired"}
+
+
+class TestKnownProgrammes:
+    """A starting point for `programme_report`'s free-text name (Sprint 39,
+    BL-10.5), not a second source of truth for what a real programme is."""
+
+    async def test_lists_distinct_named_programmes_only(self, db: AsyncSession) -> None:
+        await _enrolled_candidate(db, programme="PMKVY-KNOWN-A", skill_id=None)
+        await _enrolled_candidate(db, programme="PMKVY-KNOWN-A", skill_id=None)
+        await _enrolled_candidate(db, programme="PMKVY-KNOWN-B", skill_id=None)
+        await _enrolled_candidate(db, programme=None, skill_id=None)
+        await db.commit()
+
+        names = await service.known_programmes(db)
+        assert names.count("PMKVY-KNOWN-A") == 1
+        assert "PMKVY-KNOWN-B" in names
+        assert None not in names
+
+    async def test_the_route_requires_operator_authority(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        anon = await client.get("/ops/programmes")
+        assert anon.status_code == 401
+
+        stranger = await _candidate(client)
+        refused = await client.get("/ops/programmes", headers=stranger)
+        assert refused.status_code == 404
+
+        headers = await _operator(client, db)
+        await _enrolled_candidate(db, programme="PMKVY-ROUTE-TEST", skill_id=None)
+        await db.commit()
+        allowed = await client.get("/ops/programmes", headers=headers)
+        assert allowed.status_code == 200
+        assert "PMKVY-ROUTE-TEST" in allowed.json()["programmes"]
+
+
+class TestPlatformDashboard:
+    """An operator's first real landing screen (Sprint 39, BL-10.4)."""
+
+    async def test_counts_match_the_queues_and_platform_totals(self, db: AsyncSession) -> None:
+        before = await service.platform_dashboard(db)
+
+        tenant = Tenant(
+            slug="dashboard-unverified-employer", name="Dashboard Co", tenant_type="employer"
+        )
+        db.add(tenant)
+        await db.flush()
+        job = Job(slug="dashboard-job", tenant_id=tenant.id, title="Clerk", status="published")
+        db.add(job)
+        profile = await _enrolled_candidate(db, programme=None, skill_id=None)
+        cert = CandidateCertification(profile_id=profile.id, name="Dashboard Cert")
+        db.add(cert)
+        await db.commit()
+
+        after = await service.platform_dashboard(db)
+        assert after.unverified_organisations == before.unverified_organisations + 1
+        assert after.organisations == before.organisations + 1
+        assert after.candidates == before.candidates + 1
+        assert after.published_jobs == before.published_jobs + 1
+        # No skill named -- unverified_certifications only counts rows naming
+        # one, the same filter the queue itself uses.
+        assert after.unverified_certifications == before.unverified_certifications
+
+    async def test_the_route_requires_operator_authority(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        anon = await client.get("/ops/dashboard")
+        assert anon.status_code == 401
+
+        stranger = await _candidate(client)
+        refused = await client.get("/ops/dashboard", headers=stranger)
+        assert refused.status_code == 404
+
+        headers = await _operator(client, db)
+        allowed = await client.get("/ops/dashboard", headers=headers)
+        assert allowed.status_code == 200
+        assert set(allowed.json()) == {
+            "unverified_organisations",
+            "unverified_certifications",
+            "organisations",
+            "candidates",
+            "published_jobs",
+            "published_courses",
+        }
 
 
 # ---------------------------------------- Sprint 35, BL-3.2: certified evidence

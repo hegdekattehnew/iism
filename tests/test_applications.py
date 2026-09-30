@@ -525,6 +525,115 @@ class TestMovingAnApplicationAlong:
             assert response.status_code == 422, forbidden
 
 
+class TestCandidateDashboard:
+    """A candidate's landing numbers (Sprint 39, BL-10.1) -- no aggregate of
+    any of this exists on `/matches` today."""
+
+    async def test_counts_matches_applications_and_completeness(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        headers = await _candidate(client)
+
+        empty = await client.get("/me/dashboard", headers=headers)
+        assert empty.status_code == 200
+        assert empty.json()["match_count"] == 0
+        assert empty.json()["best_score"] is None
+        assert empty.json()["applied"] == 0
+
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": "apply-test-standard", "proficiency": 3},
+        )
+        await client.post("/me/applications", headers=headers, json={"job_slug": "open-cashier"})
+
+        response = await client.get("/me/dashboard", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["match_count"] == 1
+        assert body["best_score"] is not None and body["best_score"] > 0
+        assert body["applied"] == 1
+        # Adding a skill and a preferred role both count toward the meter;
+        # only the skill was added here, so it is up but not complete.
+        assert 0 < body["profile_completeness"] < 100
+
+    async def test_an_organisation_only_account_is_refused(self, client: AsyncClient) -> None:
+        org = await _organisation(client)
+        response = await client.get(
+            "/me/dashboard", headers={"authorization": org["authorization"]}
+        )
+        assert response.status_code == 403
+
+
+class TestEmployerDashboard:
+    """An employer's landing numbers (Sprint 39, BL-10.2) -- vacancies and
+    applicants aggregated across every posting, where every existing screen
+    only ever shows one job at a time."""
+
+    async def test_counts_across_every_vacancy_this_tenant_owns(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        applied_only = await _candidate(client)
+        hired = await _candidate(client)
+        await client.post("/me/applications", headers=applied_only, json={"job_slug": job_slug})
+        created = (
+            await client.post("/me/applications", headers=hired, json={"job_slug": job_slug})
+        ).json()
+        await client.patch(
+            f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+            headers=employer,
+            json={"status": "hired"},
+        )
+
+        response = await client.get(f"/org/{org}/dashboard", headers=employer)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["posted_jobs"] == 1
+        # Hiring the one person against the job's default `positions=1` closes
+        # it (`_close_if_filled`) -- posted and open answer different
+        # questions, and a closed vacancy is still posted.
+        assert body["open_jobs"] == 0
+        assert body["applied"] == 1
+        assert body["hired"] == 1
+
+        # A second employer's own vacancy must not leak into this one's counts.
+        other_employer, other_org, other_job = await _employer_with_job(
+            client, "apply-test-standard"
+        )
+        other_seeker = await _candidate(client)
+        await client.post("/me/applications", headers=other_seeker, json={"job_slug": other_job})
+        unchanged = (await client.get(f"/org/{org}/dashboard", headers=employer)).json()
+        assert unchanged["applied"] == 1
+        other_dashboard = (
+            await client.get(f"/org/{other_org}/dashboard", headers=other_employer)
+        ).json()
+        assert other_dashboard["applied"] == 1
+        assert other_dashboard["hired"] == 0
+
+    async def test_a_course_provider_is_refused(self, client: AsyncClient) -> None:
+        address = f"dashboard-provider-{uuid.uuid4().hex[:8]}@example.org"
+        code = (
+            await client.post(
+                "/auth/org/register",
+                json={
+                    "email": address,
+                    "organisation_name": "Dashboard Academy",
+                    "tenant_type": "course_provider",
+                    "consent_version": CONSENT,
+                },
+            )
+        ).json()["debug_code"]
+        tokens = (
+            await client.post("/auth/email/otp/verify", json={"email": address, "code": code})
+        ).json()
+        response = await client.get(
+            f"/org/{tokens['organisation_slug']}/dashboard",
+            headers={"authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert response.status_code == 403
+
+
 # ------------------------------------------------- counts, and a cap on spray
 
 

@@ -44,6 +44,16 @@ async def verification_queue(
     ]
 
 
+@router.get("/dashboard", response_model=schemas.PlatformDashboardOut)
+async def dashboard(
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadOrgs,
+) -> schemas.PlatformDashboardOut:
+    """An operator's landing numbers (Sprint 39, BL-10.4) -- today there is
+    none; sign-in opens straight onto the verification queue."""
+    return schemas.PlatformDashboardOut.model_validate(await service.platform_dashboard(db))
+
+
 @router.get(
     "/organisations/{org_slug}/verification",
     response_model=schemas.OrganisationVerificationOut,
@@ -135,6 +145,17 @@ async def verify_certification(
         verified_at=certification.verified_at,
         verification_note=certification.verification_note,
     )
+
+
+@router.get("/programmes", response_model=schemas.KnownProgrammesOut)
+async def list_programmes(
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadProgrammes,
+) -> schemas.KnownProgrammesOut:
+    """Every programme name worth offering as a starting point (Sprint 39,
+    BL-10.5). Declared before `/programmes/{name}` or the literal path would be
+    captured as a name."""
+    return schemas.KnownProgrammesOut(programmes=await service.known_programmes(db))
 
 
 @router.get("/programmes/{name}", response_model=schemas.ProgrammeReportOut)

@@ -11,6 +11,10 @@ export type QueueRow =
 export type VerificationDetail =
   paths["/ops/organisations/{org_slug}/verification"]["get"]["responses"]["200"]["content"]["application/json"];
 export type Decision = "granted" | "revoked";
+export type PlatformDashboard =
+  paths["/ops/dashboard"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ProgrammeReport =
+  paths["/ops/programmes/{name}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
  * The back office's data layer.
@@ -40,6 +44,54 @@ export function useVerificationQueue() {
     retry: false,
     queryFn: async () => {
       const { data, error, response } = await api.GET("/ops/organisations", {});
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}
+
+export function useOperatorDashboard() {
+  return useQuery({
+    queryKey: ["ops", "dashboard"] as const,
+    retry: false,
+    queryFn: async () => {
+      // Status read before the check, not inside it: this route takes no
+      // parameters at all, so its schema carries only a 200 -- on the
+      // failure branch openapi-fetch narrows the whole result to `never` and
+      // `response` becomes unreachable there (`useMemberships`'s own fix for
+      // `/auth/me`, the same shape).
+      const result = await api.GET("/ops/dashboard", {});
+      const status = result.response.status;
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      return result.data;
+    },
+  });
+}
+
+export function useKnownProgrammes() {
+  return useQuery({
+    queryKey: ["ops", "programmes"] as const,
+    retry: false,
+    queryFn: async () => {
+      const result = await api.GET("/ops/programmes", {});
+      const status = result.response.status;
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      return result.data.programmes;
+    },
+  });
+}
+
+export function useProgrammeReport(programme: string | null) {
+  return useQuery({
+    queryKey: ["ops", "programme", programme] as const,
+    enabled: programme !== null,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/ops/programmes/{name}", {
+        params: { path: { name: programme as string } },
+      });
       if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
     },

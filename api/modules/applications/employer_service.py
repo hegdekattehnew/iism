@@ -7,6 +7,7 @@ own history, and the contact details go.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
 
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.modules.analytics import record
 from api.modules.applications.models import FILLED_STATUSES, Application
 from api.modules.identity.models import Tenant, User
-from api.modules.marketplace.models import CandidateProfile, Job
+from api.modules.marketplace.models import CandidateProfile, Job, open_job, posted_job
 from api.modules.matching import score_profiles
 from api.modules.matching.scoring import MatchResult
 from api.modules.notifications import enqueue
@@ -223,3 +224,45 @@ def contact_for(user: User, application: Application) -> dict[str, str | None] |
 
 def applied_at(application: Application) -> datetime:
     return application.created_at
+
+
+@dataclass(frozen=True)
+class EmployerDashboard:
+    """An employer's landing numbers (Sprint 39, BL-10.2) -- vacancies and
+    applicants aggregated across every posting, where today's screens only
+    ever show one job at a time.
+
+    `posted` and `open` are kept apart rather than collapsed into one figure,
+    the same rule the homepage's own counts follow: the two answer different
+    questions, and a viewer who cannot tell them apart reads a closing
+    vacancy as inventory that vanished.
+    """
+
+    posted_jobs: int
+    open_jobs: int
+    applied: int
+    shortlisted: int
+    hired: int
+
+
+async def dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> EmployerDashboard:
+    posted = await db.scalar(
+        select(func.count()).select_from(Job).where(Job.tenant_id == tenant_id, posted_job())
+    )
+    open_count = await db.scalar(
+        select(func.count()).select_from(Job).where(Job.tenant_id == tenant_id, open_job())
+    )
+    rows = await db.execute(
+        select(Application.status, func.count())
+        .join(Job, Job.id == Application.job_id)
+        .where(Job.tenant_id == tenant_id)
+        .group_by(Application.status)
+    )
+    by_status: dict[str, int] = dict(rows.all())  # type: ignore[arg-type]
+    return EmployerDashboard(
+        posted_jobs=posted or 0,
+        open_jobs=open_count or 0,
+        applied=by_status.get("applied", 0),
+        shortlisted=by_status.get("shortlisted", 0),
+        hired=by_status.get("hired", 0),
+    )

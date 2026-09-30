@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,7 +25,13 @@ from api.core.authorization import ORGANISATION_TYPES
 from api.modules.applications.models import WAS_HIRED_STATUSES, Application
 from api.modules.identity.models import Membership, Tenant, User
 from api.modules.marketplace import record_verified_skill
-from api.modules.marketplace.models import CandidateCertification, CandidateProfile, Course, Job
+from api.modules.marketplace.models import (
+    CandidateCertification,
+    CandidateProfile,
+    Course,
+    Job,
+    posted_job,
+)
 from api.modules.matching import match_jobs
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
 from api.modules.operations.models import TenantVerificationEvent
@@ -257,6 +263,57 @@ async def staff_roster(db: AsyncSession) -> list[User]:
 
 
 @dataclass(frozen=True)
+class PlatformDashboard:
+    """An operator's first real landing screen (Sprint 39, BL-10.4) -- today
+    there is none; `/admin` opens straight onto the verification queue with no
+    orientation above it.
+
+    The two queue counts are the same filters `unverified_organisations`/
+    `unverified_certifications` already use, counted rather than loaded in
+    full -- a dashboard tile does not need the rows, only how many.
+    """
+
+    unverified_organisations: int
+    unverified_certifications: int
+    organisations: int
+    candidates: int
+    published_jobs: int
+    published_courses: int
+
+
+async def platform_dashboard(db: AsyncSession) -> PlatformDashboard:
+    unverified_orgs = await db.scalar(
+        select(func.count())
+        .select_from(Tenant)
+        .where(Tenant.tenant_type.in_(ORGANISATION_TYPES), Tenant.verified_at.is_(None))
+    )
+    unverified_certs = await db.scalar(
+        select(func.count())
+        .select_from(CandidateCertification)
+        .where(
+            CandidateCertification.skill_id.is_not(None),
+            CandidateCertification.verified_at.is_(None),
+        )
+    )
+    organisations = await db.scalar(
+        select(func.count()).select_from(Tenant).where(Tenant.tenant_type.in_(ORGANISATION_TYPES))
+    )
+    candidates = await db.scalar(select(func.count()).select_from(CandidateProfile))
+    published_jobs = await db.scalar(select(func.count()).select_from(Job).where(posted_job()))
+    published_courses = await db.scalar(
+        select(func.count()).select_from(Course).where(Course.status == "published")
+    )
+    return PlatformDashboard(
+        unverified_organisations=unverified_orgs or 0,
+        unverified_certifications=unverified_certs or 0,
+        organisations=organisations or 0,
+        candidates=candidates or 0,
+        published_jobs=published_jobs or 0,
+        published_courses=published_courses or 0,
+    )
+
+
+@dataclass(frozen=True)
 class ProgrammeReport:
     """What a government-agency programme has to show for itself so far.
 
@@ -319,3 +376,20 @@ async def programme_report(db: AsyncSession, programme: str) -> ProgrammeReport:
         applied=applied or 0,
         hired=hired or 0,
     )
+
+
+async def known_programmes(db: AsyncSession) -> list[str]:
+    """Every distinct programme name a candidate is actually enrolled under.
+
+    `programme_report` takes free text because there is no programme table to
+    validate against -- but an operator who does not already know the exact
+    string still needs somewhere to start. This is that list, not a second
+    source of truth: a name here is exactly a value
+    `CandidateProfile.enrolled_via_programme` holds, nothing more.
+    """
+    rows = await db.scalars(
+        select(distinct(CandidateProfile.enrolled_via_programme))
+        .where(CandidateProfile.enrolled_via_programme.is_not(None))
+        .order_by(CandidateProfile.enrolled_via_programme)
+    )
+    return [r for r in rows.all() if r is not None]
