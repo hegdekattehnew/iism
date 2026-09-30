@@ -3,9 +3,10 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { RankedBarList } from "@/components/charts/ranked-bar-list";
 import { Select } from "@/components/profile/fields";
 import { Skeleton, StatTile } from "@/components/ui";
-import { useKnownProgrammes, useProgrammeReport } from "@/lib/ops";
+import { useKnownProgrammes, useProgrammeDistricts, useProgrammeReport } from "@/lib/ops";
 
 /**
  * A government-agency programme's outcomes (Sprint 39, BL-10.5) -- the
@@ -18,6 +19,7 @@ export function ProgrammeDashboard() {
   const [selected, setSelected] = useState<string | null>(null);
   const programmes = useKnownProgrammes();
   const report = useProgrammeReport(selected);
+  const districts = useProgrammeDistricts(selected);
 
   if (programmes.isPending) {
     return <Skeleton className="h-20 w-full" />;
@@ -28,6 +30,7 @@ export function ProgrammeDashboard() {
   }
 
   const names = programmes.data ?? [];
+  const districtRows = districts.data?.districts ?? [];
 
   return (
     <div>
@@ -60,6 +63,22 @@ export function ProgrammeDashboard() {
               <StatTile value={report.data.applied} label={t("applied")} />
               <StatTile value={report.data.hired} label={t("hired")} />
             </div>
+          )}
+          {districtRows.length > 0 && (
+            <>
+              <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
+                {t("byDistrict")}
+              </h3>
+              <RankedBarList
+                className="mt-3"
+                emptyLabel={t("noDistricts")}
+                items={districtRows.map((d) => ({
+                  key: d.district,
+                  label: d.district,
+                  value: d.enrolled,
+                }))}
+              />
+            </>
           )}
         </>
       )}

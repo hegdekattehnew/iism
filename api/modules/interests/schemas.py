@@ -118,6 +118,11 @@ class ProviderDashboardOut(BaseModel):
     interested_live: int
     interested_total: int
     enrolled: int
+    # Sprint 40: the per-course breakdown (the same `CourseInterestCount` shape
+    # `/org/{org_slug}/interests` already returns, imported rather than
+    # restated) and a server-computed conversion rate.
+    conversion_rate: float = 0.0
+    courses: list[CourseInterestCount] = Field(default_factory=list)
 
 
 class ProviderStatusIn(BaseModel):

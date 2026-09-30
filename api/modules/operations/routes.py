@@ -50,8 +50,22 @@ async def dashboard(
     context: OperatorContext = CanReadOrgs,
 ) -> schemas.PlatformDashboardOut:
     """An operator's landing numbers (Sprint 39, BL-10.4) -- today there is
-    none; sign-in opens straight onto the verification queue."""
-    return schemas.PlatformDashboardOut.model_validate(await service.platform_dashboard(db))
+    none; sign-in opens straight onto the verification queue.
+
+    `scarce_skills` (Sprint 40) is built explicitly rather than folded into
+    `model_validate`: `ScarceSkillOut` carries no `from_attributes` config,
+    matching how the provider-facing market router already builds it in
+    `matching/provider_routes.py`."""
+    data = await service.platform_dashboard(db)
+    return schemas.PlatformDashboardOut(
+        unverified_organisations=data.unverified_organisations,
+        unverified_certifications=data.unverified_certifications,
+        organisations=data.organisations,
+        candidates=data.candidates,
+        published_jobs=data.published_jobs,
+        published_courses=data.published_courses,
+        scarce_skills=[schemas.ScarceSkillOut(**vars(s)) for s in data.scarce_skills],
+    )
 
 
 @router.get(
@@ -174,6 +188,26 @@ async def programme_report(
     """
     report = await service.programme_report(db, name)
     return schemas.ProgrammeReportOut.model_validate(report)
+
+
+@router.get("/programmes/{name}/districts", response_model=schemas.ProgrammeDistrictsOut)
+async def programme_districts(
+    name: str,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadProgrammes,
+) -> schemas.ProgrammeDistrictsOut:
+    """A programme's enrolment, by district (Sprint 40).
+
+    A separate, heavier `GROUP BY` from `programme_report`'s own four
+    numbers -- a caller that only wants those should not pay for this query
+    too on every call."""
+    rows = await service.programme_by_district(db, name)
+    return schemas.ProgrammeDistrictsOut(
+        programme=name,
+        districts=[
+            schemas.DistrictBreakdownOut(district=r.district, enrolled=r.enrolled) for r in rows
+        ],
+    )
 
 
 def _detail(tenant, history) -> schemas.OrganisationVerificationOut:  # type: ignore[no-untyped-def]

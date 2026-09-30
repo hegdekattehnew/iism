@@ -11,6 +11,8 @@ from api.modules.applications.models import (
 )
 from api.modules.identity import TenantOut
 from api.modules.matching import CandidateCardOut
+from api.modules.matching.schemas import JobPoolOut
+from api.modules.skills.schemas import NsqfLevel
 
 # Closed on the way out so the generated TypeScript client types a status as a
 # union rather than `string`; `tests/test_enumerations.py` holds it to the CHECK.
@@ -141,6 +143,24 @@ class EmployerDashboardOut(BaseModel):
     applied: int
     shortlisted: int
     hired: int
+    # The per-job breakdown behind the three counts above (Sprint 40) -- the
+    # same `JobPoolOut` shape the employer console already returns, imported
+    # rather than restated, so the two can never describe a pool differently.
+    jobs: list[JobPoolOut] = Field(default_factory=list)
+
+
+class TopMatchOut(BaseModel):
+    """One of a candidate's best-scoring jobs, enough to draw a ranked bar and
+    reuse `CoverageBar`/`LevelScale` for its drilldown (Sprint 40)."""
+
+    job_slug: str
+    job_title: str
+    score: int
+    coverage: float
+    missing_mandatory: int
+    capped_by_mandatory: bool
+    nsqf_level_min: NsqfLevel | None = None
+    level_shortfall: NsqfLevel | None = None
 
 
 class CandidateDashboardOut(BaseModel):
@@ -154,3 +174,6 @@ class CandidateDashboardOut(BaseModel):
     shortlisted: int
     hired: int
     profile_completeness: int
+    # The `scored` list `match_jobs()` already returns, sliced to its top few
+    # (Sprint 40) -- zero new queries, since `dashboard()` already calls it.
+    top_matches: list[TopMatchOut] = Field(default_factory=list)

@@ -14,6 +14,7 @@ from api.modules.applications.schemas import (
     ReviewIn,
     ReviewOut,
     SavedJobOut,
+    TopMatchOut,
 )
 from api.modules.identity import User, get_current_candidate
 
@@ -48,8 +49,35 @@ async def candidate_dashboard(
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
 ) -> CandidateDashboardOut:
-    """A candidate's landing numbers (Sprint 39, BL-10.1)."""
-    return CandidateDashboardOut.model_validate(await service.dashboard(db, user))
+    """A candidate's landing numbers (Sprint 39, BL-10.1), and a preview of the
+    best-scoring jobs behind `match_count`/`best_score` (Sprint 40).
+
+    Built explicitly rather than `model_validate`d off the dataclass: each
+    `TopMatchOut` is assembled from a `ScoredJob`'s two nested objects
+    (`job`, `result`), which `from_attributes` cannot flatten on its own.
+    """
+    data = await service.dashboard(db, user)
+    return CandidateDashboardOut(
+        match_count=data.match_count,
+        best_score=data.best_score,
+        applied=data.applied,
+        shortlisted=data.shortlisted,
+        hired=data.hired,
+        profile_completeness=data.profile_completeness,
+        top_matches=[
+            TopMatchOut(
+                job_slug=s.job.slug,
+                job_title=s.job.title,
+                score=s.result.score,
+                coverage=s.result.coverage,
+                missing_mandatory=s.result.missing_mandatory,
+                capped_by_mandatory=s.result.capped_by_mandatory,
+                nsqf_level_min=s.job.nsqf_level_min,
+                level_shortfall=s.result.level_shortfall,
+            )
+            for s in data.top_matches
+        ],
+    )
 
 
 @router.post("/applications", response_model=ApplicationOut, status_code=status.HTTP_201_CREATED)

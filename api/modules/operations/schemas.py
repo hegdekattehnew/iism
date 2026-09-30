@@ -4,6 +4,7 @@ from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.modules.matching.schemas import ScarceSkillOut
 from api.modules.operations.models import VERIFICATION_DECISIONS
 
 VerificationDecision = Literal["granted", "revoked"]
@@ -43,6 +44,10 @@ class PlatformDashboardOut(BaseModel):
     candidates: int
     published_jobs: int
     published_courses: int
+    # Sprint 40: the same `ScarceSkillOut` shape the employer console and the
+    # provider-facing market router already return, imported rather than
+    # restated.
+    scarce_skills: list[ScarceSkillOut] = Field(default_factory=list)
 
 
 class VerificationIn(BaseModel):
@@ -126,3 +131,20 @@ class KnownProgrammesOut(BaseModel):
     second source of truth for what a "real" programme is."""
 
     programmes: list[str]
+
+
+class DistrictBreakdownOut(BaseModel):
+    """How many of one programme's enrolled candidates live in one district
+    (Sprint 40). `district` is `"Unknown"` for a candidate whose location
+    never resolved, never omitted -- the bars still sum to `enrolled`."""
+
+    district: str
+    enrolled: int
+
+
+class ProgrammeDistrictsOut(BaseModel):
+    """A programme's enrolment, broken down by district (Sprint 40) -- a
+    separate, heavier query from `programme_report`'s own four numbers."""
+
+    programme: str
+    districts: list[DistrictBreakdownOut] = Field(default_factory=list)

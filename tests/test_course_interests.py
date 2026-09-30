@@ -551,3 +551,45 @@ class TestProviderDashboard:
             headers={"authorization": employer["authorization"]},
         )
         assert response.status_code == 403
+
+    async def test_includes_a_per_course_breakdown_and_conversion_rate(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`courses` (Sprint 40) is the same rows `counts_by_course()` already
+        fetched for the two scalars it used to be summed into alone."""
+        one = await _candidate(client)
+        two = await _candidate(client)
+        await client.post(
+            "/me/course-interests", headers=one, json={"course_slug": "open-phlebotomy"}
+        )
+        await client.post(
+            "/me/course-interests", headers=two, json={"course_slug": "open-phlebotomy"}
+        )
+
+        provider = await _owner_of(client, db, catalogue["provider"])
+        listed = (
+            await client.get("/org/learn-co/courses/open-phlebotomy/interests", headers=provider)
+        ).json()["items"]
+        target = next(r for r in listed if r["contact"]["phone"] is not None)
+        await client.patch(
+            f"/org/learn-co/courses/open-phlebotomy/interests/{target['interest_id']}",
+            headers=provider,
+            json={"status": "enrolled"},
+        )
+
+        response = await client.get("/org/learn-co/interests/dashboard", headers=provider)
+        assert response.status_code == 200
+        body = response.json()
+        # `secret-course` is this same provider's draft (the `catalogue`
+        # fixture), included with zero counts -- `counts_by_course` is an
+        # outer join and does not filter by status.
+        assert body["courses"] == [
+            {
+                "course_slug": "open-phlebotomy",
+                "course_title": "Phlebotomy Refresher",
+                "live": 2,
+                "total": 2,
+            },
+            {"course_slug": "secret-course", "course_title": "Secret", "live": 0, "total": 0},
+        ]
+        assert body["conversion_rate"] == 0.5

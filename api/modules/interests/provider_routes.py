@@ -53,8 +53,10 @@ def _learner(interest, profile, user) -> InterestedLearnerOut:  # type: ignore[n
 async def provider_dashboard(
     context: TenantContext = CanContactLearners,
     db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
 ) -> ProviderDashboardOut:
-    """A course provider's landing numbers (Sprint 39, BL-10.3).
+    """A course provider's landing numbers (Sprint 39, BL-10.3), and the
+    per-course breakdown behind them (Sprint 40).
 
     **Not** `/org/{org_slug}/courses/dashboard`: `course_publishing_routes.py`
     (registered earlier in `main.py`) already owns `/org/{org_slug}/courses/
@@ -67,9 +69,30 @@ async def provider_dashboard(
     A distinct path from the employer's own `/org/{org_slug}/dashboard`
     either way, since one route cannot serve both without branching on
     tenant type mid-handler, which `require(..., "course")` already exists
-    to avoid."""
-    return ProviderDashboardOut.model_validate(
-        await provider_service.provider_dashboard(db, context.tenant.id)
+    to avoid.
+
+    `courses` is built the same way `interest_by_course` builds its own list
+    -- localised titles via `overrides_for`, never the raw `Course.title` on
+    a Hindi page."""
+    data = await provider_service.provider_dashboard(db, context.tenant.id)
+    overrides = await overrides_for(
+        db, "course", [c for c, _, _ in data.courses], ("title",), locale
+    )
+    return ProviderDashboardOut(
+        published_courses=data.published_courses,
+        interested_live=data.interested_live,
+        interested_total=data.interested_total,
+        enrolled=data.enrolled,
+        conversion_rate=data.conversion_rate,
+        courses=[
+            CourseInterestCount(
+                course_slug=course.slug,
+                course_title=overrides.get(course.id, {}).get("title", course.title),
+                live=live,
+                total=total,
+            )
+            for course, live, total in data.courses
+        ],
     )
 
 

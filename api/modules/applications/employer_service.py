@@ -7,7 +7,7 @@ own history, and the contact details go.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import cast
 
@@ -20,7 +20,7 @@ from api.modules.analytics import record
 from api.modules.applications.models import FILLED_STATUSES, Application
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job, open_job, posted_job
-from api.modules.matching import score_profiles
+from api.modules.matching import JobPool, job_pools, score_profiles
 from api.modules.matching.scoring import MatchResult
 from api.modules.notifications import enqueue
 
@@ -243,6 +243,11 @@ class EmployerDashboard:
     applied: int
     shortlisted: int
     hired: int
+    # The per-job breakdown behind `applied`/`shortlisted`/`hired` (Sprint 40).
+    # `job_pools()` already computes this for the workspace's own job list --
+    # folding it in here costs no second query, only a second field on the
+    # response `job_pools()`'s own caller was already paying for.
+    jobs: list[JobPool] = field(default_factory=list)
 
 
 async def dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> EmployerDashboard:
@@ -259,10 +264,12 @@ async def dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> EmployerDashboard
         .group_by(Application.status)
     )
     by_status: dict[str, int] = dict(rows.all())  # type: ignore[arg-type]
+    pools = await job_pools(db, tenant_id)
     return EmployerDashboard(
         posted_jobs=posted or 0,
         open_jobs=open_count or 0,
         applied=by_status.get("applied", 0),
         shortlisted=by_status.get("shortlisted", 0),
         hired=by_status.get("hired", 0),
+        jobs=pools,
     )

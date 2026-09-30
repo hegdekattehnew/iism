@@ -11,7 +11,7 @@ way:
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -32,8 +32,13 @@ from api.modules.marketplace import (
     get_or_create_profile,
 )
 from api.modules.marketplace.models import Job
-from api.modules.matching import match_jobs
+from api.modules.matching import ScoredJob, match_jobs
 from api.modules.notifications import enqueue
+
+# How many of a candidate's best-scoring jobs the dashboard shows (Sprint 40).
+# A dashboard tile, not the matches page -- `/me/matches` already lists every
+# scored job; this is a preview, so it stays short on purpose.
+TOP_MATCHES_LIMIT = 5
 
 log = structlog.get_logger("iism.applications")
 
@@ -204,6 +209,10 @@ class CandidateDashboard:
     shortlisted: int
     hired: int
     profile_completeness: int
+    # The `scored` list below, sliced to its best few (Sprint 40) -- zero new
+    # queries, since this function already calls `match_jobs` for
+    # `match_count`/`best_score`.
+    top_matches: list[ScoredJob] = field(default_factory=list)
 
 
 async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
@@ -225,6 +234,7 @@ async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
         shortlisted=by_status.get("shortlisted", 0),
         hired=by_status.get("hired", 0),
         profile_completeness=percent,
+        top_matches=scored[:TOP_MATCHES_LIMIT],
     )
 
 

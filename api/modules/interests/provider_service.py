@@ -13,7 +13,7 @@ Newest first is the honest order.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -116,6 +116,12 @@ class ProviderDashboard:
     interested_live: int
     interested_total: int
     enrolled: int
+    # `conversion_rate` computed once here, server-side, so a `ProgressRing`
+    # never has to divide `enrolled / interested_total` on the client
+    # (Sprint 40) -- and the per-course rows `counts_by_course()` already
+    # fetched, which the sums above used to discard after adding up.
+    conversion_rate: float = 0.0
+    courses: list[tuple[Course, int, int]] = field(default_factory=list)
 
 
 async def provider_dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> ProviderDashboard:
@@ -127,12 +133,14 @@ async def provider_dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> Provider
     rows = await counts_by_course(db, tenant_id)
     interested_live = sum(live for _course, live, _total in rows)
     interested_total = sum(total for _course, _live, total in rows)
-    _total_interests, enrolled = await enrolment_conversion(db, tenant_id=tenant_id)
+    total_interests, enrolled = await enrolment_conversion(db, tenant_id=tenant_id)
     return ProviderDashboard(
         published_courses=published or 0,
         interested_live=interested_live,
         interested_total=interested_total,
         enrolled=enrolled,
+        conversion_rate=(enrolled / total_interests) if total_interests else 0.0,
+        courses=rows,
     )
 
 

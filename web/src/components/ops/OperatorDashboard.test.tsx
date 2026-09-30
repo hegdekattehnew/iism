@@ -28,6 +28,7 @@ describe("OperatorDashboard", () => {
         candidates: 400,
         published_jobs: 20,
         published_courses: 50,
+        scarce_skills: [],
       },
       error: undefined,
       response: { status: 200 },
@@ -37,6 +38,27 @@ describe("OperatorDashboard", () => {
     expect(screen.getByText("5")).toBeTruthy();
     expect(screen.getByText("40")).toBeTruthy();
     expect(screen.getByText("400")).toBeTruthy();
+  });
+
+  it("renders a ranked bar per scarce skill", async () => {
+    GET.mockResolvedValue({
+      data: {
+        unverified_organisations: 0,
+        unverified_certifications: 0,
+        organisations: 1,
+        candidates: 1,
+        published_jobs: 1,
+        published_courses: 1,
+        scarce_skills: [
+          { nos_code: "OPS/N9001", name: "Rare Standard", required_by: 8, held_by: 0 },
+        ],
+      },
+      error: undefined,
+      response: { status: 200 },
+    });
+    renderUi(<OperatorDashboard />);
+    expect(await screen.findByText("Rare Standard")).toBeTruthy();
+    expect(screen.getByText("8")).toBeTruthy();
   });
 
   it("shows the failure message rather than nothing, since operators have no other screen to fall back on", async () => {
