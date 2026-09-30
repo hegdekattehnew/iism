@@ -12,8 +12,11 @@ ADR-045 had proposed, on the owner's own instruction (ADR-046). Sprint 38 closed
 half of ADR-025's monetisation gate (ADR-047) — a provider-reported `"enrolled"` status and a
 report script — without authorising `BL-1.3`. Asked to override the remaining volume gap or wait,
 the owner chose to **wait for real traffic** — `BL-1.3` stays not started, and this is a decision,
-not an open question, until real usage or the owner says otherwise. Deployment is deferred by the
-owner, deliberately.
+not an open question, until real usage or the owner says otherwise. The owner then redirected
+Sprint 39 to a new **Epic B10 — Actor Dashboards** (`docs/IISM-Product-Backlog.docx` §3/§4.3):
+every actor sees real numbers on sign-in, composed entirely from data each actor's own module
+already computes — no new scorer, no cross-module "dashboard" service. Deployment is deferred by
+the owner, deliberately.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -31,7 +34,7 @@ has been wrong before, and §10 explains how.*
 |---|---|
 | **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
 | **Last sprint** | 38 — closed ADR-025's structural gate (provider-reported `"enrolled"`, `make monetisation-metrics`) without authorising `BL-1.3` (ADR-047) |
-| **Next sprint** | 39 — owner chose to wait for real traffic rather than override; `BL-1.3` stays not started until then, or the owner redirects |
+| **Next sprint** | 39 — Epic B10 (actor dashboards): `BL-10.1`–`BL-10.5`, one dashboard per actor, all `[NOW]`. `BL-1.3` stays not started (owner chose to wait for real traffic). |
 | **Tests** | 835 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
 | **Migrations** | head `0038`; 47 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
@@ -917,12 +920,28 @@ reach the remote was one called *"Correct the git section: the branch is pushed"
 went on asserting they were safe. **A claim about the remote is only true at the moment it is
 checked**; re-check it, do not read it here.
 
-- Branch **`v2/foundations`**, tracking `origin/v2/foundations`. Work continues on it; `main`
-  contains everything through Sprint 24 **and nothing after**. As of 2026-09-28 the branch was 38
-  commits ahead — Sprints 25–37 — and **CI had not run on any of them**, because it triggers on
-  pull requests and `main` only. That is how Sprint 37 pushed a branch whose web build failed
-  (see its follow-up in §11). The fix is a second pull request to `main`, opened by the owner
-  in the browser (`gh` is not installed); check whether it exists rather than trusting this line.
+- **Merged 2026-09-29.** PR #9 (`v2/foundations` → `main`, the correct direction) merged at
+  `2026-09-29T07:50:50Z`, merge commit `4345571`. Both CI jobs — *API: lint, types, tests* and
+  *Web: lint, types, build* — passed on it, verified via the API. `main` now contains everything
+  through Sprint 38; `git log origin/main..origin/v2/foundations` is empty. Work continues on
+  `v2/foundations`, which will again run ahead of `main` with no CI until its next PR — **re-check
+  this section's dates before trusting it**, the same discipline that caught this file asserting a
+  four-sprint-stale push once already (see the paragraph above).
+- **A PR from this branch came out backwards twice before the correct one merged, despite the
+  compare link below being right.** PR #7 (2026-09-24) and PR #8 (2026-09-29) were both created
+  with **head `main`, base `v2/foundations`** — the reverse of what a merge into `main` needs — and
+  both were closed without merging once caught. Checked via the API
+  (`mergeable_state`/`changed_files`/`additions`/`deletions`) before either was trusted: a
+  `main`-into-`v2/foundations` PR shows **0 changed files**, because `main` has nothing
+  `v2/foundations` doesn't already have — and its CI checks are the base branch's stale ones, not a
+  real test of the diff. **Do not read "a PR exists" as "the right PR exists"** — fetch
+  `GET /repos/hegdekattehnew/iism/pulls/{n}` and read `head.label`/`base.label` before reporting CI
+  status on any PR from this branch again. The fix, the second time it happened, was the same as
+  the first: close the backwards PR and open a fresh one from
+  `https://github.com/hegdekattehnew/iism/compare/main...v2/foundations?expand=1` — that URL's
+  `BASE...COMPARE` order is already correct (base `main`, compare `v2/foundations`); the mistake
+  happens inside GitHub's form after landing on that page, not in the link itself, so re-check the
+  base/compare dropdowns before submitting rather than trusting the URL alone got it right.
 - Verified with `git log origin/v2/foundations..HEAD`, which must be **empty**. Comparing the
   branch tip against the document is what failed for four sprints.
 - **CI runs on pull requests and on `main`.** Both jobs — *API: lint, types, tests* and *Web: lint,
