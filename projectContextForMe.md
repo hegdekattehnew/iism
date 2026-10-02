@@ -4,19 +4,20 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-09-29 · **Sprints 1–38 built.** Sprint 35 gave three of four
-`SKILL_SOURCES` a real writer outside the seed; Sprint 36 added semantic similarity (off by
-default) and the `SkillRelation` foundation; Sprint 37 built BL-7.3's tiered operator authority
-(ADR-044) and then Epic B8's gig work — reusing `Job`/`Application` rather than the sibling module
-ADR-045 had proposed, on the owner's own instruction (ADR-046). Sprint 38 closed the *structural*
-half of ADR-025's monetisation gate (ADR-047) — a provider-reported `"enrolled"` status and a
-report script — without authorising `BL-1.3`. Asked to override the remaining volume gap or wait,
-the owner chose to **wait for real traffic** — `BL-1.3` stays not started, and this is a decision,
-not an open question, until real usage or the owner says otherwise. The owner then redirected
-Sprint 39 to a new **Epic B10 — Actor Dashboards** (`docs/IISM-Product-Backlog.docx` §3/§4.3):
-every actor sees real numbers on sign-in, composed entirely from data each actor's own module
-already computes — no new scorer, no cross-module "dashboard" service. Deployment is deferred by
-the owner, deliberately.
+**Last updated:** 2026-10-02 · **Sprints 1–40 built, and `v2/foundations` is gone** — its last
+commit (`8e7e179`) is merged into `main` at `b15e0c6` via PR #14, and the branch was deleted both
+locally and on `origin`. There is currently **no feature branch**; the next session's first
+decision is whether to cut one before touching code. Sprint 39 gave every actor type a real
+`StatTile` dashboard on sign-in (Epic B10). Sprint 40 replaced those flat tile rows with hand-rolled
+chart primitives — `RankedBarList`, `ProgressRing`, `StatusFunnel` — and inline drilldowns on all
+five dashboards (Epic B11, no new npm dependency), then fixed a real, reported bug in role search
+and job search ("software engineer" resolved to an entry-level coding certificate; "tech" found
+irrelevant Technician roles and missed the whole IT sector) by moving `role_aliases` from a Python
+dict to a table, adding generic word-synonym query expansion, and laying a real (off-by-default)
+`sentence-transformers` embedding foundation per ADR-013/031. Landing it on `main` needed a second,
+unplanned piece of work: PR #12's CI was red on pre-existing `pyjwt`/`urllib3`/`next` CVEs, and
+fixing those collided with a Dependabot bump already merged into `main` — see the Sprint 40 entry
+in §11 and the new gotchas in §8 for both.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -32,12 +33,12 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `v2/foundations`, merged into `main` (PR #1, merge commit `7b6337a`) |
-| **Last sprint** | 38 — closed ADR-025's structural gate (provider-reported `"enrolled"`, `make monetisation-metrics`) without authorising `BL-1.3` (ADR-047) |
-| **Next sprint** | 39 — Epic B10 (actor dashboards): `BL-10.1`–`BL-10.5`, one dashboard per actor, all `[NOW]`. `BL-1.3` stays not started (owner chose to wait for real traffic). |
-| **Tests** | 835 backend (`make check`), 260 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit`, which the web tests do not do |
-| **Migrations** | head `0038`; 47 ADRs |
-| **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** |
+| **Branch** | **none** — `main` only. `v2/foundations` merged into `main` at `b15e0c6` via PR #14 (2026-10-02) and was then deleted, locally and on `origin`. Cut a new branch before starting the next sprint. |
+| **Last sprint** | 40 — Epic B11 dashboard visualisation (charts + drilldowns on all five actor dashboards) and a cross-sector role-search/job-search relevance fix, landed on `main` after resolving a `uv.lock` conflict against a Dependabot bump |
+| **Next sprint** | not yet chosen. `BL-1.3` stays not started (owner chose to wait for real traffic, Sprint 38). The semantic-search foundation (`embedding_provider="sentence_transformer"`) is built but switched off everywhere — turning it on in any real environment is a separate, later decision (model caching, image size, memory). |
+| **Tests** | 870 backend (`make check`), 288 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0040`; 47 ADRs |
+| **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
 **To get running** (Docker must be up; ports are non-default — 5433 / 6380 / 27018):
@@ -895,6 +896,24 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 55. **`scripts/` is not an importable package.** Sibling imports work (`from legacy_skill_map
     import ...`) because Python puts a script's own directory on `sys.path`; `from scripts.x import`
     does not, because only `api*` is installed.
+56. **A session running `make api`/`make web` against a checkout you then `git checkout`/merge/pull
+    on will briefly break, and that's expected, not a regression.** Fast-forwarding `v2/foundations`
+    → `main` (117 commits, Sprint 40) while both dev servers were live rewrote the working tree out
+    from under their file watchers mid-flight: the API hit `Error loading ASGI app. Could not import
+    module "api.main"` and Next hit `ENOENT` scandir-ing `web/src/app`. Both `uvicorn --reload` and
+    `next dev` recovered on their own within seconds once the checkout finished — confirmed by
+    re-checking `/health/deep` and a fresh page load a few seconds later, not by assuming "it said
+    error so it's broken." Don't restart anything reflexively on seeing this; re-check first.
+57. **A Dependabot bump and your own dependency fix can target the same `uv.lock` block, and the
+    resolution is "keep the newer one," not "keep yours" or "keep theirs."** `main` had merged
+    Dependabot's `python` group bump (`pyjwt` → 2.14.0) while a branch here independently bumped
+    `pyjwt` → 2.15.1 for a CVE; `git merge` conflicts on the exact lines since both touch the same
+    package block. The correct resolve kept 2.15.1 (newer, already audit-verified) and took every
+    *other* package in that Dependabot bump (`alembic`, `pymongo`, `ruff`) from `main` as-is — not a
+    blanket "ours" or "theirs." After hand-editing out the conflict markers, **run `uv lock` again**
+    to let it confirm the file is self-consistent (it re-resolved in under 30ms and changed nothing
+    further, which is the signal the hand-edit was correct), then `uv sync --locked --extra dev` and
+    the full suite before trusting it.
 
 ## 9. Conventions that must not be broken
 
@@ -908,6 +927,16 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
   staying out of logs. Resume-derived embeddings inherit the same sensitivity.
 
 ## 10. Git state
+
+**Merged 2026-10-02, and the branch is now gone.** PR #14 (`v2/foundations` → `main`, head
+`8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
+the API, not assumed). `v2/foundations` was then deleted both locally and on `origin` — there is
+**no feature branch right now**, only `main`. PRs #12 and #13 show as closed-without-merging in
+GitHub's history; that's GitHub auto-closing other open PRs for the same branch once #14 merged, not
+a failed attempt worth investigating. The merge itself needed resolving one real conflict — `main`
+had a Dependabot bump to the same `uv.lock` block this branch's own CVE fix touched — written up in
+full in §11's Sprint 40 entry and as a general gotcha in §8. **Before starting the next sprint, cut
+a new branch first** — there is nothing to continue on top of.
 
 **Merged 2026-09-21.** `v2/foundations` reached `origin`, PR #1 was opened and merged into `main`
 (merge commit `7b6337a`), and **CI ran green on it** — the first time CI had ever run on this work.
@@ -1559,6 +1588,124 @@ own named "Option 4."
   open question, until real usage moves either metric or the owner says otherwise. Do not treat a
   future re-run of `make monetisation-metrics` showing a slightly larger denominator as license to
   start `BL-1.3` without checking back — nothing in this decision named a threshold.
+
+### Sprint 39 — Epic B10, actor dashboards (done, before this session)
+
+Every actor type (candidate, employer, course provider, operator, government agency) gets a real
+numbers dashboard on sign-in — `StatTile` rows only, composed from data each actor's own module
+already computed. No new scorer, no cross-module "dashboard" service (ADR-014). This is the
+foundation Sprint 40 later replaced the *rendering* of, without touching the backend numbers.
+
+### Sprint 40 — dashboard visualisation (Epic B11), a cross-sector matching fix, and landing it on `main` (done 2026-10-02)
+
+Two unrelated pieces of work, planned separately and executed back to back, plus a third,
+unplanned one needed just to get the result onto `main`.
+
+**Part 1 — charts and drilldowns on all five dashboards, zero new dependencies.** `web/package.json`
+had nothing chart-shaped before this (Radix dialog/progress/slot, TanStack Query, next-intl,
+openapi-fetch). Rather than add a charting library — even the lightest costs 15–50 KB against a
+~62 KB shared first-load budget, and would be a second way to draw a bar next to `CoverageBar`'s
+existing hand-rolled one — four SVG/Tailwind primitives were built in a new, deliberately
+barrel-excluded `web/src/components/charts/`: `RankedBarList`, `ProgressRing`, `StatusFunnel`, and
+`TrendSparkline` (built and tested, left unwired — no backend aggregation feeds it yet). Each
+dashboard's backend `dashboard()`/`platform_dashboard()` function was extended to return the
+per-row array it was already computing and discarding (`job_pools()`, `counts_by_course()`,
+`market_scarce_skills()`, `scored[:5]` from `match_jobs()`) — one exception,
+`GET /ops/programmes/{name}/districts`, is a genuinely new, heavier `GROUP BY` query and got its own
+endpoint rather than riding the base report. Drilldowns are a local `useState` on the dashboard
+component revealing a panel beneath the clicked row — `aria-expanded`/`aria-controls`, not a
+`Dialog` (reserved for true modal interruptions) and not a route. **Verified live in a browser**,
+not just in tests: signed in as each of the three reachable demo actors and clicked a drilldown row
+on the candidate dashboard — it correctly reuses the pre-existing `CoverageBar`/`LevelScale`
+component with that match's own fields, exactly as planned, rather than a new detail UI.
+
+**Part 2 — the same bug, twice, is a systemic one.** Reported live: a candidate profile's role
+search for `"software engineer"` returned **"Certificate course in Coding Skills"** — an
+entry-level certificate — instead of anything resembling a software engineering qualification. This
+is the second time this exact shape of bug was hit this project: an earlier session had hand-added
+25 IT/tech `role_aliases.py` entries, including that exact wrong mapping, to fix a *different*
+reported symptom (`"tech"` surfacing irrelevant "Technician" roles in search). Investigated rather
+than just re-patched: `role_aliases.py` held 124 hand-written entries against **3,442 real, current,
+standards-bearing qualification packs across 40 sectors** — ~3.6% coverage. Hand-writing one Python
+dict entry per lay term, one sector at a time, is not a fix that scales; it is the same bug
+recurring under a different term every time someone types a phrase nobody has curated yet. Four
+changes, landed together:
+
+- **Fixed the immediate mapping**: `"software engineer"` now points at `"Software Development"`
+  (`MSU/SSC/CRS0033`, NSQF 6, 10 standards), not the Coding Skills certificate. Verified live via
+  `GET /roles/search?q=software+engineer` after the fix: Software Development ranks first with
+  `match_kind: "alias"`, followed by genuinely related roles (Software Engineering Fundamentals,
+  Embedded Software Engineer, Software Test Engineer) via the prefix/contains tiers.
+- **`role_aliases` moved from a Python dict to a database table** (migration 0039), mirroring the
+  existing `SkillAlias` pattern. `role_aliases.py`'s hand-authored dict is still the source of truth
+  and the thing a reviewer reads in a diff — `scripts/seed_skills.py` projects it into the table on
+  every run, the same relationship `SKILLS` already has to `skill_aliases`. This doesn't by itself
+  write the missing ~3,300 entries; it removes the actual bottleneck (a code change + PR + deploy
+  for every new synonym), so filling the gap can become a data-entry or admin-screen problem later
+  rather than an engineering one now.
+- **Generic word-synonym expansion** (`WORD_SYNONYMS`/`expand_query_terms` in `api/core/text.py`,
+  tested in isolation in the new `tests/test_text.py`): `tech→technology`, `dev→developer`,
+  `eng→engineer`, and similar sector-agnostic abbreviations, applied as additional OR terms in both
+  `_text_filter()` (the public `/jobs`/`/search` path, `api/modules/marketplace/service.py`) and
+  `search_roles()`. This is what actually fixed the original `"tech"` symptom's job-search half:
+  verified live, `/en/search?q=tech` now surfaces real IT-sector jobs (a Business Analyst role, a
+  Web Designing & Multimedia trainee programme) alongside the literal `%tech%` substring matches on
+  "Technician" (which were never a bug — "tech" genuinely is a substring of "Technician" — just an
+  incomplete answer on its own).
+- **A real embedding provider, built and tested, switched off everywhere by default.**
+  `HashingEmbeddingProvider` was always documented as an honest placeholder for the model ADR-013/031
+  already mandate by name — self-hosted `sentence-transformers`,
+  `paraphrase-multilingual-MiniLM-L12-v2`, 384 dimensions (ADR-031's fixed size), CPU-only,
+  multilingual for ADR-033's Hindi requirement. `api/adapters/embeddings/sentence_transformer.py` is
+  that adapter; `QualificationPack` gained `embedding`/`embedding_provider`/`embedding_model`/
+  `embedding_computed_at` columns (migration 0040, same "NULL means needs computing" convention as
+  migration 0034), and `api/modules/skills/tasks.py`'s `refresh_role_embeddings` cron fills them in
+  (registered in `api/worker.py`, **and the running worker had to be restarted to pick it up** — see
+  the new §8 gotcha). `search_roles()` only runs the semantic tier when
+  `get_embedding_provider().name != "hashing"`, which it is nowhere today — `embedding_provider` in
+  `api/core/config.py` defaults to `"hashing"`. **Real, honestly-reported calibration finding**:
+  measuring actual cosine similarities with the real model showed it does *not* cleanly separate
+  true/false role-matching pairs at this short-phrase task — an unrelated pair ("cashier"/"AC
+  Technician") scored *higher* (0.329) than a genuinely related one ("ward boy"/"General Duty
+  Assistant", 0.319). `SEMANTIC_MIN_SIMILARITY = 0.30` is a conservative placeholder threshold,
+  explicitly flagged as needing a real tuning pass before anyone flips the config switch — the same
+  discipline `SEMANTIC_WEIGHT` already established on the scoring side of this ADR.
+- **The mandatory-gap cap now tapers with coverage.** A second, related bug found while
+  investigating: `MANDATORY_GAP_CAP` (0.45) was flat regardless of how much real overlap sat behind
+  it, so a candidate whose only shared standard was a generic, widely-reused one (e.g.
+  `employability-skills-60-hours-dgt-vsq-n0102`, required by dozens of unrelated jobs) could land in
+  the same low-40s band as someone genuinely one standard short of a strong match. `scoring.py`
+  gained `MIN_COVERAGE_FOR_CAP = 0.40`; below that coverage the cap scales down proportionally
+  (`effective_cap *= coverage / MIN_COVERAGE_FOR_CAP`) rather than applying flat. `scoring.py` still
+  takes `ScoreWeights` as a passed-in value and reads no settings itself (ADR-036 intact). Verified
+  against `make evaluate`: the orderings and `capped_by_mandatory` booleans are bit-identical, but
+  several previously-45 scores now correctly read lower (e.g. `visual-merchandiser-mumbai` 45→31,
+  `ecg-technician-chennai` and others down to 16–35).
+
+**Part 3 — an unplanned detour: getting it onto `main` needed fixing CI, which needed resolving a
+merge conflict.** PR #12 (carrying the role-search fix) had red CI on both jobs, from **pre-existing,
+unrelated** vulnerabilities — `pyjwt`/`urllib3` (API job, `pip-audit`) and a critical Next.js RCE,
+GHSA-vcvr-r3jv-pc5j (Web job, `npm audit --omit=dev --audit-level=high`). Asked how far to go, the
+owner chose "bump the vulnerable packages now." Both bumps were verified clean against the exact CI
+commands (not just "tests pass") before pushing: `pip-audit` clean + 870 backend tests; `npm audit`
+clean + `tsc --noEmit` + `eslint` + 288 web tests + `next build` + the bundle budget. **Pushing that
+fix then surfaced a real merge conflict against `main`**: a Dependabot PR bumping the same
+`python` group (`alembic`, `pyjwt`, `pymongo`, `ruff`) had already merged into `main` while this
+branch was open, and both sides touched the same `pyjwt` block in `uv.lock`. Resolved by keeping
+this branch's newer `pyjwt==2.15.1` (already CVE-verified) over Dependabot's `2.14.0`, taking every
+other bump from `main` as-is, then re-running `uv lock` to confirm the hand-resolved file was
+self-consistent and re-verifying the whole stack (`pip-audit`, `make check` — ruff/mypy/870 tests,
+`alembic check` for drift from the `alembic` 1.19.2→1.20.0 bump). See the new §8 gotcha for the
+general shape of this trap. The resulting merge commit (`8e7e179`) is what PR #14 actually merged
+into `main` as `b15e0c6`; **PR #12 and #13 show as closed-without-merging in GitHub's history** —
+not failures, just earlier attempts GitHub auto-closed once #14 (for the same branch) merged.
+
+**Verified end to end, live, after landing**: `make check-role-aliases` and `make evaluate` both
+clean on `main`; all three containers (Postgres/Redis/Mongo) and all three dev processes
+(api/worker/web) confirmed healthy after restarting each cleanly on `main`; a real browser session
+against each of the four reachable seeded demo accounts (`+919000000001`,
+`hiring@apollo-care.example` as both employer *and* operator, `admin@skillbridge-institute.example`)
+showing real charts, real drilldowns, and the corrected search results — not just passing tests.
 
 ### Also outstanding, in rough order
 
