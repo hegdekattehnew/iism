@@ -557,6 +557,27 @@ class TestCandidateDashboard:
         # only the skill was added here, so it is up but not complete.
         assert 0 < body["profile_completeness"] < 100
 
+    async def test_includes_a_preview_of_top_matches(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """`top_matches` (Sprint 40) is the same `scored` list `match_jobs()`
+        already returns for `match_count`/`best_score`, sliced to the top few
+        -- zero new queries."""
+        headers = await _candidate(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=headers,
+            json={"skill_slug": "apply-test-standard", "proficiency": 3},
+        )
+
+        response = await client.get("/me/dashboard", headers=headers)
+        assert response.status_code == 200
+        top = response.json()["top_matches"]
+        assert len(top) == 1
+        assert top[0]["job_slug"] == "open-cashier"
+        assert top[0]["score"] > 0
+        assert "missing_mandatory" in top[0]
+
     async def test_an_organisation_only_account_is_refused(self, client: AsyncClient) -> None:
         org = await _organisation(client)
         response = await client.get(
@@ -610,6 +631,29 @@ class TestEmployerDashboard:
         ).json()
         assert other_dashboard["applied"] == 1
         assert other_dashboard["hired"] == 0
+
+    async def test_includes_a_per_job_breakdown(self, vacancy: dict, client: AsyncClient) -> None:
+        """The `jobs` field behind the three aggregate counts (Sprint 40) --
+        the same per-job pool `job_pools()` already computes for the
+        workspace's own job list, at no extra query."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        applicant = await _candidate(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=applicant,
+            json={"skill_slug": "apply-test-standard", "proficiency": 3},
+        )
+        await client.post("/me/applications", headers=applicant, json={"job_slug": job_slug})
+
+        response = await client.get(f"/org/{org}/dashboard", headers=employer)
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert len(jobs) == 1
+        assert jobs[0]["job"]["slug"] == job_slug
+        assert jobs[0]["pool"] == 1
+        assert jobs[0]["ready"] == 1
+        assert jobs[0]["applications"] == 1
+        assert jobs[0]["new_applications"] == 1
 
     async def test_a_course_provider_is_refused(self, client: AsyncClient) -> None:
         address = f"dashboard-provider-{uuid.uuid4().hex[:8]}@example.org"

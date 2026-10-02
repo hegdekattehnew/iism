@@ -10,6 +10,8 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.adapters.embeddings import get_embedding_provider
+from api.core.text import expand_query_terms
 from api.modules.skills.content import (
     GenericCriterion,
     KnowledgeParameter,
@@ -18,7 +20,7 @@ from api.modules.skills.content import (
 )
 from api.modules.skills.hierarchy import QpSkill, QualificationPack, Sector
 from api.modules.skills.models import Skill
-from api.modules.skills.role_aliases import ROLE_ALIASES, alias_scores
+from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX, ROLE_ALIASES
 
 MAX_SEARCH_RESULTS = 50
 
@@ -414,6 +416,17 @@ async def search_skills(db: AsyncSession, query: str, *, limit: int = 20) -> lis
 
 MAX_ROLE_RESULTS = 30
 
+# Cosine similarity floor for the semantic tier below (Sprint 40, foundation).
+# **A starting constant, not a validated one** -- real measurement against the
+# real model this session found genuinely unreliable separation at this task:
+# a true pair ("it support" / "Certificate in Computer Hardware & Networking")
+# scored 0.16, *below* a false one ("cashier" / "AC Technician") at 0.33. This
+# value catches the clearer true positives measured (0.32-0.81) while
+# excluding the clearest noise-floor negatives (below ~0.2); it does not catch
+# every true positive, and a follow-up tuning pass against a real sample --
+# not five hand-picked pairs -- is still owed before trusting this threshold.
+SEMANTIC_MIN_SIMILARITY = 0.30
+
 # Tiers mirror `_SEARCH_SQL`: exact 4, prefix 3, contains 2, and fuzzy scaled so
 # it can never reach 2 -- a guess must never outrank something the candidate
 # literally typed. Aliases arrive pre-scored on the same tiers.
@@ -433,9 +446,16 @@ WITH q AS (
     SELECT lower(btrim(CAST(:raw AS text))) AS norm
 ),
 aliased AS (
-    SELECT t.role_key, t.score
-    FROM unnest(CAST(:alias_roles AS text[]), CAST(:alias_scores AS float8[]))
-         AS t(role_key, score)
+    -- `role_aliases` (Sprint 23, moved from a Python dict this session): a
+    -- whole alias scores like an exact match (4), a half-typed one like a
+    -- prefix (3) -- the same tiers the literal match below uses, so a guess
+    -- via an alias never outranks something the candidate actually typed.
+    SELECT ra.surface_form,
+           lower(btrim(ra.job_role)) AS role_key,
+           CASE WHEN ra.surface_form = q.norm THEN 4.0 ELSE 3.0 END AS score
+    FROM role_aliases ra, q
+    WHERE ra.surface_form = q.norm
+       OR (length(q.norm) >= :min_alias_prefix AND ra.surface_form LIKE q.norm || '%')
 ),
 candidates AS (
     SELECT qp.id, qp.slug, qp.qp_code, qp.job_role, qp.nsqf_level, qp.sector_id,
@@ -445,7 +465,28 @@ candidates AS (
     WHERE qp.is_current
       AND (lower(qp.job_role) LIKE '%' || q.norm || '%'
            OR q.norm <% lower(qp.job_role)
-           OR lower(btrim(qp.job_role)) IN (SELECT role_key FROM aliased))
+           OR lower(btrim(qp.job_role)) IN (SELECT role_key FROM aliased)
+           -- Generic word-level synonyms ("tech" -> "technology"), never
+           -- role-specific -- affects only which rows are eligible to
+           -- appear, never `scored`'s ranking below, which stays keyed on
+           -- what the candidate actually typed.
+           OR EXISTS (
+               SELECT 1 FROM unnest(CAST(:synonym_terms AS text[])) AS t(term)
+               WHERE lower(qp.job_role) LIKE '%' || t.term || '%'
+           )
+           -- Semantic tier (Sprint 40, foundation): only ever reached when a
+           -- real embedding provider is active (`:query_embedding` is NULL
+           -- under the hashing placeholder, so this branch is always false
+           -- there -- token-overlap "similarity" would add noise, not
+           -- signal). Admits a row into the pool; it does not touch `scored`'s
+           -- ranking below, so a semantic-only match still lands on the fuzzy
+           -- tier there, never above a literal or aliased one.
+           OR (
+               CAST(:query_embedding AS vector) IS NOT NULL
+               AND qp.embedding IS NOT NULL
+               AND 1 - (qp.embedding <=> CAST(:query_embedding AS vector))
+                   >= :semantic_min_similarity
+           ))
 ),
 ranked AS (
     SELECT c.*,
@@ -469,6 +510,14 @@ scored AS (
            END AS literal,
            coalesce((SELECT max(a.score) FROM aliased a WHERE a.role_key = r.role_key), 0)
                AS via_alias,
+           -- The alias that produced that max score, so the caller can name
+           -- it without a second lookup -- ties broken alphabetically, same
+           -- as everything else here, so the answer is stable.
+           (
+               SELECT a.surface_form FROM aliased a WHERE a.role_key = r.role_key
+               ORDER BY a.score DESC, a.surface_form
+               LIMIT 1
+           ) AS via_alias_surface_form,
            -- Whole-string, not word: breaks ties between fuzzy hits in favour of
            -- a title that is *about* the query over one that merely contains a
            -- word of it. Without it "delivery boy" ranked a BIM architecture
@@ -479,7 +528,7 @@ scored AS (
     WHERE r.pick = 1
 )
 SELECT s.slug, s.qp_code, s.job_role, s.nsqf_level, s.standards, s.variants,
-       s.role_key, s.literal, s.via_alias, sec.name AS sector_name
+       s.role_key, s.literal, s.via_alias, s.via_alias_surface_form, sec.name AS sector_name
 FROM scored s
 LEFT JOIN sectors sec ON sec.id = s.sector_id
 ORDER BY greatest(s.literal, s.via_alias) DESC, s.closeness DESC, s.standards DESC, s.job_role
@@ -501,6 +550,13 @@ class RoleHit:
     match_kind: str
 
 
+def _pgvector_literal(vector: list[float]) -> str:
+    """`[0.1,0.2,...]`, pgvector's own text form -- the portable way to bind a
+    vector into a raw `text()` query, since `CAST(:param AS vector)` accepts
+    this from any driver without a type adapter registered for the parameter."""
+    return "[" + ",".join(repr(v) for v in vector) + "]"
+
+
 def _literal_kind(score: float) -> str:
     if score >= 4.0:
         return "exact"
@@ -516,14 +572,28 @@ async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list
     cleaned = " ".join(query.split())
     if not cleaned:
         return []
-    via = alias_scores(cleaned)
+    # Generic word-synonym expansions only ("tech" -> "technology") -- the
+    # original is excluded, since `_ROLE_SEARCH_SQL`'s own `q.norm`-based
+    # conditions already cover it.
+    synonym_terms = expand_query_terms(cleaned)[1:]
+    # Embedding the query live is only worth the cost -- and only means
+    # anything -- when a real provider is behind the port. Under the hashing
+    # placeholder this stays `None`, and the SQL's own `IS NOT NULL` guard
+    # turns the whole semantic branch off, exactly as it does with no
+    # embedding column populated at all.
+    provider = get_embedding_provider()
+    query_embedding = (
+        _pgvector_literal(provider.embed(cleaned)) if provider.name != "hashing" else None
+    )
     rows = (
         await db.execute(
             _ROLE_SEARCH_SQL,
             {
                 "raw": cleaned,
-                "alias_roles": list(via),
-                "alias_scores": [score for score, _ in via.values()],
+                "min_alias_prefix": MIN_ALIAS_PREFIX,
+                "synonym_terms": synonym_terms,
+                "query_embedding": query_embedding,
+                "semantic_min_similarity": SEMANTIC_MIN_SIMILARITY,
                 "limit": min(limit, MAX_ROLE_RESULTS),
             },
         )
@@ -534,7 +604,7 @@ async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list
         # Whichever reached it more strongly explains it. On a tie the literal
         # match wins: it is the candidate's own words.
         if row.via_alias > row.literal:
-            kind, matched_on = "alias", via[row.role_key][1]
+            kind, matched_on = "alias", row.via_alias_surface_form
         else:
             kind, matched_on = _literal_kind(float(row.literal)), row.job_role
         hits.append(

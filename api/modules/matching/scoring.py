@@ -46,6 +46,18 @@ DEFAULT_EVIDENCE = 0.6
 # point. Not a small penalty either, or "mandatory" would mean nothing.
 MANDATORY_GAP_CAP = 0.45
 
+# Below this coverage, "missing one mandatory standard" is no longer the
+# reason the match is thin -- the overlap itself is. A candidate whose only
+# shared standard is a generic, non-distinctive one (an "Employability
+# Skills" unit reused as mandatory across dozens of unrelated sectors, for
+# example) can otherwise clear the flat cap on the strength of the "unknown,
+# not zero" defaults for level and evidence alone, and read as an honest
+# near-miss when there is no real overlap behind it at all. The cap still
+# applies here -- it tapers with coverage rather than either holding flat or
+# disappearing, the same shape `level_score`/`experience_score` already use
+# for "short, not disqualified."
+MIN_COVERAGE_FOR_CAP = 0.40
+
 # Weights across the components that do enter the score. Coverage dominates
 # deliberately -- it is the only component derived from what the job actually
 # published about itself.
@@ -103,6 +115,7 @@ class ScoreWeights:
     experience: float = EXPERIENCE_WEIGHT
     evidence_share: float = EVIDENCE_WEIGHT_SHARE
     mandatory_gap_cap: float = MANDATORY_GAP_CAP
+    min_coverage_for_cap: float = MIN_COVERAGE_FOR_CAP
     experience_taper_years: float = EXPERIENCE_TAPER_YEARS
     semantic: float = SEMANTIC_WEIGHT
 
@@ -346,8 +359,11 @@ def score_match(
     missing_mandatory = sum(1 for m in missing if m.is_mandatory)
     capped = False
     if missing_mandatory:
-        capped = raw > weights.mandatory_gap_cap
-        raw = min(raw, weights.mandatory_gap_cap)
+        effective_cap = weights.mandatory_gap_cap
+        if coverage < weights.min_coverage_for_cap:
+            effective_cap *= coverage / weights.min_coverage_for_cap
+        capped = raw > effective_cap
+        raw = min(raw, effective_cap)
 
     # Most important first, so the reason reads in the order a person cares
     # about: what is mandatory and missing, then what matters most.

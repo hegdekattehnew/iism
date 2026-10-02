@@ -11,6 +11,12 @@ Same move as `DISTRICT_ALIASES` in the geography service ("Bengaluru" is what an
 employer writes; the corpus says BENGALURU URBAN) and `scripts/legacy_skill_map.py`:
 one auditable file, rather than vocabulary scattered through SQL.
 
+This dict is the *authored* source of truth, reviewable in a diff; at runtime
+`_ROLE_SEARCH_SQL` (`api/modules/skills/service.py`) queries the `role_aliases`
+table instead, which `scripts/seed_skills.py` replaces wholesale from this dict
+on every run -- the same relationship `SKILLS` in that script has to
+`skill_aliases`.
+
 Rules for editing it:
 
 * **Keys** are lower case, trimmed, and what a person would type -- English,
@@ -27,7 +33,7 @@ Rules for editing it:
   disability-track or manager-level packs exist) and "mason" (no general
   masonry pack). Unmapped terms fall through to fuzzy search and then to the
   free-text standard search.
-* **Partial words count** (`alias_scores`), because this is a typeahead. So
+* **Partial words count** (`MIN_ALIAS_PREFIX`), because this is a typeahead. So
   "nurse" has no entry of its own -- a registered nurse is a GNM/B.Sc. route,
   not an NSQF pack -- yet still reaches the nursing-assistant certificate as a
   prefix of "nurse aide". That is the nearest route the corpus offers, and far
@@ -146,30 +152,44 @@ ROLE_ALIASES: dict[str, str] = {
     "ac repair": "Field Technician - Air Conditioner",
     "mobile repair": "Mobile Phone Hardware Repair Technician",
     "mobile mechanic": "Mobile Phone Hardware Repair Technician",
+    # ------------------------------------------------- information technology
+    # Without these, "tech" reaches nothing here -- it is a literal substring
+    # of "Technician", so the plain contains-tier surfaces AC/dialysis/solar
+    # technicians from unrelated sectors before it ever reaches the real
+    # IT-ITeS corpus, none of whose job roles happen to contain that word.
+    "software developer": "Certificate Course in Coding Skills",
+    # Genuinely a different, more senior target than "developer"/"coder" --
+    # "Software Development" (NSQF 6: architecture & design patterns, DSA,
+    # testing & QA, DevOps) over the NSQF-5 entry-level coding certificate,
+    # checked against the live corpus rather than assumed the two words are
+    # interchangeable.
+    "software engineer": "Software Development",
+    "programmer": "Certificate Course in Coding Skills",
+    "coder": "Certificate Course in Coding Skills",
+    "coding": "Certificate Course in Coding Skills",
+    "web developer": "Certificate Course in Web Designing and Multimedia",
+    "website developer": "Certificate Course in Web Designing and Multimedia",
+    "web designer": "Certificate Course in Web Designing and Multimedia",
+    "web design": "Certificate Course in Web Designing and Multimedia",
+    "app developer": "Application Development - Android",
+    "android developer": "Application Development - Android",
+    "mobile app developer": "Application Development - Android",
+    "it support": "Certificate in Computer Hardware & Networking",
+    "computer technician": "Certificate in Computer Hardware & Networking",
+    "hardware technician": "Certificate in Computer Hardware & Networking",
+    "computer hardware": "Certificate in Computer Hardware & Networking",
+    "networking": "Certificate in Computer Hardware & Networking",
+    "basic computer": "Certificate in Basic Computer Concepts",
+    "computer course": "Certificate in Basic Computer Concepts",
+    "data analyst": "Certificate in Data Analytics",
+    "machine learning": "AI - Machine learning Developer",
+    "ml engineer": "AI - Machine learning Developer",
+    "ai developer": "AI - Machine learning Developer",
+    "ethical hacking": "Certificate in Cyber Security & Ethical Hacking",
+    "security analyst": "Certificate in Cyber Security",
 }
 
 # How short a partial alias may be and still count. "wa" should not claim
-# "ward boy"; "ward" may.
+# "ward boy"; "ward" may. Bound into `_ROLE_SEARCH_SQL`'s own `aliased` CTE
+# (`api/modules/skills/service.py`) as `:min_alias_prefix`.
 MIN_ALIAS_PREFIX = 3
-
-
-def alias_scores(query: str) -> dict[str, tuple[float, str]]:
-    """Roles the query reaches through an alias: `{role_key: (score, alias)}`.
-
-    Scored on the same tiers as the literal search -- a whole alias as an exact
-    match, a partial one as a prefix -- so an alias never outranks a role the
-    candidate actually named, and a half-typed word still finds its target.
-    """
-    norm = " ".join(query.lower().split())
-    found: dict[str, tuple[float, str]] = {}
-    for alias, role in ROLE_ALIASES.items():
-        if alias == norm:
-            score = 4.0
-        elif len(norm) >= MIN_ALIAS_PREFIX and alias.startswith(norm):
-            score = 3.0
-        else:
-            continue
-        key = role.lower().strip()
-        if key not in found or score > found[key][0]:
-            found[key] = (score, alias)
-    return found

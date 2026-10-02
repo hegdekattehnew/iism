@@ -77,6 +77,10 @@ evaluate: ## Score the matcher against the hand-labelled golden set
 monetisation-metrics: ## Report ADR-025's click-through and enrolment-conversion metrics (ADR-047)
 	$(NO_TIMEOUT) $(PY) scripts/report_conversion_metrics.py
 
+.PHONY: check-role-aliases
+check-role-aliases: ## Verify every role_aliases.py target names a real, current qualification
+	$(NO_TIMEOUT) $(PY) scripts/check_role_aliases.py
+
 # ---------------------------------------------------------------- backup
 # Operator scripts share the app's database engine, which now carries a
 # statement timeout. The importer and the seed run legitimately long statements.

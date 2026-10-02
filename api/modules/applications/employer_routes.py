@@ -18,6 +18,7 @@ from api.modules.applications.schemas import (
     StatusIn,
 )
 from api.modules.matching import candidate_card
+from api.modules.matching.schemas import JobPoolOut, JobSummary
 
 # Employers only, and only their own vacancies. `require` asks both questions
 # in one declaration -- a guard a handler must remember to call is one that
@@ -40,9 +41,32 @@ async def employer_dashboard(
     context: TenantContext = CanShortlist,
     db: AsyncSession = Depends(get_db_session),
 ) -> EmployerDashboardOut:
-    """An employer's landing numbers (Sprint 39, BL-10.2)."""
-    return EmployerDashboardOut.model_validate(
-        await employer_service.dashboard(db, context.tenant.id)
+    """An employer's landing numbers, and the per-job pool behind them
+    (Sprint 39, BL-10.2; the `jobs` breakdown is Sprint 40).
+
+    Built explicitly rather than `model_validate`d straight off the
+    dataclass: `JobPoolOut` carries no `from_attributes` config, matching how
+    the employer console's own `_overview()` builds it in
+    `matching/employer_routes.py`.
+    """
+    data = await employer_service.dashboard(db, context.tenant.id)
+    return EmployerDashboardOut(
+        posted_jobs=data.posted_jobs,
+        open_jobs=data.open_jobs,
+        applied=data.applied,
+        shortlisted=data.shortlisted,
+        hired=data.hired,
+        jobs=[
+            JobPoolOut(
+                job=JobSummary.model_validate(p.job),
+                pool=p.pool,
+                ready=p.ready,
+                nearly=p.nearly,
+                applications=p.applications,
+                new_applications=p.new_applications,
+            )
+            for p in data.jobs
+        ],
     )
 
 

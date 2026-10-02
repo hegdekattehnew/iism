@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { RankedBarList } from "@/components/charts/ranked-bar-list";
 import { Skeleton, StatTile } from "@/components/ui";
 import { useOperatorDashboard } from "@/lib/ops";
 
@@ -10,6 +11,10 @@ import { useOperatorDashboard } from "@/lib/ops";
  *
  * Sits above `VerificationQueue`, not instead of it -- the queue is still the
  * thing an operator acts on; this is the orientation `/admin` has never had.
+ *
+ * `scarce_skills` (Sprint 40) renders `market_scarce_skills()`'s own fields --
+ * a read-only ranked list, since there is no skill-detail screen to drill
+ * into yet.
  */
 export function OperatorDashboard() {
   const t = useTranslations("ops.dashboard");
@@ -24,6 +29,7 @@ export function OperatorDashboard() {
   }
 
   const data = dashboard.data;
+  const scarce = data.scarce_skills ?? [];
 
   return (
     <div>
@@ -36,6 +42,25 @@ export function OperatorDashboard() {
         <StatTile value={data.published_jobs} label={t("publishedJobs")} />
         <StatTile value={data.published_courses} label={t("publishedCourses")} />
       </div>
+
+      {scarce.length > 0 && (
+        <>
+          <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
+            {t("scarceSkills")}
+          </h3>
+          <RankedBarList
+            className="mt-3"
+            emptyLabel={t("noScarceSkills")}
+            items={scarce.map((s) => ({
+              key: s.nos_code ?? s.name,
+              label: s.name,
+              value: s.required_by,
+              secondary: t("scarceSecondary", { held: s.held_by }),
+              tone: s.held_by === 0 ? "danger" : "warning",
+            }))}
+          />
+        </>
+      )}
     </div>
   );
 }

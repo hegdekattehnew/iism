@@ -13,7 +13,7 @@ bare script is the one shape that cannot be.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import structlog
 from fastapi import HTTPException, status
@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from api.core.authorization import ORGANISATION_TYPES
 from api.modules.applications.models import WAS_HIRED_STATUSES, Application
+from api.modules.geography.models import District
 from api.modules.identity.models import Membership, Tenant, User
 from api.modules.marketplace import record_verified_skill
 from api.modules.marketplace.models import (
@@ -32,7 +33,7 @@ from api.modules.marketplace.models import (
     Job,
     posted_job,
 )
-from api.modules.matching import match_jobs
+from api.modules.matching import ScarceSkill, market_scarce_skills, match_jobs
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
 from api.modules.operations.models import TenantVerificationEvent
 
@@ -279,6 +280,10 @@ class PlatformDashboard:
     candidates: int
     published_jobs: int
     published_courses: int
+    # What the whole market asks for that the candidate pool cannot supply
+    # (Sprint 40) -- `market_scarce_skills()` reused rather than restated, the
+    # same shortage a course provider's own dashboard could act on.
+    scarce_skills: list[ScarceSkill] = field(default_factory=list)
 
 
 async def platform_dashboard(db: AsyncSession) -> PlatformDashboard:
@@ -303,6 +308,7 @@ async def platform_dashboard(db: AsyncSession) -> PlatformDashboard:
     published_courses = await db.scalar(
         select(func.count()).select_from(Course).where(Course.status == "published")
     )
+    scarce = await market_scarce_skills(db)
     return PlatformDashboard(
         unverified_organisations=unverified_orgs or 0,
         unverified_certifications=unverified_certs or 0,
@@ -310,6 +316,7 @@ async def platform_dashboard(db: AsyncSession) -> PlatformDashboard:
         candidates=candidates or 0,
         published_jobs=published_jobs or 0,
         published_courses=published_courses or 0,
+        scarce_skills=scarce,
     )
 
 
@@ -393,3 +400,41 @@ async def known_programmes(db: AsyncSession) -> list[str]:
         .order_by(CandidateProfile.enrolled_via_programme)
     )
     return [r for r in rows.all() if r is not None]
+
+
+@dataclass(frozen=True)
+class DistrictBreakdown:
+    """How many of one programme's enrolled candidates live in one district."""
+
+    district: str
+    enrolled: int
+
+
+async def programme_by_district(db: AsyncSession, programme: str) -> list[DistrictBreakdown]:
+    """Enrolled candidates for one programme, grouped by district (Sprint 40).
+
+    A genuinely new aggregation, not folded into `programme_report`: that
+    function already pays for a per-candidate `match_jobs` loop (its own
+    docstring names the cost), and a caller who wants only the four headline
+    numbers should not also pay for this `GROUP BY` every time.
+
+    A candidate with no resolved `district_id` rolls up into `"Unknown"`
+    rather than being dropped, so the bars this feeds still sum to
+    `programme_report`'s own `enrolled` count for the same programme --
+    **no id is better than a wrong one**, but a candidate is not invisible
+    just because their district never resolved.
+    """
+    rows = (
+        await db.execute(
+            select(District.name, func.count(CandidateProfile.id))
+            .select_from(CandidateProfile)
+            .outerjoin(District, District.id == CandidateProfile.district_id)
+            .where(CandidateProfile.enrolled_via_programme == programme)
+            .group_by(District.name)
+        )
+    ).all()
+    result = [DistrictBreakdown(district=name or "Unknown", enrolled=count) for name, count in rows]
+    # Most enrolled first, so the bars read like a ranking rather than an
+    # alphabetical list.
+    result.sort(key=lambda d: (-d.enrolled, d.district))
+    return result

@@ -25,6 +25,7 @@ from api.core.authorization import (
 )
 from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.modules.applications.models import Application
+from api.modules.geography.models import District, State
 from api.modules.identity.models import STAFF_TIERS, Tenant, User
 from api.modules.marketplace.models import (
     CandidateCertification,
@@ -668,6 +669,59 @@ class TestKnownProgrammes:
         assert "PMKVY-ROUTE-TEST" in allowed.json()["programmes"]
 
 
+class TestProgrammeByDistrict:
+    """The one genuinely new query in Sprint 40's dashboard visualisation --
+    a separate `GROUP BY` from `programme_report`'s own four numbers."""
+
+    async def test_groups_enrolled_candidates_with_an_unknown_bucket(
+        self, db: AsyncSession
+    ) -> None:
+        state = State(state_code=9101, slug="district-breakdown-state", name="Breakdown State")
+        db.add(state)
+        await db.flush()
+        district = District(district_code=9101, name="Breakdown District", state_id=state.id)
+        db.add(district)
+        await db.flush()
+
+        placed = await _enrolled_candidate(db, programme="DISTRICT-TEST", skill_id=None)
+        placed.district_id = district.id
+        unresolved = await _enrolled_candidate(db, programme="DISTRICT-TEST", skill_id=None)
+        assert unresolved.district_id is None
+        # A different programme's candidate, in the same district, must not
+        # be counted here.
+        other = await _enrolled_candidate(db, programme="OTHER-DISTRICT-PROGRAMME", skill_id=None)
+        other.district_id = district.id
+        await db.commit()
+
+        rows = await service.programme_by_district(db, "DISTRICT-TEST")
+        by_name = {r.district: r.enrolled for r in rows}
+        assert by_name == {"Breakdown District": 1, "Unknown": 1}
+
+    async def test_an_unrecognised_programme_reports_no_rows(self, db: AsyncSession) -> None:
+        assert await service.programme_by_district(db, "no-such-programme") == []
+
+    async def test_the_route_requires_operator_authority(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        anon = await client.get("/ops/programmes/PMKVY-TEST/districts")
+        assert anon.status_code == 401
+
+        stranger = await _candidate(client)
+        refused = await client.get("/ops/programmes/PMKVY-TEST/districts", headers=stranger)
+        assert refused.status_code == 404
+
+        headers = await _operator(client, db)
+        await _enrolled_candidate(db, programme="PMKVY-DISTRICT-ROUTE", skill_id=None)
+        await db.commit()
+        allowed = await client.get(
+            "/ops/programmes/PMKVY-DISTRICT-ROUTE/districts", headers=headers
+        )
+        assert allowed.status_code == 200
+        body = allowed.json()
+        assert body["programme"] == "PMKVY-DISTRICT-ROUTE"
+        assert body["districts"] == [{"district": "Unknown", "enrolled": 1}]
+
+
 class TestPlatformDashboard:
     """An operator's first real landing screen (Sprint 39, BL-10.4)."""
 
@@ -695,6 +749,41 @@ class TestPlatformDashboard:
         # one, the same filter the queue itself uses.
         assert after.unverified_certifications == before.unverified_certifications
 
+    async def test_includes_scarce_skills_from_the_whole_market(self, db: AsyncSession) -> None:
+        """`scarce_skills` (Sprint 40) is `market_scarce_skills()` reused, not
+        a second copy of "what counts as demand" (the rule `_scarce_skills`'s
+        own docstring states)."""
+        skill = Skill(
+            slug="ops-dashboard-scarce",
+            name="Ops Dashboard Scarce Standard",
+            skill_type="technical",
+            nsqf_level=Decimal("4"),
+            nos_code="OPS/N9001",
+            source="nsqf",
+        )
+        db.add(skill)
+        await db.flush()
+        tenant = Tenant(
+            slug="ops-dashboard-scarce-employer", name="Scarce Co", tenant_type="employer"
+        )
+        db.add(tenant)
+        await db.flush()
+        job = Job(
+            slug="ops-dashboard-scarce-job",
+            tenant_id=tenant.id,
+            title="Rare Role",
+            status="published",
+        )
+        db.add(job)
+        await db.flush()
+        db.add(JobSkill(job_id=job.id, skill_id=skill.id, importance=5, is_mandatory=True))
+        await db.commit()
+
+        data = await service.platform_dashboard(db)
+        entry = next(s for s in data.scarce_skills if s.nos_code == "OPS/N9001")
+        assert entry.required_by == 1
+        assert entry.held_by == 0
+
     async def test_the_route_requires_operator_authority(
         self, client: AsyncClient, db: AsyncSession
     ) -> None:
@@ -715,6 +804,7 @@ class TestPlatformDashboard:
             "candidates",
             "published_jobs",
             "published_courses",
+            "scarce_skills",
         }
 
 

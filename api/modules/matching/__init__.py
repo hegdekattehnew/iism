@@ -8,7 +8,14 @@ The employer console is the same `score_match` with its arguments the other way
 round, which is why it lives here rather than in a module of its own.
 """
 
-from api.modules.matching.employer import candidates_for_job, market_scarce_skills, score_profiles
+from api.modules.matching.employer import (
+    JobPool,
+    ScarceSkill,
+    candidates_for_job,
+    job_pools,
+    market_scarce_skills,
+    score_profiles,
+)
 from api.modules.matching.employer_routes import (
     candidate_card,
     mount_employer_console,
@@ -27,6 +34,7 @@ from api.modules.matching.scoring import (
 )
 from api.modules.matching.service import (
     RoleAlignment,
+    ScoredJob,
     course_role_alignment,
     courses_closing_gap,
     match_jobs,
@@ -34,7 +42,11 @@ from api.modules.matching.service import (
 
 __all__ = [
     "CandidateCardOut",
+    "JobPool",
+    "ScarceSkill",
+    "ScoredJob",
     "candidates_for_job",
+    "job_pools",
     "market_scarce_skills",
     "candidate_card",
     "score_profiles",

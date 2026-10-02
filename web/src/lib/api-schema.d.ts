@@ -1349,7 +1349,12 @@ export interface paths {
         };
         /**
          * Candidate Dashboard
-         * @description A candidate's landing numbers (Sprint 39, BL-10.1).
+         * @description A candidate's landing numbers (Sprint 39, BL-10.1), and a preview of the
+         *     best-scoring jobs behind `match_count`/`best_score` (Sprint 40).
+         *
+         *     Built explicitly rather than `model_validate`d off the dataclass: each
+         *     `TopMatchOut` is assembled from a `ScoredJob`'s two nested objects
+         *     (`job`, `result`), which `from_attributes` cannot flatten on its own.
          */
         get: operations["candidate_dashboard_me_dashboard_get"];
         put?: never;
@@ -1526,7 +1531,13 @@ export interface paths {
         };
         /**
          * Employer Dashboard
-         * @description An employer's landing numbers (Sprint 39, BL-10.2).
+         * @description An employer's landing numbers, and the per-job pool behind them
+         *     (Sprint 39, BL-10.2; the `jobs` breakdown is Sprint 40).
+         *
+         *     Built explicitly rather than `model_validate`d straight off the
+         *     dataclass: `JobPoolOut` carries no `from_attributes` config, matching how
+         *     the employer console's own `_overview()` builds it in
+         *     `matching/employer_routes.py`.
          */
         get: operations["employer_dashboard_org__org_slug__dashboard_get"];
         put?: never;
@@ -1587,7 +1598,8 @@ export interface paths {
         };
         /**
          * Provider Dashboard
-         * @description A course provider's landing numbers (Sprint 39, BL-10.3).
+         * @description A course provider's landing numbers (Sprint 39, BL-10.3), and the
+         *     per-course breakdown behind them (Sprint 40).
          *
          *     **Not** `/org/{org_slug}/courses/dashboard`: `course_publishing_routes.py`
          *     (registered earlier in `main.py`) already owns `/org/{org_slug}/courses/
@@ -1601,6 +1613,10 @@ export interface paths {
          *     either way, since one route cannot serve both without branching on
          *     tenant type mid-handler, which `require(..., "course")` already exists
          *     to avoid.
+         *
+         *     `courses` is built the same way `interest_by_course` builds its own list
+         *     -- localised titles via `overrides_for`, never the raw `Course.title` on
+         *     a Hindi page.
          */
         get: operations["provider_dashboard_org__org_slug__interests_dashboard_get"];
         put?: never;
@@ -1821,6 +1837,11 @@ export interface paths {
          * Dashboard
          * @description An operator's landing numbers (Sprint 39, BL-10.4) -- today there is
          *     none; sign-in opens straight onto the verification queue.
+         *
+         *     `scarce_skills` (Sprint 40) is built explicitly rather than folded into
+         *     `model_validate`: `ScarceSkillOut` carries no `from_attributes` config,
+         *     matching how the provider-facing market router already builds it in
+         *     `matching/provider_routes.py`.
          */
         get: operations["dashboard_ops_dashboard_get"];
         put?: never;
@@ -1941,6 +1962,30 @@ export interface paths {
          *     reports zero.
          */
         get: operations["programme_report_ops_programmes__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/programmes/{name}/districts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Programme Districts
+         * @description A programme's enrolment, by district (Sprint 40).
+         *
+         *     A separate, heavier `GROUP BY` from `programme_report`'s own four
+         *     numbers -- a caller that only wants those should not pay for this query
+         *     too on every call.
+         */
+        get: operations["programme_districts_ops_programmes__name__districts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2334,6 +2379,8 @@ export interface components {
             hired: number;
             /** Profile Completeness */
             profile_completeness: number;
+            /** Top Matches */
+            top_matches?: components["schemas"]["TopMatchOut"][];
         };
         /** CandidateProfileFull */
         CandidateProfileFull: {
@@ -2830,6 +2877,18 @@ export interface components {
             /** Blocked By */
             blocked_by: components["schemas"]["OrganisationFate"][];
         };
+        /**
+         * DistrictBreakdownOut
+         * @description How many of one programme's enrolled candidates live in one district
+         *     (Sprint 40). `district` is `"Unknown"` for a candidate whose location
+         *     never resolved, never omitted -- the bars still sum to `enrolled`.
+         */
+        DistrictBreakdownOut: {
+            /** District */
+            district: string;
+            /** Enrolled */
+            enrolled: number;
+        };
         /** DistrictOut */
         DistrictOut: {
             /**
@@ -2902,6 +2961,8 @@ export interface components {
             shortlisted: number;
             /** Hired */
             hired: number;
+            /** Jobs */
+            jobs?: components["schemas"]["JobPoolOut"][];
         };
         /** EmployerOut */
         EmployerOut: {
@@ -4059,6 +4120,8 @@ export interface components {
             published_jobs: number;
             /** Published Courses */
             published_courses: number;
+            /** Scarce Skills */
+            scarce_skills?: components["schemas"]["ScarceSkillOut"][];
         };
         /** PreferredLocationOut */
         PreferredLocationOut: {
@@ -4096,6 +4159,17 @@ export interface components {
             missing?: string[];
         };
         /**
+         * ProgrammeDistrictsOut
+         * @description A programme's enrolment, broken down by district (Sprint 40) -- a
+         *     separate, heavier query from `programme_report`'s own four numbers.
+         */
+        ProgrammeDistrictsOut: {
+            /** Programme */
+            programme: string;
+            /** Districts */
+            districts?: components["schemas"]["DistrictBreakdownOut"][];
+        };
+        /**
          * ProgrammeReportOut
          * @description Outcomes for one government-agency programme (Sprint 33, BL-7.1b).
          */
@@ -4124,6 +4198,13 @@ export interface components {
             interested_total: number;
             /** Enrolled */
             enrolled: number;
+            /**
+             * Conversion Rate
+             * @default 0
+             */
+            conversion_rate: number;
+            /** Courses */
+            courses?: components["schemas"]["CourseInterestCount"][];
         };
         /**
          * ProviderStatusIn
@@ -4621,6 +4702,29 @@ export interface components {
             token_type: string;
             /** Expires In */
             expires_in: number;
+        };
+        /**
+         * TopMatchOut
+         * @description One of a candidate's best-scoring jobs, enough to draw a ranked bar and
+         *     reuse `CoverageBar`/`LevelScale` for its drilldown (Sprint 40).
+         */
+        TopMatchOut: {
+            /** Job Slug */
+            job_slug: string;
+            /** Job Title */
+            job_title: string;
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Missing Mandatory */
+            missing_mandatory: number;
+            /** Capped By Mandatory */
+            capped_by_mandatory: boolean;
+            /** Nsqf Level Min */
+            nsqf_level_min?: number | null;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
         };
         /** TypeFacet */
         TypeFacet: {
@@ -7731,7 +7835,10 @@ export interface operations {
     };
     provider_dashboard_org__org_slug__interests_dashboard_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 org_slug: string;
@@ -8220,6 +8327,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgrammeReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programme_districts_ops_programmes__name__districts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeDistrictsOut"];
                 };
             };
             /** @description Validation Error */

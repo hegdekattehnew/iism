@@ -46,6 +46,19 @@ describe("ProgrammeDashboard", () => {
           response: { status: 200 },
         };
       }
+      if (
+        path === "/ops/programmes/{name}/districts" &&
+        opts?.params?.path?.name === "PMKVY-TEST"
+      ) {
+        return {
+          data: {
+            programme: "PMKVY-TEST",
+            districts: [{ district: "Nagpur", enrolled: 9 }],
+          },
+          error: undefined,
+          response: { status: 200 },
+        };
+      }
       return { data: undefined, error: undefined, response: { status: 200 } };
     });
     const { getByRole } = renderUi(<ProgrammeDashboard />);
@@ -56,5 +69,7 @@ describe("ProgrammeDashboard", () => {
     await waitFor(() => expect(screen.getByText("12")).toBeTruthy());
     expect(screen.getByText("7")).toBeTruthy();
     expect(getByRole("combobox")).toBeTruthy();
+    expect(await screen.findByText("Nagpur")).toBeTruthy();
+    expect(screen.getByText("9")).toBeTruthy();
   });
 });

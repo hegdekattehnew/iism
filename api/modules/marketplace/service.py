@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from api.core.localisation import ContentTranslation
+from api.core.text import expand_query_terms
 from api.modules.marketplace.models import (
     Course,
     CourseSkill,
@@ -32,23 +33,32 @@ def _text_filter(stmt: Select, model: type[Job] | type[Course], q: str) -> Selec
     ILIKE catches those. Translations live in their own table since ADR-041, so
     a title translated into a language the row was not written in is matched by
     the subquery rather than by a second column.
+
+    Tried alongside every `WORD_SYNONYMS` expansion of `q` (`api/core/text.py`)
+    -- "tech" alone never finds a real IT-sector listing, since none of their
+    titles/descriptions contain that literal word, only "technology"/"IT-ITeS".
+    One query, still: every variant folds into the same `or_(...)`, not a
+    second round trip.
     """
-    like = f"%{q.lower()}%"
     entity_type = "job" if model is Job else "course"
-    return stmt.where(
-        or_(
-            model.search_vector.op("@@")(func.websearch_to_tsquery("english", q)),
-            model.search_vector.op("@@")(func.websearch_to_tsquery("simple", q)),
-            func.lower(model.title).like(like),
-            model.id.in_(
-                select(ContentTranslation.entity_id).where(
-                    ContentTranslation.entity_type == entity_type,
-                    ContentTranslation.field.in_(("title", "description")),
-                    func.lower(ContentTranslation.text).like(like),
-                )
-            ),
+    conditions = []
+    for term in expand_query_terms(q):
+        like = f"%{term.lower()}%"
+        conditions.extend(
+            [
+                model.search_vector.op("@@")(func.websearch_to_tsquery("english", term)),
+                model.search_vector.op("@@")(func.websearch_to_tsquery("simple", term)),
+                func.lower(model.title).like(like),
+                model.id.in_(
+                    select(ContentTranslation.entity_id).where(
+                        ContentTranslation.entity_type == entity_type,
+                        ContentTranslation.field.in_(("title", "description")),
+                        func.lower(ContentTranslation.text).like(like),
+                    )
+                ),
+            ]
         )
-    )
+    return stmt.where(or_(*conditions))
 
 
 async def _paged(

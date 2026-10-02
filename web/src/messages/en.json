@@ -524,7 +524,9 @@
       "shortlisted": "Shortlisted",
       "hired": "Hired",
       "profileCompleteness": "Profile completeness (%)",
-      "failed": "The dashboard could not be loaded."
+      "failed": "The dashboard could not be loaded.",
+      "topMatches": "Your top matches",
+      "noMatches": "No matches yet."
     }
   },
   "stats": {
@@ -712,7 +714,14 @@
       "applied": "Applied",
       "shortlisted": "Shortlisted",
       "hired": "Hired",
-      "failed": "The dashboard could not be loaded."
+      "failed": "The dashboard could not be loaded.",
+      "byVacancy": "Pool by vacancy",
+      "noVacancies": "No published vacancies yet.",
+      "poolSecondary": "{ready} ready · {new} new",
+      "pool": "Pool",
+      "ready": "Ready",
+      "nearly": "Nearly ready",
+      "newApplications": "New applications"
     }
   },
   "context": {
@@ -891,7 +900,11 @@
       "interestedLive": "Learners interested",
       "interestedTotal": "Total interest, ever",
       "enrolled": "Enrolled (provider-reported)",
-      "failed": "The dashboard could not be loaded."
+      "failed": "The dashboard could not be loaded.",
+      "conversionRate": "Enrolment conversion",
+      "byCourse": "Interest by course",
+      "noCourses": "No published courses yet.",
+      "interestSecondary": "{live} currently live"
     }
   },
   "chooser": {
@@ -1387,7 +1400,10 @@
       "publishedCourses": "Published courses",
       "unverifiedOrganisations": "Awaiting verification",
       "unverifiedCertifications": "Certifications to review",
-      "failed": "The dashboard could not be loaded."
+      "failed": "The dashboard could not be loaded.",
+      "scarceSkills": "Scarcest standards, market-wide",
+      "noScarceSkills": "No demand recorded yet.",
+      "scarceSecondary": "{held} candidates hold it"
     },
     "programmeDashboard": {
       "title": "Programme outcomes",
@@ -1398,7 +1414,9 @@
       "matched": "Matched",
       "applied": "Applied",
       "hired": "Hired",
-      "failed": "That programme could not be loaded."
+      "failed": "That programme could not be loaded.",
+      "byDistrict": "Enrolled, by district",
+      "noDistricts": "No district data yet."
     }
   }
 }

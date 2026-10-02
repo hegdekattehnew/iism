@@ -98,6 +98,27 @@ export function useProgrammeReport(programme: string | null) {
   });
 }
 
+/**
+ * A programme's enrolment by district (Sprint 40) -- a separate, heavier
+ * query from `useProgrammeReport`'s own four numbers, fetched only once a
+ * programme is actually chosen and only for the district section, never
+ * folded into the base report's payload.
+ */
+export function useProgrammeDistricts(programme: string | null) {
+  return useQuery({
+    queryKey: ["ops", "programme", programme, "districts"] as const,
+    enabled: programme !== null,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/ops/programmes/{name}/districts", {
+        params: { path: { name: programme as string } },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}
+
 export function useVerificationDetail(slug: string) {
   return useQuery({
     queryKey: detailKey(slug),

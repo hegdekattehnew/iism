@@ -19,6 +19,14 @@ dependencies = [
     "structlog>=25.1",
     "pyjwt>=2.10",
     "pymongo>=4.9",
+    # ADR-013/ADR-031's mandated real embedding model. Pulls in torch
+    # (100-500+ MB depending on platform) and a ~470 MB multilingual model
+    # download on first use -- real CI/image-size weight, which is why the
+    # placeholder (`HashingEmbeddingProvider`) existed instead of this for as
+    # long as it did. `get_embedding_provider()` still defaults to the
+    # placeholder; this dependency existing does not turn the real model on
+    # anywhere by itself (`api/core/config.py`'s `embedding_provider` setting).
+    "sentence-transformers>=3.0",
 ]
 
 [project.optional-dependencies]
