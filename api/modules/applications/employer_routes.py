@@ -7,12 +7,14 @@ from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
 from api.core.localisation import overrides_for, request_locale
 from api.modules.applications import employer_service, review_service
+from api.modules.applications.reputation import reviewed_ids
 from api.modules.applications.schemas import (
     ApplicantOut,
     ApplicantPage,
     ContactOut,
     EmployerDashboardOut,
     JobRef,
+    ReputationOut,
     ReviewIn,
     ReviewOut,
     StatusIn,
@@ -56,6 +58,7 @@ async def employer_dashboard(
         applied=data.applied,
         shortlisted=data.shortlisted,
         hired=data.hired,
+        rating=ReputationOut.model_validate(data.rating) if data.rating else None,
         jobs=[
             JobPoolOut(
                 job=JobSummary.model_validate(p.job),
@@ -70,7 +73,9 @@ async def employer_dashboard(
     )
 
 
-def _applicant(application, profile, user, result) -> ApplicantOut:  # type: ignore[no-untyped-def]
+def _applicant(  # type: ignore[no-untyped-def]
+    application, profile, user, result, reviewed: bool = False
+) -> ApplicantOut:
     """One applicant, de-identified card plus the disclosure beside it.
 
     One construction site, because the rule that contact disappears on
@@ -84,6 +89,7 @@ def _applicant(application, profile, user, result) -> ApplicantOut:  # type: ign
         # The candidate's own words are part of what withdrawing takes back,
         # exactly as `interests.provider_routes._learner` already does.
         message=application.message if live else None,
+        reviewed=reviewed,
         candidate=candidate_card(profile, result),
         contact=(
             ContactOut(full_name=user.full_name, phone=user.phone, email=user.email)
@@ -103,7 +109,8 @@ async def list_applicants(
     """Who applied, ranked, with contact details while each application is live."""
     job, rows = await employer_service.inbox(db, context.tenant.id, job_slug)
     overrides = await overrides_for(db, "job", [job], ("title",), locale)
-    items = [_applicant(*row) for row in rows]
+    rated = await reviewed_ids(db, [row[0].id for row in rows], "worker")
+    items = [_applicant(*row, reviewed=row[0].id in rated) for row in rows]
     return ApplicantPage(
         job=JobRef.model_validate(job).model_copy(update=overrides.get(job.id, {})),
         items=items,
@@ -121,11 +128,11 @@ async def set_application_status(
 ) -> ApplicantOut:
     """Shortlist, reject, hire -- or, for a gig, complete/no-show. A withdrawn
     application cannot be moved."""
-    return _applicant(
-        *await employer_service.set_status_and_reload(
-            db, context.tenant.id, job_slug, application_id, payload.status
-        )
+    row = await employer_service.set_status_and_reload(
+        db, context.tenant.id, job_slug, application_id, payload.status
     )
+    rated = await reviewed_ids(db, [row[0].id], "worker")
+    return _applicant(*row, reviewed=row[0].id in rated)
 
 
 @router.post(

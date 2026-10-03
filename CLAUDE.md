@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(42 ADRs). Read it before making any structural decision — the summary below
+(49 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -139,6 +139,12 @@ api/                     FastAPI modular monolith
                          service.py's embedding_text_for_skills is what BL-5.1's
                          embedding sweep calls: performance criteria, never a
                          skill's own title ("OJT" embeds to noise on its own).
+                         (Sprint 42) `roles_above` is the taxonomy fact behind career
+                         ladders: higher level (at most 2.0 up), at least one *specific*
+                         shared compulsory standard (a standard compulsory in 3+ sectors is
+                         generic and is not evidence), occupation and NCO as corroboration
+                         only. `ROLE_REPRESENTATIVE_ORDER` is the one rule for which pack
+                         stands for a role -- role search and ladders both use it.
     geography/           State, District, SubDistrict, plus the service that resolves a
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
@@ -162,7 +168,12 @@ api/                     FastAPI modular monolith
                          Job.embedding/CandidateProfile.embedding in; a skill write
                          sets its owner's back to NULL rather than leaving it stale
                          (marketplace._write_skills x2), and scoring.py itself still
-                         reads no settings and calls no model.
+                         reads no settings and calls no model. (Sprint 42)
+                         `score_against_roles` scores a candidate against qualifications'
+                         **compulsory** standards through that same `score_match` --
+                         importance a flat 3, every compulsory standard mandatory, the
+                         experience floor the lowest entry route rounded up -- and
+                         `entry_routes_for_job` now shares `_entry_fit` with it.
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
@@ -183,8 +194,15 @@ api/                     FastAPI modular monolith
                          two-sided `application_reviews` row per direction (`subject_role`
                          names who the rating is *about*, never who wrote it), write-once,
                          reviewable only once `completed` -- `no_show` is deliberately not
-                         reviewable, the same reasoning ADR-045 already gave. Foundation
-                         only; nothing reads it yet, the `SkillRelation` shape.
+                         reviewable, the same reasoning ADR-045 already gave. (Sprint 41)
+                         `reputation.py` is the reader: `reviewed_ids` (has this side
+                         already rated), and `poster_reputation`/`worker_reputation`
+                         (an average over `application_reviews`, `None` rather than 0.0
+                         for no ratings). It never reaches `candidate_card()` -- a
+                         rating is a fact about one person (ADR-037). `service.
+                         application_gap` is "Why not me": a candidate's own rejected
+                         application, scored now through `matching.score_profiles`
+                         (the one scorer) with `courses_closing_gap`, never recorded.
     interests/           Registering interest in a course, and the provider's
                          view of who did. A **sibling** of applications/, not an
                          extension: a course publishes what it teaches, so an
@@ -206,7 +224,25 @@ api/                     FastAPI modular monolith
                          Both run in the **worker**, never in a request. Uses
                          the one scorer through `matching.candidates_for_job`
                          (ADR-037) -- there is no second, looser "close enough
-                         to email about" rule. Nothing depends on it.
+                         to email about" rule. Nothing depends on it. (Sprint 41,
+                         ADR-048) `sponsorship.py` + `sponsor_routes.py` are the
+                         employer-facing half of the same question: an employer
+                         may offer to sponsor the one standard a near-miss
+                         candidate lacks. It lives here because this module owns
+                         "may we write to this candidate unsolicited" -- the
+                         opt-out and the daily cap are read from one place -- and
+                         the offer never returns whether the candidate was told.
+    careers/             (Sprint 42, ADR-049) Where could this person move next: `GET /me/careers`.
+                         A **leaf** that owns **no table**. A ladder is derived at read time from
+                         the qualification data and never stored -- the national data names no
+                         prerequisite between two roles, and `SkillRelation` has no edges, so each
+                         step carries the evidence it was derived from (`basis`). It composes three
+                         things it does not own: `skills.roles_above` (which roles build on one),
+                         `matching.score_against_roles` (the person's fit, through the one scorer)
+                         and `matching.courses_closing_gap`. It resolves where the person starts:
+                         their own choice, else a guess from their profile that is trusted only on
+                         an **exact or alias** match of their own words, and flagged as a guess.
+                         The page is `/career-paths` -- `/careers` is the company's own hiring page.
     privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
                          Spans every module; nothing depends on it.
     operations/          The back office (ADR-042): tenant_verification_events, the
@@ -235,10 +271,11 @@ api/                     FastAPI modular monolith
                          (Sprint 33) is course_opened's negative half -- precision@5's
                          missing class, same shape, its own handler for the same reason.
 
-    Not built. ADR-008's career_paths/ (graph-based role transition) and
-    ADR-005/013/018's intelligence/ (LLM extraction, embeddings) have an ADR
-    each and no code. They were listed here as though they existed until
-    Sprint 15. Everything else in this tree is real; check before assuming.
+    Not built. ADR-005/013/018's intelligence/ (LLM extraction, embeddings) has
+    an ADR and no code. ADR-008's career_paths/ exists as `careers/` above (Sprint
+    42) -- derived from qualification data, **not** the inference graph ADR-008
+    imagined. They were listed here as though they existed until Sprint 15.
+    Everything else in this tree is real; check before assuming.
 
   adapters/              External integrations behind interfaces (ADR-017)
     notifications/       NotificationProvider protocol + console impl (the reference)
@@ -631,14 +668,26 @@ split would have to turn into interfaces first; do not add to it casually.
 > conversion) on this dev/demo database, and ADR-047 says plainly that closing the volume gap needs
 > real traffic or an explicit owner override. Asked which, the owner chose to **wait for real
 > traffic** (2026-09-29) — `BL-1.3` is a standing not-started, not an open question, until usage
-> moves the numbers or the owner says otherwise. **Sprint 39 is next**: Epic B10, Actor Dashboards
-> (`docs/IISM-Product-Backlog.docx` §3/§4.3) — `BL-10.1`–`BL-10.5`, one dashboard per actor
-> (candidate, employer, course provider, operator, government agency), each composed from numbers
-> its own module already computes rather than a new cross-module "dashboard" service (ADR-014).
-> `BL-10.6` (a partner/external-system summary) is recorded `[LATER]` and explicitly out of Sprint
-> 39: an API-key actor has no session to land a dashboard on. §11 also carries a standing assessment
-> of the three pillars the owner is building toward — jobs, sellable courses, gig work — and what
-> each actually needs.
+> moves the numbers or the owner says otherwise. **Sprints 39 and 40 are done**: Epic B10's
+> per-actor dashboards, then Epic B11's chart primitives and drilldowns on all five (hand-rolled
+> SVG, no new dependency), plus a cross-sector role-search fix (`role_aliases` as a table, word-
+> synonym expansion, a dormant `sentence-transformers` adapter) and a coverage-tapered mandatory-gap
+> cap. **An October audit then fixed nine defects** — most of the worst were hidden because the test
+> session used `autoflush=True` and production does not (see the convention above) — **and Sprint 41
+> is done**: finishing what was half-built (gig completion and two-sided ratings now have screens and
+> a reader; `enrolled` and the learner notice; a certification can be linked to a standard), seven
+> hardening fixes, and two differentiators — **"Why not me"** (a rejected candidate sees the exact
+> standards they lacked and the courses that teach them, computed at view time through the one scorer)
+> and **"Hire and train"** (an employer may offer to sponsor the one standard a near-miss candidate
+> lacks, ADR-048: the candidate is prompted, the employer learns nothing about them until they apply).
+> **Sprint 42 is done**: career ladders (ADR-049) — `/career-paths`, "the roles that build on yours and
+> what it would take". Derived at read time from qualification data with the evidence shown, **stores
+> nothing**, and measured honestly: **38% of roles have a step, and BFSI/IT/Electronics are near zero**
+> because those sectors share no standards across levels — a data limit the page says out loud. A looser
+> "same occupation" rule reaches 52–60% at the price of steps that share no standard; it was measured and
+> not adopted (see the ADR). **Monetisation (`BL-1.3`) and every real external integration are
+> deliberately deferred** by the owner. §11 of `projectContextForMe.md` carries what is next and a
+> standing assessment of the three pillars — jobs, sellable courses, gig work.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

@@ -54,6 +54,15 @@ TEMPLATES = (
     "job_alert",
     # Told to the applicants still waiting, never to the ones already answered.
     "vacancy_closed",
+    # Sprint 41. A provider marked a learner's interest contacted or enrolled.
+    # In-app only, by the owner's decision: free, and it reaches the phone-only
+    # learner that an email never would.
+    "course_interest_status_changed",
+    # Sprint 41, ADR-048. An employer offered to sponsor the one standard a
+    # candidate lacks for their vacancy. In-app only, and it names the
+    # organisation, the standard and the course -- never anything about the
+    # candidate, who has not yet chosen to be known to this employer.
+    "sponsor_offer",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

@@ -21,7 +21,7 @@ from api.modules.applications.models import (
     Application,
     SavedJob,
 )
-from api.modules.applications.routes import router
+from api.modules.applications.routes import public_router, router
 
 __all__ = [
     "APPLICATION_STATUSES",
@@ -30,6 +30,7 @@ __all__ = [
     "Application",
     "SavedJob",
     "router",
+    "public_router",
     "employer_router",
     "employer_dashboard_router",
 ]

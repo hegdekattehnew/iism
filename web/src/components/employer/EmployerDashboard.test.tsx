@@ -40,6 +40,26 @@ describe("EmployerDashboard", () => {
     expect(screen.getByText("12")).toBeTruthy();
   });
 
+  it("shows how workers rate the organisation, and shows nothing when nobody has", async () => {
+    const base = { posted_jobs: 2, open_jobs: 2, applied: 0, shortlisted: 0, hired: 0, jobs: [JOB] };
+    GET.mockResolvedValue({
+      data: { ...base, rating: { average: 4.2, count: 1 } },
+      error: undefined,
+      response: { status: 200 },
+    });
+    const first = renderUi(<EmployerDashboard orgSlug="apollo-care-hospitals" />);
+    expect(await screen.findByText("Workers rate you")).toBeTruthy();
+    expect(screen.getByText("4.2")).toBeTruthy();
+    expect(screen.getByText("1 rating")).toBeTruthy();
+    first.unmount();
+
+    // No ratings yet is not a rating of zero.
+    GET.mockResolvedValue({ data: { ...base, rating: null }, error: undefined, response: { status: 200 } });
+    renderUi(<EmployerDashboard orgSlug="apollo-care-hospitals" />);
+    await screen.findByText("Open vacancies");
+    expect(screen.queryByText("Workers rate you")).toBeNull();
+  });
+
   it("renders a bar per vacancy and expands its pool detail on click", async () => {
     GET.mockResolvedValue({
       data: { posted_jobs: 1, open_jobs: 1, applied: 3, shortlisted: 0, hired: 0, jobs: [JOB] },

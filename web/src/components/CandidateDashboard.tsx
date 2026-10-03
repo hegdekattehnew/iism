@@ -8,6 +8,7 @@ import { ProgressRing } from "@/components/charts/progress-ring";
 import { RankedBarList } from "@/components/charts/ranked-bar-list";
 import { StatusFunnel } from "@/components/charts/status-funnel";
 import { Skeleton, StatTile } from "@/components/ui";
+import { Link } from "@/i18n/navigation";
 import { useCandidateDashboard } from "@/lib/profile";
 
 /**
@@ -22,6 +23,7 @@ import { useCandidateDashboard } from "@/lib/profile";
  */
 export function CandidateDashboard() {
   const t = useTranslations("matchesPage.dashboard");
+  const tr = useTranslations("reviews");
   const dashboard = useCandidateDashboard();
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -44,6 +46,14 @@ export function CandidateDashboard() {
       <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
         <StatTile value={data.match_count} label={t("liveMatches")} />
         <StatTile value={data.best_score ?? null} label={t("bestScore")} />
+        {/* Absent until an employer has rated finished work, never a zero. */}
+        {data.rating && (
+          <StatTile
+            value={data.rating.average}
+            label={tr("asWorker")}
+            secondary={tr("count", { count: data.rating.count })}
+          />
+        )}
         <ProgressRing percent={data.profile_completeness} label={t("profileCompleteness")} />
       </div>
 
@@ -94,6 +104,13 @@ export function CandidateDashboard() {
           )}
         </>
       )}
+
+      <Link
+        href="/career-paths"
+        className="mt-5 inline-block text-sm font-medium text-brand underline-offset-4 hover:underline"
+      >
+        {t("careerPaths")}
+      </Link>
     </div>
   );
 }

@@ -13,6 +13,7 @@ bare script is the one shape that cannot be.
 """
 
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 
 import structlog
@@ -23,7 +24,7 @@ from sqlalchemy.orm import selectinload
 
 from api.core.authorization import ORGANISATION_TYPES
 from api.modules.applications.models import WAS_HIRED_STATUSES, Application
-from api.modules.geography.models import District
+from api.modules.geography.models import District, State
 from api.modules.identity.models import Membership, Tenant, User
 from api.modules.marketplace import record_verified_skill
 from api.modules.marketplace.models import (
@@ -424,16 +425,29 @@ async def programme_by_district(db: AsyncSession, programme: str) -> list[Distri
     **no id is better than a wrong one**, but a candidate is not invisible
     just because their district never resolved.
     """
+    # Grouped by the district's id, not its name: three names (Bilaspur,
+    # Hamirpur, Pratapgarh) belong to two districts each, and eight districts
+    # carry no name at all, so grouping on the name merged unrelated places.
     rows = (
         await db.execute(
-            select(District.name, func.count(CandidateProfile.id))
+            select(District.id, District.name, State.name, func.count(CandidateProfile.id))
             .select_from(CandidateProfile)
             .outerjoin(District, District.id == CandidateProfile.district_id)
+            .outerjoin(State, State.id == District.state_id)
             .where(CandidateProfile.enrolled_via_programme == programme)
-            .group_by(District.name)
+            .group_by(District.id, District.name, State.name)
         )
     ).all()
-    result = [DistrictBreakdown(district=name or "Unknown", enrolled=count) for name, count in rows]
+    # Two bars both called "Bilaspur" tell the reader nothing, so a name that
+    # appears twice carries its state.
+    seen = Counter(name for _id, name, _state, _n in rows if name)
+    result = [
+        DistrictBreakdown(
+            district=(f"{name} ({state})" if seen[name] > 1 else name) if name else "Unknown",
+            enrolled=count,
+        )
+        for _id, name, state, count in rows
+    ]
     # Most enrolled first, so the bars read like a ranking rather than an
     # alphabetical list.
     result.sort(key=lambda d: (-d.enrolled, d.district))

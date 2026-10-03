@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Area, Check, Field, EntryRow, Select, Text } from "@/components/profile/fields";
+import { StandardPicker } from "@/components/StandardPicker";
 import { Button } from "@/components/ui";
 import {
   type Collection,
@@ -174,6 +175,80 @@ export function SectionEditor({
 
 const str = (d: Record<string, unknown>, k: string) => (d[k] as string) ?? "";
 
+type LinkedStandard = { slug: string; name: string; nos_code?: string | null };
+
+/** The standard a certification is linked to, from either shape it can have:
+ *  the saved entry carries a `skill` object, a draft being edited carries the
+ *  `skill_slug` it will send. */
+function linkedStandard(entry: Record<string, unknown>): LinkedStandard | null {
+  const skill = entry.skill as LinkedStandard | null | undefined;
+  return skill ?? null;
+}
+
+/**
+ * Link a certification to the national standard it covers.
+ *
+ * Without this the operator's certification queue could never hold anything:
+ * it lists only credentials that name a standard, and no screen let a candidate
+ * name one. Linking is what lets a reviewer verify the certificate, which turns
+ * that skill from self-declared into certified and gives it more weight in a
+ * match.
+ */
+function CertificationStandard({
+  draft,
+  set,
+}: {
+  draft: Record<string, unknown>;
+  set: (patch: Record<string, unknown>) => void;
+}) {
+  const f = useTranslations("profilePage.fields");
+  const linked = linkedStandard(draft);
+
+  return (
+    <div className="sm:col-span-2">
+      <p className="text-sm font-medium">{f("certStandard")}</p>
+      {linked ? (
+        <div className="mt-1 flex flex-wrap items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1">
+            {linked.name}
+            {linked.nos_code && (
+              <span className="ml-2 font-mono text-[11px] text-muted">{linked.nos_code}</span>
+            )}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => set({ skill_slug: null, skill: null })}
+          >
+            {f("certStandardRemove")}
+          </Button>
+        </div>
+      ) : (
+        // Enter in the search box would otherwise submit the whole certificate.
+        <div
+          className="mt-1"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
+        >
+          <StandardPicker
+            chosen={new Set()}
+            placeholder={f("certStandardSearch")}
+            addLabel={f("certStandardLink")}
+            onSelect={(s) =>
+              set({
+                skill_slug: s.slug,
+                skill: { slug: s.slug, name: s.name, nos_code: s.nos_code ?? null },
+              })
+            }
+          />
+        </div>
+      )}
+      <p className="mt-1 text-xs text-muted">{f("certStandardHint")}</p>
+    </div>
+  );
+}
+
 export function useSectionDefs(profile: Profile | null) {
   const f = useTranslations("profilePage.fields");
   const t = useTranslations("profilePage");
@@ -286,12 +361,19 @@ export function useSectionDefs(profile: Profile | null) {
           <Field label={f("expiresOn")}>
             <Text type="date" value={str(d, "expires_on")} onChange={(e) => set({ expires_on: e.target.value })} />
           </Field>
+          <CertificationStandard draft={d} set={set} />
         </>
       ),
       summarise: (e: Entry) => ({
         title: e.name as string,
         subtitle: (e.issuing_body as string) || null,
-        meta: (e.credential_id as string) || null,
+        meta:
+          [
+            (e.credential_id as string) || null,
+            linkedStandard(e)?.name ?? null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || null,
       }),
     },
     {

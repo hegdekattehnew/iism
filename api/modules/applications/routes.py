@@ -6,25 +6,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.database import get_db_session
 from api.core.localisation import overrides_for, request_locale
 from api.modules.applications import review_service, service
+from api.modules.applications.reputation import poster_reputation_for_job, reviewed_ids
 from api.modules.applications.schemas import (
+    ApplicationGapOut,
     ApplicationIn,
     ApplicationOut,
     CandidateDashboardOut,
     JobRef,
+    PosterRatingOut,
+    ReputationOut,
     ReviewIn,
     ReviewOut,
     SavedJobOut,
     TopMatchOut,
 )
 from api.modules.identity import User, get_current_candidate
+from api.modules.matching.schemas import CourseSuggestionOut, MissingSkillOut
 
 # `get_current_candidate`, not `get_current_user`: applying is the job seeker's
 # side of the marketplace, and an organisation-only account that never asked
 # for a candidate profile should not have one created by pressing Apply.
 router = APIRouter(prefix="/me", tags=["applications"])
 
+# Not under `/me`: a poster's rating is public, because a worker choosing whom
+# to work for is exactly who it is for. A separate router rather than a field on
+# the vacancy's own payload, so `marketplace` does not gain a dependency on this
+# module (ADR-014).
+public_router = APIRouter(tags=["applications"])
 
-def _out(application, titles: dict | None = None) -> ApplicationOut:  # type: ignore[no-untyped-def]
+
+@public_router.get("/jobs/{job_slug}/poster-rating", response_model=PosterRatingOut)
+async def poster_rating(
+    job_slug: str, db: AsyncSession = Depends(get_db_session)
+) -> PosterRatingOut:
+    """How workers rated whoever posted this vacancy. Empty, never an error,
+    for a vacancy with no ratings or one that is not published."""
+    rating = await poster_reputation_for_job(db, job_slug)
+    return PosterRatingOut(rating=ReputationOut.model_validate(rating) if rating else None)
+
+
+def _out(  # type: ignore[no-untyped-def]
+    application, titles: dict | None = None, reviewed: bool = False
+) -> ApplicationOut:
     """`titles` carries the vacancy's translated title, when there is one.
 
     Resolved by the caller rather than here: one query for a whole list, not
@@ -41,6 +64,7 @@ def _out(application, titles: dict | None = None) -> ApplicationOut:  # type: ig
         message=application.message,
         applied_at=application.created_at,
         updated_at=application.updated_at,
+        reviewed=reviewed,
     )
 
 
@@ -64,6 +88,7 @@ async def candidate_dashboard(
         shortlisted=data.shortlisted,
         hired=data.hired,
         profile_completeness=data.profile_completeness,
+        rating=ReputationOut.model_validate(data.rating) if data.rating else None,
         top_matches=[
             TopMatchOut(
                 job_slug=s.job.slug,
@@ -101,7 +126,8 @@ async def my_applications(
 ) -> list[ApplicationOut]:
     applications = await service.list_applications(db, user)
     overrides = await overrides_for(db, "job", [a.job for a in applications], ("title",), locale)
-    return [_out(a, overrides.get(a.job_id)) for a in applications]
+    rated = await reviewed_ids(db, [a.id for a in applications], "poster")
+    return [_out(a, overrides.get(a.job_id), a.id in rated) for a in applications]
 
 
 @router.post("/applications/{application_id}/withdraw", response_model=ApplicationOut)
@@ -114,7 +140,39 @@ async def withdraw_application(
     """Take it back. The employer keeps the fact and loses the contact details."""
     application = await service.withdraw(db, user, application_id)
     overrides = await overrides_for(db, "job", [application.job], ("title",), locale)
-    return _out(application, overrides.get(application.job_id))
+    rated = await reviewed_ids(db, [application.id], "poster")
+    return _out(application, overrides.get(application.job_id), application.id in rated)
+
+
+@router.get("/applications/{application_id}/gap", response_model=ApplicationGapOut)
+async def application_gap(
+    application_id: uuid.UUID,
+    user: User = Depends(get_current_candidate),
+    db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
+) -> ApplicationGapOut:
+    """Why not me: the standards this application was missing, and the courses
+    that teach them. Computed now, from the candidate's skills as they stand."""
+    gap = await service.application_gap(db, user, application_id)
+    overrides = await overrides_for(db, "job", [gap.application.job], ("title",), locale)
+    job = JobRef.model_validate(gap.application.job).model_copy(
+        update=overrides.get(gap.application.job_id, {})
+    )
+    result = gap.result
+    return ApplicationGapOut(
+        application_id=gap.application.id,
+        job=job,
+        status=gap.application.status,
+        score=result.score,
+        coverage=round(result.coverage, 4),
+        missing=[MissingSkillOut.from_missing(m) for m in result.missing],
+        missing_mandatory=result.missing_mandatory,
+        level_shortfall=float(result.level_shortfall)
+        if result.level_shortfall is not None
+        else None,
+        capped_by_mandatory=result.capped_by_mandatory,
+        courses=[CourseSuggestionOut.from_suggestion(c) for c in gap.courses],
+    )
 
 
 @router.post(

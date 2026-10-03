@@ -24,7 +24,12 @@ from api.modules.matching.employer_routes import org_router as employer_org_rout
 from api.modules.matching.provider_routes import market_router as provider_market_router
 from api.modules.matching.provider_routes import org_router as provider_org_router
 from api.modules.matching.routes import router
-from api.modules.matching.schemas import CandidateCardOut
+from api.modules.matching.schemas import (
+    CandidateCardOut,
+    CourseSuggestionOut,
+    EntryRouteOut,
+    MissingSkillOut,
+)
 from api.modules.matching.scoring import (
     DEFAULT_WEIGHTS,
     SERIOUS_MATCH_SCORE,
@@ -33,16 +38,26 @@ from api.modules.matching.scoring import (
     score_match,
 )
 from api.modules.matching.service import (
+    CourseSuggestion,
+    EntryRouteFit,
     RoleAlignment,
+    RoleFit,
     ScoredJob,
     course_role_alignment,
     courses_closing_gap,
     match_jobs,
+    score_against_roles,
 )
 
 __all__ = [
     "CandidateCardOut",
+    "CourseSuggestion",
+    "CourseSuggestionOut",
+    "EntryRouteFit",
+    "EntryRouteOut",
     "JobPool",
+    "MissingSkillOut",
+    "RoleFit",
     "ScarceSkill",
     "ScoredJob",
     "candidates_for_job",
@@ -63,5 +78,6 @@ __all__ = [
     "match_jobs",
     "mount_employer_console",
     "router",
+    "score_against_roles",
     "score_match",
 ]

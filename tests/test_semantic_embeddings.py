@@ -127,6 +127,121 @@ class TestRefreshJobs:
         assert job.embedding == first
 
 
+class _OtherModel:
+    """A stand-in for the real provider: same 384 dimensions, a different model."""
+
+    name = "sentence_transformer"
+    model = "a-different-model"
+
+    def embed(self, text: str) -> list[float]:
+        return [0.5] * 384
+
+
+class TestAProviderSwitchRefreshesOldVectors:
+    """Both sweeps selected only `embedding IS NULL`, so switching from the
+    placeholder to the real model left every old vector in place, and a query
+    vector from one model was then compared against stored vectors from
+    another."""
+
+    async def test_a_job_embedded_by_another_model_is_recomputed(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        skill = await _skill_with_criteria(db, "switch-job-skill", criteria=["Stack the shelves"])
+        job = await _published_job_with_skill(db, skill)
+        await _refresh_jobs(db)
+        await db.refresh(job)
+        assert job.embedding_model != _OtherModel.model
+
+        monkeypatch.setattr("api.adapters.embeddings.get_embedding_provider", lambda: _OtherModel())
+        processed = await _refresh_jobs(db)
+        await db.refresh(job)
+
+        assert processed >= 1
+        assert job.embedding_model == _OtherModel.model
+        assert job.embedding_provider == "sentence_transformer"
+
+    async def test_a_second_sweep_with_the_same_model_leaves_it_alone(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        skill = await _skill_with_criteria(db, "switch-stable-skill", criteria=["Label the stock"])
+        job = await _published_job_with_skill(db, skill)
+        monkeypatch.setattr("api.adapters.embeddings.get_embedding_provider", lambda: _OtherModel())
+        await _refresh_jobs(db)
+        await db.refresh(job)
+
+        assert await _refresh_jobs(db) == 0
+
+    async def test_a_profile_embedded_by_another_model_is_recomputed(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        from api.modules.marketplace.models import CandidateSkill
+
+        skill = await _skill_with_criteria(db, "switch-profile-skill", criteria=["Greet people"])
+        user = User(phone=f"+9197{uuid.uuid4().int % 100000000:08d}")
+        db.add(user)
+        await db.flush()
+        profile = CandidateProfile(user_id=user.id)
+        db.add(profile)
+        await db.flush()
+        db.add(CandidateSkill(profile_id=profile.id, skill_id=skill.id, proficiency=3))
+        await db.commit()
+        await _refresh_profiles(db)
+        await db.refresh(profile)
+        assert profile.embedding_model != _OtherModel.model
+
+        monkeypatch.setattr("api.adapters.embeddings.get_embedding_provider", lambda: _OtherModel())
+        await _refresh_profiles(db)
+        await db.refresh(profile)
+        assert profile.embedding_model == _OtherModel.model
+
+
+class TestTheRoleSweep:
+    async def test_it_embeds_nothing_under_the_placeholder_provider(self, db: AsyncSession) -> None:
+        """`search_roles` never reads a role vector under hashing, so the sweep
+        was embedding about 4,400 packs for nothing."""
+        from api.modules.skills.hierarchy import QualificationPack
+        from api.modules.skills.tasks import _refresh_packs
+
+        # A pack that is current and unembedded: without the early return it
+        # would be picked up. An empty table would make this pass for nothing.
+        pack = QualificationPack(
+            qp_code=f"TST/Q{uuid.uuid4().int % 100000:05d}",
+            version="1.0",
+            name="Cashier",
+            job_role="Cashier",
+            slug=f"cashier-{uuid.uuid4().hex[:8]}",
+            is_current=True,
+        )
+        db.add(pack)
+        await db.commit()
+
+        assert await _refresh_packs(db) == 0
+        await db.refresh(pack)
+        assert pack.embedding is None
+
+    async def test_it_embeds_stale_packs_once_a_real_provider_is_active(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        from api.modules.skills.hierarchy import QualificationPack
+        from api.modules.skills.tasks import _refresh_packs
+
+        pack = QualificationPack(
+            qp_code=f"TST/Q{uuid.uuid4().int % 100000:05d}",
+            version="1.0",
+            name="Warehouse Assistant",
+            job_role="Warehouse Assistant",
+            slug=f"warehouse-assistant-{uuid.uuid4().hex[:8]}",
+            is_current=True,
+        )
+        db.add(pack)
+        await db.commit()
+
+        monkeypatch.setattr("api.adapters.embeddings.get_embedding_provider", lambda: _OtherModel())
+        assert await _refresh_packs(db) >= 1
+        await db.refresh(pack)
+        assert pack.embedding_model == _OtherModel.model
+
+
 class TestRefreshProfiles:
     async def test_populates_a_null_embedding_with_provenance(self, db: AsyncSession) -> None:
         skill = await _skill_with_criteria(

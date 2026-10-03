@@ -440,6 +440,16 @@ SEMANTIC_MIN_SIMILARITY = 0.30
 # as variants. `variants` says how many were collapsed, so the screen can.
 #
 # A pack with no standards is never offered -- choosing it would offer nothing.
+# **The one rule for which pack stands for a role** (Sprint 42). Role search and
+# the career ladder both collapse a role's many codes to one, and a second copy of
+# this ordering is how the two would one day name different packs for the same job
+# title. It is a SQL fragment because both callers pick inside a query; `c` is the
+# candidate row and must carry `qp_code` and `standards` (the pack's standard count).
+ROLE_REPRESENTATIVE_ORDER = """(c.qp_code ~ '-SI[0-9]+$'),
+                        length(c.qp_code) - length(replace(c.qp_code, '/', '')),
+                        c.standards DESC,
+                        c.qp_code"""
+
 _ROLE_SEARCH_SQL = text(
     """
 WITH q AS (
@@ -493,10 +503,7 @@ ranked AS (
            count(*) OVER (PARTITION BY c.role_key) AS variants,
            row_number() OVER (
                PARTITION BY c.role_key
-               ORDER BY (c.qp_code ~ '-SI[0-9]+$'),
-                        length(c.qp_code) - length(replace(c.qp_code, '/', '')),
-                        c.standards DESC,
-                        c.qp_code
+               ORDER BY __REPRESENTATIVE_ORDER__
            ) AS pick
     FROM candidates c
     WHERE c.standards > 0
@@ -533,7 +540,7 @@ FROM scored s
 LEFT JOIN sectors sec ON sec.id = s.sector_id
 ORDER BY greatest(s.literal, s.via_alias) DESC, s.closeness DESC, s.standards DESC, s.job_role
 LIMIT :limit
-"""
+""".replace("__REPRESENTATIVE_ORDER__", ROLE_REPRESENTATIVE_ORDER)
 )
 
 
@@ -815,3 +822,223 @@ async def contexts_for(
         )
         for row in rows
     }
+
+
+# ----------------------------------------------------------- the career ladder
+#
+# (Sprint 42, ADR-049.) "Which roles build on this one" is a **taxonomy fact**, so
+# it is answered here, from the qualification data, and not by whoever asks.
+#
+# Nothing in the national data says "role A leads to role B": entry routes name a
+# *minimum prior level* in 1,882 packs and a specific pack in five, and
+# `SkillRelation` has no edges. So a step is *derived*, and each one carries the
+# evidence it was derived from, so a reader can judge it:
+#
+#   * a higher NSQF level, by at most `LADDER_MAX_RISE` -- a rung, not a leap;
+#   * at least one **specific** compulsory standard in common with the starting
+#     role, compared at concept level (the key `courses_closing_gap` uses). A
+#     standard that turns up in compulsory lists across `GENERIC_STANDARD_SECTORS`
+#     or more sectors ("Employability Skills", "Communication Skills") is not
+#     evidence of anything: left in, a General Duty Assistant "led to" an
+#     Automotive technician through one shared employability unit;
+#   * compulsory standards of its own -- an elective-only pack has nothing to
+#     score a person against.
+#
+# Same occupation and a shared NCO code are **corroboration, not grounds**: they
+# are returned and shown, and break ties, but a step with neither a specific
+# shared standard nor anything else is not offered. Occupation alone put a
+# Beauty Therapist after a Retail Sales Associate, because one disability-track
+# "occupation" is a catch-all. Divyangjan-track packs are left out unless the
+# starting role is itself one -- the same job twice is not a next step.
+#
+# One row per role, picked by `ROLE_REPRESENTATIVE_ORDER`: the same rule role
+# search uses, so the two cannot name different packs for one job title.
+LADDER_MAX_RISE = 2.0
+MAX_LADDER_STEPS = 8
+GENERIC_STANDARD_SECTORS = 3
+
+_LADDER_SQL = text(
+    """
+WITH f AS (
+    SELECT id, nsqf_level, occupation_id,
+           (job_role ILIKE '%divyangjan%') AS is_divyangjan
+    FROM qualification_packs
+    WHERE slug = :slug AND is_current AND nsqf_level IS NOT NULL
+),
+generic AS MATERIALIZED (
+    SELECT coalesce(k.concept_id, k.id) AS key
+    FROM qp_skills s
+    JOIN skills k ON k.id = s.skill_id
+    JOIN qualification_packs p ON p.id = s.qp_id
+    WHERE p.is_current AND s.requirement = 'compulsory'
+    GROUP BY 1
+    HAVING count(DISTINCT p.sector_id) >= :generic_sectors
+),
+f_keys AS MATERIALIZED (
+    SELECT DISTINCT coalesce(k.concept_id, k.id) AS key
+    FROM qp_skills s
+    JOIN skills k ON k.id = s.skill_id
+    JOIN f ON s.qp_id = f.id
+    WHERE s.requirement = 'compulsory'
+      AND coalesce(k.concept_id, k.id) NOT IN (SELECT key FROM generic)
+),
+f_nco AS (
+    SELECT n.nco_code FROM qp_nco_codes n JOIN f ON n.qp_id = f.id
+),
+windowed AS (
+    SELECT qp.id, qp.slug, qp.qp_code, qp.job_role, qp.nsqf_level, qp.sector_id,
+           qp.occupation_id, lower(btrim(qp.job_role)) AS role_key,
+           coalesce(qp.occupation_id = f.occupation_id, false) AS same_occupation
+    FROM qualification_packs qp, f
+    WHERE qp.is_current
+      AND qp.id <> f.id
+      AND qp.job_role IS NOT NULL
+      AND (f.is_divyangjan OR qp.job_role NOT ILIKE '%divyangjan%')
+      AND qp.nsqf_level > f.nsqf_level
+      AND qp.nsqf_level <= f.nsqf_level + CAST(:max_rise AS numeric)
+),
+candidates AS (
+    SELECT w.*,
+           (SELECT count(*) FROM qp_skills s WHERE s.qp_id = w.id) AS standards,
+           (SELECT count(*) FROM qp_skills s
+             WHERE s.qp_id = w.id AND s.requirement = 'compulsory') AS compulsory,
+           (SELECT count(*) FROM qp_skills s JOIN skills k ON k.id = s.skill_id
+             WHERE s.qp_id = w.id AND s.requirement = 'compulsory'
+               AND coalesce(k.concept_id, k.id) IN (SELECT key FROM f_keys)) AS shared,
+           EXISTS (SELECT 1 FROM qp_nco_codes n
+                    WHERE n.qp_id = w.id AND n.nco_code IN (SELECT nco_code FROM f_nco))
+               AS shared_nco
+    FROM windowed w
+),
+related AS (
+    SELECT c.* FROM candidates c
+    WHERE c.compulsory > 0 AND c.shared > 0
+),
+ranked AS (
+    SELECT c.*,
+           count(*) OVER (PARTITION BY c.role_key) AS variants,
+           row_number() OVER (
+               PARTITION BY c.role_key
+               ORDER BY __REPRESENTATIVE_ORDER__
+           ) AS pick
+    FROM related c
+)
+SELECT r.id, r.slug, r.qp_code, r.job_role, r.nsqf_level, r.standards, r.compulsory,
+       r.shared, r.same_occupation, r.shared_nco, r.variants, sec.name AS sector_name
+FROM ranked r
+LEFT JOIN sectors sec ON sec.id = r.sector_id
+WHERE r.pick = 1
+-- How much of the role is already shared, then corroboration, then the nearest
+-- rung, then a stable tail.
+ORDER BY (r.shared::float / r.compulsory) DESC,
+         (r.same_occupation OR r.shared_nco) DESC,
+         r.nsqf_level, r.job_role
+LIMIT :limit
+""".replace("__REPRESENTATIVE_ORDER__", ROLE_REPRESENTATIVE_ORDER)
+)
+
+
+@dataclass(frozen=True)
+class RoleRef:
+    """A qualification pack seen as a role: where a ladder starts."""
+
+    qp_id: uuid.UUID
+    slug: str
+    qp_code: str
+    job_role: str
+    nsqf_level: float
+    sector_name: str | None
+
+
+@dataclass(frozen=True)
+class RoleStepUp:
+    """A role that builds on the starting one, and the evidence it does."""
+
+    qp_id: uuid.UUID
+    slug: str
+    qp_code: str
+    job_role: str
+    nsqf_level: float
+    sector_name: str | None
+    standards_count: int
+    compulsory_count: int
+    shared_standards: int
+    """Specific (non-generic) compulsory standards this role shares with the
+    starting role. Always at least one: it is what makes a step a step."""
+    same_occupation: bool
+    shared_nco: bool
+    variants: int
+
+
+@dataclass(frozen=True)
+class RoleLadder:
+    anchor: RoleRef
+    steps: list[RoleStepUp]
+
+
+async def roles_above(
+    db: AsyncSession,
+    slug: str,
+    *,
+    max_rise: float = LADDER_MAX_RISE,
+    limit: int = MAX_LADDER_STEPS,
+) -> RoleLadder | None:
+    """The roles that build on one, most-shared first.
+
+    `None` is an unknown (or retired, or level-less) starting role, which is a
+    different answer from an empty list: "our data shows no further step from
+    this role" is something the page can say, "that role does not exist" is not.
+    """
+    anchor = (
+        await db.execute(
+            select(QualificationPack, Sector.name)
+            .outerjoin(Sector, Sector.id == QualificationPack.sector_id)
+            .where(
+                QualificationPack.slug == slug,
+                QualificationPack.is_current.is_(True),
+                QualificationPack.nsqf_level.is_not(None),
+            )
+        )
+    ).first()
+    if anchor is None:
+        return None
+    qp, sector_name = anchor
+
+    rows = (
+        await db.execute(
+            _LADDER_SQL,
+            {
+                "slug": slug,
+                "max_rise": max_rise,
+                "generic_sectors": GENERIC_STANDARD_SECTORS,
+                "limit": min(limit, MAX_LADDER_STEPS),
+            },
+        )
+    ).all()
+    return RoleLadder(
+        anchor=RoleRef(
+            qp_id=qp.id,
+            slug=qp.slug,
+            qp_code=qp.qp_code,
+            job_role=qp.job_role or qp.name,
+            nsqf_level=float(qp.nsqf_level),
+            sector_name=sector_name,
+        ),
+        steps=[
+            RoleStepUp(
+                qp_id=r.id,
+                slug=r.slug,
+                qp_code=r.qp_code,
+                job_role=r.job_role,
+                nsqf_level=float(r.nsqf_level),
+                sector_name=r.sector_name,
+                standards_count=r.standards,
+                compulsory_count=r.compulsory,
+                shared_standards=r.shared,
+                same_occupation=bool(r.same_occupation),
+                shared_nco=bool(r.shared_nco),
+                variants=r.variants,
+            )
+            for r in rows
+        ],
+    )

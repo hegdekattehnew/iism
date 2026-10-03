@@ -342,6 +342,35 @@ class TestApplicationOutcomeStateMachine:
         )
         assert refused.status_code == 422
 
+    async def test_a_finished_engagement_cannot_be_moved_again(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`completed` and `no_show` record something that happened. Letting an
+        employer move one back to `hired` or on to `rejected` rewrote it, and
+        reopened a review window that closes for a reason."""
+        skill = await _skill(db, "terminal-skill-1")
+        employer, candidate, org_slug, job_slug, application_id = await _hire_via_gig(
+            client, db, skill_slug=skill.slug
+        )
+        url = f"/org/{org_slug}/jobs/{job_slug}/applications/{application_id}"
+        assert (
+            await client.patch(url, headers=employer, json={"status": "completed"})
+        ).status_code == 200
+
+        for target in ("hired", "rejected", "shortlisted", "no_show", "completed"):
+            refused = await client.patch(url, headers=employer, json={"status": target})
+            assert refused.status_code == 409, target
+
+    async def test_a_no_show_is_final_too(self, client: AsyncClient, db: AsyncSession) -> None:
+        skill = await _skill(db, "terminal-skill-2")
+        employer, candidate, org_slug, job_slug, application_id = await _hire_via_gig(
+            client, db, skill_slug=skill.slug
+        )
+        url = f"/org/{org_slug}/jobs/{job_slug}/applications/{application_id}"
+        await client.patch(url, headers=employer, json={"status": "no_show"})
+        refused = await client.patch(url, headers=employer, json={"status": "hired"})
+        assert refused.status_code == 409
+
     async def test_completed_on_a_gig_after_hired_succeeds(
         self, client: AsyncClient, db: AsyncSession
     ) -> None:
@@ -597,3 +626,227 @@ class TestAFinishedGigStillFillsItsPosition:
         job = await _gig_with_outcomes(db, ["no_show", "hired"], positions=2)
         assert await _close_if_filled(db, job) is False
         assert job.closed_at is None
+
+
+class TestDashboardsKeepCountingAFinishedGig:
+    """Both dashboards summed `status == "hired"`, so a gig worker dropped out
+    of the figure the moment the gig was marked completed."""
+
+    async def test_the_candidates_hired_count_survives_completion(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        skill = await _skill(db, "dash-completed-skill")
+        employer, candidate, org_slug, job_slug, application_id = await _hire_via_gig(
+            client, db, skill_slug=skill.slug
+        )
+        assert (await client.get("/me/dashboard", headers=candidate)).json()["hired"] == 1
+
+        await client.patch(
+            f"/org/{org_slug}/jobs/{job_slug}/applications/{application_id}",
+            headers=employer,
+            json={"status": "completed"},
+        )
+        assert (await client.get("/me/dashboard", headers=candidate)).json()["hired"] == 1
+
+    async def test_the_employers_hired_count_survives_completion_and_no_show(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        from api.modules.applications.employer_service import dashboard
+
+        job = await _gig_with_outcomes(
+            db, ["completed", "no_show", "hired", "rejected"], positions=9
+        )
+        result = await dashboard(db, job.tenant_id)
+        assert result.hired == 3
+
+
+class TestDashboardMatchCount:
+    async def test_match_count_is_not_cut_at_twenty(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`match_count` was `len()` of a list `match_jobs` had already cut to
+        its default page of twenty, so it could never say more than twenty."""
+        from api.modules.marketplace.models import JobSkill
+
+        skill = Skill(
+            slug="count-skill",
+            name="Operate a till",
+            skill_type="technical",
+            nsqf_level=Decimal("3"),
+            nos_code="TST/CNT001",
+            source="nsqf",
+        )
+        db.add(skill)
+        tenant = Tenant(
+            slug=f"count-{uuid.uuid4().hex[:8]}", name="Count Co", tenant_type="employer"
+        )
+        db.add(tenant)
+        await db.flush()
+        for i in range(25):
+            job = Job(
+                slug=f"count-job-{uuid.uuid4().hex[:8]}-{i}",
+                tenant_id=tenant.id,
+                title=f"Cashier {i}",
+                status="published",
+            )
+            db.add(job)
+            await db.flush()
+            db.add(JobSkill(job_id=job.id, skill_id=skill.id, importance=3, is_mandatory=True))
+        await db.flush()
+
+        candidate = await _candidate(client)
+        await client.post(
+            "/me/profile/skills",
+            headers=candidate,
+            json={"skill_slug": skill.slug, "proficiency": 4},
+        )
+
+        dashboard = (await client.get("/me/dashboard", headers=candidate)).json()
+        assert dashboard["match_count"] == 25
+        assert len(dashboard["top_matches"]) == 5
+
+
+async def _rate(
+    db: AsyncSession, application: Application, *, about: str, rating: int
+) -> ApplicationReview:
+    review = ApplicationReview(application_id=application.id, subject_role=about, rating=rating)
+    db.add(review)
+    await db.flush()
+    return review
+
+
+async def _applications_of(db: AsyncSession, job: Job) -> list[Application]:
+    return list(await db.scalars(select(Application).where(Application.job_id == job.id)))
+
+
+class TestReviewedFlags:
+    """The rating form could not tell whether to show itself, because nothing
+    said a review already existed and the API answers a second one with 409."""
+
+    async def test_each_side_sees_only_its_own_review(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        skill = await _skill(db, "flag-skill-1")
+        employer, candidate, org_slug, job_slug, application_id = await _hire_via_gig(
+            client, db, skill_slug=skill.slug
+        )
+        url = f"/org/{org_slug}/jobs/{job_slug}/applications"
+        await client.patch(
+            f"{url}/{application_id}", headers=employer, json={"status": "completed"}
+        )
+
+        def employer_flag() -> object:
+            return client.get(url, headers=employer)
+
+        before = (await employer_flag()).json()["items"][0]["reviewed"]
+        mine_before = (await client.get("/me/applications", headers=candidate)).json()[0][
+            "reviewed"
+        ]
+        assert before is False and mine_before is False
+
+        await client.post(f"{url}/{application_id}/review", headers=employer, json={"rating": 4})
+        # The employer has rated the worker; the worker has not yet rated them.
+        assert (await employer_flag()).json()["items"][0]["reviewed"] is True
+        assert (await client.get("/me/applications", headers=candidate)).json()[0][
+            "reviewed"
+        ] is False
+
+        await client.post(
+            f"/me/applications/{application_id}/review", headers=candidate, json={"rating": 5}
+        )
+        assert (await client.get("/me/applications", headers=candidate)).json()[0][
+            "reviewed"
+        ] is True
+
+
+class TestReputation:
+    async def test_an_average_over_nothing_is_absent_not_zero(self, db: AsyncSession) -> None:
+        from api.modules.applications.reputation import poster_reputation, worker_reputation
+
+        job = await _gig_with_outcomes(db, ["completed"], positions=1)
+        application = (await _applications_of(db, job))[0]
+        assert await poster_reputation(db, job.tenant_id) is None
+        assert await worker_reputation(db, application.profile_id) is None
+
+    async def test_a_poster_is_rated_by_workers_across_all_their_vacancies(
+        self, db: AsyncSession
+    ) -> None:
+        from api.modules.applications.reputation import poster_reputation
+
+        job = await _gig_with_outcomes(db, ["completed", "completed", "completed"], positions=3)
+        apps = await _applications_of(db, job)
+        await _rate(db, apps[0], about="poster", rating=5)
+        await _rate(db, apps[1], about="poster", rating=4)
+        # Rated *about the worker*: must not count towards the poster.
+        await _rate(db, apps[2], about="worker", rating=1)
+
+        result = await poster_reputation(db, job.tenant_id)
+        assert result is not None
+        assert (result.average, result.count) == (4.5, 2)
+
+    async def test_a_workers_rating_is_what_employers_said_about_them(
+        self, db: AsyncSession
+    ) -> None:
+        from api.modules.applications.reputation import worker_reputation
+
+        job = await _gig_with_outcomes(db, ["completed"], positions=1)
+        application = (await _applications_of(db, job))[0]
+        await _rate(db, application, about="worker", rating=3)
+        await _rate(db, application, about="poster", rating=5)
+
+        result = await worker_reputation(db, application.profile_id)
+        assert result is not None
+        assert (result.average, result.count) == (3.0, 1)
+
+    async def test_the_public_poster_rating_for_a_vacancy(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        job = await _gig_with_outcomes(db, ["completed", "completed"], positions=2)
+        apps = await _applications_of(db, job)
+        empty = await client.get(f"/jobs/{job.slug}/poster-rating")
+        assert empty.status_code == 200
+        assert empty.json() == {"rating": None}
+
+        await _rate(db, apps[0], about="poster", rating=5)
+        await _rate(db, apps[1], about="poster", rating=3)
+        await db.commit()
+        rated = await client.get(f"/jobs/{job.slug}/poster-rating")
+        assert rated.json() == {"rating": {"average": 4.0, "count": 2}}
+
+    async def test_a_draft_or_unknown_vacancy_gives_nothing_away(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        job = await _gig_with_outcomes(db, ["completed"], positions=1)
+        job.status = "draft"
+        await _rate(db, (await _applications_of(db, job))[0], about="poster", rating=5)
+        await db.commit()
+
+        assert (await client.get(f"/jobs/{job.slug}/poster-rating")).json() == {"rating": None}
+        assert (await client.get("/jobs/no-such-job/poster-rating")).json() == {"rating": None}
+
+    async def test_the_dashboards_carry_the_rating_and_the_card_never_does(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        skill = await _skill(db, "rating-dash-skill")
+        employer, candidate, org_slug, job_slug, application_id = await _hire_via_gig(
+            client, db, skill_slug=skill.slug
+        )
+        url = f"/org/{org_slug}/jobs/{job_slug}/applications"
+        await client.patch(
+            f"{url}/{application_id}", headers=employer, json={"status": "completed"}
+        )
+        await client.post(f"{url}/{application_id}/review", headers=employer, json={"rating": 2})
+        await client.post(
+            f"/me/applications/{application_id}/review", headers=candidate, json={"rating": 5}
+        )
+
+        employer_dash = (await client.get(f"/org/{org_slug}/dashboard", headers=employer)).json()
+        assert employer_dash["rating"] == {"average": 5.0, "count": 1}
+        candidate_dash = (await client.get("/me/dashboard", headers=candidate)).json()
+        assert candidate_dash["rating"] == {"average": 2.0, "count": 1}
+
+        # ADR-037: a rating is a fact about one person, and the employer's view
+        # of a candidate is de-identified.
+        listing = (await client.get(url, headers=employer)).json()["items"][0]
+        assert "rating" not in listing["candidate"]
+        assert "rating" not in listing

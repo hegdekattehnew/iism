@@ -50,17 +50,27 @@ async def _refresh_packs(db: AsyncSession) -> int:
     from api.modules.skills.hierarchy import QpSkill, QualificationPack
     from api.modules.skills.service import embedding_text_for_skills
 
+    provider = get_embedding_provider()
+    if provider.name == "hashing":
+        # `search_roles` never reads a role vector under the placeholder
+        # provider (its "similarity" is word overlap, which the literal tiers
+        # already cover), so embedding 4,400 packs would be work for nothing.
+        return 0
+
     packs = list(
         await db.scalars(
             select(QualificationPack)
-            .where(QualificationPack.is_current, QualificationPack.embedding.is_(None))
+            .where(
+                QualificationPack.is_current,
+                QualificationPack.embedding.is_(None)
+                | QualificationPack.embedding_model.is_distinct_from(provider.model),
+            )
             .limit(BATCH_SIZE)
         )
     )
     if not packs:
         return 0
 
-    provider = get_embedding_provider()
     for pack in packs:
         skill_ids = list(await db.scalars(select(QpSkill.skill_id).where(QpSkill.qp_id == pack.id)))
         criteria_text = await embedding_text_for_skills(db, skill_ids)

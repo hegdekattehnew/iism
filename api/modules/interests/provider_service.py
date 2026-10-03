@@ -14,15 +14,17 @@ Newest first is the honest order.
 
 import uuid
 from dataclasses import dataclass, field
+from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
-from api.modules.identity.models import User
+from api.modules.identity.models import Tenant, User
 from api.modules.interests.models import LIVE_STATUSES, CourseInterest
 from api.modules.marketplace.models import CandidateProfile, Course
+from api.modules.notifications import enqueue
 
 
 async def _course_of(db: AsyncSession, tenant_id: uuid.UUID, course_slug: str) -> Course:
@@ -151,11 +153,15 @@ async def set_status(
     interest_id: uuid.UUID,
     new_status: str,
 ) -> CourseInterest:
-    """Mark that the provider has been in touch.
+    """Move a learner's interest along: contacted, or enrolled.
 
-    Deliberately silent to the learner: the provider reaches them by phone,
-    which is the entire point of the disclosure, so a notification saying
-    "somebody contacted you" would arrive after the call it describes.
+    **The learner is told**, in-app only (Sprint 41, the owner's decision). This
+    used to be deliberately silent, on the reasoning that the provider phones
+    them, so a notice would arrive after the call it describes. But a call can
+    be missed, and an enrolment recorded against somebody who never learns of it
+    is a record they cannot check -- a free in-app notice costs nothing and
+    reaches the phone-only learner an email never would. No email: this is not
+    worth an inbox.
     """
     course = await _course_of(db, tenant_id, course_slug)
     interest = await db.scalar(
@@ -172,7 +178,26 @@ async def set_status(
             status.HTTP_409_CONFLICT, "This interest has been withdrawn by the learner"
         )
 
+    changed = interest.status != new_status
     interest.status = new_status
+    if changed:
+        profile = await db.get(CandidateProfile, interest.profile_id)
+        learner = await db.get(User, profile.user_id) if profile is not None else None
+        if learner is not None:
+            await enqueue(
+                db,
+                recipient_kind="user",
+                recipient_id=learner.id,
+                channel="in_app",
+                template="course_interest_status_changed",
+                payload={
+                    "course": course.title,
+                    "organisation": cast(Tenant, course.tenant).name,
+                    "status": new_status,
+                    "path": "/interests",
+                },
+                locale=learner.preferred_locale,
+            )
     await db.commit()
     await record(
         db,

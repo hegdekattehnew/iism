@@ -126,15 +126,20 @@ async def _values(db: AsyncSession, collection: str, body: dict) -> dict:
     # collections, which means FastAPI's automatic 422 does not apply and the
     # validation error has to be translated here.
     try:
-        values = model.model_validate(body).model_dump()
+        parsed = model.model_validate(body)
     except ValidationError as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, jsonable_encoder(exc.errors())
         ) from exc
+    values = parsed.model_dump()
     if collection == "certifications":
-        values["skill_id"] = await profile_service.resolve_certification_skill(
-            db, values.pop("skill_slug", None)
-        )
+        slug = values.pop("skill_slug", None)
+        # A body that never mentions `skill_slug` leaves the link alone. The
+        # editor sends back the entry it was given, which carries `skill` and
+        # not `skill_slug`, so reading its absence as "no standard" silently
+        # unlinked the standard on every edit.
+        if "skill_slug" in parsed.model_fields_set:
+            values["skill_id"] = await profile_service.resolve_certification_skill(db, slug)
     if collection == "preferred_locations":
         values = await profile_service.resolve_preferred_location(db, values)
     return values

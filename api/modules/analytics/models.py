@@ -81,6 +81,13 @@ EVENT_NAMES = (
     # only ever reachable through a `completed` application), payload carries
     # `subject_role` and `rating` -- never the candidate's identity.
     "application_review_submitted",
+    # Sprint 41, ADR-048. Subject to the vacancy, never the candidate: a count of
+    # offers made, with no identity on the row.
+    "sponsor_intent_recorded",
+    # Sprint 42, ADR-049. Subject to the *role* the ladder started from, never
+    # the person; the payload carries counts and whether the starting role was a
+    # guess -- no standards, which would describe somebody.
+    "career_ladder_viewed",
 )
 
 

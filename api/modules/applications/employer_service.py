@@ -17,7 +17,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics import record
-from api.modules.applications.models import FILLED_STATUSES, Application
+from api.modules.applications.models import FILLED_STATUSES, WAS_HIRED_STATUSES, Application
+from api.modules.applications.reputation import Reputation, poster_reputation
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Job, open_job, posted_job
 from api.modules.matching import JobPool, job_pools, score_profiles
@@ -94,6 +95,14 @@ async def set_status(
         # details back on an employer's screen by a side door.
         raise HTTPException(
             status.HTTP_409_CONFLICT, "This application has been withdrawn by the candidate"
+        )
+    if application.status in ("completed", "no_show"):
+        # The outcome of an engagement is a real-world fact that happened. Moving
+        # it back to `hired` or on to `rejected` would rewrite that, and would
+        # reopen a review window that closes for a reason (review_service.py).
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This engagement has ended and its outcome cannot be changed",
         )
     if new_status in ("completed", "no_show"):
         # A narrower rule than shortlist/reject/hire, which have no ordering
@@ -251,6 +260,7 @@ class EmployerDashboard:
     # folding it in here costs no second query, only a second field on the
     # response `job_pools()`'s own caller was already paying for.
     jobs: list[JobPool] = field(default_factory=list)
+    rating: Reputation | None = None
 
 
 async def dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> EmployerDashboard:
@@ -273,6 +283,9 @@ async def dashboard(db: AsyncSession, tenant_id: uuid.UUID) -> EmployerDashboard
         open_jobs=open_count or 0,
         applied=by_status.get("applied", 0),
         shortlisted=by_status.get("shortlisted", 0),
-        hired=by_status.get("hired", 0),
+        # Ever hired (`WAS_HIRED_STATUSES`): a gig worker moves `hired` ->
+        # `completed` and must not drop out of the count.
+        hired=sum(by_status.get(s, 0) for s in WAS_HIRED_STATUSES),
         jobs=pools,
+        rating=await poster_reputation(db, tenant_id),
     )

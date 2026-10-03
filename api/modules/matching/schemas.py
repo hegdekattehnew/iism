@@ -6,6 +6,7 @@ score (ADR-036).
 """
 
 import uuid
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,6 +29,19 @@ class MissingSkillOut(BaseModel):
     importance: int
     is_mandatory: bool
     nsqf_level: NsqfLevel | None = None
+
+    @classmethod
+    def from_missing(cls, m: Any) -> "MissingSkillOut":
+        """The one place a scorer's `MissingSkill` becomes a payload, so a match
+        card and a rejected application name the gap identically."""
+        return cls(
+            skill_id=m.skill_id,
+            nos_code=m.nos_code,
+            name=m.name,
+            importance=m.importance,
+            is_mandatory=m.is_mandatory,
+            nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,
+        )
 
 
 class JobSummary(BaseModel):
@@ -81,6 +95,21 @@ class CourseSuggestionOut(BaseModel):
     closes_count: int
     gap_size: int
     covers_mandatory: int
+
+    @classmethod
+    def from_suggestion(cls, c: Any) -> "CourseSuggestionOut":
+        """The one place a `CourseSuggestion` becomes a payload."""
+        return cls(
+            slug=c.course.slug,
+            title=c.course.title,
+            mode=c.course.mode,
+            duration_hours=c.course.duration_hours,
+            fee_inr=c.course.fee_inr,
+            closes=c.closes,
+            closes_count=c.closes_count,
+            gap_size=c.gap_size,
+            covers_mandatory=c.covers_mandatory,
+        )
 
 
 class CourseRoleAlignmentOut(BaseModel):

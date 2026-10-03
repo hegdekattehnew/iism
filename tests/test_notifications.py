@@ -325,3 +325,34 @@ def test_hindi_templates_are_really_hindi() -> None:
 
 async def test_the_queue_starts_empty(db: AsyncSession) -> None:
     assert await db.scalar(select(func.count()).select_from(Notification)) == 0
+
+
+async def test_the_drain_locks_the_rows_it_claims_and_skips_locked_ones(
+    db: AsyncSession,
+) -> None:
+    """Two overlapping ticks picked the same pending rows and sent each message
+    twice, because the read took no lock.
+
+    Asserted on the SQL the drain actually sends. A real two-connection race
+    cannot be staged here: every test's rows live in one uncommitted
+    transaction, which a second connection cannot see.
+    """
+    from sqlalchemy import event
+
+    from api.core.database import get_engine
+
+    statements: list[str] = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        statements.append(statement)
+
+    engine = get_engine().sync_engine
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        await drain(db)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    selects = [s for s in statements if "FROM notifications" in s and "SELECT" in s]
+    assert selects, "the drain issued no query against notifications"
+    assert all("FOR UPDATE SKIP LOCKED" in s for s in selects)

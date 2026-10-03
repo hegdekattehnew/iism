@@ -46,3 +46,50 @@ class JobAlert(Base):
         ForeignKey("candidate_profiles.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SponsorIntent(Base):
+    """An employer's offer to sponsor the one standard a candidate lacks (ADR-048).
+
+    One row per (vacancy, candidate), so an offer can be made once and a
+    candidate is never prompted twice about the same vacancy by the same act.
+    The unique constraint is what makes that a property of the database rather
+    than an intention -- `JobAlert`'s own reasoning, one table over.
+
+    **The employer never learns who it was.** The route that creates a row takes
+    the de-identified reference the console already shows, resolves it
+    server-side inside that vacancy's own near-miss pool, and never returns the
+    profile, the user or whether the candidate responded. What the candidate
+    receives names the organisation, the standard and the course, and links to
+    the vacancy, where applying is the act that discloses them (ADR-037).
+
+    `notified_at` is NULL when the candidate was not told -- they switched off
+    unsolicited messages, or had reached today's cap. The offer is still a fact
+    about the employer's intent, and the employer is deliberately not told which
+    of the two happened: an opt-out is a fact about the candidate.
+
+    Keyed on the profile, not the user, for the reason `applications` and
+    `job_alerts` are: erasure deletes the profile and this goes with it.
+    """
+
+    __tablename__ = "sponsor_intents"
+    __table_args__ = (
+        UniqueConstraint("job_id", "profile_id", name="uq_sponsor_intent_job_profile"),
+        Index("ix_sponsor_intents_job_id", "job_id"),
+        # The daily-cap query: how much unsolicited mail has this candidate had.
+        Index("ix_sponsor_intents_profile_created", "profile_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"))
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_profiles.id", ondelete="CASCADE")
+    )
+    skill_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("skills.id", ondelete="SET NULL"), default=None
+    )
+    offered_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

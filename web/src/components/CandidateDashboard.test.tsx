@@ -49,6 +49,38 @@ describe("CandidateDashboard", () => {
     expect(await screen.findByText("3")).toBeTruthy();
     expect(screen.getByText("72")).toBeTruthy();
     expect(screen.getByText("65%")).toBeTruthy();
+    // The one way into the career ladder (the header has no room for it).
+    expect(
+      screen.getByRole("link", { name: "See where you could move next" }).getAttribute("href"),
+    ).toBe("/career-paths");
+  });
+
+  it("shows the employers' rating, and shows nothing at all when there is none", async () => {
+    const base = {
+      match_count: 1,
+      best_score: 50,
+      applied: 0,
+      shortlisted: 0,
+      hired: 0,
+      profile_completeness: 40,
+      top_matches: [],
+    };
+    GET.mockResolvedValue({
+      data: { ...base, rating: { average: 4.5, count: 6 } },
+      error: undefined,
+      response: { status: 200 },
+    });
+    const first = renderUi(<CandidateDashboard />);
+    expect(await screen.findByText("Employers rate you")).toBeTruthy();
+    expect(screen.getByText("4.5")).toBeTruthy();
+    expect(screen.getByText("6 ratings")).toBeTruthy();
+    first.unmount();
+
+    // "No ratings yet" is not "rated 0": no tile, not a zero.
+    GET.mockResolvedValue({ data: { ...base, rating: null }, error: undefined, response: { status: 200 } });
+    renderUi(<CandidateDashboard />);
+    await screen.findByText("40%");
+    expect(screen.queryByText("Employers rate you")).toBeNull();
   });
 
   it("renders a dash for best_score rather than a false zero when there are no matches yet", async () => {

@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { CoverageBar } from "@/components/CoverageBar";
+import { SponsorPanel } from "@/components/employer/SponsorPanel";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Badge, Card, CardBody, Skeleton } from "@/components/ui";
 import { isSignedOut } from "@/lib/http";
@@ -107,6 +108,11 @@ export function CandidateShortlist({
                       {te("missingMandatory")}:{" "}
                       {mandatoryGaps.map((m) => m.name).join(" · ")}
                     </p>
+                  )}
+
+                  {/* Exactly one standard short: the case worth training for. */}
+                  {c.missing_mandatory === 1 && (
+                    <SponsorPanel orgSlug={orgSlug} jobSlug={jobSlug} reference={c.reference} />
                   )}
                 </CardBody>
               </Card>

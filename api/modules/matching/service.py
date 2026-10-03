@@ -7,9 +7,12 @@ is the difference between a page and a timeout, and retrofitting it later means
 rewriting the scorer's callers.
 """
 
+import math
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -223,10 +226,16 @@ async def match_jobs(
     db: AsyncSession,
     profile_id: uuid.UUID,
     *,
-    limit: int = 20,
+    limit: int | None = 20,
     state_id: uuid.UUID | None = None,
 ) -> list[ScoredJob]:
-    """Rank published jobs for one candidate."""
+    """Rank published jobs for one candidate.
+
+    `limit=None` keeps every scored job. Scoring has already happened for all of
+    them by the time the list is cut, so asking for all of them costs nothing
+    more than the slice -- which is why a *count* of matches must not be taken
+    from the default page of twenty.
+    """
     held = await _held_skills(db, profile_id)
     facts = await candidate_facts(db, profile_id)
     if not held:
@@ -480,9 +489,14 @@ async def entry_routes_for_job(db: AsyncSession, job_id: uuid.UUID) -> EntryRout
             )
         )
     ).all()
+    return _entry_fit(qp, routes)
+
+
+def _entry_fit(qp: QualificationPack, routes: Sequence[Any]) -> EntryRouteFit | None:
+    """The ways in, as one answer. Shared by a job's qualification and a ladder's
+    -- one reading of `QpEntryRoute`, not two that can drift apart."""
     if not routes:
         return None
-
     years = [r.experience_years for r in routes if r.experience_years is not None]
     return EntryRouteFit(
         qp_code=qp.qp_code,
@@ -492,6 +506,111 @@ async def entry_routes_for_job(db: AsyncSession, job_id: uuid.UUID) -> EntryRout
         # The easiest way in is what a candidate needs to know.
         lowest_experience_years=min(years) if years else None,
     )
+
+
+@dataclass(frozen=True)
+class RoleFit:
+    """One candidate measured against one qualification's compulsory standards."""
+
+    qp_id: uuid.UUID
+    result: MatchResult
+    entry: EntryRouteFit | None
+
+
+async def score_against_roles(
+    db: AsyncSession, profile_id: uuid.UUID, qp_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, RoleFit]:
+    """A candidate against a set of qualifications, through the one scorer.
+
+    Not a second scorer (ADR-037): this builds `RequiredSkill` rows from a
+    qualification's **compulsory** standards -- electives are "choose one of
+    these", not requirements, the distinction `course_role_alignment` already
+    draws -- and hands them to `score_match` with the candidate's held skills,
+    exactly as `match_jobs` does for a vacancy. Every compulsory standard is
+    mandatory, so one the candidate lacks caps the score the way a missing
+    mandatory standard does for a job.
+
+    `importance` is a flat 3. The source's `weightage` is an assessment mark, not
+    how much a standard matters to doing the work, and bucketing it into 1-5
+    would invent a precision the data does not have.
+
+    The experience floor is the *lowest* a qualification's entry routes ask for
+    (the easiest way in, as `EntryRouteFit` says), rounded up: asking for 1.5
+    years of somebody with 1 is a shortfall, not a pass.
+
+    Embeddings are `None`, so the semantic term scores 0 whatever its weight --
+    a qualification has no embedding of the kind a vacancy carries, and a
+    ladder's relevance is stated by the standards it shares, not by a vector.
+    """
+    if not qp_ids:
+        return {}
+    held = await _held_skills(db, profile_id)
+    facts = await candidate_facts(db, profile_id)
+    weights = weights_from_settings()
+
+    packs = {
+        qp.id: qp
+        for qp in (
+            await db.scalars(select(QualificationPack).where(QualificationPack.id.in_(qp_ids)))
+        ).all()
+    }
+    standards = (
+        await db.execute(
+            select(
+                QpSkill.qp_id,
+                QpSkill.skill_id,
+                Skill.concept_id,
+                Skill.nos_code,
+                Skill.name,
+                func.coalesce(QpSkill.nsqf_level, Skill.nsqf_level).label("level"),
+            )
+            .join(Skill, Skill.id == QpSkill.skill_id)
+            .where(QpSkill.qp_id.in_(qp_ids), QpSkill.requirement == "compulsory")
+            .order_by(QpSkill.qp_id, Skill.nos_code, Skill.name)
+        )
+    ).all()
+    required: dict[uuid.UUID, list[RequiredSkill]] = {}
+    for r in standards:
+        required.setdefault(r.qp_id, []).append(
+            RequiredSkill(
+                skill_id=r.skill_id,
+                concept_id=r.concept_id,
+                nos_code=r.nos_code,
+                name=r.name,
+                nsqf_level=r.level,
+                importance=3,
+                is_mandatory=True,
+            )
+        )
+    routes: dict[uuid.UUID, list[Any]] = {}
+    for route in (
+        await db.execute(
+            select(
+                QpEntryRoute.qp_id, QpEntryRoute.education_desc, QpEntryRoute.experience_years
+            ).where(QpEntryRoute.qp_id.in_(qp_ids))
+        )
+    ).all():
+        routes.setdefault(route.qp_id, []).append(route)
+
+    out: dict[uuid.UUID, RoleFit] = {}
+    for qp_id, qp in packs.items():
+        needs = required.get(qp_id, [])
+        entry = _entry_fit(qp, routes.get(qp_id, []))
+        floor = entry.lowest_experience_years if entry is not None else None
+        out[qp_id] = RoleFit(
+            qp_id=qp_id,
+            result=score_match(
+                needs,
+                held,
+                job_level_min=qp.nsqf_level,
+                candidate_level=attained_level(held, needs),
+                job_min_years=math.ceil(floor) if floor is not None else None,
+                candidate_years=facts.years_experience,
+                weights=weights,
+            ),
+            entry=entry,
+        )
+    return out
 
 
 async def has_declared_skills(db: AsyncSession, profile_id: uuid.UUID) -> bool:

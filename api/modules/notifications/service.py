@@ -106,12 +106,18 @@ async def drain(db: AsyncSession, *, limit: int = 50) -> dict[str, int]:
     email address, and there is nothing wrong with that -- the in-app copy is
     what reaches them until DLT registration makes SMS possible.
     """
+    # Locked until the commit below, and rows another tick already holds are
+    # skipped rather than waited for. Without it a tick that outlived its
+    # minute (a slow SMTP batch) and the next one picked the same rows and
+    # sent each message twice. A crash mid-batch still resends, because the
+    # status commit is the last step: at-least-once, never twice at once.
     pending = (
         await db.scalars(
             select(Notification)
             .where(Notification.status == "pending", Notification.channel == "email")
             .order_by(Notification.created_at)
             .limit(limit)
+            .with_for_update(skip_locked=True)
         )
     ).all()
 

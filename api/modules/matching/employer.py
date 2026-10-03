@@ -23,7 +23,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.identity.models import Tenant
-from api.modules.marketplace.models import CandidateProfile, CandidateSkill, Job, JobSkill
+from api.modules.marketplace.models import (
+    CandidateProfile,
+    CandidateSkill,
+    Job,
+    JobSkill,
+    open_job,
+)
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
 from api.modules.matching.service import (
     RETRIEVAL_LIMIT,
@@ -410,7 +416,10 @@ async def _scarce_skills(
         )
         .join(JobSkill, JobSkill.skill_id == Skill.id)
         .join(Job, Job.id == JobSkill.job_id)
-        .where(Job.status == "published")
+        # `open_job()`, the one predicate every listing uses: a vacancy that
+        # has been filled or has expired is no longer anybody's demand, and
+        # `status == "published"` alone kept counting it.
+        .where(open_job())
         .group_by(Skill.id, Skill.concept_id, Skill.nos_code, Skill.name)
     )
     if tenant_id is not None:

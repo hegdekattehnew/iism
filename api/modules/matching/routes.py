@@ -42,17 +42,7 @@ def _to_match(scored: service.ScoredJob) -> schemas.MatchOut:
         score=r.score,
         coverage=round(r.coverage, 4),
         matched=[schemas.MatchedSkillOut(**vars(m)) for m in r.matched],
-        missing=[
-            schemas.MissingSkillOut(
-                skill_id=m.skill_id,
-                nos_code=m.nos_code,
-                name=m.name,
-                importance=m.importance,
-                is_mandatory=m.is_mandatory,
-                nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,
-            )
-            for m in r.missing
-        ],
+        missing=[schemas.MissingSkillOut.from_missing(m) for m in r.missing],
         missing_mandatory=r.missing_mandatory,
         level_shortfall=float(r.level_shortfall) if r.level_shortfall is not None else None,
         experience_shortfall=r.experience_shortfall,
@@ -97,20 +87,7 @@ async def match_detail(
     base = _to_match(scored)
     return schemas.MatchDetail(
         **base.model_dump(),
-        courses=[
-            schemas.CourseSuggestionOut(
-                slug=c.course.slug,
-                title=c.course.title,
-                mode=c.course.mode,
-                duration_hours=c.course.duration_hours,
-                fee_inr=c.course.fee_inr,
-                closes=c.closes,
-                closes_count=c.closes_count,
-                gap_size=c.gap_size,
-                covers_mandatory=c.covers_mandatory,
-            )
-            for c in courses
-        ],
+        courses=[schemas.CourseSuggestionOut.from_suggestion(c) for c in courses],
         entry=(
             schemas.EntryRouteOut(
                 qp_code=entry.qp_code,

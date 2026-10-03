@@ -22,7 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
 from api.modules.analytics import record
-from api.modules.applications.models import Application, SavedJob
+from api.modules.applications.models import WAS_HIRED_STATUSES, Application, SavedJob
+from api.modules.applications.reputation import Reputation, worker_reputation
 from api.modules.identity import User
 from api.modules.identity.models import Tenant
 from api.modules.marketplace import (
@@ -32,7 +33,14 @@ from api.modules.marketplace import (
     get_or_create_profile,
 )
 from api.modules.marketplace.models import Job
-from api.modules.matching import ScoredJob, match_jobs
+from api.modules.matching import (
+    CourseSuggestion,
+    MatchResult,
+    ScoredJob,
+    courses_closing_gap,
+    match_jobs,
+    score_profiles,
+)
 from api.modules.notifications import enqueue
 
 # How many of a candidate's best-scoring jobs the dashboard shows (Sprint 40).
@@ -213,11 +221,14 @@ class CandidateDashboard:
     # queries, since this function already calls `match_jobs` for
     # `match_count`/`best_score`.
     top_matches: list[ScoredJob] = field(default_factory=list)
+    rating: Reputation | None = None
 
 
 async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
     profile = await get_or_create_profile(db, user.id)
-    scored = await match_jobs(db, profile.id)
+    # Everything, not the default page: `match_count` is the number of matches,
+    # and `len()` of a list cut at twenty can never say more than twenty.
+    scored = await match_jobs(db, profile.id, limit=None)
 
     rows = await db.execute(
         select(Application.status, func.count())
@@ -232,9 +243,12 @@ async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
         best_score=max((s.result.score for s in scored), default=None),
         applied=by_status.get("applied", 0),
         shortlisted=by_status.get("shortlisted", 0),
-        hired=by_status.get("hired", 0),
+        # Everyone ever hired, so a finished gig (`completed`) and a no-show
+        # still count; `status == "hired"` alone dropped them once they moved on.
+        hired=sum(by_status.get(s, 0) for s in WAS_HIRED_STATUSES),
         profile_completeness=percent,
         top_matches=scored[:TOP_MATCHES_LIMIT],
+        rating=await worker_reputation(db, profile.id),
     )
 
 
@@ -315,3 +329,47 @@ async def list_saved(db: AsyncSession, user: User) -> list[SavedJob]:
         .order_by(SavedJob.created_at.desc())
     )
     return list(rows.all())
+
+
+@dataclass(frozen=True)
+class ApplicationGap:
+    """What one of the candidate's own applications was missing, and what would
+    close it."""
+
+    application: Application
+    result: MatchResult
+    courses: list[CourseSuggestion]
+
+
+async def application_gap(
+    db: AsyncSession, user: User, application_id: uuid.UUID
+) -> ApplicationGap:
+    """The gap behind an application, computed now ("Why not me", Sprint 41).
+
+    **At view time, not at the moment of rejection**, so nothing is recorded and
+    nothing can go stale: the job's requirements and the candidate's skills are
+    both readable at any moment, and a candidate who has since closed part of
+    the gap sees a smaller one, which is what they came to find out. The cost is
+    that this is not a frozen record of what the employer saw; an employer who
+    edits a vacancy's standards afterwards changes it.
+
+    Runs through `score_profiles`, the same `score_match` every other score
+    comes from (ADR-037), and not `match_job_by_slug`, which only answers for an
+    open vacancy: the job behind a rejection is very often closed by now.
+
+    404 for an application that is not the caller's, never 403 (ADR-038). The
+    employer learns nothing from this: the route is the candidate's own, and a
+    job's requirements are already public on its page.
+    """
+    profile = await ensure_profile(db, user.id)
+    application = await db.scalar(
+        select(Application).where(
+            Application.id == application_id, Application.profile_id == profile.id
+        )
+    )
+    if application is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+    result = (await score_profiles(db, application.job, [profile.id]))[profile.id]
+    courses = await courses_closing_gap(db, result.missing)
+    return ApplicationGap(application=application, result=result, courses=courses)

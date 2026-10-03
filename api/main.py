@@ -20,13 +20,16 @@ from api.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from api.core.tasks import close_task_pool
+from api.modules.alerts import router as alerts_router
 from api.modules.analytics import router as analytics_router
 from api.modules.applications import (
     employer_dashboard_router as applications_employer_dashboard_router,
 )
 from api.modules.applications import employer_router as applications_employer_router
+from api.modules.applications import public_router as applications_public_router
 from api.modules.applications import router as applications_router
 from api.modules.assessment import router as assessment_router
+from api.modules.careers import router as careers_router
 from api.modules.geography import router as geography_router
 from api.modules.identity import (
     account_router,
@@ -155,6 +158,7 @@ app.include_router(matching_router)
 app.include_router(analytics_router)
 app.include_router(assessment_router)
 app.include_router(applications_router)
+app.include_router(applications_public_router)
 app.include_router(applications_employer_router)
 app.include_router(applications_employer_dashboard_router)
 app.include_router(interests_router)
@@ -169,6 +173,8 @@ app.include_router(privacy_org_router)
 # badge grantable only on a laptop is the absent writer in a new costume.
 app.include_router(operations_router)
 
+app.include_router(alerts_router)
+app.include_router(careers_router)
 app.include_router(employer_org_router)
 app.include_router(provider_org_router)
 app.include_router(provider_market_router)

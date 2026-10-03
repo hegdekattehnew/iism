@@ -109,6 +109,59 @@ describe("ProviderInbox", () => {
     expect(screen.queryByRole("button", { name: "Mark as contacted" })).toBeNull();
   });
 
+  // The mutation hardcoded "contacted", so a provider had no way to record an
+  // enrolment and the dashboard's enrolled tile could only be fed by seed data.
+  it("marks an interest enrolled", async () => {
+    renderUi(inbox());
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as enrolled" }));
+
+    await waitFor(() => expect(PATCH).toHaveBeenCalledTimes(1));
+    const [, init] = PATCH.mock.calls[0] as [string, { body: Record<string, unknown> }];
+    expect(init.body).toEqual({ status: "enrolled" });
+  });
+
+  it("offers enrolment, and only enrolment, to somebody already contacted", async () => {
+    answer([learner({ status: "contacted" })]);
+    renderUi(inbox());
+
+    expect(await screen.findByRole("button", { name: "Mark as enrolled" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mark as contacted" })).toBeNull();
+  });
+
+  it("shows an enrolled learner as enrolled, and offers no way back", async () => {
+    // "Mark as contacted" used to be offered to anyone not yet contacted --
+    // including somebody enrolled, who could be moved back without a word.
+    answer([learner({ status: "enrolled" })]);
+    renderUi(inbox());
+
+    expect(await screen.findByText("Enrolled")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mark as contacted" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mark as enrolled" })).toBeNull();
+  });
+
+  it("names the server's reason, on the row that failed and no other", async () => {
+    answer([
+      learner({ interest_id: "i1" }),
+      learner({
+        interest_id: "i2",
+        contact: { full_name: "Second Person", phone: "+919000000013", email: null },
+      }),
+    ]);
+    PATCH.mockResolvedValue({
+      error: { detail: "This interest has been withdrawn by the learner" },
+      response: { status: 409 },
+    });
+    renderUi(inbox());
+
+    const buttons = await screen.findAllByRole("button", { name: "Mark as enrolled" });
+    fireEvent.click(buttons[0]);
+
+    expect(
+      await screen.findByText("This interest has been withdrawn by the learner"),
+    ).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
   it("says the inbox is empty rather than rendering an empty list", async () => {
     answer([]);
     renderUi(inbox());

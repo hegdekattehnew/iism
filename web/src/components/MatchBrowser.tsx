@@ -5,17 +5,11 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CoverageBar, LevelScale } from "@/components/CoverageBar";
+import { SkillChip } from "@/components/GapPanel";
 import { ButtonLink, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
-type Missing = {
-  name: string;
-  nos_code?: string | null;
-  importance: number;
-  is_mandatory: boolean;
-};
-type Matched = Missing & { evidence: string; proficiency: number };
 
 function ScoreDial({ score }: { score: number }) {
   const t = useTranslations("matchesPage");
@@ -32,37 +26,6 @@ function ScoreDial({ score }: { score: number }) {
       className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${tone}`}
     >
       {t("matchScore", { score })}
-    </span>
-  );
-}
-
-function SkillChip({
-  skill,
-  held,
-}: {
-  skill: Matched | Missing;
-  held: boolean;
-}) {
-  const t = useTranslations("matchesPage");
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${
-        held
-          ? "border-success-border bg-success-surface text-success-text"
-          : "border-border-token bg-surface text-muted"
-      }`}
-    >
-      {skill.is_mandatory && (
-        <span className="font-semibold uppercase tracking-wide">
-          {t("mandatory")}
-        </span>
-      )}
-      <span>{skill.name}</span>
-      {skill.nos_code && (
-        <span className="font-mono text-[10px] opacity-70">
-          {skill.nos_code}
-        </span>
-      )}
     </span>
   );
 }

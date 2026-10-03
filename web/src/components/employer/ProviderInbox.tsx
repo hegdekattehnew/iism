@@ -5,7 +5,14 @@ import { useFormatter, useTranslations } from "next-intl";
 
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 import { providerDashboardKey } from "@/lib/counts";
+import { ApiError, detailOf, readDetail } from "@/lib/http";
+
+// What a provider may set, from the generated schema. The mutation used to
+// hardcode "contacted", so a provider had no way to record an enrolment and the
+// dashboard's enrolled tile could only ever be fed by seed data.
+type ProviderStatus = components["schemas"]["ProviderStatusIn"]["status"];
 
 /**
  * Who wants this course, and how to reach them.
@@ -40,15 +47,16 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
   });
 
   const setStatus = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, status }: { id: string; status: ProviderStatus }) => {
       const { error, response } = await api.PATCH(
         "/org/{org_slug}/courses/{course_slug}/interests/{interest_id}",
         {
           params: { path: { org_slug: org, course_slug: courseSlug, interest_id: id } },
-          body: { status: "contacted" },
+          body: { status },
         },
       );
-      if (error) throw new Error(String(response.status));
+      const code = response.status;
+      if (error) throw new ApiError(code, readDetail(error));
     },
     // Every mutation that can fail needs an onError: a button that silently
     // does nothing is worse than an error (Sprint 14).
@@ -80,6 +88,8 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
         <ul className="mt-6 space-y-4">
           {items.map((learner) => {
             const withdrawn = learner.status === "withdrawn";
+            // This row's own save, not "some row's".
+            const mine = setStatus.variables?.id === learner.interest_id;
             return (
               <li key={learner.interest_id}>
                 <Card>
@@ -108,6 +118,7 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
                         <Badge tone="good">{t("newBadge")}</Badge>
                       )}
                       {learner.status === "contacted" && <Badge>{t("contactedBadge")}</Badge>}
+                      {learner.status === "enrolled" && <Badge tone="good">{t("enrolledBadge")}</Badge>}
                     </div>
 
                     {withdrawn ? (
@@ -136,21 +147,39 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
                       </div>
                     )}
 
-                    {!withdrawn && learner.status !== "contacted" && (
-                      <div className="mt-4">
+                    {/* Forward only: "contacted" is offered to somebody who has not
+                        been, "enrolled" to anybody not yet enrolled. An enrolled
+                        learner used to be offered "contacted" and could be moved
+                        back without a word. */}
+                    {!withdrawn && learner.status !== "enrolled" && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {learner.status === "registered" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={setStatus.isPending && mine}
+                            onClick={() =>
+                              setStatus.mutate({ id: learner.interest_id, status: "contacted" })
+                            }
+                          >
+                            {setStatus.isPending && mine ? t("saving") : t("markContacted")}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"
-                          disabled={setStatus.isPending}
-                          onClick={() => setStatus.mutate(learner.interest_id)}
+                          disabled={setStatus.isPending && mine}
+                          onClick={() =>
+                            setStatus.mutate({ id: learner.interest_id, status: "enrolled" })
+                          }
                         >
-                          {setStatus.isPending ? t("saving") : t("markContacted")}
+                          {t("markEnrolled")}
                         </Button>
                       </div>
                     )}
-                    {setStatus.isError && (
+                    {setStatus.isError && mine && (
                       <p role="alert" className="mt-3 text-sm text-danger-text">
-                        {t("errorGeneric")}
+                        {detailOf(setStatus.error) ?? t("errorGeneric")}
                       </p>
                     )}
                   </CardBody>
