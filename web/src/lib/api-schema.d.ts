@@ -1406,6 +1406,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/applications/{application_id}/gap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Application Gap
+         * @description Why not me: the standards this application was missing, and the courses
+         *     that teach them. Computed now, from the candidate's skills as they stand.
+         */
+        get: operations["application_gap_me_applications__application_id__gap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/applications/{application_id}/review": {
         parameters: {
             query?: never;
@@ -1456,6 +1477,27 @@ export interface paths {
         post?: never;
         /** Unsave Job */
         delete: operations["unsave_job_me_saved_jobs__job_slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{job_slug}/poster-rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Poster Rating
+         * @description How workers rated whoever posted this vacancy. Empty, never an error,
+         *     for a vacancy with no ratings or one that is not published.
+         */
+        get: operations["poster_rating_jobs__job_slug__poster_rating_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1994,6 +2036,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/candidates/{job_slug}/{reference}/training": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Training
+         * @description The courses that teach the one standard this candidate is missing.
+         */
+        get: operations["training_org__org_slug__candidates__job_slug___reference__training_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/candidates/{job_slug}/{reference}/sponsor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sponsor
+         * @description Offer to sponsor that standard. The candidate is told if they may be.
+         */
+        post: operations["sponsor_org__org_slug__candidates__job_slug___reference__sponsor_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/careers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Career Ladder */
+        get: operations["career_ladder_me_careers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates": {
         parameters: {
             query?: never;
@@ -2260,6 +2359,11 @@ export interface components {
             message?: string | null;
             candidate: components["schemas"]["CandidateCardOut"];
             contact?: components["schemas"]["ContactOut"] | null;
+            /**
+             * Reviewed
+             * @default false
+             */
+            reviewed: boolean;
         };
         /** ApplicantPage */
         ApplicantPage: {
@@ -2268,6 +2372,42 @@ export interface components {
             items?: components["schemas"]["ApplicantOut"][];
             /** Total */
             total: number;
+        };
+        /**
+         * ApplicationGapOut
+         * @description What one of the candidate's own applications was missing ("Why not me").
+         *
+         *     The same shapes a match card uses -- `MissingSkillOut` and
+         *     `CourseSuggestionOut` come from `matching` -- so a rejection and a match name
+         *     the gap identically. Never put in a notification payload: the outbox and an
+         *     email can reach a shared address.
+         */
+        ApplicationGapOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            job: components["schemas"]["JobRef"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Missing */
+            missing?: components["schemas"]["MissingSkillOut"][];
+            /** Missing Mandatory */
+            missing_mandatory: number;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
+            /** Capped By Mandatory */
+            capped_by_mandatory: boolean;
+            /** Courses */
+            courses?: components["schemas"]["CourseSuggestionOut"][];
         };
         /** ApplicationIn */
         ApplicationIn: {
@@ -2304,6 +2444,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Reviewed
+             * @default false
+             */
+            reviewed: boolean;
         };
         /**
          * AssessmentWebhookOut
@@ -2379,6 +2524,7 @@ export interface components {
             hired: number;
             /** Profile Completeness */
             profile_completeness: number;
+            rating?: components["schemas"]["ReputationOut"] | null;
             /** Top Matches */
             top_matches?: components["schemas"]["TopMatchOut"][];
         };
@@ -2518,6 +2664,43 @@ export interface components {
             items: components["schemas"]["CandidateSkillAdd"][];
             /** Preferred Role Title */
             preferred_role_title?: string | null;
+        };
+        /** CareerLadderOut */
+        CareerLadderOut: {
+            anchor?: components["schemas"]["RoleRefOut"] | null;
+            /**
+             * Anchor Source
+             * @enum {string}
+             */
+            anchor_source: "chosen" | "guessed" | "none";
+            /** Needs Choice */
+            needs_choice: boolean;
+            /** Has Skills */
+            has_skills: boolean;
+            /** Steps */
+            steps?: components["schemas"]["CareerStepOut"][];
+        };
+        /** CareerStepOut */
+        CareerStepOut: {
+            role: components["schemas"]["RoleRefOut"];
+            basis: components["schemas"]["StepBasisOut"];
+            /** Variants */
+            variants: number;
+            /** Score */
+            score: number;
+            /** Coverage */
+            coverage: number;
+            /** Missing */
+            missing?: components["schemas"]["MissingSkillOut"][];
+            /** Missing Mandatory */
+            missing_mandatory: number;
+            /** Level Shortfall */
+            level_shortfall?: number | null;
+            /** Experience Shortfall */
+            experience_shortfall?: number | null;
+            /** Courses */
+            courses?: components["schemas"]["CourseSuggestionOut"][];
+            entry?: components["schemas"]["EntryRouteOut"] | null;
         };
         /** CertificationOut */
         CertificationOut: {
@@ -2961,6 +3144,7 @@ export interface components {
             shortlisted: number;
             /** Hired */
             hired: number;
+            rating?: components["schemas"]["ReputationOut"] | null;
             /** Jobs */
             jobs?: components["schemas"]["JobPoolOut"][];
         };
@@ -4123,6 +4307,14 @@ export interface components {
             /** Scarce Skills */
             scarce_skills?: components["schemas"]["ScarceSkillOut"][];
         };
+        /**
+         * PosterRatingOut
+         * @description What a vacancy's page shows about whoever posted it. An object rather
+         *     than a bare `null`, which a client cannot tell from a failed request.
+         */
+        PosterRatingOut: {
+            rating?: components["schemas"]["ReputationOut"] | null;
+        };
         /** PreferredLocationOut */
         PreferredLocationOut: {
             /** State */
@@ -4249,6 +4441,17 @@ export interface components {
             refresh_token: string;
         };
         /**
+         * ReputationOut
+         * @description An average rating and how many it rests on. Absent, not zero, when
+         *     nobody has rated yet (`reputation.py`).
+         */
+        ReputationOut: {
+            /** Average */
+            average: number;
+            /** Count */
+            count: number;
+        };
+        /**
          * ReviewIn
          * @description One direction of a completed gig engagement's rating (Sprint 37, Epic
          *     B8). `subject_role` is never accepted here -- it is fixed by which of the
@@ -4311,6 +4514,19 @@ export interface components {
              * @enum {string}
              */
             match_kind: "exact" | "prefix" | "contains" | "fuzzy" | "alias";
+        };
+        /** RoleRefOut */
+        RoleRefOut: {
+            /** Slug */
+            slug: string;
+            /** Qp Code */
+            qp_code: string;
+            /** Job Role */
+            job_role: string;
+            /** Nsqf Level */
+            nsqf_level: number;
+            /** Sector Name */
+            sector_name?: string | null;
         };
         /**
          * RoleStandardOut
@@ -4612,6 +4828,18 @@ export interface components {
              */
             match_kind: "exact" | "prefix" | "alias" | "text";
         };
+        /**
+         * SponsorOut
+         * @description The same answer whether the candidate was notified or not -- an opt-out
+         *     is a fact about the candidate and must not leak through this endpoint.
+         */
+        SponsorOut: {
+            /**
+             * Offered
+             * @default true
+             */
+            offered: boolean;
+        };
         /** StateOut */
         StateOut: {
             /**
@@ -4634,6 +4862,20 @@ export interface components {
              * @enum {string}
              */
             status: "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
+        };
+        /**
+         * StepBasisOut
+         * @description Why this role is offered, so a reader can judge it rather than trust it.
+         */
+        StepBasisOut: {
+            /** Shared Standards */
+            shared_standards: number;
+            /** Compulsory Count */
+            compulsory_count: number;
+            /** Same Occupation */
+            same_occupation: boolean;
+            /** Shared Nco */
+            shared_nco: boolean;
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -4725,6 +4967,19 @@ export interface components {
             nsqf_level_min?: number | null;
             /** Level Shortfall */
             level_shortfall?: number | null;
+        };
+        /**
+         * TrainingOut
+         * @description The one standard a candidate is missing, and what teaches it.
+         */
+        TrainingOut: {
+            /** Reference */
+            reference: string;
+            standard: components["schemas"]["MissingSkillOut"];
+            /** Courses */
+            courses?: components["schemas"]["CourseSuggestionOut"][];
+            /** Offered */
+            offered: boolean;
         };
         /** TypeFacet */
         TypeFacet: {
@@ -7471,6 +7726,40 @@ export interface operations {
             };
         };
     };
+    application_gap_me_applications__application_id__gap_get: {
+        parameters: {
+            query?: {
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     review_poster_me_applications__application_id__review_post: {
         parameters: {
             query?: never;
@@ -7579,6 +7868,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    poster_rating_jobs__job_slug__poster_rating_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosterRatingOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -8358,6 +8678,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgrammeDistrictsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    training_org__org_slug__candidates__job_slug___reference__training_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                reference: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sponsor_org__org_slug__candidates__job_slug___reference__sponsor_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                reference: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SponsorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    career_ladder_me_careers_get: {
+        parameters: {
+            query?: {
+                /** @description The slug of the role to start from. Omit it and the API guesses once, from the profile, and says so in `anchor_source`. */
+                role?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLadderOut"];
                 };
             };
             /** @description Validation Error */

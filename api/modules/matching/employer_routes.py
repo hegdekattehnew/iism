@@ -52,17 +52,7 @@ def candidate_card(profile: CandidateProfile, result: MatchResult) -> schemas.Ca
         score=result.score,
         coverage=round(result.coverage, 4),
         matched=[schemas.MatchedSkillOut(**vars(m)) for m in result.matched],
-        missing=[
-            schemas.MissingSkillOut(
-                skill_id=m.skill_id,
-                nos_code=m.nos_code,
-                name=m.name,
-                importance=m.importance,
-                is_mandatory=m.is_mandatory,
-                nsqf_level=float(m.nsqf_level) if m.nsqf_level is not None else None,
-            )
-            for m in result.missing
-        ],
+        missing=[schemas.MissingSkillOut.from_missing(m) for m in result.missing],
         missing_mandatory=result.missing_mandatory,
         level_shortfall=(
             float(result.level_shortfall) if result.level_shortfall is not None else None

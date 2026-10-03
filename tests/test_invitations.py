@@ -179,6 +179,32 @@ class TestInviting:
         )
         assert again.status_code == 409
 
+    async def test_an_address_whose_invitation_lapsed_can_be_invited_again(
+        self, client: AsyncClient, db: AsyncSession, owner: tuple[dict[str, str], str]
+    ) -> None:
+        """`uq_invitations_live` cannot mention the clock, so a lapsed invitation
+        still counted as live to the database while the service ignored it: the
+        second invite passed the 409 check and then failed on the unique index
+        with a 500."""
+        headers, slug = owner
+        address = _email("lapsed")
+        first = await _invite(client, owner, address)
+
+        row = await db.get(Invitation, uuid.UUID(first["id"]))
+        assert row is not None
+        row.expires_at = datetime.now(UTC) - timedelta(days=1)
+        await db.commit()
+
+        again = await client.post(
+            f"/org/{slug}/invitations", headers=headers, json={"email": address}
+        )
+        assert again.status_code == 201, again.text
+        assert again.json()["id"] != first["id"]
+
+        # The lapsed row is closed at the moment it lapsed, not left dangling.
+        await db.refresh(row)
+        assert row.revoked_at == row.expires_at
+
     async def test_inviting_an_existing_member_is_refused(
         self, client: AsyncClient, owner: tuple[dict[str, str], str]
     ) -> None:

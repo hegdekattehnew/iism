@@ -223,7 +223,7 @@
 
 ## ADR-008: Career Path Engine
 
-**Status:** Accepted
+**Status:** Accepted. First slice built in Sprint 42 as ADR-049, derived from qualification data rather than the graph below.
 
 **Context:** Need workforce mobility intelligence
 
@@ -2082,3 +2082,184 @@ whichever future ADR cites the number
   but a provider using the web UI has no way to mark a learner enrolled today, only a direct API
   call can. Building that button, and the two i18n labels it needs, is a small follow-up story, not
   bundled here because it was not part of what ADR-025's gate required.
+  **Closed in Sprint 41 (ADR-048's sprint):** `ProviderInbox` now sends the status it is given,
+  offers "Mark as enrolled" forward-only, and the learner's `InterestList` names `enrolled` instead of
+  rendering a raw message key. A provider's change to `contacted` or `enrolled` also queues a free
+  in-app notice to the learner, reversing the "deliberately silent" decision recorded in
+  `provider_service.set_status`'s old docstring.
+
+
+## ADR-048: Hire and Train — An Employer May Prompt a Candidate, Never Learn Who They Are First
+
+**Status:** Accepted (October 2026). Extends ADR-037 (de-identified employer payloads) and the alert
+sweep's rules (Sprint 27). Introduces no revenue mechanism and no external integration.
+
+**Context:** The employer console already shows, per vacancy, the candidates missing exactly one
+mandatory standard ("nearly ready") and names the standard. What an employer could do about it was
+nothing. The market research behind Sprint 41 found that no competitor connects a named missing
+standard to a course an employer could sponsor. The risk is the one ADR-037 exists for: any feature
+that lets an employer *act on* a specific candidate is one step from identifying them.
+
+**Decision:** An employer looking at a one-standard-short card may open "Train and hire", see the
+courses that teach that one standard, and **offer to sponsor** it. The offer is a row in
+`sponsor_intents` (migration 0042), unique per (vacancy, candidate). The candidate receives **one
+in-app notice** (`sponsor_offer`) naming the organisation, the standard and the course, linking to
+the vacancy. **Applying is the act that discloses the candidate** (ADR-037, unchanged): the employer
+learns who they are only if they choose to apply.
+
+Six rules, each enforced in one place and each tested:
+
+1. **A reference is a handle, not a key.** `C-XXXXXXXX` is eight hex characters of a profile id. It is
+   resolved server-side, only inside *this vacancy's own near-miss pool* (`candidates_for_job`, the
+   one scorer), never as a lookup of its own; every way of failing is the same 404.
+2. **No second scorer.** "Who may be offered" is `missing_mandatory == 1` over the same ranking the
+   console shows.
+3. **Unsolicited, so it obeys the alerts' rules:** a candidate with `job_alerts_enabled = false` is
+   not messaged, and an offer counts against the same `max_alerts_per_candidate_per_day` an alert does.
+4. **The employer is never told which.** A notified candidate and an opted-out or capped one produce
+   an identical response; `notified_at` records the difference and only the database holds it,
+   because an opt-out is a fact about the candidate. The panel's wording never claims the candidate
+   was told.
+5. **In-app only, no email.** Unsolicited and employer-initiated; an inbox is not worth it. This is
+   conservative and reversible.
+6. **An offer needs a course.** If nothing on the platform teaches the standard the offer is refused
+   (422): a promise to sponsor training that does not exist cannot be kept.
+
+**Options considered:** 1. Do nothing; leave the near-miss pool informational
+2. A direct employer-to-candidate message
+3. An offer the candidate may respond to, with no identity disclosed until they apply
+4. Reveal the candidate's identity once an offer is accepted
+
+**Trade-offs:**
+
+- Option 1: ✅ No new disclosure surface
+❌ Wastes the console's most actionable number, and leaves the gap → course loop one-sided
+- Option 2: ❌ A free-text channel from an employer to a de-identified person is exactly what ADR-037
+forbids, and a new abuse surface
+- Option 3: ✅ Reuses the consent act that already exists (applying); the employer's payload gains no
+identity field
+❌ The employer cannot tell whether an offer was seen; that is the cost of protecting the opt-out
+- Option 4: ✅ A tighter loop
+❌ Makes "accepting a training offer" a second disclosure act with its own consent record, and
+re-opens the question ADR-037 settled
+
+**Final decision:** Option 3.
+
+**Consequences:**
+
+- Migration 0042 creates `sponsor_intents`, widens `ck_notification_template` (`sponsor_offer`) and
+  `ck_analytics_event_name` (`sponsor_intent_recorded`) by hand with frozen value lists. The event is
+  nameless: subject is the vacancy, payload `{"notified": bool}`, never the candidate.
+- Erasure removes the rows explicitly in both directions (`privacy.service._delete_tenant` and the
+  candidate's own deletion), though the foreign keys would cascade -- "everything went" is a claim an
+  erasure path must not make on assumption. The rows are **not** part of the DPDP export, matching
+  `job_alerts`, which already holds the same kind of record; revisit if the export is widened.
+- Lives in `api/modules/alerts/` beside `JobAlert`, which owns "may we write to this candidate
+  unsolicited" -- the caps and the opt-out are read from one place. The module's old claim that
+  nothing depends on it still holds; it now also has employer-facing routes.
+- **No revenue hook.** Sponsorship records an intent, not a payment, an order or a placement fee.
+  ADR-025's gate and the owner's 2026-09-29 decision to wait for real traffic are unchanged.
+
+
+---
+
+## ADR-049: Career Ladders Are Derived at Read Time From Qualification Data, Not From a Stored Graph
+
+**Status:** Accepted (October 2026). Implements the first slice of ADR-008 (the career path engine)
+without the inference graph ADR-008 and BL-6.3 assumed. Relaxes BL-6.3's dependency on BL-6.1/6.2 for
+this slice only. Introduces no revenue mechanism and no external integration.
+
+**Context:** ADR-008 reserved a `career_paths/` module and BL-6.3 described a graph-based role-transition
+engine that rests on `SkillRelation` (BL-6.1, built in Sprint 36) and skill inference (BL-6.2, not
+built). `SkillRelation` has **zero rows** and nobody has the labelling effort to fill 21,303 standards.
+The national data names no prerequisite between two roles: entry routes carry a *minimum prior NSQF
+level* in 1,882 qualification packs and name a specific pack in five. A worker's most natural question
+-- "what is the next role up from mine, and what would it take" -- therefore had no answer, while the
+market research found nobody else answering it for India's national framework.
+
+**Decision:** A career ladder is **derived at read time** from the qualification data, **states the
+evidence for every step**, and **stores nothing**. `GET /me/careers` (module `api/modules/careers/`, the
+`career_paths/` ADR-008 reserved, named shorter) lists up to eight roles that build on the person's
+own. Three modules each own one question: `skills.roles_above` (which roles build on one), the one
+scorer through `matching.score_against_roles` (the person's fit; ADR-037), and
+`matching.courses_closing_gap` (which courses teach what is missing).
+
+**What counts as a step.** A current qualification pack `T` is a step from `F` when:
+
+1. `T.nsqf_level > F.nsqf_level`, by at most **2.0 levels** (`LADDER_MAX_RISE`) -- a rung, not a leap;
+2. `T` shares **at least one specific compulsory standard** with `F`, compared at concept level (the key
+   `courses_closing_gap` uses). A standard in the compulsory list of **three or more sectors**
+   (`GENERIC_STANDARD_SECTORS`; 81 of 13,618 standards -- "Employability Skills", "Communication
+   Skills") is generic and is not evidence;
+3. `T` has compulsory standards of its own, and is current;
+4. Divyangjan-track packs are excluded unless the starting role is itself one.
+
+Same occupation and a shared NCO code are **returned and shown as corroboration** and break ties; they
+are not grounds. One row per role, collapsing `-SI` and reissued codes by the **same representative
+rule role search uses** -- extracted to a single constant (`ROLE_REPRESENTATIVE_ORDER`) so the two cannot
+name different packs for one job title; verified byte-identical on 699 real queries before and after.
+
+**The starting role is an explicit choice, resolved by the existing role search, and nothing is stored.**
+Without one the service guesses once, from the latest current job title then the preferred roles, and
+**trusts only an exact or alias match of the person's own words**. A prefix, substring or typo is a
+guess about a guess, and every step beneath a wrong starting role would look equally confident. A guess
+is returned as `anchor_source: "guessed"` and the page says so; an unsure guess is `needs_choice` and
+the page asks.
+
+**What the real data showed (4,340 roles with compulsory standards, whole corpus):**
+
+- **38% have at least one step** (1,661); 767 hit the eight-step cap; the query takes 57 ms median,
+  72 ms p95.
+- **Coverage is very uneven by sector.** BFSI 0% of 129, Information Technology Sector 1% of 178,
+  Instrumentation 4%, Electronics 6% of 218, IT-ITeS 8% of 191, Management 12% of 319. In those sectors
+  every pack carries its own standards, so nothing is shared across levels. This is a limit of the
+  *data*, and the page says "we found none ... that can mean there is none, or that the data does not
+  link them" rather than "there is none".
+- **Without the generic-standard rule** a General Duty Assistant "led" to an Automotive technician and a
+  Welder to a Green Hydrogen technician through one shared employability unit; coverage then read 54%
+  and was mostly noise.
+
+**Options considered:** 1. Fill `SkillRelation` by hand/inference, then traverse it (BL-6.2/6.3 as written)
+2. Derive from qualification data at read time, with evidence (chosen)
+3. Derive and also admit "same occupation, higher level" as grounds
+4. Persist a ladder per candidate
+
+**Trade-offs:**
+
+- Option 1: ✅ Could express any transition ❌ No labelled edges exist and a hand-built graph is a claim
+  nobody maintains; blocks the feature on the largest piece of work in Epic B6
+- Option 2: ✅ Every step carries the evidence it came from; nothing to go stale; no new table; reuses
+  the one scorer ❌ 38% overall and ~0% in several large sectors
+- Option 3: ✅ Measured on a sample of 724 roles: 60% have a step (IT-ITeS 11% → 65%) ❌ 27% of the
+  steps then share no standard at all, and narrowing it (occupations of at most 15/30 packs: 54%/57%,
+  16-24% no-shared-standard steps; same sub-sector as well: 52%, 16%) did not remove them. "Same
+  occupation, one level up" is a weaker claim than a shared standard and mixing the two would present
+  them as equal. **Not adopted; revisit with a domain expert** -- if adopted, as a separately labelled
+  weaker tier, never ranked with the first.
+- Option 4: ✅ Faster ❌ A stored ladder is a claim about a person that goes stale; needs erasure,
+  export and a consent story. The gap panel for a rejected application (Sprint 41) took the same view.
+
+**Final decision:** Option 2.
+
+**Consequences:**
+
+- **Migration 0043 adds one event** (`career_ladder_viewed`), hand-written with a frozen value tuple. No
+  table, so **erasure and the DPDP export have nothing to cover** -- verified, not assumed. The event is
+  subject to the *role* the ladder started from; the payload is counts and whether the start was a guess,
+  never a standard (a skill list describes a person) and never a name.
+- `skills.roles_above` is a taxonomy fact and lives with the taxonomy. `matching.score_against_roles`
+  builds `RequiredSkill` from a pack's **compulsory** standards (electives are "choose one of these",
+  as `course_role_alignment` already says) with `importance` a flat 3 -- the source's `weightage` is an
+  assessment mark, not how much a standard matters to the work -- and the lowest entry-route experience
+  floor rounded up. `score_match`, the weights, the retrieval limit and the sort keys are untouched, so
+  the golden set is unaffected. `EntryRouteFit` gained one shared helper so a job's qualification and a
+  ladder's read `QpEntryRoute` the same way.
+- Because every compulsory standard counts as mandatory, a role the person only partly holds is capped
+  at 45 as a vacancy would be. That is the scorer's rule applied consistently, and the page shows
+  "N mandatory standards missing" beside the bar rather than a bare low number.
+- **The cost grows with the steps shown and nothing else:** scoring batches (six statements however many
+  roles), the course lookup is six statements per step. Eight steps is the cap.
+- **`SkillRelation` stays an unused foundation**, and BL-6.2 stays `[LATER]`. If a labelled graph ever
+  exists, it can add steps; it does not replace the evidence rule.
+- The page lives at `/career-paths`, not `/careers`, which is the company's own hiring page linked from
+  the footer.

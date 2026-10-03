@@ -697,6 +697,30 @@ class TestProgrammeByDistrict:
         by_name = {r.district: r.enrolled for r in rows}
         assert by_name == {"Breakdown District": 1, "Unknown": 1}
 
+    async def test_two_districts_with_one_name_stay_two_rows(self, db: AsyncSession) -> None:
+        """Grouping on the name merged Bilaspur in two states into one bar. Two
+        rows with one label read as a bug, so the state is added to both."""
+        first = State(state_code=9111, slug="twin-state-a", name="Twin State A")
+        second = State(state_code=9112, slug="twin-state-b", name="Twin State B")
+        db.add_all([first, second])
+        await db.flush()
+        a = District(district_code=9111, name="Twin Town", state_id=first.id)
+        b = District(district_code=9112, name="Twin Town", state_id=second.id)
+        db.add_all([a, b])
+        await db.flush()
+
+        for district, n in ((a, 2), (b, 1)):
+            for _ in range(n):
+                candidate = await _enrolled_candidate(db, programme="TWIN-TEST", skill_id=None)
+                candidate.district_id = district.id
+        await db.commit()
+
+        rows = await service.programme_by_district(db, "TWIN-TEST")
+        assert {r.district: r.enrolled for r in rows} == {
+            "Twin Town (Twin State A)": 2,
+            "Twin Town (Twin State B)": 1,
+        }
+
     async def test_an_unrecognised_programme_reports_no_rows(self, db: AsyncSession) -> None:
         assert await service.programme_by_district(db, "no-such-programme") == []
 
@@ -913,6 +937,91 @@ class TestCertificationVerification:
         # Left the queue: it is now verified.
         queue = (await client.get("/ops/candidates/certifications", headers=headers)).json()
         assert cert_id not in [row["id"] for row in queue]
+
+    async def test_editing_a_certification_does_not_unlink_its_standard(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The editor sends back the entry it was given, which carries `skill`
+        and not `skill_slug`. Reading that absence as "no standard" silently
+        unlinked the standard on every edit -- invisible until the form could
+        link one at all."""
+        await _skill(db, "edit-keeps-link")
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(
+            client, candidate, name="Ward Care Certificate", skill_slug="edit-keeps-link"
+        )
+
+        edited = await client.put(
+            f"/me/profile/certifications/{cert_id}",
+            headers=candidate,
+            json={"name": "Ward Care Certificate (renewed)", "issuing_body": "NSDC"},
+        )
+        assert edited.status_code == 200
+        cert = next(c for c in edited.json()["certifications"] if c["id"] == cert_id)
+        assert cert["name"] == "Ward Care Certificate (renewed)"
+        assert cert["skill"]["slug"] == "edit-keeps-link"
+
+    async def test_naming_no_standard_on_purpose_does_unlink_it(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await _skill(db, "unlink-on-purpose")
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(
+            client, candidate, name="Certificate", skill_slug="unlink-on-purpose"
+        )
+
+        edited = await client.put(
+            f"/me/profile/certifications/{cert_id}",
+            headers=candidate,
+            json={"name": "Certificate", "skill_slug": None},
+        )
+        cert = next(c for c in edited.json()["certifications"] if c["id"] == cert_id)
+        assert cert["skill"] is None
+
+    async def test_changing_the_standard_clears_the_verification(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """An operator verified this credential against one standard. Pointing
+        it at another would leave a verified badge on a claim nobody checked."""
+        await _skill(db, "verified-standard")
+        await _skill(db, "a-different-standard")
+        candidate = await _candidate(client)
+        cert_id = await _add_certification(
+            client, candidate, name="Certificate", skill_slug="verified-standard"
+        )
+        operator = await _operator(client, db)
+        verified = await client.post(
+            f"/ops/candidates/certifications/{cert_id}/verify",
+            headers=operator,
+            json={"note": CERT_NOTE},
+        )
+        assert verified.status_code == 200
+
+        # Editing without touching the standard keeps the verification.
+        await client.put(
+            f"/me/profile/certifications/{cert_id}",
+            headers=candidate,
+            json={"name": "Certificate, renamed"},
+        )
+        db.expire_all()
+        row = await db.get(CandidateCertification, uuid.UUID(cert_id))
+        assert row is not None and row.verified_at is not None
+
+        # Pointing it at a different standard does not.
+        await client.put(
+            f"/me/profile/certifications/{cert_id}",
+            headers=candidate,
+            json={"name": "Certificate, renamed", "skill_slug": "a-different-standard"},
+        )
+        db.expire_all()
+        row = await db.get(CandidateCertification, uuid.UUID(cert_id))
+        assert row is not None
+        assert row.verified_at is None and row.verified_by is None
+        assert row.verification_note is None
+
+        # ...and it is back in the queue for somebody to check against the new one.
+        queue = (await client.get("/ops/candidates/certifications", headers=operator)).json()
+        assert cert_id in [r["id"] for r in queue]
 
     async def test_a_certification_naming_no_standard_cannot_be_verified(
         self, client: AsyncClient, db: AsyncSession

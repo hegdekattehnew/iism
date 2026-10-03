@@ -53,6 +53,14 @@ export function JobEditor({
     toRequirements(job),
   );
 
+  // A gig is a vacancy with an end and a place: the server refuses one with no
+  // closing date or no resolvable district, so the form says so up front
+  // rather than after the employer has filled in the rest.
+  const [employmentType, setEmploymentType] = useState<string>(
+    job?.employment_type ?? "full_time",
+  );
+  const isGig = employmentType === "gig";
+
   const chosen = new Set(requirements.map((r) => r.skill_slug));
 
   const add = (s: Standard) =>
@@ -141,10 +149,11 @@ export function JobEditor({
                 defaultValue={job?.location_state ?? ""}
               />
             </Field>
-            <Field label={t("district")}>
+            <Field label={t("district")} hint={isGig ? t("gigDistrictHint") : undefined}>
               <Text
                 name="location_district"
                 maxLength={120}
+                required={isGig}
                 defaultValue={job?.location_district ?? ""}
               />
             </Field>
@@ -152,6 +161,7 @@ export function JobEditor({
               <Select
                 name="employment_type"
                 defaultValue={job?.employment_type ?? "full_time"}
+                onChange={(e) => setEmploymentType(e.target.value)}
               >
                 {EMPLOYMENT_TYPES.map(
                   (v) => (
@@ -183,10 +193,11 @@ export function JobEditor({
                 defaultValue={job?.positions ?? 1}
               />
             </Field>
-            <Field label={t("closesAt")} hint={t("closesAtHint")}>
+            <Field label={t("closesAt")} hint={isGig ? t("closesAtGigHint") : t("closesAtHint")}>
               <Text
                 name="closes_at"
                 type="date"
+                required={isGig}
                 defaultValue={job?.closes_at ? job.closes_at.slice(0, 10) : ""}
               />
             </Field>

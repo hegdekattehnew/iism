@@ -11,7 +11,7 @@ from api.modules.applications.models import (
 )
 from api.modules.identity import TenantOut
 from api.modules.matching import CandidateCardOut
-from api.modules.matching.schemas import JobPoolOut
+from api.modules.matching.schemas import CourseSuggestionOut, JobPoolOut, MissingSkillOut
 from api.modules.skills.schemas import NsqfLevel
 
 # Closed on the way out so the generated TypeScript client types a status as a
@@ -53,6 +53,23 @@ class ApplicationIn(BaseModel):
     message: str | None = Field(None, max_length=1_000)
 
 
+class ReputationOut(BaseModel):
+    """An average rating and how many it rests on. Absent, not zero, when
+    nobody has rated yet (`reputation.py`)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    average: float
+    count: int
+
+
+class PosterRatingOut(BaseModel):
+    """What a vacancy's page shows about whoever posted it. An object rather
+    than a bare `null`, which a client cannot tell from a failed request."""
+
+    rating: ReputationOut | None = None
+
+
 class ApplicationOut(BaseModel):
     """The candidate's own view of an application."""
 
@@ -64,6 +81,31 @@ class ApplicationOut(BaseModel):
     message: str | None = None
     applied_at: datetime
     updated_at: datetime
+    # Has this candidate already rated the poster. Without it the rating form
+    # could not tell whether to show itself, and the API answers a second
+    # review with a 409.
+    reviewed: bool = False
+
+
+class ApplicationGapOut(BaseModel):
+    """What one of the candidate's own applications was missing ("Why not me").
+
+    The same shapes a match card uses -- `MissingSkillOut` and
+    `CourseSuggestionOut` come from `matching` -- so a rejection and a match name
+    the gap identically. Never put in a notification payload: the outbox and an
+    email can reach a shared address.
+    """
+
+    application_id: uuid.UUID
+    job: JobRef
+    status: ApplicationStatus
+    score: int
+    coverage: float
+    missing: list[MissingSkillOut] = Field(default_factory=list)
+    missing_mandatory: int
+    level_shortfall: float | None = None
+    capped_by_mandatory: bool
+    courses: list[CourseSuggestionOut] = Field(default_factory=list)
 
 
 class SavedJobOut(BaseModel):
@@ -100,6 +142,8 @@ class ApplicantOut(BaseModel):
     candidate: CandidateCardOut
     # None once withdrawn: the employer keeps the fact and loses the person.
     contact: ContactOut | None = None
+    # Has the employer already rated this worker (see `ApplicationOut.reviewed`).
+    reviewed: bool = False
 
 
 class ApplicantPage(BaseModel):
@@ -143,6 +187,8 @@ class EmployerDashboardOut(BaseModel):
     applied: int
     shortlisted: int
     hired: int
+    # How workers rated this organisation; absent until somebody has.
+    rating: ReputationOut | None = None
     # The per-job breakdown behind the three counts above (Sprint 40) -- the
     # same `JobPoolOut` shape the employer console already returns, imported
     # rather than restated, so the two can never describe a pool differently.
@@ -174,6 +220,8 @@ class CandidateDashboardOut(BaseModel):
     shortlisted: int
     hired: int
     profile_completeness: int
+    # How employers rated this candidate's finished gigs; absent until somebody has.
+    rating: ReputationOut | None = None
     # The `scored` list `match_jobs()` already returns, sliced to its top few
     # (Sprint 40) -- zero new queries, since `dashboard()` already calls it.
     top_matches: list[TopMatchOut] = Field(default_factory=list)

@@ -82,4 +82,89 @@ describe("Notices", () => {
     await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(/Could not mark these as read/)).toBeNull();
   });
+
+
+  // Every notice used to be worded as an application status change, so a job
+  // alert read "Acme moved your application for Cashier to: Applied" about a
+  // vacancy nobody had applied to.
+  describe("wording follows the template", () => {
+    it("words a job alert as a vacancy, not as an application update", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "job_alert",
+            payload: { vacancy: "Cashier", organisation: "Acme", path: "/jobs/cashier-bengaluru" },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(await screen.findByText(/Acme published Cashier/)).toBeTruthy();
+      expect(screen.queryByText(/moved your application/)).toBeNull();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe(
+        "/jobs/cashier-bengaluru",
+      );
+    });
+
+    it("words a closed vacancy as closed", async () => {
+      GET.mockResolvedValue({
+        data: [notice({ template: "vacancy_closed", payload: { vacancy: "Cashier" } })],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(await screen.findByText("Cashier is no longer taking applications.")).toBeTruthy();
+    });
+
+    it("words a provider's update on a course interest", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "course_interest_status_changed",
+            payload: {
+              course: "Phlebotomy Refresher",
+              organisation: "SkillBridge",
+              status: "enrolled",
+              path: "/interests",
+            },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(
+        await screen.findByText(
+          "SkillBridge marked your interest in Phlebotomy Refresher as: Enrolled.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText(/moved your application/)).toBeNull();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/interests");
+    });
+
+    it("says something neutral for a template it does not know", async () => {
+      GET.mockResolvedValue({
+        data: [notice({ template: "something_new", payload: {} })],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(await screen.findByText("You have an update.")).toBeTruthy();
+      expect(screen.queryByText(/moved your application/)).toBeNull();
+    });
+
+    it("never links a notice off-site", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({ template: "job_alert", payload: { vacancy: "Cashier", path: "https://evil.example/x" } }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      await screen.findByText(/Cashier/);
+      expect(screen.queryByRole("link", { name: "Open" })).toBeNull();
+    });
+  });
 });

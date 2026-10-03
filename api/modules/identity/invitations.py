@@ -34,7 +34,7 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.cache import get_redis
@@ -166,6 +166,22 @@ async def invite(
             raise HTTPException(
                 status.HTTP_409_CONFLICT, "They are already a member of this organisation"
             )
+
+    # An expired invitation is still "live" to `uq_invitations_live`, whose
+    # predicate cannot mention the clock, so inviting the same address again
+    # hit the unique index and returned a 500. Close the lapsed row first,
+    # stamped with the moment it actually lapsed rather than now.
+    await db.execute(
+        update(Invitation)
+        .where(
+            Invitation.tenant_id == tenant.id,
+            Invitation.email == address,
+            Invitation.accepted_at.is_(None),
+            Invitation.revoked_at.is_(None),
+            Invitation.expires_at <= now,
+        )
+        .values(revoked_at=Invitation.expires_at)
+    )
 
     live = await _open_invitations(db, tenant.id, now)
     if any(i.email == address for i in live):

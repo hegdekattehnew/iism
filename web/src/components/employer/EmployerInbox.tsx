@@ -4,9 +4,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { CoverageBar } from "@/components/CoverageBar";
+import { ReviewControl } from "@/components/ReviewControl";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
+import { ApiError, detailOf, readDetail } from "@/lib/http";
+
+// Derived from the generated schema, never restated: the hand-written
+// three-value union this replaced is why `completed` and `no_show` could not
+// be set from here at all.
+type EmployerStatus = components["schemas"]["StatusIn"]["status"];
+
+// A finished gig is final. The server refuses any further move, so the card
+// offers none.
+const ENDED = ["completed", "no_show"];
 
 /**
  * Who applied, and how to reach them.
@@ -19,6 +31,7 @@ import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
  */
 export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }) {
   const t = useTranslations("employerInbox");
+  const tr = useTranslations("reviews");
   const tc = useTranslations("employerConsole");
   const format = useFormatter();
   const qc = useQueryClient();
@@ -37,7 +50,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
   });
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "shortlisted" | "rejected" | "hired" }) => {
+    mutationFn: async ({ id, status }: { id: string; status: EmployerStatus }) => {
       const { error, response } = await api.PATCH(
         "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}",
         {
@@ -45,7 +58,10 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
           body: { status },
         },
       );
-      if (error) throw new Error(String(response.status));
+      // Read before the check, and keep what the server said: "only a hired
+      // application can be marked completed" is worth showing.
+      const code = response.status;
+      if (error) throw new ApiError(code, readDetail(error));
     },
     // Every mutation that can fail needs an onError: a form that silently does
     // nothing is worse than an error (Sprint 14).
@@ -59,10 +75,28 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
     },
   });
 
+  // The employer rating the worker. The server fixes the direction by route.
+  const rateWorker =
+    (applicationId: string) =>
+    async (review: { rating: number; comment: string | null }) => {
+      const { error, response } = await api.POST(
+        "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}/review",
+        {
+          params: {
+            path: { org_slug: org, job_slug: jobSlug, application_id: applicationId },
+          },
+          body: review,
+        },
+      );
+      const code = response.status;
+      if (error) throw new ApiError(code, readDetail(error));
+    };
+
   if (isPending) return <Skeleton className="mt-8 h-40 w-full" />;
   if (isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
 
   const items = data.items ?? [];
+  const isGig = data.job.employment_type === "gig";
 
   return (
     <div className="mt-8">
@@ -82,6 +116,10 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
         <ul className="mt-6 space-y-4">
           {items.map((applicant) => {
             const withdrawn = applicant.status === "withdrawn";
+            const ended = ENDED.includes(applicant.status);
+            // This row's own save, not "some row's": one failed or pending save
+            // used to show its error and disable its buttons on every card.
+            const mine = setStatus.variables?.id === applicant.application_id;
             return (
               <li key={applicant.application_id}>
                 <Card>
@@ -104,6 +142,9 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {applicant.status === "applied" && <Badge tone="good">{t("newBadge")}</Badge>}
+                        {["shortlisted", "rejected", "hired", "completed", "no_show"].includes(
+                          applicant.status,
+                        ) && <Badge>{t(`status.${applicant.status}`)}</Badge>}
                         <Badge>{tc("matchScore", { score: applicant.candidate.score })}</Badge>
                       </div>
                     </div>
@@ -142,14 +183,31 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                       </div>
                     )}
 
-                    {!withdrawn && (
+                    {ended && (
+                      <p className="mt-4 text-sm text-muted">{t("endedNote")}</p>
+                    )}
+
+                    {/* `no_show` is deliberately not reviewable: the status
+                        already is the evidence, and there was no work to rate. */}
+                    {isGig && applicant.status === "completed" &&
+                      (applicant.reviewed ? (
+                        <p className="mt-3 text-sm text-muted">{tr("givenWorker")}</p>
+                      ) : (
+                        <ReviewControl
+                          prompt={tr("promptWorker")}
+                          submit={rateWorker(applicant.application_id)}
+                          onSaved={() => qc.invalidateQueries({ queryKey: key })}
+                        />
+                      ))}
+
+                    {!withdrawn && !ended && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {(["shortlisted", "rejected", "hired"] as const).map((status) => (
                           <Button
                             key={status}
                             size="sm"
                             variant={applicant.status === status ? "primary" : "secondary"}
-                            disabled={setStatus.isPending}
+                            disabled={setStatus.isPending && mine}
                             onClick={() =>
                               setStatus.mutate({ id: applicant.application_id, status })
                             }
@@ -161,15 +219,30 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                                 : t("hire")}
                           </Button>
                         ))}
+                        {isGig &&
+                          applicant.status === "hired" &&
+                          (["completed", "no_show"] as const).map((status) => (
+                            <Button
+                              key={status}
+                              size="sm"
+                              variant="secondary"
+                              disabled={setStatus.isPending && mine}
+                              onClick={() =>
+                                setStatus.mutate({ id: applicant.application_id, status })
+                              }
+                            >
+                              {status === "completed" ? t("markCompleted") : t("markNoShow")}
+                            </Button>
+                          ))}
                       </div>
                     )}
 
-                    {setStatus.isError && (
+                    {setStatus.isError && mine && (
                       <p
                         role="alert"
                         className="mt-3 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text"
                       >
-                        {t("errorGeneric")}
+                        {detailOf(setStatus.error) ?? t("errorGeneric")}
                       </p>
                     )}
                   </CardBody>

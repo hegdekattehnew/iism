@@ -11,7 +11,12 @@ from api.modules.skills.roles_routes import router as roles_router
 from api.modules.skills.routes import router
 from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn
 from api.modules.skills.service import (
+    LADDER_MAX_RISE,
+    MAX_LADDER_STEPS,
     QualificationRef,
+    RoleLadder,
+    RoleRef,
+    RoleStepUp,
     SearchHit,
     count_skills,
     embedding_text_for_skills,
@@ -19,6 +24,7 @@ from api.modules.skills.service import (
     get_skill_by_slug,
     list_skills,
     qualifications_for_skill,
+    roles_above,
     search_roles,
     search_skills,
     skill_facets,
@@ -27,11 +33,16 @@ from api.modules.skills.service import (
 
 __all__ = [
     "ALIAS_SCRIPTS",
+    "LADDER_MAX_RISE",
+    "MAX_LADDER_STEPS",
     "SKILL_RELATION_TYPES",
     "SKILL_TYPES",
     "NsqfLevel",
     "NsqfLevelIn",
     "QualificationRef",
+    "RoleLadder",
+    "RoleRef",
+    "RoleStepUp",
     "SearchHit",
     "Skill",
     "SkillAlias",
@@ -43,6 +54,7 @@ __all__ = [
     "list_skills",
     "qualifications_for_skill",
     "roles_router",
+    "roles_above",
     "router",
     "search_roles",
     "search_skills",

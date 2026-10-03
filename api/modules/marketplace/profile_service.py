@@ -450,6 +450,18 @@ async def update_child(
     if entry is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
 
+    if (
+        isinstance(entry, CandidateCertification)
+        and "skill_id" in values
+        and values["skill_id"] != entry.skill_id
+    ):
+        # An operator verified this credential **against a standard**. Pointing
+        # it at a different one would leave a "verified" badge on a claim nobody
+        # checked, so the verification goes with the old link.
+        entry.verified_at = None
+        entry.verified_by = None
+        entry.verification_note = None
+
     for key, value in values.items():
         setattr(entry, key, value)
     await db.commit()

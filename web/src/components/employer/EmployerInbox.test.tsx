@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmployerInbox } from "@/components/employer/EmployerInbox";
@@ -12,7 +12,10 @@ vi.mock(
 );
 
 const GET = vi.fn();
-vi.mock("@/lib/api", () => ({ api: { GET: (...a: unknown[]) => GET(...a), PATCH: vi.fn() } }));
+const PATCH = vi.fn();
+vi.mock("@/lib/api", () => ({
+  api: { GET: (...a: unknown[]) => GET(...a), PATCH: (...a: unknown[]) => PATCH(...a) },
+}));
 
 /**
  * The one screen where a candidate's contact details appear, and the one that
@@ -42,10 +45,14 @@ const applicant = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function answer(items: ReturnType<typeof applicant>[]) {
+function answer(items: ReturnType<typeof applicant>[], employmentType = "full_time") {
   GET.mockResolvedValue({
     data: {
-      job: { slug: "gda-chennai", title: "General Duty Assistant" },
+      job: {
+        slug: "gda-chennai",
+        title: "General Duty Assistant",
+        employment_type: employmentType,
+      },
       total: items.length,
       items,
     },
@@ -56,6 +63,8 @@ function answer(items: ReturnType<typeof applicant>[]) {
 beforeEach(() => {
   resetWorld();
   GET.mockReset();
+  PATCH.mockReset();
+  PATCH.mockResolvedValue({ data: {}, error: undefined, response: { status: 200 } });
 });
 
 const inbox = () => <EmployerInbox org="apollo-care-hospitals" jobSlug="gda-chennai" />;
@@ -97,4 +106,114 @@ describe("EmployerInbox", () => {
   });
 
   void world;
+});
+
+describe("EmployerInbox -- a gig's outcome", () => {
+  // `completed` and `no_show` were reachable through the API from Sprint 37 and
+  // from no screen at all, so a gig could be posted and hired for and never
+  // finished.
+  it("offers completed and did-not-attend for a hired worker on a gig", async () => {
+    answer([applicant({ status: "hired" })], "gig");
+    renderUi(inbox());
+
+    expect(await screen.findByRole("button", { name: "Mark as completed" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Did not attend" })).toBeTruthy();
+  });
+
+  it("does not offer them on a permanent vacancy", async () => {
+    // The server would refuse with a 422; the screen should not ask.
+    answer([applicant({ status: "hired" })], "full_time");
+    renderUi(inbox());
+
+    await screen.findByText("Ward-ready GDA");
+    expect(screen.queryByRole("button", { name: "Mark as completed" })).toBeNull();
+  });
+
+  it("does not offer them before the worker is hired", async () => {
+    answer([applicant({ status: "shortlisted" })], "gig");
+    renderUi(inbox());
+
+    await screen.findByText("Ward-ready GDA");
+    expect(screen.queryByRole("button", { name: "Mark as completed" })).toBeNull();
+  });
+
+  it("sends completed, and nothing else, when the button is pressed", async () => {
+    answer([applicant({ status: "hired" })], "gig");
+    renderUi(inbox());
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as completed" }));
+
+    await waitFor(() => expect(PATCH).toHaveBeenCalledTimes(1));
+    expect(PATCH.mock.calls[0][1].body).toEqual({ status: "completed" });
+  });
+
+  it("shows a finished engagement as final, with no way to move it", async () => {
+    answer([applicant({ status: "completed" })], "gig");
+    renderUi(inbox());
+
+    expect(await screen.findByText(/This engagement has ended/)).toBeTruthy();
+    expect(screen.getByText("Completed")).toBeTruthy();
+    for (const name of [/Shortlist/, /Not suitable/, /Mark as hired/, /Mark as completed/]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+  });
+});
+
+describe("EmployerInbox -- rating the worker", () => {
+  it("asks for a rating once a gig is completed and not yet rated", async () => {
+    answer([applicant({ status: "completed", reviewed: false })], "gig");
+    renderUi(inbox());
+
+    expect(await screen.findByText("How was working with this person?")).toBeTruthy();
+  });
+
+  it("says it was rated, and offers no second form, once it has been", async () => {
+    // The API answers a second review with a 409, so a form that stays on
+    // screen is a form that fails on the next press.
+    answer([applicant({ status: "completed", reviewed: true })], "gig");
+    renderUi(inbox());
+
+    expect(await screen.findByText("You rated this worker.")).toBeTruthy();
+    expect(screen.queryByText("How was working with this person?")).toBeNull();
+  });
+
+  it("offers no rating for a no-show: there was no work to rate", async () => {
+    answer([applicant({ status: "no_show" })], "gig");
+    renderUi(inbox());
+
+    await screen.findByText("Ward-ready GDA");
+    expect(screen.queryByText("How was working with this person?")).toBeNull();
+  });
+
+  it("offers no rating before the gig is completed", async () => {
+    answer([applicant({ status: "hired" })], "gig");
+    renderUi(inbox());
+
+    await screen.findByText("Ward-ready GDA");
+    expect(screen.queryByText("How was working with this person?")).toBeNull();
+  });
+});
+
+describe("EmployerInbox -- one failed save", () => {
+  it("names the server's reason, on the row that failed and no other", async () => {
+    // A single `setStatus.isError` was rendered inside the `.map`, so one
+    // refusal showed its alert on every card and disabled every button.
+    answer([
+      applicant({ application_id: "a1" }),
+      applicant({ application_id: "a2", contact: { full_name: "Second Person", phone: "+919000000002", email: null } }),
+    ]);
+    PATCH.mockResolvedValue({
+      data: undefined,
+      error: { detail: "This application has been withdrawn by the candidate" },
+      response: { status: 409 },
+    });
+    renderUi(inbox());
+
+    const hire = await screen.findAllByRole("button", { name: "Mark as hired" });
+    fireEvent.click(hire[0]);
+
+    expect(
+      await screen.findByText("This application has been withdrawn by the candidate"),
+    ).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
 });

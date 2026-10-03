@@ -1078,6 +1078,24 @@ class TestMarketDemand:
         await db.commit()
         return {"shared": shared, "lonely": lonely, "employer_a": first}
 
+    async def test_a_closed_vacancy_is_no_longer_demand(
+        self, db: AsyncSession, two_employers: dict
+    ) -> None:
+        """`scarce_skills` filtered on `status == "published"`, so a vacancy
+        that had been filled or had expired went on counting as demand."""
+        from datetime import UTC, datetime
+
+        from api.modules.matching.employer import market_scarce_skills
+
+        job_b = await db.scalar(select(Job).where(Job.slug == "market-demand-job-b"))
+        assert job_b is not None
+        job_b.closed_at = datetime.now(UTC)
+        job_b.close_reason = "filled"
+        await db.commit()
+
+        market = {s.nos_code: s for s in await market_scarce_skills(db)}
+        assert market["MKT/N0001"].required_by == 1
+
     async def test_demand_sums_across_every_employer(
         self, db: AsyncSession, two_employers: dict
     ) -> None:

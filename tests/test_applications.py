@@ -801,3 +801,137 @@ async def test_my_applications_are_listed_in_the_language_asked_for(
     ).json()
     assert english[0]["job"]["title"] == "Cashier"
     assert hindi[0]["job"]["title"] == "कैशियर"
+
+
+# ---------------------------------------------------------------- why not me
+
+
+class TestWhyNotMe:
+    """A rejection used to end the conversation. The candidate is told the
+    exact standards that were missing, and the courses that teach them, computed
+    now from their own skills -- nothing recorded, so nothing goes stale."""
+
+    async def _rejected(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> tuple[dict[str, str], dict[str, str], str, str, str]:
+        from api.modules.marketplace.models import Course, CourseSkill
+
+        provider = Tenant(slug="gap-academy", name="Gap Academy", tenant_type="course_provider")
+        db.add(provider)
+        await db.flush()
+        course = Course(
+            slug="process-payments-course",
+            tenant_id=provider.id,
+            title="Process Payments",
+            mode="online",
+            status="published",
+        )
+        db.add(course)
+        await db.flush()
+        db.add(CourseSkill(course_id=course.id, skill_id=vacancy["skill"].id, level_taught=4))
+        await db.commit()
+
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)  # holds nothing, so everything is missing
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+        await client.patch(
+            f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+            headers=employer,
+            json={"status": "rejected"},
+        )
+        return employer, seeker, org, job_slug, created["id"]
+
+    async def test_a_rejected_candidate_sees_what_was_missing_and_how_to_close_it(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _employer, seeker, _org, job_slug, application_id = await self._rejected(
+            vacancy, client, db
+        )
+        response = await client.get(f"/me/applications/{application_id}/gap", headers=seeker)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "rejected"
+        assert body["job"]["slug"] == job_slug
+        assert body["missing_mandatory"] == 1
+        assert [m["nos_code"] for m in body["missing"]] == ["TST/N7001"]
+        assert body["missing"][0]["is_mandatory"] is True
+        assert [c["slug"] for c in body["courses"]] == ["process-payments-course"]
+        assert body["courses"][0]["covers_mandatory"] == 1
+
+    async def test_it_shrinks_as_the_candidate_closes_the_gap(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Computed at view time, so a candidate who has since acquired the
+        standard sees a smaller gap rather than a stale one."""
+        _employer, seeker, _org, _job, application_id = await self._rejected(vacancy, client, db)
+        await client.post(
+            "/me/profile/skills",
+            headers=seeker,
+            json={"skill_slug": "apply-test-standard", "proficiency": 4},
+        )
+
+        body = (await client.get(f"/me/applications/{application_id}/gap", headers=seeker)).json()
+        assert body["missing"] == []
+        assert body["courses"] == []
+
+    async def test_it_works_after_the_vacancy_has_closed(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`match_job_by_slug` answers only for an open vacancy, and the job
+        behind a rejection is very often closed by now."""
+        employer, seeker, org, job_slug, application_id = await self._rejected(vacancy, client, db)
+        closed = await client.post(
+            f"/org/{org}/jobs/{job_slug}/close", headers=employer, json={"reason": "filled"}
+        )
+        assert closed.status_code == 200
+
+        response = await client.get(f"/me/applications/{application_id}/gap", headers=seeker)
+        assert response.status_code == 200
+        assert response.json()["missing_mandatory"] == 1
+
+    async def test_somebody_elses_application_is_a_404_not_a_403(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _employer, _seeker, _org, _job, application_id = await self._rejected(vacancy, client, db)
+        stranger = await _candidate(client)
+
+        refused = await client.get(f"/me/applications/{application_id}/gap", headers=stranger)
+        assert refused.status_code == 404
+        # Byte-identical to an application that does not exist at all.
+        missing = await client.get(f"/me/applications/{uuid.uuid4()}/gap", headers=stranger)
+        assert refused.json() == missing.json()
+
+    async def test_signed_out_and_organisation_only_callers_are_refused(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _employer, _seeker, _org, _job, application_id = await self._rejected(vacancy, client, db)
+        url = f"/me/applications/{application_id}/gap"
+
+        assert (await client.get(url)).status_code == 401
+        organisation = await _organisation(client)
+        assert (await client.get(url, headers=organisation)).status_code in (403, 404)
+
+    async def test_the_employer_learns_nothing_new_and_the_notice_carries_no_gap(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        from api.modules.notifications.models import Notification
+
+        employer, seeker, org, job_slug, application_id = await self._rejected(vacancy, client, db)
+        await client.get(f"/me/applications/{application_id}/gap", headers=seeker)
+
+        # The employer's payload has no gap route and no new field to carry one.
+        listing = (
+            await client.get(f"/org/{org}/jobs/{job_slug}/applications", headers=employer)
+        ).json()["items"][0]
+        assert "courses" not in listing and "gap" not in listing
+
+        # The outbox and an email can reach a shared address, so the rejection
+        # notice links to the page and never carries the gap itself.
+        notice = await db.scalar(
+            select(Notification).where(Notification.template == "application_status_changed")
+        )
+        assert notice is not None
+        assert set(notice.payload) == {"vacancy", "organisation", "status", "path"}

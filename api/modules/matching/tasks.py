@@ -48,15 +48,23 @@ async def _refresh_jobs(db: AsyncSession) -> int:
     from api.modules.marketplace.models import Job, JobSkill
     from api.modules.skills import embedding_text_for_skills
 
+    provider = get_embedding_provider()
     jobs = list(
         await db.scalars(
-            select(Job).where(Job.status == "published", Job.embedding.is_(None)).limit(BATCH_SIZE)
+            select(Job)
+            .where(
+                Job.status == "published",
+                # Missing, or computed by a different model than the one now
+                # configured: vectors from two models are not comparable, and
+                # `embedding IS NULL` alone never revisited the old ones.
+                Job.embedding.is_(None) | Job.embedding_model.is_distinct_from(provider.model),
+            )
+            .limit(BATCH_SIZE)
         )
     )
     if not jobs:
         return 0
 
-    provider = get_embedding_provider()
     for job in jobs:
         skill_ids = list(
             await db.scalars(select(JobSkill.skill_id).where(JobSkill.job_id == job.id))
@@ -80,15 +88,20 @@ async def _refresh_profiles(db: AsyncSession) -> int:
     from api.modules.marketplace.models import CandidateProfile, CandidateSkill
     from api.modules.skills import embedding_text_for_skills
 
+    provider = get_embedding_provider()
     profiles = list(
         await db.scalars(
-            select(CandidateProfile).where(CandidateProfile.embedding.is_(None)).limit(BATCH_SIZE)
+            select(CandidateProfile)
+            .where(
+                CandidateProfile.embedding.is_(None)
+                | CandidateProfile.embedding_model.is_distinct_from(provider.model)
+            )
+            .limit(BATCH_SIZE)
         )
     )
     if not profiles:
         return 0
 
-    provider = get_embedding_provider()
     for profile in profiles:
         skill_ids = list(
             await db.scalars(

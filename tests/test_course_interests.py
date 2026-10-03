@@ -495,6 +495,88 @@ class TestTheProviderIsTold:
         assert {"course_interest_registered", "course_interest_withdrawn"} <= names
 
 
+class TestTheLearnerIsTold:
+    """Sprint 41, the owner's decision. This path was deliberately silent --
+    the provider phones, so a notice would arrive after the call -- but a call
+    can be missed, and an enrolment recorded against somebody who never hears of
+    it is a record they cannot check."""
+
+    async def _setup(self, catalogue: dict, client: AsyncClient, db: AsyncSession):
+        learner = await _candidate(client)
+        await client.post(
+            "/me/course-interests", headers=learner, json={"course_slug": "open-phlebotomy"}
+        )
+        provider = await _owner_of(client, db, catalogue["provider"])
+        listed = (
+            await client.get("/org/learn-co/courses/open-phlebotomy/interests", headers=provider)
+        ).json()["items"][0]
+        url = f"/org/learn-co/courses/open-phlebotomy/interests/{listed['interest_id']}"
+        return learner, provider, url
+
+    async def _notices(self, client: AsyncClient, learner: dict[str, str]) -> list[dict]:
+        everything = (await client.get("/me/notifications", headers=learner)).json()
+        return [n for n in everything if n["template"] == "course_interest_status_changed"]
+
+    async def test_marking_contacted_queues_an_in_app_notice(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        learner, provider, url = await self._setup(catalogue, client, db)
+        await client.patch(url, headers=provider, json={"status": "contacted"})
+
+        notices = await self._notices(client, learner)
+        assert len(notices) == 1
+        assert notices[0]["payload"]["status"] == "contacted"
+        assert notices[0]["payload"]["course"] == "Phlebotomy Refresher"
+        assert notices[0]["payload"]["path"] == "/interests"
+
+    async def test_marking_enrolled_is_a_second_notice(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        learner, provider, url = await self._setup(catalogue, client, db)
+        await client.patch(url, headers=provider, json={"status": "contacted"})
+        await client.patch(url, headers=provider, json={"status": "enrolled"})
+
+        statuses = sorted(n["payload"]["status"] for n in await self._notices(client, learner))
+        assert statuses == ["contacted", "enrolled"]
+
+    async def test_pressing_the_same_status_again_tells_nobody_twice(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        learner, provider, url = await self._setup(catalogue, client, db)
+        await client.patch(url, headers=provider, json={"status": "contacted"})
+        await client.patch(url, headers=provider, json={"status": "contacted"})
+
+        assert len(await self._notices(client, learner)) == 1
+
+    async def test_it_is_in_app_only_and_names_no_person(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        learner, provider, url = await self._setup(catalogue, client, db)
+        await client.patch(url, headers=provider, json={"status": "enrolled"})
+
+        rows = list(
+            await db.scalars(
+                select(Notification).where(
+                    Notification.template == "course_interest_status_changed"
+                )
+            )
+        )
+        assert [r.channel for r in rows] == ["in_app"]
+        # The course and the organisation; nobody's name, phone or address.
+        assert set(rows[0].payload) == {"course", "organisation", "status", "path"}
+
+    async def test_a_withdrawn_interest_is_still_refused_and_tells_nobody(
+        self, catalogue: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        learner, provider, url = await self._setup(catalogue, client, db)
+        interest_id = url.rsplit("/", 1)[1]
+        await client.post(f"/me/course-interests/{interest_id}/withdraw", headers=learner)
+
+        refused = await client.patch(url, headers=provider, json={"status": "contacted"})
+        assert refused.status_code == 409
+        assert await self._notices(client, learner) == []
+
+
 class TestProviderDashboard:
     """A course provider's landing numbers (Sprint 39, BL-10.3) -- the direct
     payoff of ADR-047's `"enrolled"` status finally having a screen."""

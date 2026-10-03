@@ -70,6 +70,11 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/ReviewControl.tsx",
+    label: "ReviewIn",
+    expect: { comment: ["maxLength={1000}"] },
+  },
+  {
     file: "components/profile/AboutSection.tsx",
     label: "CandidateProfileUpdateFull",
     expect: {

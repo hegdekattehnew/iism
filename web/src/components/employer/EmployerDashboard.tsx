@@ -19,6 +19,7 @@ import { useEmployerDashboard } from "@/lib/org";
  */
 export function EmployerDashboard({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("employerWorkspace.dashboard");
+  const tr = useTranslations("reviews");
   const dashboard = useEmployerDashboard(orgSlug);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -42,6 +43,14 @@ export function EmployerDashboard({ orgSlug }: { orgSlug: string }) {
       <div className="flex flex-wrap gap-x-8 gap-y-4">
         <StatTile value={data.posted_jobs} label={t("postedJobs")} />
         <StatTile value={data.open_jobs} label={t("openJobs")} />
+        {/* Absent until a worker has rated this organisation, never a zero. */}
+        {data.rating && (
+          <StatTile
+            value={data.rating.average}
+            label={tr("asEmployer")}
+            secondary={tr("count", { count: data.rating.count })}
+          />
+        )}
       </div>
 
       <StatusFunnel

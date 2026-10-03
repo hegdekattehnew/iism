@@ -6,12 +6,17 @@ import { useFormatter, useTranslations } from "next-intl";
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 
-type Status = "registered" | "withdrawn" | "contacted";
+// From the generated client, never restated: the hand-written three-value copy
+// plus a cast let `enrolled` reach this screen with no colour and no wording,
+// so a learner who had been enrolled saw a raw message key.
+type Status = components["schemas"]["InterestOut"]["status"];
 
 const TONE: Record<Status, string> = {
   registered: "bg-surface-muted text-foreground",
   contacted: "bg-success-surface text-success-text",
+  enrolled: "bg-success-surface text-success-text",
   withdrawn: "bg-warning-surface text-warning-text",
 };
 
@@ -44,7 +49,7 @@ export function InterestList() {
   return (
     <ul className="mt-8 space-y-4">
       {data.map((interest) => {
-        const status = interest.status as Status;
+        const status: Status = interest.status;
         return (
           <li key={interest.id}>
             <Card>

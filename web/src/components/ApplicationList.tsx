@@ -1,12 +1,16 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
+import { useState } from "react";
 
+import { GapPanel } from "@/components/GapPanel";
+import { ReviewControl } from "@/components/ReviewControl";
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
+import { ApiError, readDetail } from "@/lib/http";
 
 // From the generated client, never restated: a hand-written copy plus a cast
 // let `completed`/`no_show` reach this screen with no colour and no compile error.
@@ -33,7 +37,10 @@ const TONE: Record<Status, string> = {
 export function ApplicationList() {
   const t = useTranslations("applications");
   const format = useFormatter();
+  const tr = useTranslations("reviews");
   const title = useTitle();
+  const qc = useQueryClient();
+  const [gapOpen, setGapOpen] = useState<string | null>(null);
   const { data, isPending, isError } = useQuery({
     queryKey: ["me", "applications"],
     queryFn: async () => {
@@ -42,6 +49,18 @@ export function ApplicationList() {
       return data;
     },
   });
+
+  // The worker rating whoever posted the gig. The server fixes the direction.
+  const ratePoster =
+    (applicationId: string) =>
+    async (review: { rating: number; comment: string | null }) => {
+      const { error, response } = await api.POST("/me/applications/{application_id}/review", {
+        params: { path: { application_id: applicationId } },
+        body: review,
+      });
+      const code = response.status;
+      if (error) throw new ApiError(code, readDetail(error));
+    };
 
   if (isPending) return <Skeleton className="mt-8 h-32 w-full" />;
   if (isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
@@ -88,6 +107,34 @@ export function ApplicationList() {
                     }),
                   })}
                 </p>
+                {status === "rejected" && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      aria-expanded={gapOpen === application.id}
+                      aria-controls={`gap-${application.id}`}
+                      onClick={() => setGapOpen((cur) => (cur === application.id ? null : application.id))}
+                      className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    >
+                      {gapOpen === application.id ? t("hideGap") : t("whyNotMe")}
+                    </button>
+                    {gapOpen === application.id && (
+                      <div id={`gap-${application.id}`}>
+                        <GapPanel applicationId={application.id} />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {status === "completed" &&
+                  (application.reviewed ? (
+                    <p className="mt-3 text-sm text-muted">{tr("givenPoster")}</p>
+                  ) : (
+                    <ReviewControl
+                      prompt={tr("promptPoster", { organisation: application.job.tenant.name })}
+                      submit={ratePoster(application.id)}
+                      onSaved={() => qc.invalidateQueries({ queryKey: ["me", "applications"] })}
+                    />
+                  ))}
               </CardBody>
             </Card>
           </li>

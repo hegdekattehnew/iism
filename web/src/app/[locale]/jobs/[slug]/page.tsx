@@ -32,6 +32,14 @@ export default async function JobDetailPage({
   if (response.status === 404) notFound();
   if (error || !data) throw new Error(`API responded ${response.status}`);
 
+  // How workers rated whoever posted this. A second, optional call: a failure
+  // here is "no rating to show", never a reason the vacancy fails to load.
+  const rated = await api
+    .GET("/jobs/{job_slug}/poster-rating", { params: { path: { job_slug: slug } } })
+    .then((r) => r.data?.rating ?? null)
+    .catch(() => null);
+  const tr = await getTranslations("reviews");
+
   const title = data.title;
   const description =
     data.description;
@@ -91,6 +99,17 @@ export default async function JobDetailPage({
         {data.location_district ? ` · ${data.location_district}` : ""}
         {data.location_state ? `, ${data.location_state}` : ""}
       </p>
+      {rated && (
+        <p className="mt-1 text-sm text-muted">
+          {tr("ofPoster")}:{" "}
+          {tr("summary", {
+            average: new Intl.NumberFormat(locale === "hi" ? "hi-IN" : "en-IN", {
+              maximumFractionDigits: 1,
+            }).format(rated.average),
+            count: rated.count,
+          })}
+        </p>
+      )}
 
       <dl className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-border-token bg-surface p-5 text-sm sm:grid-cols-2">
         <div>

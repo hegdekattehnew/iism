@@ -10,12 +10,15 @@ anything that reached back into this would be coupling a request path to a
 worker's schedule.
 """
 
-from api.modules.alerts.models import JobAlert
+from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.alerts.service import close_expired, sweep
+from api.modules.alerts.sponsor_routes import router
 from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 
 __all__ = [
     "JobAlert",
+    "SponsorIntent",
+    "router",
     "close_expired",
     "close_expired_jobs",
     "send_job_alerts",

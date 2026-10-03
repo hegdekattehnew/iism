@@ -4,20 +4,15 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-02 · **Sprints 1–40 built, and `v2/foundations` is gone** — its last
-commit (`8e7e179`) is merged into `main` at `b15e0c6` via PR #14, and the branch was deleted both
-locally and on `origin`. There is currently **no feature branch**; the next session's first
-decision is whether to cut one before touching code. Sprint 39 gave every actor type a real
-`StatTile` dashboard on sign-in (Epic B10). Sprint 40 replaced those flat tile rows with hand-rolled
-chart primitives — `RankedBarList`, `ProgressRing`, `StatusFunnel` — and inline drilldowns on all
-five dashboards (Epic B11, no new npm dependency), then fixed a real, reported bug in role search
-and job search ("software engineer" resolved to an entry-level coding certificate; "tech" found
-irrelevant Technician roles and missed the whole IT sector) by moving `role_aliases` from a Python
-dict to a table, adding generic word-synonym query expansion, and laying a real (off-by-default)
-`sentence-transformers` embedding foundation per ADR-013/031. Landing it on `main` needed a second,
-unplanned piece of work: PR #12's CI was red on pre-existing `pyjwt`/`urllib3`/`next` CVEs, and
-fixing those collided with a Dependabot bump already merged into `main` — see the Sprint 40 entry
-in §11 and the new gotchas in §8 for both.
+**Last updated:** 2026-10-03 · **Sprints 1–42 built.** Sprints 41 and 42 are both implemented and
+verified and both **uncommitted on branch `sprint-41`** (cut from `main` at `9f339c7`, which already
+carries the October audit's nine fixes via PR #16) — so one commit would mix them; split by file if two
+are wanted. Sprint 41 finished the features that existed only on the server and shipped "Why not me" and
+"Hire and train" (ADR-048). **Sprint 42 shipped career ladders (ADR-049)**: `/career-paths`, "the roles
+that build on yours and what it would take", derived at read time from the national qualification data
+with the evidence for every step shown and **nothing stored**. It is honest about its reach — **38% of
+roles have a step, and BFSI, IT and Electronics are near zero** because those sectors share no standards
+across levels. Monetisation and every real external integration stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -33,11 +28,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | **none** — `main` only. `v2/foundations` merged into `main` at `b15e0c6` via PR #14 (2026-10-02) and was then deleted, locally and on `origin`. Cut a new branch before starting the next sprint. |
-| **Last sprint** | 40 — Epic B11 dashboard visualisation (charts + drilldowns on all five actor dashboards) and a cross-sector role-search/job-search relevance fix, landed on `main` after resolving a `uv.lock` conflict against a Dependabot bump |
-| **Next sprint** | not yet chosen. `BL-1.3` stays not started (owner chose to wait for real traffic, Sprint 38). The semantic-search foundation (`embedding_provider="sentence_transformer"`) is built but switched off everywhere — turning it on in any real environment is a separate, later decision (model caching, image size, memory). |
-| **Tests** | 870 backend (`make check`), 288 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0040`; 47 ADRs |
+| **Branch** | `sprint-41`, **uncommitted** — holds Sprint 41 *and* Sprint 42 (nothing committed or pushed; the owner has not asked). Cut from `main` at `9f339c7`. |
+| **Last sprint** | 42 — career ladders (ADR-049): `GET /me/careers`, `/career-paths`, `skills.roles_above`, `matching.score_against_roles`, migration 0043 (one analytics event). Before it, 41 — the half-built finished, "Why not me", "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: the district skill-gap view, course credit chips, an owner rule on withdraw-then-reapply, and — for the ladder's reach — a domain expert's view on whether "same occupation, one level up" may be a *separately labelled weaker tier* (see ADR-049). `BL-1.3` stays not started (owner chose to wait for real traffic, Sprint 38). |
+| **Tests** | 972 backend (`make check`, 2026-10-03), 356 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0043`; 49 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -915,6 +910,35 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
     further, which is the signal the hand-edit was correct), then `uv sync --locked --extra dev` and
     the full suite before trusting it.
 
+58. **The Terminal panel's shell eats the first character of a command.** oh-my-zsh's prompt
+    redraw swallowed the `m` of `make api`. Start commands with a leading space, and confirm the
+    prompt is back before sending the next one.
+59. **A foreground or background shell has a time limit; a long suite needs `timeout` set.**
+    `make check` is ~85 s and passes at the default, but an import plus a seed does not — pass the
+    explicit timeout rather than concluding the command hung.
+60. **Edit a file in one step, not two.** A string replace that adds a use before the declaration is
+    live to HMR the instant it is written: the browser logged `ReferenceError: now is not defined`
+    from the half-applied state. The console buffer is cumulative, so judge a fix by whether the
+    **count grows after a fresh load**, not by whether old errors are still listed.
+
+61. **A nullable boolean sorts first on `DESC`.** `qp.occupation_id = f.occupation_id` is NULL when either
+    side is, `NULL OR false` is NULL, and Postgres puts NULLs *first* on `ORDER BY ... DESC`. Python's
+    `bool(row.x)` then hid it from every read. `coalesce(expr, false)` in the SQL, and a test whose two
+    candidates differ only in that flag.
+62. **A rule that passes every fixture can still read as nonsense on the real corpus.** The ladder's first
+    version passed its tests and "led" a General Duty Assistant to an Automotive technician. Print real
+    output for a handful of roles you can judge before trusting a derived rule, and measure its reach over
+    the whole corpus rather than a sample — a 310-role sample said 42% and 79% for two versions of the
+    same query; the full run said 38%.
+63. **`/careers` is not the career ladder.** It is the company's own hiring placeholder (`PlaceholderPage`
+    with `titleKey="careers"`), linked from the footer. The ladder is `/career-paths`; the API is
+    `/me/careers`. Check `ls web/src/app/[locale]/` before naming a route.
+64. **macOS `sed -i` takes the next argument as a backup suffix.** `sed -i 's/a/b/' file` fails with
+    "undefined label"; use `sed -i.bak ... && rm file.bak`, or a short Python replace. This cost a failed
+    edit twice this sprint.
+65. **Next 16 keeps dev output in `.next/dev`, so `npm run build` is safe beside a running `make web`.**
+    The budget script reads `.next/diagnostics/route-bundle-stats.json` from the build.
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -928,7 +952,15 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Merged 2026-10-02, and the branch is now gone.** PR #14 (`v2/foundations` → `main`, head
+**Working on `sprint-41`, uncommitted — Sprints 41 and 42 together.** Cut from `main` at `9f339c7` (the
+October audit's PR #16). Nothing is committed or pushed; commit only when the owner asks. Sprint 42's
+files are new (`api/modules/careers/`, `tests/test_career_ladder_roles.py`, `tests/test_role_scoring.py`,
+`tests/test_careers.py`, `migrations/versions/0043_*.py`, `web/src/components/CareerLadder*.tsx`,
+`web/src/app/[locale]/career-paths/`) plus edits to `skills/service.py`, `matching/service.py`,
+`matching/__init__.py`, `analytics/models.py`, `main.py`, the messages, `CandidateDashboard.tsx`,
+`GapPanel.tsx`, `CLAUDE.md` and ADR-049 — separable if two commits are wanted.
+
+**Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
 the API, not assumed). `v2/foundations` was then deleted both locally and on `origin` — there is
 **no feature branch right now**, only `main`. PRs #12 and #13 show as closed-without-merging in
@@ -1707,6 +1739,119 @@ against each of the four reachable seeded demo accounts (`+919000000001`,
 `hiring@apollo-care.example` as both employer *and* operator, `admin@skillbridge-institute.example`)
 showing real charts, real drilldowns, and the corrected search results — not just passing tests.
 
+### Sprint 41 — finish the half-built, then two differentiators (done 2026-10-03, uncommitted)
+
+The audit found the strongest parts of the product (the explainable gap, the course loop) and
+several features built on the server and never shown. The market research found nobody else tells a
+rejected candidate what they were missing, or lets an employer sponsor the missing standard.
+Owner decisions: monetisation and external integrations deferred; Standard size; the learner notice
+is **in-app only**, no email.
+
+- **Notices say the right thing.** `Notices.tsx` rendered every notice as "moved your application",
+  so a job alert read as a status change. It now switches on `template`. It also passes `useNow()`
+  to `relativeTime` — without it next-intl logs an `ENVIRONMENT_FALLBACK` error per notice, which is
+  what the Next dev "1 issue" badge was (it predates this sprint).
+- **Gig completion.** `completed`/`no_show` are terminal on the server (a finished row cannot go back
+  to `hired`), shown on the employer card. Dashboards count `FILLED_STATUSES` rather than `hired`.
+- **Two-sided ratings and reputation.** `ReviewControl` serves both directions; the API answers 409
+  on a duplicate and offers no way to ask first, so both application payloads carry `reviewed` and
+  the control disappears once used. Average and count appear on a poster's job page, the employer
+  dashboard and the worker's own dashboard — **never on the candidate card** (ADR-037) — and a
+  poster with no ratings is `None`, not 0.0.
+- **Enrolled, and the learner is told.** `InterestList`/`ProviderInbox` had hidden `enrolled`
+  (a raw message key, no button, a provider could downgrade it). `provider_service.set_status`
+  queues an in-app `course_interest_status_changed` notice on a *change* to `contacted`/`enrolled`;
+  a repeat tells nobody twice.
+- **Certification linking.** The profile form can finally link a certification to a standard, so the
+  operator queue is no longer empty by construction. Editing used to send `skill` where the server
+  expects `skill_slug` and silently unlinked it; changing the standard now clears `verified_at`.
+- **Why not me.** `GET /me/applications/{id}/gap` (404 for anyone else's), computed **at view time**
+  through `matching.score_profiles` and `courses_closing_gap` and never recorded, so the panel
+  shrinks as the candidate closes the gap. The rejection notice links to `/applications` and **never
+  carries the gap in its payload** — the outbox and email can reach a shared address. A closed
+  vacancy still resolves (`match_job_by_slug` would refuse it).
+- **Hire and train (ADR-048).** `alerts/sponsorship.py`: an employer opens the one-standard-short
+  card, sees the courses for that standard, and may offer to sponsor. The `C-XXXXXXXX` reference is a
+  handle, not a key — it resolves server-side only inside that vacancy's own near-miss pool, and an
+  unknown vacancy, an out-of-pool reference and a not-actually-near candidate are all the same 404.
+  `sponsor_intents` is unique on `(job_id, profile_id)`. The offer obeys the alerts' rules (opt-out,
+  shared daily cap) and the response is identical whether or not the candidate was notified, so an
+  opt-out never leaks. Refused (422) when no course teaches the standard. The candidate gets one
+  notice naming the organisation, standard and course, and applies if they choose — the employer
+  never learns who they are before that. Erasure covers the new table. Mutation-tested: removing the
+  opt-out check or the near-pool filter each fails a test.
+- **Hardening bundle** (each with a test that fails on the old code): re-inviting an address whose
+  invitation expired no longer 500s; `drain` uses `FOR UPDATE SKIP LOCKED` so two workers cannot
+  double-send; candidate dashboard `match_count` no longer caps at 20; the embedding sweeps recompute
+  rows whose `embedding_model` differs and skip the role sweep under the hashing provider;
+  `programme_by_district` groups by district id, not name; `_scarce_skills` counts only open
+  vacancies as demand.
+- **Two migrations, not one.** `0041` widens the notification-template CHECK; `0042` creates
+  `sponsor_intents` and widens the analytics CHECK. Both hand-written with frozen value lists;
+  round-trip down/up and `alembic check` clean.
+- **Verified.** `make check` 928 passed; web 346 passed with `tsc` and `eslint` clean; a 31-check
+  live script against the running API (demo organisations, throwaway candidates, all erased); in the
+  browser: the "See what you were missing" panel and "Train and hire" on exactly the one card that is
+  one mandatory standard short. Heaviest route 678 of 684 KB — **6 KB of headroom**.
+- **Left for later:** ~~career ladders~~ **(built in Sprint 42, ADR-049)**, a district skill-gap view,
+  course credit chips, and an **owner rule** on withdraw-then-reapply (it currently resets the
+  employer's decision).
+
+### Sprint 42 — career ladders: where could I move next (done 2026-10-03, uncommitted)
+
+The one differentiator from the market research still unbuilt. ADR-008 and BL-6.3 assumed an inference
+graph (`SkillRelation`); it has **zero rows**, and the national data names no prerequisite between two
+roles (entry routes carry a *minimum prior level* in 1,882 packs and name a pack in five). So a ladder
+is **derived at read time from qualification data, states the evidence for every step, and stores
+nothing** — ADR-049. The page is **`/career-paths`**, because `/careers` is the company's own hiring
+placeholder, linked from the footer.
+
+- **Three modules each own one question.** `skills.roles_above` (which roles build on one), the one
+  scorer through `matching.score_against_roles` (the person's fit; ADR-037, no second scorer), and
+  `matching.courses_closing_gap`. A new leaf module `api/modules/careers/` composes them; it owns no
+  table, so erasure and export have nothing to cover.
+- **What counts as a step.** Higher level by at most 2.0; at least one **specific** shared compulsory
+  standard, compared at concept level; the pack is current and has compulsory standards of its own;
+  Divyangjan-track packs are left out unless the anchor is one. Same occupation and shared NCO code are
+  *corroboration* — shown, tie-breaking, never grounds.
+- **A standard compulsory in three or more sectors is generic and is not evidence** (81 of 13,618:
+  "Employability Skills" and the like). Without that rule a General Duty Assistant "led" to an Automotive
+  technician through one shared employability unit. This was found by looking at real output, not by a
+  test: the first version of the rule passed every fixture and read as nonsense on the live corpus.
+- **One rule for "which pack is the role".** The representative-pack ordering was embedded in role
+  search's SQL; copying it is how the two would drift, so it is `ROLE_REPRESENTATIVE_ORDER`, used by
+  both. Proved byte-identical on 699 real queries (3,015 hits) before and after, and a test holds the
+  ladder's pick to role search's.
+- **The starting role is the person's choice, or a guess trusted only on an exact/alias match of their own
+  words** (latest current job title, then preferred roles), flagged `guessed` and shown as one. A prefix,
+  a substring or a typo is a guess about a guess, and a ladder from the wrong role is about somebody else.
+- **Measured over the whole corpus (4,340 roles with compulsory standards): 38% have a step**; median
+  query 57 ms, p95 72 ms. **By sector it is very uneven**: BFSI 0% of 129, Information Technology Sector
+  1% of 178, Instrumentation 4%, Electronics 6% of 218, IT-ITeS 8% of 191, Management 12% of 319 — those
+  sectors give every pack its own standards, so nothing is shared across levels. The page says "we found
+  none … that can mean there is none, or that the data does not link them", not "there is none".
+- **A looser rule was measured and deliberately not adopted.** Admitting "same occupation, higher level"
+  lifts a 724-role sample from 39% to 60% (IT-ITeS 11% → 65%) but 27% of those steps then share no
+  standard at all, and narrowing it by occupation size (≤15/≤30 packs) or by sub-sector (52%) left 16–24%
+  of them in. It is a weaker claim, and mixing it with the first would show them as equal. If it is ever
+  adopted it must be a **separately labelled weaker tier**. The real fix for the dead sectors is data.
+- **Cost:** scoring batches (six statements however many roles); the course lookup is six statements per
+  step shown, eight steps at most — a fixed ceiling, with a test.
+- **A real bug the first test found:** `same_occupation` is NULL, not false, for a pack with no
+  occupation, and Postgres sorts NULLs *first* on `DESC` — so uncorroborated steps ranked **ahead** of
+  corroborated ones. Fixed with `coalesce(..., false)`; the Python layer's `bool()` had been hiding it.
+- **Verified.** `make check` 972 passed (928 + 44 new across three files); web 356; `tsc`/`eslint`
+  clean; `make evaluate` — all 34 golden pairs, 7 orderings and 16 course expectations hold; migration 0043
+  round-trips and `alembic check` is clean; the build adds `/[locale]/career-paths` and **no existing
+  route grew** (heaviest still `/profile` at 678 of 684 KB, `/matches` 661); live against the real corpus as
+  the seeded demo candidate, both locales, in the browser. Each ladder rule has a test where it is the
+  *only* reason a row is out, and removing each rule fails exactly its own test.
+- **A layout bug found in the browser, not by a test:** `SkillChip` (shared by the match page, the rejection
+  panel and now this) was three unwrapped columns, so on a phone a long standard name collapsed to a word
+  a line and the code ran off the card. It now wraps (`flex-wrap`, `max-w-full`).
+- **Left for later:** the weaker-tier question above; a stored "current role" on the profile (a migration
+  and a consent-style act); inference from `SkillRelation` (BL-6.2, still `[LATER]`); pay or demand on a step.
+
 ### Also outstanding, in rough order
 
 - ~~**Grow the golden set.**~~ **Done 2026-09-23 (Sprint 29)**: 34 pairs, 7 orderings and 16 course
@@ -1750,10 +1895,11 @@ that sells courses, connects jobs, and carries gig work.*
   `Application` carries the completion event (`completed`/`no_show`, reachable only from `hired`)
   and a full two-sided `application_reviews` table is the reputation layer, foundation-only (a
   writer, no reader yet, the `SkillRelation` shape). An employer can post a gig and a candidate
-  can find, apply to and track one in the interface. What is genuinely still missing: the
-  employer's controls to mark a gig completed or a no-show and both sides' rating form (API only
-  today), and any payment/payout, which ADR-045 §5 and ADR-025/ADR-043's billing gate both still
-  forbid.
+  can find, apply to and track one in the interface. **Sprint 41 built the rest of the interface**:
+  the employer's completed / no-show controls, both sides' rating form, and the reputation figures
+  (a poster's on the job page and employer dashboard, a worker's on their own dashboard — never on the
+  de-identified candidate card). What is genuinely still missing is any payment/payout, which ADR-045 §5
+  and ADR-025/ADR-043's billing gate both still forbid.
 
 **Nothing built so far has to be undone for any of it**, which is the important finding. The
 expensive assets — 21,303 NSQF standards with role search, one pure deterministic scorer, one

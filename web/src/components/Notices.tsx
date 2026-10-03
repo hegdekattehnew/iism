@@ -1,11 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useNow, useTranslations } from "next-intl";
 
 import { Alert, Button } from "@/components/ui";
+import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { ApiError, detailOf, readDetail } from "@/lib/http";
+
+/** An in-app path from a payload, and nothing else: a notice never links off-site. */
+function linkOf(value: unknown): string | null {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : null;
+}
 
 /**
  * What changed since you last looked.
@@ -21,6 +29,8 @@ import { ApiError, detailOf, readDetail } from "@/lib/http";
 export function Notices() {
   const t = useTranslations("notices");
   const format = useFormatter();
+  // Passed explicitly: with no `now`, next-intl logs an ENVIRONMENT_FALLBACK error per notice.
+  const now = useNow();
   const qc = useQueryClient();
 
   const { data } = useQuery({
@@ -54,6 +64,34 @@ export function Notices() {
   const unread = notices.filter((n) => !n.read_at);
   if (unread.length === 0) return null;
 
+  // The wording follows the notice's template. Every notice used to be worded
+  // as an application status change, so a job alert read "Acme moved your
+  // application for Cashier to: Applied" about a vacancy nobody had applied to.
+  const describe = (notice: (typeof notices)[number]): string => {
+    const vacancy = String(notice.payload.vacancy ?? "");
+    const organisation = String(notice.payload.organisation ?? "");
+    switch (notice.template) {
+      case "application_status_changed":
+        return t("statusChanged", {
+          vacancy,
+          organisation,
+          status: t(`status.${String(notice.payload.status ?? "applied")}`),
+        });
+      case "job_alert":
+        return t("jobAlert", { vacancy, organisation });
+      case "vacancy_closed":
+        return t("vacancyClosed", { vacancy });
+      case "course_interest_status_changed":
+        return t("interestStatusChanged", {
+          course: String(notice.payload.course ?? ""),
+          organisation,
+          status: t(`interestStatus.${String(notice.payload.status ?? "contacted")}`),
+        });
+      default:
+        return t("generic");
+    }
+  };
+
   return (
     <section
       aria-labelledby="notices-heading"
@@ -78,20 +116,26 @@ export function Notices() {
         </Alert>
       )}
       <ul className="mt-3 space-y-2">
-        {unread.map((notice) => (
-          <li key={notice.id} className="text-sm">
-            <span>
-              {t("statusChanged", {
-                vacancy: String(notice.payload.vacancy ?? ""),
-                organisation: String(notice.payload.organisation ?? ""),
-                status: t(`status.${String(notice.payload.status ?? "applied")}`),
-              })}
-            </span>{" "}
-            <span className="text-xs text-muted">
-              {format.relativeTime(new Date(notice.created_at))}
-            </span>
-          </li>
-        ))}
+        {unread.map((notice) => {
+          // A status notice is shown on the page its link would open.
+          const path =
+            notice.template === "application_status_changed"
+              ? null
+              : linkOf(notice.payload.path);
+          return (
+            <li key={notice.id} className="text-sm">
+              <span>{describe(notice)}</span>{" "}
+              {path && (
+                <Link href={path} className="text-brand underline-offset-2 hover:underline">
+                  {t("open")}
+                </Link>
+              )}{" "}
+              <span className="text-xs text-muted">
+                {format.relativeTime(new Date(notice.created_at), now)}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
