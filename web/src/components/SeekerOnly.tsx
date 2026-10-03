@@ -17,7 +17,11 @@ import { useMemberships } from "@/lib/org";
  * such an account; this is the interface saying the same thing in words rather
  * than as an error state.
  *
- * Signed out, the children render: they carry their own sign-in prompts.
+ * Signed out, a sign-in prompt renders instead of the children. They used to
+ * render on the claim that each carried its own prompt; most did not, so
+ * `/matches`, `/applications`, `/interests` and `/saved` fired their queries,
+ * got 401s, and told a visitor who had simply not signed in that something
+ * had gone wrong.
  * Signed in and still loading, nothing renders, rather than a candidate page
  * that is about to be withdrawn.
  */
@@ -26,7 +30,18 @@ export function SeekerOnly({ children }: { children: ReactNode }) {
   const signedIn = useIsSignedIn();
   const { data, isPending, isJobSeeker, organisations } = useMemberships();
 
-  if (!signedIn) return <>{children}</>;
+  if (!signedIn) {
+    return (
+      <Card>
+        <CardBody>
+          <p className="text-sm text-muted">{t("signedOut")}</p>
+          <ButtonLink href="/signin" className="mt-4">
+            {t("signIn")}
+          </ButtonLink>
+        </CardBody>
+      </Card>
+    );
+  }
   if (isPending || !data) return null;
   if (isJobSeeker) return <>{children}</>;
 

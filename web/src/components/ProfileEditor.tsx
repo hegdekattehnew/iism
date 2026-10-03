@@ -12,8 +12,10 @@ import {
 } from "@/components/profile/SectionEditor";
 import { SkillsSection } from "@/components/profile/SkillsSection";
 import { TagSection } from "@/components/profile/TagSection";
-import { ButtonLink } from "@/components/ui";
+import { SessionExpired } from "@/components/SessionExpired";
+import { Alert, ButtonLink } from "@/components/ui";
 import { useIsSignedIn } from "@/lib/auth";
+import { detailOf, isSignedOut } from "@/lib/http";
 import { useProfile } from "@/lib/profile";
 
 export function ProfileEditor() {
@@ -35,8 +37,14 @@ export function ProfileEditor() {
   }
 
   if (profile.isPending) return null;
+  if (isSignedOut(profile.error)) return <SessionExpired />;
+  // Never fall through to an empty editor: saving it would overwrite the
+  // profile we failed to read.
+  if (profile.isError) {
+    return <Alert>{detailOf(profile.error) ?? t("loadError")}</Alert>;
+  }
 
-  const data = profile.data ?? null;
+  const data = profile.data;
 
   // First visit gets the guided wizard; everyone else the sectioned editor.
   if (data && !data.onboarding_completed_at) {

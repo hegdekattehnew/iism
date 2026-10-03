@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { CoverageBar } from "@/components/CoverageBar";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
+import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
 
 /**
  * Who applied, and how to reach them.
@@ -50,7 +51,11 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
     // nothing is worse than an error (Sprint 14).
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: key });
-      await qc.invalidateQueries({ queryKey: ["org", org, "overview"] });
+      // A hire can fill the last position and close the vacancy, which moves
+      // the dashboard, the workspace's job list and the public counts.
+      void qc.invalidateQueries({ queryKey: employerDashboardKey(org) });
+      void qc.invalidateQueries({ queryKey: ["org-jobs", org] });
+      invalidatePublicCounts(qc);
     },
   });
 

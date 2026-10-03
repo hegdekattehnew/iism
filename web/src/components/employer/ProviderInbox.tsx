@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from "next-intl";
 
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
+import { providerDashboardKey } from "@/lib/counts";
 
 /**
  * Who wants this course, and how to reach them.
@@ -54,6 +55,7 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: key });
       await qc.invalidateQueries({ queryKey: ["org", org, "interests"] });
+      void qc.invalidateQueries({ queryKey: providerDashboardKey(org) });
     },
   });
 

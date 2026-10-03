@@ -17,7 +17,12 @@ import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CORPUS_STATS, MARKETPLACE_COUNTS } from "@/lib/counts";
+import {
+  CORPUS_STATS,
+  MARKETPLACE_COUNTS,
+  employerDashboardKey,
+  providerDashboardKey,
+} from "@/lib/counts";
 import { useOrgCourseMutations, useOrgJobMutations } from "@/lib/org";
 
 const ok = { data: { slug: "a-vacancy" }, error: null, response: { status: 200 } };
@@ -79,6 +84,36 @@ describe("a vacancy that changes the catalogue", () => {
   it("marks the counts stale when one is deleted", async () => {
     await run((m) => m.remove.mutateAsync("a"));
     expect(stale(MARKETPLACE_COUNTS)).toBe(true);
+  });
+});
+
+describe("the organisation dashboards move with their own mutations", () => {
+  // The tile above the list is a count too. Every mutation refreshed its own
+  // list and stopped, so publishing or closing a vacancy left "Open jobs"
+  // showing the figure from before.
+  it("marks the employer dashboard stale when a vacancy is published or closed", async () => {
+    for (const change of [
+      (m: ReturnType<typeof useOrgJobMutations>) =>
+        m.setPublished.mutateAsync({ slug: "a", published: true }),
+      (m: ReturnType<typeof useOrgJobMutations>) =>
+        m.setOpen.mutateAsync({ slug: "a", open: false, reason: "filled" }),
+    ]) {
+      qc.setQueryData(employerDashboardKey("acme"), { open_jobs: 5 });
+      const { result } = renderHook(() => useOrgJobMutations("acme"), { wrapper });
+      await act(async () => {
+        await change(result.current);
+      });
+      expect(stale(employerDashboardKey("acme"))).toBe(true);
+    }
+  });
+
+  it("marks the provider dashboard stale when a course is created", async () => {
+    qc.setQueryData(providerDashboardKey("acme"), { published_courses: 3 });
+    const { result } = renderHook(() => useOrgCourseMutations("acme"), { wrapper });
+    await act(async () => {
+      await result.current.create.mutateAsync({ title: "A course" } as never);
+    });
+    expect(stale(providerDashboardKey("acme"))).toBe(true);
   });
 });
 

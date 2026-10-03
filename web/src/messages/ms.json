@@ -361,6 +361,7 @@
     "sourceNote": "Skills you add yourself are marked self-declared. Assessment results will carry more weight once assessments are available.",
     "signInPrompt": "Sign in to build your profile.",
     "goToSignIn": "Sign in",
+    "loadError": "Could not load your profile. Please try again.",
     "completeness": "Profile {percent}% complete",
     "completeNext": "Add {what} next",
     "field": {
@@ -931,7 +932,9 @@
   "seekerOnly": {
     "title": "This is an organisation account",
     "body": "Matches and a candidate profile belong to accounts that signed up to look for work.",
-    "goToWorkspace": "Go to my workspace"
+    "goToWorkspace": "Go to my workspace",
+    "signedOut": "Sign in to continue.",
+    "signIn": "Sign in"
   },
   "account": {
     "title": "Your account",

@@ -1,6 +1,54 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { shouldTryRefresh } from "@/lib/api";
+import { api, shouldTryRefresh } from "@/lib/api";
+
+/**
+ * The first save after the access token expired.
+ *
+ * `fetch()` consumes a request's body, and openapi-fetch hands that same
+ * consumed request to `onResponse`, so retrying with `request.clone()` threw
+ * for every write with a body: the person pressed save, got a generic error,
+ * pressed it again and it worked. The mock below reads each body exactly as a
+ * real `fetch` would, which is what reproduces it.
+ */
+describe("a write after the access token expired", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("is retried once, with its body intact, after a refresh", async () => {
+    localStorage.setItem("iism.access_token", "expired");
+    localStorage.setItem("iism.refresh_token", "still-valid");
+    const received: { auth: string | null; body: string }[] = [];
+
+    const mock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (new URL(url).pathname === "/auth/refresh") {
+        return new Response(JSON.stringify({ access_token: "fresh", refresh_token: "next" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const request = input as Request;
+      const auth = request.headers.get("authorization");
+      received.push({ auth, body: await request.text() });
+      return auth === "Bearer expired"
+        ? new Response(null, { status: 401 })
+        : new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mock);
+
+    const body = { headline: "Ward attendant, three years" };
+    const { response } = await api.PUT("/me/profile", { body: body as never, fetch: mock });
+
+    expect(response.status).toBe(200);
+    expect(received).toEqual([
+      { auth: "Bearer expired", body: JSON.stringify(body) },
+      { auth: "Bearer fresh", body: JSON.stringify(body) },
+    ]);
+  });
+});
 
 /**
  * Which 401s are worth a refresh.
