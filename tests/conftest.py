@@ -67,7 +67,9 @@ async def db() -> AsyncIterator:
 
     connection = await get_engine().connect()
     transaction = await connection.begin()
-    session = AsyncSession(bind=connection, expire_on_commit=False)
+    # Same session settings as `get_sessionmaker()`: with autoflush on here and
+    # off in production, a write-then-query path passed every test and failed live.
+    session = AsyncSession(bind=connection, expire_on_commit=False, autoflush=False)
     try:
         yield session
     finally:

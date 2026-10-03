@@ -281,9 +281,25 @@ class BodySizeLimitMiddleware:
                 await _reject(send, 413, "Request body too large")
 
 
-def _limiter_identity(scope: Scope) -> str:
-    """Who a request counts against: the signed-in user, a partner's key, or
-    the client IP.
+def _partner_key_hash(scope: Scope) -> str | None:
+    """The hashed `X-API-Key` on a partner route, or None.
+
+    Only `/partners` routes accept a service-account key, so a key anywhere
+    else -- on `/auth/otp/request`, say -- is ignored by the limiter outright.
+    """
+    from api.core.security import hash_secret  # local: security imports the DB layer
+
+    if not scope.get("path", "").startswith("/partners"):
+        return None
+    for name, value in scope["headers"]:
+        if name == b"x-api-key":
+            return hash_secret(value.decode("latin-1").strip())
+    return None
+
+
+def _limiter_identity(scope: Scope, *, verified_key: str | None = None) -> str:
+    """Who a request counts against: the signed-in user, a verified partner
+    key, or the client IP.
 
     Per user when there is a valid access token, because Indian mobile carriers
     put many subscribers behind one address and a per-IP limit would throttle
@@ -291,14 +307,12 @@ def _limiter_identity(scope: Scope) -> str:
     read -- and an invalid one falls back to the IP rather than erroring, since
     rejecting it is the route's job, not the limiter's.
 
-    An `X-API-Key` is hashed and used as its own bucket the same way, for the
-    same reason: a partner's calls may all originate from one gateway IP, and
-    bucketing them there would let one partner's traffic throttle another's.
-    The hash is not looked up against `service_accounts` here -- an invalid
-    key still gets a bucket of its own rather than falling through to the IP,
-    and `get_service_account` is what actually decides whether the key works.
+    A partner key gets its own bucket only once `get_service_account` has
+    verified it (`verified_key`), because a partner's calls may share a gateway
+    IP. Any unverified key counts against the IP: when every key earned a
+    bucket, a random key per request was an unlimited budget on `/auth/*`.
     """
-    from api.core.security import decode_token, hash_secret  # local: security imports the DB layer
+    from api.core.security import decode_token  # local: security imports the DB layer
 
     settings = get_settings()
     for name, value in scope["headers"]:
@@ -309,16 +323,17 @@ def _limiter_identity(scope: Scope) -> str:
             except Exception:  # noqa: BLE001 - any invalid token counts as anonymous
                 break
 
-    for name, value in scope["headers"]:
-        if name == b"x-api-key":
-            return "k:" + hash_secret(value.decode("latin-1").strip())
+    if verified_key:
+        return "k:" + verified_key
 
     client = scope.get("client")
     ip = client[0] if client else "unknown"
     if settings.rate_limit_trust_forwarded:
         for name, value in scope["headers"]:
             if name == b"x-forwarded-for":
-                ip = value.decode("latin-1").split(",")[0].strip()
+                # The rightmost entry is the one our proxy appended; everything
+                # to its left is whatever the client chose to send.
+                ip = value.decode("latin-1").split(",")[-1].strip()
                 break
     return "ip:" + ip
 
@@ -365,13 +380,21 @@ class RateLimitMiddleware:
         else:
             bucket, limit = "read", settings.rate_limit_reads_per_minute
 
-        # The identity is in the key and never in the log line: an IP address
-        # is personal data, and the key expires in seventy seconds anyway.
-        key = f"ratelimit:{bucket}:{_limiter_identity(scope)}:{int(time.time() // 60)}"
         try:
             from api.core.cache import get_redis  # local: keeps this module DB-free
+            from api.core.security import VERIFIED_SERVICE_KEY_PREFIX
 
             redis = get_redis()
+            key_hash = _partner_key_hash(scope)
+            verified = (
+                key_hash
+                if key_hash and await redis.exists(VERIFIED_SERVICE_KEY_PREFIX + key_hash)
+                else None
+            )
+            # The identity is in the key and never in the log line: an IP address
+            # is personal data, and the key expires in seventy seconds anyway.
+            identity = _limiter_identity(scope, verified_key=verified)
+            key = f"ratelimit:{bucket}:{identity}:{int(time.time() // 60)}"
             count = await redis.incr(key)
             if count == 1:
                 await redis.expire(key, 70)

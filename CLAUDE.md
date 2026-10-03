@@ -293,6 +293,12 @@ split would have to turn into interfaces first; do not add to it casually.
   `tests/test_security_hardening.py` boots a fresh subprocess per `ENVIRONMENT` and reads the
   resulting route table, which is how a guard on the app's own assembly has to be tested. A second
   module-level binding without that is the thing this rule forbids.
+- **Tests use production session settings, `autoflush=False` included.** The `db` fixture in
+  `tests/conftest.py` used SQLAlchemy's default `autoflush=True` while `get_sessionmaker()` sets it
+  off, so every "write, then query" path behaved differently in tests than live. It hid two real
+  bugs for ten sprints — `_close_if_filled` never saw the hire it was counting, so a filled vacancy
+  never closed, and the alert sweep's daily cap never saw its own alerts — while their tests passed.
+  Under `autoflush=False`, flush explicitly before any query that must see a pending change.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an

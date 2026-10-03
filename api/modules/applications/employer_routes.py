@@ -76,15 +76,18 @@ def _applicant(application, profile, user, result) -> ApplicantOut:  # type: ign
     One construction site, because the rule that contact disappears on
     withdrawal is a property of this function and nothing else.
     """
+    live = application.contact_is_visible
     return ApplicantOut(
         application_id=application.id,
         status=application.status,
         applied_at=application.created_at,
-        message=application.message,
+        # The candidate's own words are part of what withdrawing takes back,
+        # exactly as `interests.provider_routes._learner` already does.
+        message=application.message if live else None,
         candidate=candidate_card(profile, result),
         contact=(
             ContactOut(full_name=user.full_name, phone=user.phone, email=user.email)
-            if application.contact_is_visible
+            if live
             else None
         ),
     )

@@ -213,19 +213,88 @@ def test_a_forged_token_counts_as_anonymous() -> None:
     assert _limiter_identity(scope) == "ip:10.0.0.2"
 
 
-def test_an_api_key_gets_its_own_bucket_not_the_gateway_ip() -> None:
-    """A partner's calls may all share one gateway address; bucketing them
-    there would let one partner throttle another's traffic. No database read
-    here -- an invalid key still gets a bucket of its own rather than falling
-    through to the shared IP bucket."""
+def test_only_the_rightmost_forwarded_address_is_trusted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A load balancer appends the address it saw; everything to the left is
+    whatever the client sent, so honouring the leftmost let a client choose a
+    fresh identity per request."""
     from api.core.middleware import _limiter_identity
 
-    same_ip = {"client": ("10.0.0.3", 1)}
-    a = {**same_ip, "headers": [(b"x-api-key", b"key-a")]}
-    b = {**same_ip, "headers": [(b"x-api-key", b"key-b")]}
-    assert _limiter_identity(a) != _limiter_identity(b)
-    assert _limiter_identity(a).startswith("k:")
-    assert _limiter_identity(a) == _limiter_identity(a)
+    monkeypatch.setenv("RATE_LIMIT_TRUST_FORWARDED", "true")
+    get_settings.cache_clear()
+    try:
+        spoofed = {
+            "headers": [(b"x-forwarded-for", b"1.2.3.4, 203.0.113.9")],
+            "client": ("10.0.0.1", 1),
+        }
+        assert _limiter_identity(spoofed) == "ip:203.0.113.9"
+    finally:
+        monkeypatch.delenv("RATE_LIMIT_TRUST_FORWARDED")
+        get_settings.cache_clear()
+
+
+def test_an_unverified_api_key_counts_against_the_ip() -> None:
+    """When any key earned its own bucket, a random key per request was an
+    unlimited budget. Only a key `get_service_account` has verified does."""
+    from api.core.middleware import _limiter_identity, _partner_key_hash
+
+    scope = {
+        "path": "/partners/jobs",
+        "client": ("10.0.0.3", 1),
+        "headers": [(b"x-api-key", b"key-a")],
+    }
+    assert _limiter_identity(scope) == "ip:10.0.0.3"
+    verified = _partner_key_hash(scope)
+    assert verified is not None
+    assert _limiter_identity(scope, verified_key=verified) == "k:" + verified
+
+
+def test_a_key_outside_the_partner_routes_is_ignored() -> None:
+    from api.core.middleware import _partner_key_hash
+
+    scope = {"path": "/auth/otp/request", "headers": [(b"x-api-key", b"key-a")]}
+    assert _partner_key_hash(scope) is None
+
+
+@pytest.mark.usefixtures("limiter")
+class TestApiKeysCannotBuyBudget:
+    async def test_random_keys_do_not_escape_the_auth_limit(self, client: AsyncClient) -> None:
+        statuses = [
+            (
+                await client.post(
+                    "/auth/otp/request",
+                    json={"phone": "9" + str(uuid.uuid4().int)[:9]},
+                    headers={"x-api-key": uuid.uuid4().hex},
+                )
+            ).status_code
+            for _ in range(4)
+        ]
+        assert statuses[-1] == 429
+
+    async def test_random_keys_do_not_escape_the_partner_limit(self, client: AsyncClient) -> None:
+        statuses = [
+            (
+                await client.get("/partners/jobs", headers={"x-api-key": uuid.uuid4().hex})
+            ).status_code
+            for _ in range(4)
+        ]
+        assert statuses == [401, 401, 401, 429]
+
+    async def test_a_verified_partner_keeps_its_own_bucket(self, client: AsyncClient, db) -> None:  # type: ignore[no-untyped-def]
+        """A partner behind a shared gateway is not throttled by strangers on
+        that address once its key has been verified."""
+        from api.core.security import hash_secret
+        from api.modules.identity.models import ServiceAccount
+
+        raw = "verified-partner-" + uuid.uuid4().hex
+        db.add(ServiceAccount(name="gateway-partner", hashed_key=hash_secret(raw)))
+        await db.commit()
+
+        assert (await client.get("/partners/jobs", headers={"x-api-key": raw})).status_code == 200
+        for _ in range(3):
+            await client.get("/skills")  # the shared address is now spent
+        assert (await client.get("/skills")).status_code == 429
+        partner = await client.get("/partners/jobs", headers={"x-api-key": raw})
+        assert partner.status_code == 200
 
 
 # ----------------------------------------------------------------- exposure
