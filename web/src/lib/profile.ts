@@ -54,7 +54,16 @@ export function useProfile(enabled = true) {
   return useQuery({
     queryKey: ["profile"],
     enabled,
-    queryFn: async () => (await api.GET("/me/profile")).data ?? null,
+    // Throws rather than resolving to null: "could not load" read as "no
+    // profile yet", the editor rendered blank, and saving it wrote the blanks
+    // over the real profile.
+    queryFn: async () => {
+      const result = await api.GET("/me/profile");
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data)
+        throw new ApiError(result.response.status, readDetail(errorBody));
+      return result.data;
+    },
   });
 }
 

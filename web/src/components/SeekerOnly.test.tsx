@@ -44,11 +44,15 @@ describe("SeekerOnly — an organisation account never sees the job-seeker side"
     expect(screen.queryByText(CANDIDATE_PAGE)).toBeNull();
   });
 
-  it("leaves a signed-out visitor to the page's own sign-in prompt", () => {
+  it("asks a signed-out visitor to sign in instead of rendering the page", () => {
+    // The page used to render and fire queries that could only 401, so
+    // /matches said "Could not load your matches." to anyone not signed in.
     world.signedIn = false;
     renderUi(<SeekerOnly>{CANDIDATE_PAGE}</SeekerOnly>);
 
-    expect(screen.getByText(CANDIDATE_PAGE)).toBeTruthy();
+    expect(screen.queryByText(CANDIDATE_PAGE)).toBeNull();
+    expect(screen.getByText("Sign in to continue.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/signin");
   });
 });
 

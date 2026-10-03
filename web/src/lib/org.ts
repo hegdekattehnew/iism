@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
-import { invalidatePublicCounts } from "./counts";
+import { employerDashboardKey, invalidatePublicCounts, providerDashboardKey } from "./counts";
 import { ApiError, readDetail } from "./http";
 
 /**
@@ -97,7 +97,7 @@ export function useOrgJobs(orgSlug: string | null) {
 
 export function useEmployerDashboard(orgSlug: string | null) {
   return useQuery({
-    queryKey: ["org-dashboard", orgSlug],
+    queryKey: employerDashboardKey(orgSlug),
     enabled: orgSlug !== null,
     retry: false,
     queryFn: async () => {
@@ -123,6 +123,7 @@ export function useOrgJobMutations(orgSlug: string) {
   // and was shown the figure fetched before they did it.
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["org-jobs", orgSlug] });
+    void qc.invalidateQueries({ queryKey: employerDashboardKey(orgSlug) });
     invalidatePublicCounts(qc);
   };
 
@@ -293,7 +294,7 @@ export function useOrgInterests(orgSlug: string | null) {
 
 export function useProviderDashboard(orgSlug: string | null) {
   return useQuery({
-    queryKey: ["org", orgSlug, "dashboard"],
+    queryKey: providerDashboardKey(orgSlug),
     enabled: Boolean(orgSlug),
     retry: false,
     queryFn: async () => {
@@ -311,6 +312,7 @@ export function useOrgCourseMutations(orgSlug: string) {
   // The public counts go with it, for the reason the job mutations above give.
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["org-courses", orgSlug] });
+    void qc.invalidateQueries({ queryKey: providerDashboardKey(orgSlug) });
     invalidatePublicCounts(qc);
   };
 

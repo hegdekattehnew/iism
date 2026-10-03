@@ -342,16 +342,38 @@ async def get_service_account(
     if key is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing API key")
 
-    account = await db.scalar(
-        select(ServiceAccount).where(ServiceAccount.hashed_key == hash_secret(key))
-    )
+    hashed = hash_secret(key)
+    account = await db.scalar(select(ServiceAccount).where(ServiceAccount.hashed_key == hashed))
     if account is None or not account.is_active:
         # The key itself never reaches the logger -- only the outcome does.
         log.warning("auth.service_account_denied")
+        await _mark_service_key(hashed, live=False)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or revoked API key")
 
+    await _mark_service_key(hashed, live=True)
     structlog.contextvars.bind_contextvars(service_account_id=str(account.id))
     return account
+
+
+VERIFIED_SERVICE_KEY_PREFIX = "ratelimit:verified-key:"
+
+
+async def _mark_service_key(hashed: str, *, live: bool) -> None:
+    """Tell the rate limiter which keys are real, so it can stay database-free.
+
+    Only a key marked here earns a rate-limit bucket of its own; any other
+    `X-API-Key` counts against the caller's IP, or a fresh random key per
+    request would be a fresh budget per request. Best effort: a Redis failure
+    costs a partner its own bucket for a while, never a request.
+    """
+    try:
+        redis = get_redis()
+        if live:
+            await redis.set(VERIFIED_SERVICE_KEY_PREFIX + hashed, "1", ex=300)
+        else:
+            await redis.delete(VERIFIED_SERVICE_KEY_PREFIX + hashed)
+    except Exception:  # noqa: BLE001 - the limiter is advisory here
+        log.warning("auth.service_key_mark_failed")
 
 
 def require_service_scope(scope: str) -> Callable[..., Awaitable["ServiceAccount"]]:

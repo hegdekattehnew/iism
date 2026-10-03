@@ -408,6 +408,25 @@ class TestTheEmployerInbox:
         assert applicant["status"] == "withdrawn"
         assert applicant["contact"] is None
 
+    async def test_withdrawing_takes_the_message_back_too(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        """The candidate's own words are theirs to withdraw, as they already are
+        on a course interest."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        note = "I live two streets away and can start Monday"
+        created = (
+            await client.post(
+                "/me/applications", headers=seeker, json={"job_slug": job_slug, "message": note}
+            )
+        ).json()
+        inbox = f"/org/{org}/jobs/{job_slug}/applications"
+        assert (await client.get(inbox, headers=employer)).json()["items"][0]["message"] == note
+
+        await client.post(f"/me/applications/{created['id']}/withdraw", headers=seeker)
+        assert (await client.get(inbox, headers=employer)).json()["items"][0]["message"] is None
+
     async def test_applicants_are_ranked_by_the_same_scorer(
         self, vacancy: dict, client: AsyncClient
     ) -> None:

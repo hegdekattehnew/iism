@@ -84,8 +84,14 @@ async function tryRefresh(): Promise<boolean> {
   return refreshing;
 }
 
+// An unsent copy of each request, keyed by openapi-fetch's per-request id. By
+// the time `onResponse` runs, `fetch()` has consumed the original's body, so
+// `request.clone()` throws for every POST/PUT/PATCH -- which made the first
+// save after a token expired fail every time.
+const pending = new Map<string, Request>();
+
 const authMiddleware: Middleware = {
-  async onRequest({ request }) {
+  async onRequest({ request, id }) {
     if (typeof window === "undefined") return request;
     // The language this page is in, on every call -- one middleware rather
     // than a parameter at forty call sites. The API resolves the text from it
@@ -94,18 +100,23 @@ const authMiddleware: Middleware = {
     if (locale) request.headers.set("accept-language", locale);
     const token = getAccessToken();
     if (token) request.headers.set("authorization", `Bearer ${token}`);
+    if (shouldTryRefresh(request.url)) pending.set(id, request.clone());
     return request;
   },
-  async onResponse({ request, response }) {
+  async onResponse({ request, response, id }) {
+    const unsent = pending.get(id);
+    pending.delete(id);
     if (typeof window === "undefined") return response;
-    if (response.status !== 401) return response;
+    if (response.status !== 401 || !unsent) return response;
     if (!shouldTryRefresh(request.url)) return response;
 
     if (!(await tryRefresh())) return response;
 
-    const retry = request.clone();
-    retry.headers.set("authorization", `Bearer ${getAccessToken()}`);
-    return fetch(retry);
+    unsent.headers.set("authorization", `Bearer ${getAccessToken()}`);
+    return fetch(unsent);
+  },
+  onError({ id }) {
+    pending.delete(id);
   },
 };
 

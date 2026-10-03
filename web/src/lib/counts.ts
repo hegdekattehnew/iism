@@ -37,6 +37,17 @@ export const CORPUS_STATS = ["corpus-stats"] as const;
 export const SKILL_COUNT = ["skill-count"] as const;
 
 /**
+ * The organisation dashboards' tiles are counts too, with the same failure:
+ * the job and course mutations and both inboxes refreshed their own lists and
+ * left the tiles above them showing the old figure. One key each, shared by
+ * the query and everything that moves it.
+ */
+export const employerDashboardKey = (orgSlug: string | null) =>
+  ["org-dashboard", orgSlug] as const;
+export const providerDashboardKey = (orgSlug: string | null) =>
+  ["org", orgSlug, "dashboard"] as const;
+
+/**
  * Mark the public counts stale after changing what they count.
  *
  * Fire-and-forget by design: a refetch that fails must never be the reason a

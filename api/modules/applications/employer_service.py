@@ -199,6 +199,9 @@ async def _close_if_filled(db: AsyncSession, job: Job) -> bool:
     """
     if job.closed_at is not None:
         return False
+    # Sessions run with autoflush off, so the status change that brought us
+    # here is invisible to the count below until it is flushed.
+    await db.flush()
     hired = (
         await db.scalar(
             select(func.count())

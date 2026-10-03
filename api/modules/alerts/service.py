@@ -120,6 +120,9 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
 
     now = datetime.now(UTC)
     alerts = capped = opted_out = 0
+    # One tally for the whole sweep. Re-reading the counts per vacancy missed
+    # this sweep's own (unflushed) alerts, so ten matching vacancies sent ten.
+    sent_today: dict = {}
 
     for job in jobs:
         # **Claim the job first.** Stamped before anything is queued, so a
@@ -134,8 +137,14 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
             continue
 
         told = await _already_told(db, job.id)
-        profile_ids = [c.profile.id for c in eligible if c.profile.id not in told]
-        recent = await _recent_alert_counts(db, profile_ids)
+        unseen = [
+            c.profile.id
+            for c in eligible
+            if c.profile.id not in told and c.profile.id not in sent_today
+        ]
+        if unseen:
+            counted = await _recent_alert_counts(db, unseen)
+            sent_today.update({pid: counted.get(pid, 0) for pid in unseen})
         users = await _users_by_id(db, {c.profile.user_id for c in eligible})
 
         sent_for_this_job = 0
@@ -148,7 +157,7 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
             if not profile.job_alerts_enabled:
                 opted_out += 1
                 continue
-            if recent.get(profile.id, 0) >= settings.max_alerts_per_candidate_per_day:
+            if sent_today.get(profile.id, 0) >= settings.max_alerts_per_candidate_per_day:
                 capped += 1
                 continue
 
@@ -184,7 +193,7 @@ async def sweep(db: AsyncSession, *, limit: int = MAX_JOBS_PER_SWEEP) -> SweepRe
                     locale=user.preferred_locale,
                 )
             db.add(JobAlert(job_id=job.id, profile_id=profile.id))
-            recent[profile.id] = recent.get(profile.id, 0) + 1
+            sent_today[profile.id] = sent_today.get(profile.id, 0) + 1
             alerts += 1
             sent_for_this_job += 1
 
