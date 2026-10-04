@@ -85,8 +85,15 @@ async def set_status(
     """Move an application along: shortlisted, rejected, hired -- or, for a
     gig engagement only, completed/no_show (Sprint 37, Epic B8)."""
     job = await _job_of(db, tenant_id, job_slug)
+    # `FOR UPDATE`, for the reason `service.withdraw` takes it: the "withdrawn"
+    # check below is only true if the candidate cannot withdraw between it and the
+    # write. Without the lock a status change landing as a candidate revoked their
+    # contact left the row moved along, with the contact visible again (Sprint 45).
     application = await db.scalar(
-        select(Application).where(Application.id == application_id, Application.job_id == job.id)
+        select(Application)
+        .where(Application.id == application_id, Application.job_id == job.id)
+        .with_for_update(of=Application)
+        .execution_options(populate_existing=True)
     )
     if application is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")

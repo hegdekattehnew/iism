@@ -2434,3 +2434,80 @@ exactly two ownership emails for two handovers.
   else's records and the new owner can reverse it.
 - Not built: inviting somebody **as** owner, handing over to a non-member, undo, approval by two owners.
 
+
+## ADR-052: A Check That Guards an Invariant Takes a Lock; a Cap That Deters Abuse May Stay Advisory
+
+**Status:** Accepted (October 2026). Generalises ADR-051 from ownership to the candidate-facing write paths, and
+refines the role-search tiers of ADR-050 (BL-12.14). No migration and no external integration.
+
+**Context:** Sprint 44 found that the last-owner guard was a check followed by a write, and that nothing in the
+suite could show it, because every test shares one connection inside one rolled-back transaction. Reading the other
+check-then-write paths suggested the same blind spot; each suspicion was reproduced with two real requests before
+anything was changed. Two of them were real, in different ways, and one was not what it first looked like:
+
+1. **A double-submit raised an unhandled unique violation, a 500.** Two taps on Apply (or on registering interest, or
+   on saving a vacancy) each find no row and each insert; the constraint refuses the second and nothing catches it.
+   Data stayed right, the answer was wrong, and the target device is a phone on mobile data where a retry is normal.
+   **A first attempt at the test passed** — because a brand-new candidate's first two requests race to create their
+   *profile*, a different race that hid this one. The helper now creates the profile first.
+2. **Withdrawing against a decision was a lost update.** `withdraw()` checked the status and then wrote; the employer's
+   `set_status` checked "not withdrawn" and then wrote. Run together, both reported success. A candidate's withdrawal
+   overwrote an employer's rejection (what BL-12.6 exists to prevent), and an employer's status change overwrote a
+   withdrawal, leaving a learner's contact visible on a row they had revoked: a DPDP concern, not an annoyance.
+3. **Re-applying after a withdrawal, twice at once, queued two emails to the employer** — no constraint is involved
+   (both find the same row), so nothing failed, and a duplicate went out.
+
+**Decision:**
+
+- **A check whose result must still be true when the write lands takes `SELECT ... FOR UPDATE` on the row it read**
+  (`of=` the entity, so a joined relationship cannot make PostgreSQL refuse it) and re-reads under the lock with
+  `populate_existing`. Applied to `applications.service.apply` (the existing row) and `withdraw`, `employer_service.
+  set_status`, `interests.service.register`, and `provider_service.set_status`.
+- **Where there is no row to lock yet, the unique constraint is the arbiter**, inserted inside a savepoint
+  (`begin_nested`) so losing the race undoes only the insert, and the loser gets the answer it would have got a
+  moment later: **409 "already applied"** for apply and interest, **the winner's row** for saving a vacancy, which
+  is idempotent.
+- **A learner's withdrawal of a course interest takes no lock, deliberately.** It is unconditional and always the last
+  word, so its check cannot go stale; the race is closed on the provider's side, which locks and refuses a withdrawn
+  row. A lock there could not change the outcome, and a mutation check confirmed that no test can fail without it.
+- **Caps stay advisory** (50 applications a day, 20 pending invitations, 60 skills). They deter abuse rather than
+  guard an invariant, and locking every application per candidate would turn "about 50" into "exactly 50" at the cost
+  of serialising a hot path for a precision nothing depends on. Under concurrency a cap can be exceeded by a few.
+
+**Options considered:** 1. Catch `IntegrityError` everywhere and change nothing else
+2. Compare-and-set (`UPDATE ... WHERE status = :seen`, check the row count)
+3. **Row locks, plus the constraint as arbiter where there is no row** (chosen)
+4. `SERIALIZABLE` for these requests
+
+**Trade-offs:**
+
+- Option 1: ✅ Smallest ❌ Fixes the 500 and leaves the lost update, which is the serious one.
+- Option 2: ✅ No lock held across the request ❌ Needs a second code path per transition and an ORM bypass, and the
+  re-check the lock gives us for free ("is it still withdrawable?") has to be written out by hand each time.
+- Option 3: ✅ The same pattern as ADR-051, the code reads as it did with one extra clause, and the check and the write
+  are provably about the same row ❌ A request holds a row lock for the length of its transaction — one candidate's
+  application, for milliseconds.
+- Option 4: ✅ Strongest guarantee ❌ A retry loop around the request layer for paths that are one row each.
+
+**Role search (BL-12.14), in the same sprint.** Sprint 43 let a synonym admit a row into role search and then scored it
+as a fuzzy guess; the synonym applied only to the whole query string. `mfg technician` led with Technician -
+Mechatronics, and `mfg operator` with Loader Operator. Two tiers now sit **below every literal one** — 1.4 for the query
+with its abbreviations spelled out found whole in the title, 1.3 for every word met by itself or a synonym, in any
+order — because what a person typed must outrank what we expanded it to. A first design put the phrase at 1.9, above
+"all the typed words in any order" (1.5); reviewing it against that principle, before it shipped, caught it. Measured on
+764 real queries: 6 lists changed, 4 of them at the top, every one an improvement, no exact-title or single-word query
+moved. **The backlog's premise was partly wrong:** `tech` leading with Technical and Technician is correct, not a defect.
+
+**Consequences:**
+
+- **Race tests need committed rows and two requests that each hold their own session.** `tests/concurrency.py` builds
+  the world through the real routes and sessionmaker and erases it afterwards. Two techniques: **hold a row lock from a
+  third session and release it once `pg_stat_activity` shows both requests waiting** (deterministic, no sleeps), and
+  widen a window by wrapping the function after a check. The suite's `db` fixture cannot show a race and must not be
+  used for one.
+- **A test that passes before the fix proves nothing.** One of the first four double-submit tests passed on unfixed code
+  for the wrong reason (the profile race above). Every guard here was mutation-checked; one lock failed no test, which
+  is how it was found to be redundant and removed.
+- **Still advisory and still racy:** the three caps, and `_close_if_filled` (two hires landing together against one
+  position close the vacancy at the head-count, by design). Not audited this sprint: slug uniqueness on publish.
+

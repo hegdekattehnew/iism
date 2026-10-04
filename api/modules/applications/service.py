@@ -18,6 +18,7 @@ from typing import cast
 import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
@@ -99,10 +100,15 @@ async def apply(
     job = await _open_job(db, job_slug)
     await _within_daily_cap(db, profile.id)
 
+    # Locked, so two requests for the same withdrawn row (a double-tap on a flaky
+    # connection) queue instead of both finding it "withdrawn" and both queueing an
+    # email to the employer. The *first* application has no row to lock, and there
+    # the unique constraint is the arbiter -- see the insert below (Sprint 45).
     existing = await db.scalar(
-        select(Application).where(
-            Application.job_id == job.id, Application.profile_id == profile.id
-        )
+        select(Application)
+        .where(Application.job_id == job.id, Application.profile_id == profile.id)
+        .with_for_update(of=Application)
+        .execution_options(populate_existing=True)
     )
     now = datetime.now(UTC)
     if existing is not None and existing.status == "rejected":
@@ -129,7 +135,18 @@ async def apply(
             # The consent record: this is the moment the disclosure happens.
             contact_shared_at=now,
         )
-        db.add(application)
+        try:
+            # A savepoint, so losing the race undoes only this insert. Two taps
+            # on Apply both find no row; the unique constraint refuses the second,
+            # and that is the same answer the second tap would have got a moment
+            # later -- "already applied" -- not a 500 (Sprint 45).
+            async with db.begin_nested():
+                db.add(application)
+                await db.flush()
+        except IntegrityError:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "You have already applied to this vacancy"
+            ) from None
 
     # Queued in the same transaction as the application itself: a notification
     # for an application that did not commit would be a lie, and sending inline
@@ -266,10 +283,16 @@ async def dashboard(db: AsyncSession, user: User) -> CandidateDashboard:
 async def withdraw(db: AsyncSession, user: User, application_id: uuid.UUID) -> Application:
     """Take the application back, and the contact details with it."""
     profile = await ensure_profile(db, user.id)
+    # `FOR UPDATE`: the status checked below must still be true when the write
+    # lands. Without it an employer rejecting at the same instant had their
+    # decision overwritten by this withdrawal, or this revocation was overwritten
+    # by their status change and left contact visible on a row the candidate had
+    # taken back (Sprint 45).
     application = await db.scalar(
-        select(Application).where(
-            Application.id == application_id, Application.profile_id == profile.id
-        )
+        select(Application)
+        .where(Application.id == application_id, Application.profile_id == profile.id)
+        .with_for_update(of=Application)
+        .execution_options(populate_existing=True)
     )
     # 404 rather than 403: someone else's application is not the caller's
     # business to learn the existence of.
@@ -316,7 +339,20 @@ async def save_job(db: AsyncSession, user: User, job_slug: str) -> SavedJob:
         return existing
 
     saved = SavedJob(job_id=job.id, profile_id=profile.id)
-    db.add(saved)
+    try:
+        async with db.begin_nested():
+            db.add(saved)
+            await db.flush()
+    except IntegrityError:
+        # Saved twice at once: the other request won, and saving is idempotent, so
+        # the right answer is theirs rather than a 500 (Sprint 45).
+        won = await db.scalar(
+            select(SavedJob)
+            .where(SavedJob.job_id == job.id, SavedJob.profile_id == profile.id)
+            .execution_options(populate_existing=True)
+        )
+        assert won is not None  # noqa: S101 - the constraint fired because it exists
+        return won
     await db.commit()
     await record(db, "job_saved", user_id=user.id, subject_type="job", subject_id=job.id)
     # Re-read rather than returning the instance just added: a freshly
