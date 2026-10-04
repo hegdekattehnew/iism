@@ -16,6 +16,7 @@ from typing import cast
 import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
@@ -57,10 +58,15 @@ async def register(
     course = await _published_course(db, course_slug)
     await _within_daily_cap(db, profile.id)
 
+    # Locked for the reason `applications.service.apply` locks its row: two taps on
+    # a withdrawn interest must queue, not both register and both email the
+    # provider. A first registration has no row, and the unique constraint decides
+    # it (Sprint 45).
     existing = await db.scalar(
-        select(CourseInterest).where(
-            CourseInterest.course_id == course.id, CourseInterest.profile_id == profile.id
-        )
+        select(CourseInterest)
+        .where(CourseInterest.course_id == course.id, CourseInterest.profile_id == profile.id)
+        .with_for_update(of=CourseInterest)
+        .execution_options(populate_existing=True)
     )
     now = datetime.now(UTC)
     if existing is not None and existing.status != "withdrawn":
@@ -83,7 +89,14 @@ async def register(
             # The consent record: this is the moment the disclosure happens.
             contact_shared_at=now,
         )
-        db.add(interest)
+        try:
+            async with db.begin_nested():
+                db.add(interest)
+                await db.flush()
+        except IntegrityError:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "You have already registered interest in this course"
+            ) from None
 
     # Queued in the same transaction as the interest itself: a notification for
     # an interest that did not commit would be a lie, and sending inline would
@@ -167,6 +180,14 @@ async def list_interests(db: AsyncSession, user: User) -> list[CourseInterest]:
 async def withdraw(db: AsyncSession, user: User, interest_id: uuid.UUID) -> CourseInterest:
     """Take it back, and the contact details with it."""
     profile = await ensure_profile(db, user.id)
+    # No row lock here, unlike `applications.service.withdraw`, and that is
+    # deliberate: that one refuses some states, so its check can go stale, whereas
+    # a learner's withdrawal is unconditional and is always the last word. The
+    # race -- a provider marking this "contacted" as the learner withdraws -- is
+    # closed on the provider's side, which locks the row and refuses a withdrawn
+    # one (`provider_service.set_status`). A lock here could not change the
+    # outcome, and a guard no test can fail only gives the next reader something
+    # to wonder about (Sprint 45).
     interest = await db.scalar(
         select(CourseInterest).where(
             CourseInterest.id == interest_id, CourseInterest.profile_id == profile.id

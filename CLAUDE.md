@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(51 ADRs). Read it before making any structural decision — the summary below
+(52 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -228,7 +228,9 @@ api/                     FastAPI modular monolith
                          (Sprint 43, BL-12.6) `WITHDRAWABLE_STATUSES` (`applied`, `shortlisted`)
                          is what a candidate may take back: a rejection, a hire or a finished
                          gig is the employer's record, and withdrawing then reapplying used to
-                         wipe it.
+                         wipe it. (Sprint 45, ADR-052) `withdraw`, `employer_service.set_status`
+                         and `apply` lock the application row before the check, and a double
+                         submit is a 409, not a 500.
     interests/           Registering interest in a course, and the provider's
                          view of who did. A **sibling** of applications/, not an
                          extension: a course publishes what it teaches, so an
@@ -365,6 +367,16 @@ split would have to turn into interfaces first; do not add to it casually.
   bugs for ten sprints — `_close_if_filled` never saw the hire it was counting, so a filled vacancy
   never closed, and the alert sweep's daily cap never saw its own alerts — while their tests passed.
   Under `autoflush=False`, flush explicitly before any query that must see a pending change.
+- **A check that guards an invariant takes a lock; a cap that deters abuse may stay advisory** (ADR-051, ADR-052).
+  "Is it still withdrawable?" is only true if nobody can change the row between the question and the write, so
+  `withdraw`, the employer's and provider's `set_status`, and `apply`/`register` on an existing row take
+  `SELECT ... FOR UPDATE` (`of=` the entity) and re-read under it; where there is no row yet, the unique constraint
+  is the arbiter, inserted in a savepoint, and the loser gets the answer it would have got a moment later (409, or
+  the winner's row for an idempotent save) -- never a 500. **The suite's `db` fixture cannot show a race**: it is one
+  connection in one rolled-back transaction, so two requests take turns. Race tests use `tests/concurrency.py`
+  (committed rows, real requests, hold a row lock until `pg_stat_activity` shows both waiting). A test that passes
+  before the fix proves nothing: one double-submit test did, because a new candidate's first two requests race to
+  create their *profile* -- a different race that hid the one under test.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -728,7 +740,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > than the feature — the last-owner guard was a check followed by a write, so two owners acting together could
 > leave an organisation with no owner (reproduced, owner count 0). Every ownership change now takes a lock on
 > the tenant row and re-checks the caller's authority after it, erasure included, and each guard has a test that
-> fails without it. Migration 0045.
+> fails without it. Migration 0045. **Sprint 45 is done** (ADR-052): the same blind spot on the candidate-facing
+> paths. Reproduced with two real requests, then fixed: a double-tap on Apply (or on registering interest or saving a
+> vacancy) was an unhandled unique violation, a 500; a candidate withdrawing at the instant an employer decided was a
+> lost update that could overwrite a rejection or leave contact visible after a revocation; and re-applying twice
+> emailed the employer twice. Row locks plus the constraint as arbiter. Alongside it, BL-12.14: an abbreviation now
+> works across a multi-word role search (`mfg technician`, `mfg operator`), scored below everything the person typed.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

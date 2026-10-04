@@ -164,10 +164,14 @@ async def set_status(
     worth an inbox.
     """
     course = await _course_of(db, tenant_id, course_slug)
+    # `FOR UPDATE`: the "withdrawn" check below must still hold when the write
+    # lands, or a status change overwrites a withdrawal made at the same instant and
+    # puts the learner's contact back on the provider's screen (Sprint 45).
     interest = await db.scalar(
-        select(CourseInterest).where(
-            CourseInterest.id == interest_id, CourseInterest.course_id == course.id
-        )
+        select(CourseInterest)
+        .where(CourseInterest.id == interest_id, CourseInterest.course_id == course.id)
+        .with_for_update(of=CourseInterest)
+        .execution_options(populate_existing=True)
     )
     if interest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Interest not found")

@@ -4,14 +4,15 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–44 built.** Sprints 41–43 are merged into `main` (PRs #17 and
-#18, `8ca2479`); **Sprint 44 is on `sprint-44`, cut from that, uncommitted.** Sprint 44 is *handing an
-organisation over as one act* (BL-9.1, ADR-051). Closing that gap exposed a race older than the feature:
-the last-owner guard was a check followed by a write with nothing between them, so two owners acting at the
-same moment — one demoting the other while being demoted, or both leaving — could leave an organisation with
-**no owner** (reproduced: both succeeded, owner count 0). Every ownership-changing act now takes a lock on
-the tenant row first and re-checks the caller's authority after it. **Alias coverage is unchanged and still
-thin: 43 distinct roles of 3,417.** Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-04 · **Sprints 1–45 built.** Sprints 41–44 are merged into `main` (PRs #17–#19,
+`7ba7547`); **Sprint 45 is on `sprint-45`, cut from that, uncommitted.** Sprint 45 is *the same blind spot as
+Sprint 44, on the paths people use most* (ADR-052). The suite runs every test inside one rolled-back transaction,
+so two requests can never overlap; reading the other check-then-write paths and then **reproducing each suspicion
+with two real requests** found a double-tap on Apply returning a **500**, a candidate's withdrawal and an
+employer's decision overwriting each other (a rejection wiped, or contact left visible after a revocation), and a
+re-apply emailing the employer twice. Fixed with row locks plus the unique constraint as arbiter. Also BL-12.14:
+abbreviations now work across a multi-word role search. **Alias coverage is unchanged and still thin: 43 distinct
+roles of 3,417.** Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -27,11 +28,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-44` (Sprint 44, **uncommitted**), cut from `main` at `8ca2479`, which has Sprints 41–43. The old `sprint-41`, `sprint-43` and `fix/audit-2026-10` are deleted locally; `origin/sprint-41` and `origin/fix/audit-2026-10` are merged and still on the remote. |
-| **Last sprint** | 44 — BL-9.1, hand an organisation over in one act, and the ownership race it exposed (ADR-051, migration 0045). Before it: 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,033 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0045`; 51 ADRs |
+| **Branch** | `sprint-45` (Sprint 45, **uncommitted**), cut from `main` at `7ba7547`, which has Sprints 41–44 (PRs #17–#19). Every merged branch is deleted, locally and on `origin`; five unmerged dependabot branches remain on the remote. |
+| **Last sprint** | 45 — a concurrency audit of the candidate-facing writes (double-submit 500s, withdraw-vs-decision lost updates) and BL-12.14, abbreviations in multi-word role search (ADR-052, no migration). Before it: 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a minimum cell size too, because a small district's counts identify people) (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
+| **Tests** | 1,055 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0045` (Sprint 45 added none); 52 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -966,14 +967,11 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-44`, uncommitted**, cut from `main` at `8ca2479` (the PR #18 merge, which carries Sprints
-41, 42 and 43). Commit only when the owner asks. Sprint 44's changes: `identity/{invitations,member_routes,
-schemas,__init__}.py` (the ownership lock, `transfer_ownership`, `lock_ownership_of`), `privacy/service.py`
-(erasure takes the lock), `analytics/models.py`, `notifications/{models,templates}.py`,
-`migrations/versions/0045_*`, `web/src/components/employer/TeamPanel.tsx` (+test), the messages,
-`web/src/lib/api-schema.d.ts`, new tests (`test_ownership_race.py`, `test_ownership_transfer.py`), ADR-051,
-`CLAUDE.md`. **Restart `make worker` after pulling it**: the new `ownership_received` template is only used
-when the worker drains.
+**Working on `sprint-45`, uncommitted**, cut from `main` at `7ba7547` (the PR #19 merge, which carries Sprints
+41–44). Commit only when the owner asks. Sprint 45's changes: `applications/{service,employer_service}.py` and
+`interests/{service,provider_service}.py` (row locks, savepointed inserts), `skills/service.py` (the two synonym
+tiers and `_term_groups`), new tests (`tests/concurrency.py`, `test_concurrency_audit.py`,
+`test_role_search_synonyms.py`), ADR-052, `CLAUDE.md`, the backlog document. **No migration and no web change.**
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -1967,6 +1965,60 @@ Owner decisions, all taken as recommended: the person handing over **chooses** t
 - **Left for later:** BL-12.7 district skill-gap view; BL-12.8 credit chips (blocked); BL-12.11 PWA device
   check; BL-12.14 synonym-row scoring; BL-12.15 operator alias screen; the curated alias batch; BL-5.3 real
   embeddings; BL-1.3 monetisation.
+
+### Sprint 45 — the same blind spot, on the paths people use most, and abbreviations in role search (done 2026-10-04, uncommitted)
+
+Sprint 44 found a race that had sat in the code for 19 sprints because the suite could not show it. This sprint
+looked for the others, and **reproduced every suspicion with two real requests before changing anything**. Owner
+decisions, as recommended: the audit plus BL-12.14 (not the district view), and the caps stay advisory.
+
+- **A double-tap on Apply was a 500.** Two requests each find no row and each insert; the unique constraint refuses
+  the second and nothing caught it. The data was right and the answer was wrong, on a phone where a retry is
+  normal. Same for registering interest and saving a vacancy. **The first version of the test passed** — a
+  brand-new candidate's first two requests race to create their *profile*, a different race that hid this one.
+  `tests/concurrency.py` now creates the profile first. Lesson recorded in `CLAUDE.md`: a test that passes before the
+  fix proves nothing.
+- **Withdrawing against a decision was a lost update**, the serious one. `withdraw()` checked the status and then
+  wrote; the employer's `set_status` checked "not withdrawn" and then wrote; run together both reported success. A
+  withdrawal overwrote an employer's rejection (what BL-12.6 exists to prevent), and an employer's status change
+  overwrote a withdrawal — for course interests that left the learner's contact visible on a row they had revoked.
+- **Re-applying twice emailed the employer twice**: both requests find the same withdrawn row, so no constraint is
+  involved and nothing fails.
+- **The fix (ADR-052).** `SELECT ... FOR UPDATE` (`of=` the entity) on the row the check read, then re-read under
+  it; where there is no row yet the unique constraint arbitrates, inside a savepoint (`begin_nested`), so the loser
+  gets 409 "already applied" — or the winner's row for the idempotent save. **One planned lock was removed:** a
+  learner's withdrawal of a course interest is unconditional and always the last word, so its check cannot go stale
+  and the race is closed on the provider's side; mutation checking showed no test could fail without it.
+- **Caps are not locked** (50 applications a day, 20 pending invitations, 60 skills): they deter abuse rather than
+  guard an invariant. Under concurrency one can be exceeded by a few. **Not audited:** slug uniqueness on publish.
+- **How the tests work.** Eight tests in `test_concurrency_audit.py`, on committed rows and real requests. The
+  deterministic technique is to **hold a row lock from a third session and release it once `pg_stat_activity`
+  shows both requests waiting**, so both have passed their check before either may write; the double-submits widen
+  the window with a sleep instead. All eight fail on the unfixed code (`assert [201, 201] == [201, 409]`, an
+  unhandled `UniqueViolationError`, both withdraw and decide returning 200) and pass four runs out of four.
+  One expectation of mine was wrong and was corrected, not the code: *shortlist then withdraw* is a legal order
+  where both succeed, so for that status the test asserts the final state instead of a single winner.
+- **BL-12.14, and the backlog's premise was partly wrong.** `tech` leading with Technical and Technician is
+  correct. The real defect: a synonym only applied to the whole query string, so `mfg technician` led with
+  Technician - Mechatronics and `mfg operator` with Loader Operator. Two tiers now sit **below every literal one**:
+  1.4 for the query with its abbreviations spelled out found whole in the title, 1.3 for every word met by itself or
+  a synonym, in any order (`_term_groups`, a `jsonb` parameter). **A first design put the phrase at 1.9, above
+  "all the typed words in any order", and was caught in review against the rule "what was typed outranks what we
+  expanded it to" before it shipped** — and the first set of tests did not pin three of the rules until they were
+  rebuilt. Seven mutations, each now failing exactly its own test.
+- **Measured on 764 real queries** (the 726 plus 38 abbreviation probes): 758 identical, **6 lists changed, 4 at
+  the top, every one an improvement** — `mfg technician` → Pharma Manufacturing Technician, `mfg operator` →
+  Automotive Additive Manufacturing Operator, `hr manager` now finds Deputy Human Resources Manager, `logistics
+  executive` puts Supply Chain Executive above Business Analytics Executive. No exact-title and no single-word query
+  moved.
+- **Verified.** `make check` 1,055 passed (1,033 + 22); `make evaluate` holds; `make check-role-aliases` passes;
+  no web change and the generated client is byte-identical. **Live** against the running API: four simultaneous
+  applies gave 201 and three 409s with one row; withdraw fired against rejected, hired and shortlisted gave no
+  500 and a coherent final state each time — **honestly, the live race does not fail on the old code every time**
+  (natural interleaving is luck), so the deterministic tests are the proof and the live pass is the smoke test.
+  Throwaway candidates erased.
+- **Left for later:** the district skill-gap view (BL-12.7, needs a minimum cell size and a ranking rather than a
+  threshold); slug-uniqueness races; BL-12.15; the curated alias batch; BL-5.3; BL-12.11; BL-1.3.
 
 ### Also outstanding, in rough order
 

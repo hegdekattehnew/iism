@@ -3,6 +3,7 @@
 Routes validate and delegate here; they contain no logic themselves (CLAUDE.md).
 """
 
+import json
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.embeddings import get_embedding_provider
-from api.core.text import expand_query_terms
+from api.core.text import WORD_SYNONYMS, expand_query_terms
 from api.modules.skills.content import (
     GenericCriterion,
     KnowledgeParameter,
@@ -499,6 +500,17 @@ candidates AS (
                SELECT 1 FROM unnest(CAST(:synonym_terms AS text[])) AS t(term)
                WHERE lower(qp.job_role) LIKE '%' || t.term || '%'
            )
+           -- Sprint 45: every word of a multi-word query, each met by itself or by
+           -- a synonym ("mfg operator" -> a title with "manufacturing" and
+           -- "operator" in it, in any order). `:term_groups` is `[]` unless some
+           -- word has a synonym, so this is false for every other query.
+           OR (jsonb_array_length(CAST(:term_groups AS jsonb)) > 0 AND NOT EXISTS (
+               SELECT 1 FROM jsonb_array_elements(CAST(:term_groups AS jsonb)) AS g(alts)
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM jsonb_array_elements_text(g.alts) AS a(alt)
+                   WHERE lower(qp.job_role) LIKE '%' || a.alt || '%'
+               )
+           ))
            -- Semantic tier (Sprint 40, foundation): only ever reached when a
            -- real embedding provider is active (`:query_embedding` is NULL
            -- under the hashing placeholder, so this branch is always false
@@ -535,6 +547,25 @@ scored AS (
                     SELECT 1 FROM unnest(CAST(:terms AS text[])) AS w(word)
                     WHERE r.role_key NOT LIKE '%' || w.word || '%'
                 ) THEN 1.5
+                -- Sprint 45: the query with an abbreviation spelled out ("mfg
+                -- technician" -> "manufacturing technician") found whole in the
+                -- title. Below *every* literal tier, including all-the-words-in-any-
+                -- order: what the person typed outranks what we expanded it to. It
+                -- used to be admitted and then scored as a fuzzy guess, below titles
+                -- that merely resembled the query.
+                WHEN EXISTS (
+                    SELECT 1 FROM unnest(CAST(:synonym_terms AS text[])) AS t(term)
+                    WHERE r.role_key LIKE '%' || t.term || '%'
+                ) THEN 1.4
+                -- All the words in any order, any of them met by a synonym: under the
+                -- expanded phrase, as a looser form of the same thing.
+                WHEN jsonb_array_length(CAST(:term_groups AS jsonb)) > 0 AND NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(CAST(:term_groups AS jsonb)) AS g(alts)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM jsonb_array_elements_text(g.alts) AS a(alt)
+                        WHERE r.role_key LIKE '%' || a.alt || '%'
+                    )
+                ) THEN 1.3
                 ELSE 0.9 * word_similarity(q.norm, r.role_key)
            END AS literal,
            -- Sprint 43: a disability-track pack is demoted by one match tier (the
@@ -629,6 +660,34 @@ def _query_terms(cleaned: str) -> list[str]:
     return seen if len(seen) >= 2 else []
 
 
+def _term_groups(cleaned: str) -> list[list[str]]:
+    """Each word of a multi-word query with what it may stand for, or `[]`.
+
+    `"mfg operator"` becomes `[["mfg", "manufacturing"], ["operator"]]`: a title
+    meets the query if it carries, for every group, any one of its words (Sprint
+    45, BL-12.14). Without this the synonym only applied to the **whole** query
+    string, so `mfg operator` found no `Manufacturing ... Operator` unless that
+    exact phrase was in the title, and returned every operator in the corpus.
+
+    Empty when no word has a synonym -- the literal all-words rule already covers
+    that, and a second rule that repeats it would only add a way to disagree with
+    it. Whole words only (the reason `WORD_SYNONYMS` is matched that way), and a
+    word carrying a `LIKE` wildcard is looked up as itself, never as what its
+    stripped form happens to spell.
+    """
+    groups: list[list[str]] = []
+    seen: set[str] = set()
+    for raw in cleaned.lower().split():
+        word = "".join(ch for ch in raw if ch not in "%_\\")
+        if not word or word in _QUERY_STOPWORDS or word in seen:
+            continue
+        seen.add(word)
+        groups.append([word, *WORD_SYNONYMS.get(raw, [])] if word == raw else [word])
+    if len(groups) < 2 or all(len(g) == 1 for g in groups):
+        return []
+    return groups
+
+
 def _literal_kind(score: float) -> str:
     if score >= 4.0:
         return "exact"
@@ -669,6 +728,7 @@ async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list
                 "query_embedding": query_embedding,
                 "semantic_min_similarity": SEMANTIC_MIN_SIMILARITY,
                 "terms": _query_terms(cleaned),
+                "term_groups": json.dumps(_term_groups(cleaned)),
                 "asks_disability": any(t in cleaned.lower() for t in _ASKS_DISABILITY),
                 "limit": min(limit, MAX_ROLE_RESULTS),
             },
