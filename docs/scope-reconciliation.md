@@ -4,6 +4,38 @@
 moment of writing, not carried from a plan or from memory. Check it rather than trusting it: the
 whole value of this document is that each claim names a file you can open.
 
+## Status update, 2026-10-03
+
+Everything below this section is the ledger **as it stood on 2026-09-24** and is left as written, so
+that the record of what was wrong survives the fixing of it. This section says where each
+divergence stands now, after Sprints 33 to 42. Each line names where to look.
+
+| # | Divergence | Now | Where to look |
+|---|---|---|---|
+| 1 | Matching is deterministic only; the baseline says hybrid | **Partly closed.** The mechanism exists end to end: an embedding adapter, a worker sweep, and an additive bounded similarity term in `score_match` (Sprint 36), and a real self-hosted `sentence-transformers` provider (Sprint 40). All of it is **off by default** (`embedding_provider="hashing"`, `match_weight_semantic=0.0`), so the scorer is still four components in practice. Turning it on is BL-5.3 and needs an owner decision. | `api/adapters/embeddings/`, `matching/scoring.py`, BL-5.1 to BL-5.3 |
+| 2 | Match weights are constants | **Closed** (Sprint 33, BL-2.1). `ScoreWeights` is a value passed into the scorer, built from configuration by `weights_from_settings()`. `scoring.py` still reads no settings. | `matching/service.py`, `core/config.py` |
+| 3 | Recommendations are never recorded as dismissed | **Closed** (Sprint 33, BL-2.2). `course_dismissed` is in `EVENT_NAMES`, so precision@5 has a negative class. | `analytics/models.py` |
+| 4 | Course-to-job alignment exists only through a candidate | **Closed** (Sprint 33, BL-2.3). `course_role_alignment()` returns coverage for a course and a role with no candidate involved. | `matching/service.py` |
+| 5 | Three of eight actor types exist | **Mostly closed, as thin slices.** Assessment provider: adapter and webhook (Sprint 35). Government agency: bulk CSV enrolment and a programme report (Sprint 33). External system: API-key credential beside JWT (Sprint 33). Super admin: `staff_tier`, support and admin (Sprint 37). Still thin: there is no agency login (an operator stands in), no live assessment partner (console implementation only), and platform administration is still scripts. | `identity/`, `assessment/`, `operations/`, BL-3.1, BL-7.1 to BL-7.3 |
+| 6 | A provider cannot see what the market is short of | **Closed** (Sprint 33, BL-2.4). `market_scarce_skills()` is the same query with no tenant filter. | `matching/employer.py`, `matching/provider_routes.py` |
+| 7 | `SkillRelation` is not built | **Partly closed.** The model and migration exist (Sprint 36) with **zero rows** and nothing reading it. Career ladders (Sprint 42, ADR-049) were built **without** it, derived from qualification data instead, so the table remains an unused foundation. Inference (BL-6.2) is not started. | `skills/graph.py`, BL-6.1 to BL-6.5 |
+| P | Three of four `SKILL_SOURCES` have no writer | **Mostly closed** (Sprint 35). `assessed` is written by the assessment webhook and `certified` by an operator's verification of a candidate's certification (Sprint 41 added the way to link a certification to a standard). **`inferred` still has no writer**; it waits on résumé extraction or skill inference. | `assessment/service.py`, `operations/service.py` |
+
+**Two things the ledger could not have predicted, worth knowing before you read it:**
+
+- **The gaps it named were not the biggest ones.** An October 2026 audit found nine defects in code
+  the ledger had called conformant, most of them hidden because the test session autoflushed and
+  production does not. The ledger checks the product definition against the tree; it does not audit
+  the tree.
+- **Career ladders are in no baseline document.** They are the first slice of ADR-008's career path
+  engine, built from qualification data. They reach 38% of roles, and BFSI, IT and Electronics are
+  near zero because those sectors share no standards across levels (ADR-049).
+
+The full status of every story is in `docs/IISM-Product-Backlog.docx` (version 1.2) and, with the
+reasoning, in `projectContextForMe.md` section 11.
+
+---
+
 ## Why this exists, and what it is not
 
 `docs/IISM-Product-Definition.docx` is the baseline. It is a good document and it is **one release

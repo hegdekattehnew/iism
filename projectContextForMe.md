@@ -4,15 +4,16 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-03 · **Sprints 1–42 built.** Sprints 41 and 42 are both implemented and
-verified and both **uncommitted on branch `sprint-41`** (cut from `main` at `9f339c7`, which already
-carries the October audit's nine fixes via PR #16) — so one commit would mix them; split by file if two
-are wanted. Sprint 41 finished the features that existed only on the server and shipped "Why not me" and
-"Hire and train" (ADR-048). **Sprint 42 shipped career ladders (ADR-049)**: `/career-paths`, "the roles
-that build on yours and what it would take", derived at read time from the national qualification data
-with the evidence for every step shown and **nothing stored**. It is honest about its reach — **38% of
-roles have a step, and BFSI, IT and Electronics are near zero** because those sectors share no standards
-across levels. Monetisation and every real external integration stay deferred by the owner.
+**Last updated:** 2026-10-04 · **Sprints 1–43 built.** Sprints 41 and 42 are committed and pushed on
+`sprint-41` (PR into `main` not yet merged; `b1ab9c1`). **Sprint 43 is on `sprint-43`, cut from
+`sprint-41`** because migration 0043 and `careers/` live there — it will need rebasing onto `main`
+once that PR merges. Sprint 43 is *role search you can trust* (ADR-050): running the search against
+the real corpus found a disability-track pack leading a general one, fourteen aliases pointing at one,
+a half-typed alias losing to a literal prefix, and multi-word queries finding nothing. All four are
+fixed, plus two small stories (a rejected application can no longer be withdrawn and reapplied;
+an organisation is emailed when its Verified badge actually changes). **Alias coverage is unchanged
+and still thin: 43 distinct roles of 3,417** — the curated batch was deliberately left out. Monetisation
+and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -28,11 +29,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-41`, **uncommitted** — holds Sprint 41 *and* Sprint 42 (nothing committed or pushed; the owner has not asked). Cut from `main` at `9f339c7`. |
-| **Last sprint** | 42 — career ladders (ADR-049): `GET /me/careers`, `/career-paths`, `skills.roles_above`, `matching.score_against_roles`, migration 0043 (one analytics event). Before it, 41 — the half-built finished, "Why not me", "Hire and train" |
-| **Next sprint** | not yet chosen. Candidates: the district skill-gap view, course credit chips, an owner rule on withdraw-then-reapply, and — for the ladder's reach — a domain expert's view on whether "same occupation, one level up" may be a *separately labelled weaker tier* (see ADR-049). `BL-1.3` stays not started (owner chose to wait for real traffic, Sprint 38). |
-| **Tests** | 972 backend (`make check`, 2026-10-03), 356 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0043`; 49 ADRs |
+| **Branch** | `sprint-43` (Sprint 43, **uncommitted**), cut from `sprint-41` (`b1ab9c1`: Sprints 41 and 42 plus the backlog and scope documents, pushed). `main` is at `9f339c7` and does not yet have either. |
+| **Last sprint** | 43 — role search trust (ADR-050), BL-12.6 (a rejection cannot be withdrawn), BL-9.2 (the Verified-badge email, migration 0044). Before it: 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: single-action ownership transfer (BL-9.1, needs a locking decision), the district skill-gap view (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
+| **Tests** | 1,013 backend (`make check`, 2026-10-04), 364 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0044`; 50 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -80,7 +81,8 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 |---|---|
 | `docs/adr/architecture-decisions.md` | **42 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. **Read the next row with it.** |
-| `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. |
+| `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. **A status table at the top (2026-10-03) says where each stands now**: five closed or mostly closed, two partly closed; the body is left as written. `docs/IISM-Scope-Reconciliation.docx` is the same ledger rewritten for top management (executive summary, scorecard, decisions requested, what to say plainly); regenerate or edit it when a gap's status changes. |
+| `docs/IISM-Product-Backlog.docx` | **Every story's status** — done, in progress, to do (Now / Next / Later), waiting or deferred. Version 1.2 (2026-10-03) adds a status-at-a-glance table, Epic 13 (what shipped in Sprints 33–42), Epics B11–B13, and §4.4 with a proposal for the next sprint. It had stopped at Sprint 38 and still tagged the dashboards `[NOW]`. **Update it when a story's status changes** — it went five sprints stale once. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
 | `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprints 30–31's is the latest). Lives outside the repo. |
@@ -939,6 +941,20 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 65. **Next 16 keeps dev output in `.next/dev`, so `npm run build` is safe beside a running `make web`.**
     The budget script reads `.next/diagnostics/route-bundle-stats.json` from the build.
 
+66. **Role search reads the `role_aliases` TABLE, not `ROLE_ALIASES`.** Editing `role_aliases.py` changes
+    nothing in the running product until the table is re-projected (`make seed`, or just
+    `scripts/seed_skills.py::_seed_role_aliases`). The first snapshot comparison for ADR-050 ran against a
+    stale table and showed no effect from the alias edits — `telecaller` still reached the old target.
+67. **Diff a ranking change on real queries, not fixtures.** Both defects in the first demotion rule
+    (exact titles demoted; the only literal match buried) were invisible to the fixture corpus and obvious in a
+    before/after diff of 726 real queries. Snapshot first, then change, then read every top-result change.
+68. **A shared SQL fragment changes every caller.** `ROLE_REPRESENTATIVE_ORDER` is used by role search,
+    career ladders and the alias checker. Changing it is one edit and three behaviours; the ladder's tests and
+    the 699-query snapshot both ran after it.
+69. **Rolling back the `db` test fixture rolls back the whole test, including the organisation you just
+    registered.** A "stand or fall together" test that rolls back and then looks for the tenant finds
+    nothing. Prove ordering with a spy on `enqueue` and `commit` instead.
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -952,13 +968,15 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-41`, uncommitted — Sprints 41 and 42 together.** Cut from `main` at `9f339c7` (the
-October audit's PR #16). Nothing is committed or pushed; commit only when the owner asks. Sprint 42's
-files are new (`api/modules/careers/`, `tests/test_career_ladder_roles.py`, `tests/test_role_scoring.py`,
-`tests/test_careers.py`, `migrations/versions/0043_*.py`, `web/src/components/CareerLadder*.tsx`,
-`web/src/app/[locale]/career-paths/`) plus edits to `skills/service.py`, `matching/service.py`,
-`matching/__init__.py`, `analytics/models.py`, `main.py`, the messages, `CandidateDashboard.tsx`,
-`GapPanel.tsx`, `CLAUDE.md` and ADR-049 — separable if two commits are wanted.
+**Working on `sprint-43`, uncommitted**, cut from `sprint-41` at `b1ab9c1` (Sprints 41 and 42 and the
+backlog and scope documents, pushed to `origin/sprint-41`; its PR into `main` is not yet merged). Nothing
+on `sprint-43` is committed; commit only when the owner asks. Sprint 43's changes: `skills/service.py`
+(search SQL, representative order, `alias_problems`), `skills/role_aliases.py`, `skills/schemas.py`
+(`words` kind), `applications/{service,models}.py`, `operations/service.py`,
+`notifications/{models,templates}.py`, `migrations/versions/0044_*`, `scripts/check_role_aliases.py`,
+`web/src/components/{ApplyPanel,Notices}.tsx`, the messages, new tests
+(`test_role_search_trust.py`, `ApplyPanel.decided.test.tsx`) and edits to five existing ones, ADR-050,
+`CLAUDE.md`. It will need rebasing onto `main` after the Sprint 41/42 PR merges.
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -1739,7 +1757,7 @@ against each of the four reachable seeded demo accounts (`+919000000001`,
 `hiring@apollo-care.example` as both employer *and* operator, `admin@skillbridge-institute.example`)
 showing real charts, real drilldowns, and the corrected search results — not just passing tests.
 
-### Sprint 41 — finish the half-built, then two differentiators (done 2026-10-03, uncommitted)
+### Sprint 41 — finish the half-built, then two differentiators (done 2026-10-03, committed and pushed on `sprint-41`)
 
 The audit found the strongest parts of the product (the explainable gap, the course loop) and
 several features built on the server and never shown. The market research found nobody else tells a
@@ -1797,7 +1815,7 @@ is **in-app only**, no email.
   course credit chips, and an **owner rule** on withdraw-then-reapply (it currently resets the
   employer's decision).
 
-### Sprint 42 — career ladders: where could I move next (done 2026-10-03, uncommitted)
+### Sprint 42 — career ladders: where could I move next (done 2026-10-03, committed and pushed on `sprint-41`)
 
 The one differentiator from the market research still unbuilt. ADR-008 and BL-6.3 assumed an inference
 graph (`SkillRelation`); it has **zero rows**, and the national data names no prerequisite between two
@@ -1851,6 +1869,58 @@ placeholder, linked from the footer.
   a line and the code ran off the card. It now wraps (`flex-wrap`, `max-w-full`).
 - **Left for later:** the weaker-tier question above; a stored "current role" on the profile (a migration
   and a consent-style act); inference from `SkillRelation` (BL-6.2, still `[LATER]`); pay or demand on a step.
+
+### Sprint 43 — role search you can trust, and two small stories (done 2026-10-04, uncommitted)
+
+Career ladders start from `search_roles`, so a wrong search result now starts a wrong ladder. The
+investigation that opened this sprint ran the search against the **real corpus**, which the small
+fixture corpus never could, and found problems that matter more than the "3.6% alias coverage" figure
+the backlog quoted. (That figure was aliases over packs; the real coverage is **43 distinct roles of
+3,417, 1.3%**, in 17 of 43 sectors.) Owner decisions: scope = role-search trust plus two small stories;
+reapply = block withdrawing a rejection; disability-track packs = demoted unless asked for and never an
+alias target; **no curated alias batch** (lay terms are labour-market knowledge and nothing in the repo
+contains them).
+
+- **Disability-track packs, one tier lower (ADR-050).** Every one carries a `PWD/` code — 69 roles, no
+  exception, 31 of them not named "Divyangjan" — and 57 exist *only* as a disability-track pack. Search now
+  subtracts 1.01 from their match score unless the query asks (`divyang`, `pwd`, `disab`) or is exactly the
+  title. **The first version put them in last place and was wrong on the real corpus**: `hr executive` has
+  one literal match, a disability-track pack, and last place ranked it below "Executive Housekeeper". The
+  first version also had no exact-title exemption, so `pressman` typed in full lost to something else. Both
+  were found by diffing 726 real queries before and after, not by a fixture.
+- **A half-typed alias beats a literal prefix on a tie** (`war` listed Warper above General Duty
+  Assistant). **A multi-word query matches a title containing every word** (a new `words` kind, score 1.5).
+  Each needed a fixture where that rule alone decides: removing the all-words *admission* clause failed
+  nothing until a title was found whose trigram similarity (0.54) is under the 0.6 threshold.
+- **Fourteen aliases pointed at a disability-track pack, and the checker could not see it.** Re-pointed two
+  roles to their general twins (same code, different name), removed the seven retail keys (no general pack
+  exists) and `cook` (the corpus has a role literally named Cook). `alias_problems()` now **fails** on that,
+  and on a key that is a role's exact title aliased elsewhere — its first real run found two more
+  (`web developer`, `security analyst`). It **reports** ambiguous prefixes without failing. Aliases 124 → 114.
+- **BL-12.6.** `withdraw()` refused outside `applied`/`shortlisted` (`WITHDRAWABLE_STATUSES`), `apply()` says
+  "not selected" for a rejection, `ApplyPanel` shows the employer's word and no Withdraw button, and a 409
+  that arrives after the page was drawn is explained rather than "something went wrong". **Known limit:**
+  rows already withdrawn after a rejection cannot be told apart, because the earlier status was overwritten.
+  A hired application also cannot be withdrawn here (the message says to contact the employer) — that follows
+  the approved plan and is a behaviour change worth a second look.
+- **BL-9.2.** `set_verification` queues one email to the organisation **only when the badge flips**,
+  before the commit, with a payload of the name and a link — no operator note, no address. Email only,
+  because organisation members have no in-app inbox. An owner who signed up by phone alone has no address,
+  so that organisation is **not** told (the row is `skipped`); that is stated, not hidden. Migration 0044.
+- **Also:** `Notices` had no wording for `sponsor_offer`, so a sponsorship notice read "You have an update."
+- **Verified.** `make check` 1,013 passed (972 + 41); web 364 (356 + 8) with `tsc` and `eslint` clean;
+  `make evaluate` — all 34 golden pairs, 7 orderings, 16 course expectations hold; `alembic check` clean and
+  0044 round-trips; no route grew (heaviest `/profile` 678 of 684 KB). **Mutation-tested**: every ranking
+  rule, both checker rules, both withdraw guards and the flip rule each fail exactly their own test when
+  removed. **Live** against the running API with a throwaway candidate and organisation: a rejection could
+  not be withdrawn or reapplied, and the worker log showed exactly two emails to the throwaway owner
+  (verified, revoked) for four operator decisions. Everything created was erased.
+- **Role search before/after on 726 queries:** 11 top results changed, all explained — seven are the alias
+  tie-break on three-letter prefixes, one is the demotion, three are the alias corrections. No exact-title
+  query changed.
+- **Left for later:** the curated alias batch; an operator alias screen (the seed deletes the table on every
+  run, so edits would vanish — it needs a source-of-truth redesign first); scoring synonym-admitted rows
+  (`mfg`, `tech`); BL-9.1; BL-12.7/12.8 (see the backlog).
 
 ### Also outstanding, in rough order
 

@@ -22,7 +22,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
 from api.modules.analytics import record
-from api.modules.applications.models import WAS_HIRED_STATUSES, Application, SavedJob
+from api.modules.applications.models import (
+    WAS_HIRED_STATUSES,
+    WITHDRAWABLE_STATUSES,
+    Application,
+    SavedJob,
+)
 from api.modules.applications.reputation import Reputation, worker_reputation
 from api.modules.identity import User
 from api.modules.identity.models import Tenant
@@ -100,6 +105,12 @@ async def apply(
         )
     )
     now = datetime.now(UTC)
+    if existing is not None and existing.status == "rejected":
+        # Not "already applied": that reads as something the candidate can undo, and
+        # a rejection is not. The employer's decision stands (Sprint 43, BL-12.6).
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This application was not selected for this vacancy"
+        )
     if existing is not None and existing.status != "withdrawn":
         raise HTTPException(status.HTTP_409_CONFLICT, "You have already applied to this vacancy")
 
@@ -266,6 +277,20 @@ async def withdraw(db: AsyncSession, user: User, application_id: uuid.UUID) -> A
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
     if application.status == "withdrawn":
         return application
+    # Only an application nobody has decided on, or one still under consideration,
+    # can be taken back. Withdrawing a *rejected* one overwrote the status with no
+    # record of what it had been, after which `apply()` reset it to "applied" -- a
+    # way to wipe an employer's decision. The outcomes after a hire are history
+    # (a completed or no-show gig feeds both sides' reputation) and are not the
+    # candidate's to rewrite either (Sprint 43, BL-12.6).
+    if application.status not in WITHDRAWABLE_STATUSES:
+        detail = (
+            "This application was not selected, so it cannot be withdrawn"
+            if application.status == "rejected"
+            else "A decision has been made on this application, so it cannot be withdrawn here. "
+            "Contact the employer."
+        )
+        raise HTTPException(status.HTTP_409_CONFLICT, detail)
 
     application.status = "withdrawn"
     application.contact_revoked_at = datetime.now(UTC)

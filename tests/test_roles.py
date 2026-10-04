@@ -21,7 +21,7 @@ from api.modules.skills import Skill
 from api.modules.skills.hierarchy import QpSkill, QualificationPack, RoleAlias, Sector
 from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX, ROLE_ALIASES
 
-TIER = {"exact": 4, "alias": 4, "prefix": 3, "contains": 2, "fuzzy": 1}
+TIER = {"exact": 4, "alias": 4, "prefix": 3, "contains": 2, "words": 1.5, "fuzzy": 1}
 
 
 def _standard(code: str, name: str) -> Skill:
@@ -222,7 +222,7 @@ class TestTheAliasMap:
         whether each value names a *real, current* qualification is instead
         `scripts/check_role_aliases.py`'s job (`make check-role-aliases`),
         against the actual corpus."""
-        for term in ("software developer", "web developer", "it support"):
+        for term in ("software developer", "web designer", "it support"):
             assert term in ROLE_ALIASES, term
             assert ROLE_ALIASES[term].strip()
 

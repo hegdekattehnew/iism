@@ -26,7 +26,10 @@ Rules for editing it:
   corpus matches nothing, silently; `unresolved_aliases()` in the service lists
   them, and the verification step of any change to this file runs it.
 * **Point at the general qualification**, never a sector-specific or
-  disability-track variant, even when the name fits better. A candidate who
+  disability-track variant, even when the name fits better. Every
+  disability-track pack carries a `PWD/` code, whether or not its name says
+  "Divyangjan", and `alias_problems()` fails on an alias whose representative
+  pack has one (Sprint 43, ADR-050; fourteen keys had been pointing at three). A candidate who
   types "waiter" and is offered *Food & Beverage Service Associate (Divyangjan)*
   has been told something untrue about the route open to them.
 * **Leave a term out rather than guess.** Deliberately absent: "waiter" (only
@@ -83,13 +86,14 @@ ROLE_ALIASES: dict[str, str] = {
     "xray technician": "Certificate in X-Ray Technology",
     "dialysis technician": "Certificate in Dialysis Technology",
     # ----------------------------------------------------------------- retail
-    "salesman": "Retail Sales Associate",
-    "saleswoman": "Retail Sales Associate",
-    "sales boy": "Retail Sales Associate",
-    "sales girl": "Retail Sales Associate",
-    "shop assistant": "Retail Sales Associate",
-    "counter salesman": "Retail Sales Associate",
-    "सेल्समैन": "Retail Sales Associate",
+    # No entry for salesman, saleswoman, sales boy, sales girl, shop assistant,
+    # counter salesman or सेल्समैन (Sprint 43, ADR-050). They all pointed at
+    # "Retail Sales Associate", which exists only as a disability-track pack
+    # (PWD/RAS/Q0104) -- the very thing the rule above forbids, and invisible to
+    # the checker until it learned to look at the code. The nearest general role,
+    # "Retail Sales Executive", is a different qualification at NSQF 4, not the
+    # same entry-level work at 3. A labour-market reviewer should decide whether it
+    # stands in; until then these fall through to literal search.
     "cashier": "Retail Cashier",
     "billing clerk": "Retail Cashier",
     "billing staff": "Retail Cashier",
@@ -119,9 +123,12 @@ ROLE_ALIASES: dict[str, str] = {
     "ड्राइवर": "Light Motor Vehicle Driver",
     "truck driver": "Commercial Vehicle Driver",
     "lorry driver": "Commercial Vehicle Driver",
-    "cook": "Assistant Chef",
-    "khansama": "Assistant Chef",
-    "रसोइया": "Assistant Chef",
+    # "Assistant Chef" is the disability-track issue of THC/Q2702 (PWD/THC/Q2702);
+    # the same qualification is issued generally as "Kitchen Trainee". "cook" has no
+    # entry: the corpus has a role literally named "Cook (Multi-Cuisine)", which
+    # search already reaches, and an alias would put a trainee qualification above it.
+    "khansama": "Kitchen Trainee",
+    "रसोइया": "Kitchen Trainee",
     "housekeeping": "Housekeeping Assistant",
     "cleaner": "Housekeeping Assistant",
     "sweeper": "Housekeeping Assistant",
@@ -129,10 +136,12 @@ ROLE_ALIASES: dict[str, str] = {
     "computer operator": "Certificate in Data Entry Operations - Domestic",
     "data entry": "Certificate in Data Entry Operations - Domestic",
     "कंप्यूटर ऑपरेटर": "Certificate in Data Entry Operations - Domestic",
-    "telecaller": "Customer Care Executive(Call Center)",
-    "call centre": "Customer Care Executive(Call Center)",
-    "call center": "Customer Care Executive(Call Center)",
-    "bpo": "Customer Care Executive(Call Center)",
+    # "Customer Care Executive(Call Center)" is the disability-track issue of
+    # TEL/Q0100 (PWD/TEL/Q0100); the general issue is "Call Center Executive".
+    "telecaller": "Call Center Executive",
+    "call centre": "Call Center Executive",
+    "call center": "Call Center Executive",
+    "bpo": "Call Center Executive",
     # ---------------------------------------------------------------- trades
     "electrician": "Assistant Electrician",
     "बिजली मिस्त्री": "Assistant Electrician",
@@ -167,7 +176,9 @@ ROLE_ALIASES: dict[str, str] = {
     "programmer": "Certificate Course in Coding Skills",
     "coder": "Certificate Course in Coding Skills",
     "coding": "Certificate Course in Coding Skills",
-    "web developer": "Certificate Course in Web Designing and Multimedia",
+    # No entry for "web developer": it is the exact title of SSC/Q0503, so the
+    # literal match already reaches it, and an alias to the multimedia certificate
+    # sent somebody who typed the title in full elsewhere (ADR-050).
     "website developer": "Certificate Course in Web Designing and Multimedia",
     "web designer": "Certificate Course in Web Designing and Multimedia",
     "web design": "Certificate Course in Web Designing and Multimedia",
@@ -186,7 +197,7 @@ ROLE_ALIASES: dict[str, str] = {
     "ml engineer": "AI - Machine learning Developer",
     "ai developer": "AI - Machine learning Developer",
     "ethical hacking": "Certificate in Cyber Security & Ethical Hacking",
-    "security analyst": "Certificate in Cyber Security",
+    # No entry for "security analyst" either: SSC/Q0901 is titled exactly that.
 }
 
 # How short a partial alias may be and still count. "wa" should not claim

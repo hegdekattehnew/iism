@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(49 ADRs). Read it before making any structural decision — the summary below
+(50 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -145,6 +145,16 @@ api/                     FastAPI modular monolith
                          generic and is not evidence), occupation and NCO as corroboration
                          only. `ROLE_REPRESENTATIVE_ORDER` is the one rule for which pack
                          stands for a role -- role search and ladders both use it.
+                         (Sprint 43, ADR-050) Role search ranks a disability-track pack (every
+                         one carries a `PWD/` code) **one match tier lower** unless the query
+                         asks for one or is exactly its title, and `ROLE_REPRESENTATIVE_ORDER`
+                         now prefers a general pack. A half-typed alias beats a literal prefix on
+                         a tie; a multi-word query matches a title containing every word
+                         (`match_kind: "words"`, 1.5). `alias_problems()` replaces
+                         `unresolved_aliases()`: it **fails** an alias that resolves to a
+                         disability-track pack or shadows a role's exact title, and reports
+                         ambiguous prefixes. **Role search reads the `role_aliases` table, not
+                         the dict**: edit `role_aliases.py`, then re-project (`make seed`).
     geography/           State, District, SubDistrict, plus the service that resolves a
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
@@ -203,6 +213,10 @@ api/                     FastAPI modular monolith
                          application_gap` is "Why not me": a candidate's own rejected
                          application, scored now through `matching.score_profiles`
                          (the one scorer) with `courses_closing_gap`, never recorded.
+                         (Sprint 43, BL-12.6) `WITHDRAWABLE_STATUSES` (`applied`, `shortlisted`)
+                         is what a candidate may take back: a rejection, a hire or a finished
+                         gig is the employer's record, and withdrawing then reapplying used to
+                         wipe it.
     interests/           Registering interest in a course, and the provider's
                          view of who did. A **sibling** of applications/, not an
                          extension: a course publishes what it teaches, so an
@@ -258,7 +272,10 @@ api/                     FastAPI modular monolith
                          and, since Sprint 33, matching (for the report's serious-match
                          count) -- nothing depends on it. No staff-management endpoint,
                          ever, by decision; `scripts/grant_staff.py` is the only writer
-                         of `users.is_staff`.
+                         of `users.is_staff`. (Sprint 43, BL-9.2) `set_verification` queues one
+                         email to the organisation, **only when the badge actually flips**, in the
+                         decision's own transaction; the payload is the name and a link, never the
+                         operator's note or an address.
     assessment/          (Sprint 35, BL-3.1) The one webhook an assessment provider
                          calls. No model of its own: ADR-023 names "assessment results"
                          among the data an encryption path must exist for before it is
@@ -686,8 +703,15 @@ split would have to turn into interfaces first; do not add to it casually.
 > because those sectors share no standards across levels — a data limit the page says out loud. A looser
 > "same occupation" rule reaches 52–60% at the price of steps that share no standard; it was measured and
 > not adopted (see the ADR). **Monetisation (`BL-1.3`) and every real external integration are
-> deliberately deferred** by the owner. §11 of `projectContextForMe.md` carries what is next and a
-> standing assessment of the three pillars — jobs, sellable courses, gig work.
+> deliberately deferred** by the owner. **Sprint 43 is done** (ADR-050): *role search you can trust*.
+> Running the search against the real corpus found that a disability-track pack could lead a general
+> one, fourteen aliases pointed at one, a half-typed alias lost to a literal prefix, and a multi-word
+> query found nothing. All four are fixed and each rule has a test that fails without it; the alias
+> checker now sees the disability-track and shadowed-title cases and found two more on its first run.
+> Alongside: a rejected application can no longer be withdrawn and reapplied (BL-12.6), and an
+> organisation is emailed when its Verified badge actually changes (BL-9.2, migration 0044). **Alias
+> coverage is unchanged: 43 distinct roles of 3,417.** §11 of `projectContextForMe.md` carries what is
+> next and a standing assessment of the three pillars — jobs, sellable courses, gig work.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

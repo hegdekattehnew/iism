@@ -52,6 +52,23 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "If you were not expecting this, you can ignore it -- nothing "
             "happens until you open the link.\n",
         ),
+        # Sprint 43, BL-9.2. No operator note and no address: the note is the
+        # operator's evidence, not the organisation's to read here.
+        "organisation_verified": (
+            "{organisation} is now verified on IISM",
+            "{organisation} has been verified on IISM. The Verified badge now "
+            "appears next to your organisation's name on its listings, so "
+            "candidates and learners can see that we checked who you are.\n\n"
+            "See your organisation profile:\n{link}\n",
+        ),
+        "organisation_verification_revoked": (
+            "The Verified badge for {organisation} has been removed",
+            "The Verified badge for {organisation} on IISM has been removed. "
+            "Your vacancies and courses are still published, but they no longer "
+            "carry the badge.\n\n"
+            "See your organisation profile:\n{link}\n\n"
+            "If you think this is a mistake, please contact the IISM team.\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -90,6 +107,20 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "केवल एक बार काम करता है:\n{link}\n\n"
             "यदि आपको इसकी अपेक्षा नहीं थी, तो इसे अनदेखा कर सकते हैं — लिंक खोलने "
             "तक कुछ नहीं होता।\n",
+        ),
+        "organisation_verified": (
+            "{organisation} अब IISM पर सत्यापित है",
+            "{organisation} को IISM पर सत्यापित कर दिया गया है। अब आपके संगठन के नाम "
+            "के आगे उसकी सूचियों पर “सत्यापित” का निशान दिखता है, ताकि उम्मीदवार और "
+            "शिक्षार्थी देख सकें कि हमने जाँचा है कि आप कौन हैं।\n\n"
+            "अपने संगठन की प्रोफ़ाइल देखें:\n{link}\n",
+        ),
+        "organisation_verification_revoked": (
+            "{organisation} का “सत्यापित” निशान हटा दिया गया है",
+            "IISM पर {organisation} का “सत्यापित” निशान हटा दिया गया है। आपकी रिक्तियाँ और "
+            "पाठ्यक्रम अब भी प्रकाशित हैं, पर उन पर यह निशान नहीं दिखेगा।\n\n"
+            "अपने संगठन की प्रोफ़ाइल देखें:\n{link}\n\n"
+            "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम से संपर्क करें।\n",
         ),
     },
 }

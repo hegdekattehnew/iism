@@ -143,6 +143,36 @@ describe("Notices", () => {
       expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/interests");
     });
 
+    it("words a sponsorship offer, naming the organisation, the standard and the course", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "sponsor_offer",
+            payload: {
+              vacancy: "General Duty Assistant",
+              organisation: "Apollo Care",
+              standard: "Follow infection control policies",
+              course: "Infection Control in Hospitals",
+              path: "/jobs/general-duty-assistant-chennai",
+            },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(
+        await screen.findByText(
+          "Apollo Care would sponsor you to close a gap for General Duty Assistant: take Infection Control in Hospitals, which teaches “Follow infection control policies”.",
+        ),
+      ).toBeTruthy();
+      // It used to fall through to this, which says nothing.
+      expect(screen.queryByText("You have an update.")).toBeNull();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe(
+        "/jobs/general-duty-assistant-chennai",
+      );
+    });
+
     it("says something neutral for a template it does not know", async () => {
       GET.mockResolvedValue({
         data: [notice({ template: "something_new", payload: {} })],

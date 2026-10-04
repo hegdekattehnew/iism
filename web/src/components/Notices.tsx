@@ -87,6 +87,16 @@ export function Notices() {
           organisation,
           status: t(`interestStatus.${String(notice.payload.status ?? "contacted")}`),
         });
+      case "sponsor_offer":
+        // Sprint 41 queued it and nothing worded it, so it read as "You have an
+        // update." It names the organisation, the standard and the course, and
+        // nothing about the person: the employer does not know who they are.
+        return t("sponsorOffer", {
+          organisation,
+          vacancy,
+          standard: String(notice.payload.standard ?? ""),
+          course: String(notice.payload.course ?? ""),
+        });
       default:
         return t("generic");
     }

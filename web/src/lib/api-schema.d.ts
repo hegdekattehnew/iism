@@ -4513,7 +4513,7 @@ export interface components {
              * Match Kind
              * @enum {string}
              */
-            match_kind: "exact" | "prefix" | "contains" | "fuzzy" | "alias";
+            match_kind: "exact" | "prefix" | "contains" | "words" | "fuzzy" | "alias";
         };
         /** RoleRefOut */
         RoleRefOut: {

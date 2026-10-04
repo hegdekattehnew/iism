@@ -8,7 +8,16 @@ import { Area } from "@/components/profile/fields";
 import { Alert, Button, ButtonLink } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useIsSignedIn } from "@/lib/auth";
+import type { components } from "@/lib/api-schema";
 import { useMemberships } from "@/lib/org";
+
+type Status = components["schemas"]["ApplicationOut"]["status"];
+
+/** What a candidate may still take back. The server's `WITHDRAWABLE_STATUSES`: once
+ *  an employer has decided, withdrawing would rewrite their record rather than end
+ *  the candidate's own interest. Typed against the schema so a renamed status is a
+ *  compile error, not a button that silently never appears. */
+const WITHDRAWABLE: readonly Status[] = ["applied", "shortlisted"];
 
 /**
  * Apply, and save for later — the two things a candidate can finally *do*.
@@ -76,6 +85,7 @@ export function ApplyPanel({
   const mine = applications.data?.find((a) => a.job.slug === jobSlug);
   const isSaved = saved.data?.some((s) => s.job.slug === jobSlug) ?? false;
   const live = mine && mine.status !== "withdrawn";
+  const canWithdraw = mine ? WITHDRAWABLE.includes(mine.status) : false;
 
   const apply = useMutation({
     mutationFn: async () => {
@@ -118,7 +128,8 @@ export function ApplyPanel({
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["me", "applications"] });
     },
-    onError: () => setError(t("errorGeneric")),
+    onError: (e: Error) =>
+      setError(Number(e.message) === 409 ? t("errorWithdrawDecided") : t("errorGeneric")),
   });
 
   const toggleSave = useMutation({
@@ -164,16 +175,28 @@ export function ApplyPanel({
       <div className="flex flex-wrap items-center gap-3">
         {live ? (
           <>
-            <span className="inline-flex items-center rounded-lg bg-success-surface px-3 py-2 text-sm font-semibold text-success-text">
-              {t("appliedLabel")}
-            </span>
-            <Button
-              variant="ghost"
-              onClick={() => withdraw.mutate()}
-              disabled={withdraw.isPending}
+            <span
+              className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${
+                mine.status === "rejected"
+                  ? "bg-warning-surface text-warning-text"
+                  : "bg-success-surface text-success-text"
+              }`}
             >
-              {withdraw.isPending ? t("withdrawing") : t("withdraw")}
-            </Button>
+              {/* "Applied" for a live application, and the employer's own word once
+                  they have decided: a rejected candidate told "Applied" is misled. */}
+              {mine.status === "applied" || mine.status === "shortlisted"
+                ? t("appliedLabel")
+                : t(`status.${mine.status}`)}
+            </span>
+            {canWithdraw && (
+              <Button
+                variant="ghost"
+                onClick={() => withdraw.mutate()}
+                disabled={withdraw.isPending}
+              >
+                {withdraw.isPending ? t("withdrawing") : t("withdraw")}
+              </Button>
+            )}
           </>
         ) : (
           <Button size="lg" onClick={() => setConfirming(true)}>

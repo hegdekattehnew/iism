@@ -1201,7 +1201,8 @@
       "completed": "You finished this assignment.",
       "no_show": "The employer recorded that you did not attend this assignment."
     },
-    "vacancyClosed": "This vacancy is closed and is no longer taking applications."
+    "vacancyClosed": "This vacancy is closed and is no longer taking applications.",
+    "errorWithdrawDecided": "A decision has been made on this application, so it cannot be withdrawn here. Contact the employer."
   },
   "employerInbox": {
     "title": "Applicants",
@@ -1252,7 +1253,8 @@
       "hired": "Hired",
       "completed": "Completed",
       "no_show": "Did not attend"
-    }
+    },
+    "sponsorOffer": "{organisation} would sponsor you to close a gap for {vacancy}: take {course}, which teaches “{standard}”."
   },
   "searchPage": {
     "title": "Results for “{q}”",
