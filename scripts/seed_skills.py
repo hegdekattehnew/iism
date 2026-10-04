@@ -18,7 +18,7 @@ from sqlalchemy import delete, select
 
 from api.core import localisation
 from api.core.database import dispose_engine, get_sessionmaker
-from api.modules.skills.hierarchy import RoleAlias
+from api.modules.skills.alias_admin import sync_seed_aliases
 from api.modules.skills.models import Skill, SkillAlias
 from api.modules.skills.role_aliases import ROLE_ALIASES
 
@@ -559,14 +559,16 @@ SCRIPT_NAMES = {"l": "latin", "d": "devanagari", "t": "transliteration"}
 
 
 async def _seed_role_aliases(db) -> int:  # type: ignore[no-untyped-def]
-    """Replace `role_aliases` wholesale from `ROLE_ALIASES` (Sprint 23, moved
-    to a table this session) -- `role_aliases.py`'s dict is the authored
-    source of truth, the same relationship `SKILLS` above has to
-    `skill_aliases`, so a run of this script is what keeps the table current."""
-    await db.execute(delete(RoleAlias))
-    for surface_form, job_role in ROLE_ALIASES.items():
-        db.add(RoleAlias(surface_form=surface_form, job_role=job_role))
-    await db.commit()
+    """Project `ROLE_ALIASES` into `role_aliases` **without touching an operator's work**.
+
+    Until Sprint 47 this deleted every row and rewrote it, so the dict was the only way
+    to add an alias and anything added another way vanished at the next seed. The table
+    is the source of truth now (ADR-054): the dict inserts what is missing and keeps its
+    own (`source='seed'`) rows current, and never writes to a row an operator owns --
+    including one they retired, which a dict that still names the key must not revive.
+    Returns how many seed aliases the dict holds, as before.
+    """
+    await sync_seed_aliases(db, ROLE_ALIASES)
     return len(ROLE_ALIASES)
 
 

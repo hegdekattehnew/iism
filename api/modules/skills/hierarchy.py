@@ -37,7 +37,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.adapters.embeddings.base import EMBEDDING_DIMENSIONS
-from api.core.database import Base
+from api.core.database import Base, one_of
 
 # How a NOS is attached to a Qualification Pack. Elective and optional NOS are
 # grouped under a named bundle in the source; `group_name` preserves that.
@@ -349,6 +349,16 @@ class ModelCurriculum(Base):
     # misinforms rather than under-informs. The totals below are complete.
 
 
+# Where an alias came from, and so who may overwrite it. The seed owns `seed` rows and
+# never touches an `operator` one (Sprint 47); an operator retiring a seed row takes
+# ownership of it, which is what stops the next seed bringing it back.
+ALIAS_SOURCES = ("seed", "operator")
+
+# The two things an operator does to an alias. Adding over a retired one revives it, and
+# that is an `added` event too: the log says what was true afterwards, not how.
+ALIAS_ACTIONS = ("added", "retired")
+
+
 class RoleAlias(Base):
     """A lay term that resolves onto a qualification's `job_role` (Sprint 23,
     moved from a Python dict to a table for the same reason `SkillAlias`
@@ -360,17 +370,59 @@ class RoleAlias(Base):
     spans multiple QP rows (reissues, `-SI` variants) and the search query's
     own `pick=1` ranking already picks the representative one at read time.
 
-    `role_aliases.py`'s `ROLE_ALIASES` dict stays the authored source of
-    truth -- reviewable in a diff, exactly like `seed_skills.py`'s `SKILLS`
-    tuple is for `SkillAlias` -- and `scripts/seed_skills.py` replaces this
-    table's rows from it on every run. A row here with no matching
-    `job_role` "matches nothing, silently", exactly as the dict-based version
-    always could; `scripts/check_role_aliases.py` is unchanged in that regard.
+    **The table is the source of truth since Sprint 47** (ADR-054). Until then the
+    `ROLE_ALIASES` dict was, and `scripts/seed_skills.py` deleted and rewrote every
+    row on every run, so nobody but an engineer could add one and anything added any
+    other way vanished at the next seed. Now the dict only *seeds*: `sync_seed_aliases`
+    inserts what is missing, updates `source='seed'` rows and removes seed rows the
+    dict no longer names, and never touches an `operator` row. A retired row is kept
+    (`retired_at`) rather than deleted, so a seed that still names its key cannot
+    resurrect it; role search ignores retired rows.
     """
 
     __tablename__ = "role_aliases"
-    __table_args__ = (UniqueConstraint("surface_form", name="uq_role_alias_surface_form"),)
+    __table_args__ = (
+        UniqueConstraint("surface_form", name="uq_role_alias_surface_form"),
+        CheckConstraint(one_of("source", ALIAS_SOURCES), name="ck_role_alias_source"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     surface_form: Mapped[str] = mapped_column(Text())
     job_role: Mapped[str] = mapped_column(Text())
+    source: Mapped[str] = mapped_column(default="seed", server_default="seed")
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RoleAliasEvent(Base):
+    """One operator decision about one alias (Sprint 47, ADR-054).
+
+    The record an operator-edited table needs, because those edits are not in version
+    control the way the dict was. **Append-only, and not in `analytics_events`**, for
+    `TenantVerificationEvent`'s reasons: that table is purged past a retention age and
+    `record()` swallows its failures, both correct for measurement and disqualifying
+    for an audit row.
+
+    The alias is **named, not referenced**: `surface_form` and `job_role` are copied,
+    with no foreign key, because the seed may delete the row an event describes and
+    the history must still read.
+    """
+
+    __tablename__ = "role_alias_events"
+    __table_args__ = (
+        CheckConstraint(one_of("action", ALIAS_ACTIONS), name="ck_role_alias_event_action"),
+        Index("ix_role_alias_events_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    action: Mapped[str] = mapped_column()
+    surface_form: Mapped[str] = mapped_column(Text())
+    job_role: Mapped[str] = mapped_column(Text())
+    note: Mapped[str | None] = mapped_column(Text(), default=None)
+    # SET NULL for the reason `TenantVerificationEvent.actor_user_id` gives: the record
+    # must survive its author's erasure, and copying their address in to keep the name
+    # would store somebody else's address in a log.
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

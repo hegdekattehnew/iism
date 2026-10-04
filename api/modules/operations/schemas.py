@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from api.modules.matching.schemas import ScarceSkillOut
 from api.modules.operations.models import VERIFICATION_DECISIONS
+from api.modules.skills import ALIAS_ACTIONS, ALIAS_SOURCES
 
 VerificationDecision = Literal["granted", "revoked"]
 
@@ -13,6 +14,11 @@ VerificationDecision = Literal["granted", "revoked"]
 # reason `tests/test_enumerations.py` exists: a widened constraint is invisible
 # both to autogenerate and to the schema beside it.
 assert set(get_args(VerificationDecision)) == set(VERIFICATION_DECISIONS)  # noqa: S101
+
+AliasSource = Literal["seed", "operator"]
+AliasAction = Literal["added", "retired"]
+assert set(get_args(AliasSource)) == set(ALIAS_SOURCES)  # noqa: S101
+assert set(get_args(AliasAction)) == set(ALIAS_ACTIONS)  # noqa: S101
 
 
 class UnverifiedOrganisation(BaseModel):
@@ -148,3 +154,72 @@ class ProgrammeDistrictsOut(BaseModel):
 
     programme: str
     districts: list[DistrictBreakdownOut] = Field(default_factory=list)
+
+
+# ------------------------------------------------------------ role aliases (Sprint 47)
+
+
+class RoleAliasIn(BaseModel):
+    """A term somebody might type, and the role it should find.
+
+    The limits mirror `skills.alias_admin` (`MIN_KEY_LENGTH`, `MAX_KEY_LENGTH`,
+    `MAX_NOTE_LENGTH`) and `web/src/lib/constraints.test.ts` holds the form to them. The
+    target is the role's name as the corpus spells it; the screen offers it from role
+    search so it is picked, not typed.
+    """
+
+    surface_form: str = Field(min_length=2, max_length=80)
+    job_role: str = Field(min_length=1, max_length=300)
+    note: str | None = Field(None, max_length=300)
+
+
+class RoleAliasRetireIn(BaseModel):
+    note: str | None = Field(None, max_length=300)
+
+
+class AliasTargetOut(BaseModel):
+    """The role an alias would find: the pack that stands for it, as role search names it."""
+
+    job_role: str
+    slug: str
+    qp_code: str
+    nsqf_level: float | None = None
+    standards_count: int
+    sector_name: str | None = None
+
+
+class RoleAliasCheckOut(BaseModel):
+    """What adding this alias would do, with nothing written."""
+
+    ok: bool
+    surface_form: str
+    target: AliasTargetOut | None = None
+    problems: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    existing: Literal["active", "retired"] | None = None
+
+
+class RoleAliasOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    surface_form: str
+    job_role: str
+    source: AliasSource
+    created_at: datetime
+
+
+class RoleAliasListOut(BaseModel):
+    items: list[RoleAliasOut]
+    total: int
+    """Every live alias, so the screen can say "showing 100 of 114"."""
+
+
+class RoleAliasEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    action: AliasAction
+    surface_form: str
+    job_role: str
+    note: str | None = None
+    created_at: datetime

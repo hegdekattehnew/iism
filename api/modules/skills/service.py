@@ -20,9 +20,9 @@ from api.modules.skills.content import (
     PerformanceCriterion,
     PerformanceElement,
 )
-from api.modules.skills.hierarchy import QpSkill, QualificationPack, Sector
+from api.modules.skills.hierarchy import QpSkill, QualificationPack, RoleAlias, Sector
 from api.modules.skills.models import Skill
-from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX, ROLE_ALIASES
+from api.modules.skills.role_aliases import MIN_ALIAS_PREFIX
 
 MAX_SEARCH_RESULTS = 50
 
@@ -472,8 +472,11 @@ aliased AS (
            lower(btrim(ra.job_role)) AS role_key,
            CASE WHEN ra.surface_form = q.norm THEN 4.0 ELSE 3.0 END AS score
     FROM role_aliases ra, q
-    WHERE ra.surface_form = q.norm
-       OR (length(q.norm) >= :min_alias_prefix AND ra.surface_form LIKE q.norm || '%')
+    -- Sprint 47: a retired alias stays in the table (so the seed cannot revive it)
+    -- and is invisible here.
+    WHERE ra.retired_at IS NULL
+      AND (ra.surface_form = q.norm
+           OR (length(q.norm) >= :min_alias_prefix AND ra.surface_form LIKE q.norm || '%'))
 ),
 candidates AS (
     SELECT qp.id, qp.slug, qp.qp_code, qp.job_role, qp.nsqf_level, qp.sector_id,
@@ -902,11 +905,16 @@ def alias_prefix_collisions(aliases: Mapping[str, str]) -> dict[str, list[str]]:
 async def alias_problems(db: AsyncSession, aliases: Mapping[str, str] | None = None) -> AliasReport:
     """Check role aliases against the corpus (Sprint 43, ADR-050).
 
-    Defaults to the authored `ROLE_ALIASES`; the tests pass their own. Editing
-    `role_aliases.py` is verified by running this against the real corpus
-    (`make check-role-aliases`), which is why it cannot run in CI.
+    Defaults to the **live aliases in the table** (Sprint 47): the dict only seeds, so an
+    operator's edits are exactly what a check of the dict would miss. The tests pass
+    their own. It is verified against the real corpus by `make check-role-aliases`,
+    which is why that cannot run in CI.
     """
-    aliases = ROLE_ALIASES if aliases is None else aliases
+    if aliases is None:
+        live = await db.execute(
+            select(RoleAlias.surface_form, RoleAlias.job_role).where(RoleAlias.retired_at.is_(None))
+        )
+        aliases = {row[0]: row[1] for row in live.all()}
     targets = sorted({role.lower().strip() for role in aliases.values()})
     keys = sorted({key.lower().strip() for key in aliases})
     # The same representative pick role search makes, by the same rule: this is

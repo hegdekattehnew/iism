@@ -2573,3 +2573,66 @@ it waited with it. The newest PR, merged with current `main` and run through eve
 - **Newer npm prints `allow-scripts` warnings** for two packages with install scripts (`fsevents`, `unrs-resolver`).
   Nothing fails, and the build and tests pass without approving them.
 
+
+## ADR-054: Role Aliases Are Edited by an Operator, the Table Is the Source of Truth, and the Seed Never Overwrites an Operator
+
+**Status:** Accepted (October 2026). Supersedes the "the dict is the authored source of truth" arrangement of Sprint 23
+and Sprint 40. One migration (0046). No external integration; scoring and the golden set are untouched.
+
+**Context:** Role-alias coverage is the product's weakest point: **43 of 3,417 roles** have an alias. The owner decided that
+a curated batch needs a labour-market reviewer, which is right, and exposed why none had been written: a reviewer cannot
+work. Aliases lived in a Python dict (`role_aliases.py`), and `scripts/seed_skills.py` projected them into the
+`role_aliases` table by **deleting every row and rewriting it**. So only an engineer could add one, every batch needed a
+commit and a deploy, and an alias added any other way vanished at the next seed.
+
+**Decision:**
+
+- **The table is the source of truth.** `role_aliases` gains `source` (`seed` | `operator`), `retired_at` and `created_at`;
+  every existing row is `seed`. The dict only seeds.
+- **The seed never touches an operator's work** (`sync_seed_aliases`): it inserts what is missing, updates a `seed` row whose
+  target changed, and removes a `seed` row the dict no longer names. A row with `source='operator'` — including a retired
+  one — is left exactly as it is, whatever the dict says.
+- **Nothing is deleted by hand.** An operator **retires** an alias: `retired_at` is set and the row is handed to the operator,
+  so a dict that still names the key cannot bring it back. Role search ignores retired rows. Adding a retired term again
+  revives the same row.
+- **`role_alias_events`** is the audit record, because those edits are not in version control the way the dict was:
+  append-only, **naming** the alias (a copy of key and target) rather than referencing it, since the seed may delete the row
+  an event describes; `actor_user_id` is `SET NULL` so the record outlives its author. Not `analytics_events`, for
+  `TenantVerificationEvent`'s reasons (purged past retention; `record()` swallows its failures).
+- **An alias is valid if it passes the checks `make check-role-aliases` runs**, from the same function (`alias_problems`),
+  not a copy: the target must be a current role with standards, never a disability-track pack, and the key must not be a
+  role's exact title aliased elsewhere. Ambiguous prefixes are **warnings**, never refusals. The target is stored as the
+  corpus spells it, and the screen offers it from role search so it is **picked, not typed**.
+- **Admin tier only** (`OPS_ALIAS_EDIT`, not on the support tier): an alias changes every candidate's role search, the same
+  public blast radius that kept `OPS_ORG_VERIFY` off it (ADR-044). A support operator gets 403 and the screen says so.
+- **`make check-role-aliases` now checks the table**, operator rows included and retired ones excluded. Checking the dict
+  would have been checking exactly what an operator's edits are not.
+
+**Options considered:** 1. Keep the dict as the truth and have the screen export a patch for an engineer to commit
+2. A second table for operator aliases, merged at read time
+3. **One table, with ownership per row and a seed that respects it** (chosen)
+4. Drop the dict and seed from a data file
+
+**Trade-offs:**
+
+- Option 1: ✅ Reviewable in a diff ❌ Keeps the engineer in the loop for every batch, which is the thing being removed.
+- Option 2: ✅ The seed can stay "delete and rewrite" ❌ Role search joins two tables and the checker reads two; two
+  places for one fact.
+- Option 3: ✅ Search is unchanged but for one filter, and the seed's rule is one sentence ❌ Operator edits are no longer
+  in a diff; the audit table is the only record, and it has to be trusted.
+- Option 4: ✅ Data, not code ❌ Moves the problem without solving it.
+
+**Consequences:**
+
+- **Raises capability, not coverage.** Coverage is 43 of 3,417 until somebody uses it.
+- **The seed change is the dangerous part**, and is tested as a property: an operator's row survives a re-seed, is not
+  overwritten by a seed that names it, and a retired one is not revived. Replacing the sync with the old delete-and-rewrite
+  fails five tests.
+- **Two operators adding one term at once** is a 201 and a 409, never a 500 (the unique constraint inside a savepoint,
+  ADR-052); proven on committed rows, and the test fails without the handling.
+- **An operator cannot edit a target in place**: retire, then add. Two steps, deliberately, so the history says what
+  happened.
+- **Typed searches are not logged** (ADR-023), so nothing here says which lay terms people actually use. A worklist from
+  candidates' preferred-role titles (counts only, hidden below three) was considered and left out; with 42 candidates it
+  would show nothing.
+

@@ -1,7 +1,11 @@
-"""Verify `role_aliases.py` against the real corpus.
+"""Verify the live role aliases against the real corpus.
 
-Editing that file is "verified by running this, against the real corpus", as its
-own docstring says, but for twenty sprints nothing ran it, and what it checked
+Since Sprint 47 this checks the **table**, which includes whatever an operator has added
+on `/admin` and excludes what they retired; the `role_aliases.py` dict only seeds it. Before
+that it checked the dict -- which is exactly what would miss an operator's edits.
+
+Editing aliases is "verified by running this, against the real corpus", as the dict's own
+docstring says, but for twenty sprints nothing ran it, and what it checked
 was only that a target exists. `alias_problems()` (`api/modules/skills/service.py`)
 now checks three things that make an alias wrong, and reports a fourth that makes
 one ambiguous:

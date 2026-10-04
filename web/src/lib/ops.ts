@@ -157,3 +157,97 @@ export function useSetVerification(slug: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------- role aliases (Sprint 47)
+
+export type RoleAlias =
+  paths["/ops/role-aliases"]["get"]["responses"]["200"]["content"]["application/json"]["items"][number];
+export type AliasCheck =
+  paths["/ops/role-aliases/check"]["post"]["responses"]["200"]["content"]["application/json"];
+export type AliasEvent =
+  paths["/ops/role-aliases/history"]["get"]["responses"]["200"]["content"]["application/json"][number];
+
+/** Mirrored from `RoleAliasIn` and pinned by `lib/constraints.test.ts`. */
+export const ALIAS_TERM_MIN = 2;
+export const ALIAS_TERM_MAX = 80;
+export const ALIAS_NOTE_MAX = 300;
+
+const ALIASES = ["ops", "role-aliases"] as const;
+
+export function useRoleAliases(query: string) {
+  return useQuery({
+    queryKey: [...ALIASES, "list", query] as const,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/ops/role-aliases", {
+        params: { query: { q: query || undefined, limit: 100 } },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}
+
+export function useAliasHistory() {
+  return useQuery({
+    queryKey: [...ALIASES, "history"] as const,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/ops/role-aliases/history", {
+        params: { query: { limit: 20 } },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}
+
+/**
+ * The dry run: what adding this alias would do, with nothing written. It runs as the
+ * operator types, so they hear "that role is a disability-track pack" before they press
+ * anything, and `enabled` waits until both halves exist.
+ */
+export function useAliasCheck(surfaceForm: string, jobRole: string | null) {
+  const term = surfaceForm.trim();
+  return useQuery({
+    queryKey: [...ALIASES, "check", term, jobRole] as const,
+    enabled: term.length >= ALIAS_TERM_MIN && jobRole !== null,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.POST("/ops/role-aliases/check", {
+        body: { surface_form: term, job_role: jobRole as string },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}
+
+export function useAddAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { surface_form: string; job_role: string; note?: string }) => {
+      const { data, error, response } = await api.POST("/ops/role-aliases", { body });
+      // The server's own sentence ("... is itself a role's exact title ..."), never a
+      // fixed one: it names which rule was broken and for which term.
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ALIASES }),
+  });
+}
+
+export function useRetireAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, note }: { id: string; note?: string }) => {
+      const { data, error, response } = await api.POST("/ops/role-aliases/{alias_id}/retire", {
+        params: { path: { alias_id: id } },
+        body: { note },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ALIASES }),
+  });
+}

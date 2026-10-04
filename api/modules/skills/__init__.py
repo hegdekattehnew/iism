@@ -5,7 +5,19 @@ Other modules import from `api.modules.skills` only. Reaching into `.service` or
 what ADR-014's microservices path depends on avoiding.
 """
 
+from api.modules.skills.alias_admin import (
+    AliasCheck,
+    AliasTarget,
+    SeedSync,
+    add_alias,
+    check_alias,
+    list_aliases,
+    recent_events,
+    retire_alias,
+    sync_seed_aliases,
+)
 from api.modules.skills.graph import SKILL_RELATION_TYPES, SkillRelation
+from api.modules.skills.hierarchy import ALIAS_ACTIONS, ALIAS_SOURCES, RoleAlias, RoleAliasEvent
 from api.modules.skills.models import ALIAS_SCRIPTS, SKILL_TYPES, Skill, SkillAlias
 from api.modules.skills.roles_routes import router as roles_router
 from api.modules.skills.routes import router
@@ -32,27 +44,39 @@ from api.modules.skills.service import (
 )
 
 __all__ = [
+    "ALIAS_ACTIONS",
     "ALIAS_SCRIPTS",
+    "ALIAS_SOURCES",
     "LADDER_MAX_RISE",
     "MAX_LADDER_STEPS",
     "SKILL_RELATION_TYPES",
     "SKILL_TYPES",
     "NsqfLevel",
+    "AliasCheck",
+    "AliasTarget",
     "NsqfLevelIn",
     "QualificationRef",
     "RoleLadder",
     "RoleRef",
     "RoleStepUp",
+    "RoleAlias",
+    "RoleAliasEvent",
     "SearchHit",
+    "SeedSync",
     "Skill",
     "SkillAlias",
     "SkillRelation",
+    "add_alias",
+    "check_alias",
     "count_skills",
     "embedding_text_for_skills",
     "get_skill_by_nos_code",
     "get_skill_by_slug",
+    "list_aliases",
     "list_skills",
     "qualifications_for_skill",
+    "recent_events",
+    "retire_alias",
     "roles_router",
     "roles_above",
     "router",
@@ -60,4 +84,5 @@ __all__ = [
     "search_skills",
     "skill_facets",
     "standards_for_role",
+    "sync_seed_aliases",
 ]
