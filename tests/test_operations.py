@@ -34,6 +34,8 @@ from api.modules.marketplace.models import (
     Job,
     JobSkill,
 )
+from api.modules.notifications import drain
+from api.modules.notifications.models import Notification
 from api.modules.operations import service
 from api.modules.operations.models import TenantVerificationEvent
 from api.modules.skills.models import Skill
@@ -1102,3 +1104,166 @@ class TestCertificationVerification:
         )
         assert len(rows) == 1
         assert rows[0].source == "certified"
+
+
+# ----------------------------------------------- the organisation is told (BL-9.2)
+
+
+class TestTheOrganisationIsTold:
+    """Sprint 43. A decision changes what every candidate sees about an organisation
+    and used to tell the organisation nothing. One email, only when the badge
+    actually changes, naming the organisation and carrying no operator note."""
+
+    async def _decide(self, client: AsyncClient, headers: dict, slug: str, decision: str) -> None:
+        response = await client.post(
+            f"/ops/organisations/{slug}/verification",
+            headers=headers,
+            json={"decision": decision, "note": f"{decision}: {NOTE}"},
+        )
+        assert response.status_code == 200, response.text
+
+    async def _rows(self, db: AsyncSession) -> list[Notification]:
+        db.expire_all()
+        return list(
+            await db.scalars(
+                select(Notification)
+                .where(Notification.template.like("organisation_verif%"))
+                .order_by(Notification.created_at)
+            )
+        )
+
+    async def test_granting_queues_one_email_to_the_organisation(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _, slug = await _register_org(client, "Told Ltd")
+        operator = await _operator(client, db)
+
+        await self._decide(client, operator, slug, "granted")
+
+        (row,) = await self._rows(db)
+        assert (row.template, row.channel, row.recipient_kind) == (
+            "organisation_verified",
+            "email",
+            "tenant",
+        )
+        assert set(row.payload) == {"organisation", "path"}
+        assert row.payload["organisation"] == "Told Ltd"
+        assert row.payload["path"] == f"/employer/{slug}/settings"
+
+    async def test_the_row_carries_no_address_and_no_operator_note(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _, slug = await _register_org(client, "Quiet Ltd")
+        operator = await _operator(client, db)
+        await self._decide(client, operator, slug, "granted")
+        await self._decide(client, operator, slug, "revoked")
+
+        rows = await self._rows(db)
+        assert len(rows) == 2
+        for row in rows:
+            assert "@" not in str(row.payload)  # ADR-023: resolved at send time
+            assert "Registration certificate" not in str(row.payload)  # evidence, not for email
+
+    async def test_revoking_a_verified_organisation_queues_the_other_email(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _, slug = await _register_org(client, "Revoked Ltd")
+        operator = await _operator(client, db)
+        await self._decide(client, operator, slug, "granted")
+        await self._decide(client, operator, slug, "revoked")
+
+        assert [r.template for r in await self._rows(db)] == [
+            "organisation_verified",
+            "organisation_verification_revoked",
+        ]
+
+    async def test_a_regrant_of_a_verified_organisation_tells_nobody(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Re-verification is legitimate and the badge does not change, so there is
+        nothing the organisation can see to be told about."""
+        _, slug = await _register_org(client, "Again Ltd")
+        operator = await _operator(client, db)
+        await self._decide(client, operator, slug, "granted")
+        await self._decide(client, operator, slug, "granted")
+
+        assert [r.template for r in await self._rows(db)] == ["organisation_verified"]
+
+    async def test_revoking_one_that_never_had_the_badge_tells_nobody(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        _, slug = await _register_org(client, "Never Ltd")
+        operator = await _operator(client, db)
+        await self._decide(client, operator, slug, "revoked")
+
+        assert await self._rows(db) == []
+
+    async def test_the_owner_receives_it_when_the_organisation_has_no_contact_address(
+        self, client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`Tenant.contact_email` is usually empty; the notice must reach the owner
+        rather than be skipped, and must read as a notice about this organisation."""
+        import api.modules.notifications.service as notifications
+
+        owner, slug = await _register_org(client, "Reached Ltd")
+        owner_email = (await client.get("/auth/me", headers=owner)).json()["email"]
+        operator = await _operator(client, db)
+        sent: list[tuple[str, str, str]] = []
+
+        class Recording:
+            async def send_email(self, address: str, subject: str, body: str) -> None:
+                sent.append((address, subject, body))
+
+        monkeypatch.setattr(notifications, "get_email_provider", lambda: Recording())
+        await self._decide(client, operator, slug, "granted")
+        counts = await drain(db)
+
+        assert counts["sent"] == 1
+        address, subject, body = sent[0]
+        assert address == owner_email
+        assert "Reached Ltd" in subject
+        assert f"/employer/{slug}/settings" in body
+        assert "Registration certificate" not in body
+
+    async def test_an_owner_with_only_a_phone_is_skipped_not_failed(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Said plainly in the story rather than hidden: that organisation is not told."""
+        headers = await _candidate(client)
+        created = await client.post(
+            "/me/organisations",
+            headers=headers,
+            json={"organisation_name": "Phone Only Ltd", "tenant_type": "employer"},
+        )
+        slug = created.json()["slug"]
+        operator = await _operator(client, db)
+        await self._decide(client, operator, slug, "granted")
+        await drain(db)
+
+        (row,) = await self._rows(db)
+        assert row.status == "skipped" and row.last_error == "no address on file"
+
+    async def test_the_notice_is_queued_before_the_decision_commits(
+        self, client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """In the decision's own transaction: a notice that cannot be queued must not
+        leave a changed badge nobody was told about, and a commit that came first
+        could not be undone by a failed enqueue."""
+        _, slug = await _register_org(client, "Ordered Ltd")
+        operator = await _operator(client, db)
+        order: list[str] = []
+        real_enqueue, real_commit = service.enqueue, db.commit
+
+        async def spy_enqueue(*args: object, **kwargs: object) -> object:
+            order.append("enqueue")
+            return await real_enqueue(*args, **kwargs)  # type: ignore[arg-type]
+
+        async def spy_commit() -> None:
+            order.append("commit")
+            await real_commit()
+
+        monkeypatch.setattr(service, "enqueue", spy_enqueue)
+        monkeypatch.setattr(db, "commit", spy_commit)
+        await self._decide(client, operator, slug, "granted")
+
+        assert order[:2] == ["enqueue", "commit"]

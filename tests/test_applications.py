@@ -271,6 +271,118 @@ class TestWithdrawing:
         assert response.status_code == 404
 
 
+class TestWithdrawingADecision:
+    """Sprint 43, BL-12.6. Withdrawing a *rejected* application overwrote its status
+    with no record of what it had been, and `apply()` then reset it to "applied": a
+    way to wipe an employer's decision. Only an application nobody has decided on,
+    or one still under consideration, can be taken back."""
+
+    async def _applied(self, client: AsyncClient) -> tuple[dict[str, str], dict]:
+        headers = await _candidate(client)
+        created = (
+            await client.post(
+                "/me/applications", headers=headers, json={"job_slug": "open-cashier"}
+            )
+        ).json()
+        return headers, created
+
+    async def _set_status(self, db: AsyncSession, application_id: str, status: str) -> None:
+        row = await db.scalar(
+            select(Application).where(Application.id == uuid.UUID(application_id))
+        )
+        assert row is not None
+        row.status = status
+        await db.commit()
+
+    @pytest.mark.parametrize("status", ["rejected", "hired", "completed", "no_show"])
+    async def test_a_decided_application_cannot_be_withdrawn(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession, status: str
+    ) -> None:
+        headers, created = await self._applied(client)
+        await self._set_status(db, created["id"], status)
+
+        response = await client.post(f"/me/applications/{created['id']}/withdraw", headers=headers)
+
+        assert response.status_code == 409, response.text
+        db.expire_all()
+        row = await db.scalar(select(Application).where(Application.id == uuid.UUID(created["id"])))
+        assert row is not None
+        # Nothing moved: not the status, and not the disclosure.
+        assert row.status == status
+        assert row.contact_revoked_at is None
+
+    async def test_an_application_under_consideration_can_still_be_withdrawn(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, created = await self._applied(client)
+        await self._set_status(db, created["id"], "shortlisted")
+
+        response = await client.post(f"/me/applications/{created['id']}/withdraw", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "withdrawn"
+
+    async def test_a_rejection_stands_through_withdrawing_and_reapplying(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """The whole loophole, end to end, with the employer's real decision."""
+        employer, org, job_slug = await _employer_with_job(client, "apply-test-standard")
+        seeker = await _candidate(client)
+        created = (
+            await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        ).json()
+        await client.patch(
+            f"/org/{org}/jobs/{job_slug}/applications/{created['id']}",
+            headers=employer,
+            json={"status": "rejected"},
+        )
+
+        withdrawn = await client.post(f"/me/applications/{created['id']}/withdraw", headers=seeker)
+        assert withdrawn.status_code == 409
+        assert "not selected" in withdrawn.json()["detail"]
+
+        again = await client.post("/me/applications", headers=seeker, json={"job_slug": job_slug})
+        assert again.status_code == 409
+        # Not "already applied": that reads as something the candidate can undo.
+        assert "not selected" in again.json()["detail"]
+        assert "already applied" not in again.json()["detail"]
+
+        db.expire_all()
+        row = await db.scalar(select(Application).where(Application.id == uuid.UUID(created["id"])))
+        assert row is not None
+        assert row.status == "rejected"
+        # One row, still: nothing was created or reset along the way.
+        assert (
+            await db.scalar(
+                select(func.count())
+                .select_from(Application)
+                .where(Application.profile_id == row.profile_id)
+            )
+            == 1
+        )
+
+    async def test_a_hire_tells_the_candidate_to_contact_the_employer(
+        self, vacancy: dict, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers, created = await self._applied(client)
+        await self._set_status(db, created["id"], "hired")
+
+        response = await client.post(f"/me/applications/{created['id']}/withdraw", headers=headers)
+
+        assert response.status_code == 409
+        assert "Contact the employer" in response.json()["detail"]
+
+    async def test_an_open_application_still_says_already_applied(
+        self, vacancy: dict, client: AsyncClient
+    ) -> None:
+        headers, _created = await self._applied(client)
+        again = await client.post(
+            "/me/applications", headers=headers, json={"job_slug": "open-cashier"}
+        )
+        assert again.status_code == 409
+        assert "already applied" in again.json()["detail"]
+
+
 # ----------------------------------------------------------------- my listing
 
 

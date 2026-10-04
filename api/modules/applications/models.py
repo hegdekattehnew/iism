@@ -56,6 +56,11 @@ APPLICATION_STATUSES = (
 # `no_show` are both live -- the engagement is over, not the disclosure.
 LIVE_STATUSES = ("applied", "shortlisted", "hired", "completed", "no_show")
 
+# What a candidate may still take back. A subset of `LIVE_STATUSES`: once an employer
+# has hired, rejected or closed out an engagement, withdrawing would rewrite their
+# record rather than end the candidate's own interest.
+WITHDRAWABLE_STATUSES = ("applied", "shortlisted")
+
 # Two different questions, and a gig is where they part. A finished gig worker
 # moves `hired` -> `completed`, so anything counting `status == "hired"` alone
 # stops counting them. `no_show` was hired, but left the seat empty.

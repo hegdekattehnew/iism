@@ -4,6 +4,7 @@ Routes validate and delegate here; they contain no logic themselves (CLAUDE.md).
 """
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -445,7 +446,13 @@ SEMANTIC_MIN_SIMILARITY = 0.30
 # this ordering is how the two would one day name different packs for the same job
 # title. It is a SQL fragment because both callers pick inside a query; `c` is the
 # candidate row and must carry `qp_code` and `standards` (the pack's standard count).
-ROLE_REPRESENTATIVE_ORDER = """(c.qp_code ~ '-SI[0-9]+$'),
+#
+# **A general pack stands for a role before a disability-track one** (Sprint 43,
+# ADR-050): every disability-track pack carries a `PWD/` code (69 roles, no
+# exception), and twelve roles have both kinds. The old order preferred the general
+# pack only because it usually has fewer `/` segments -- a coincidence, not a rule.
+ROLE_REPRESENTATIVE_ORDER = """(c.qp_code LIKE 'PWD/%'),
+                        (c.qp_code ~ '-SI[0-9]+$'),
                         length(c.qp_code) - length(replace(c.qp_code, '/', '')),
                         c.standards DESC,
                         c.qp_code"""
@@ -476,6 +483,14 @@ candidates AS (
       AND (lower(qp.job_role) LIKE '%' || q.norm || '%'
            OR q.norm <% lower(qp.job_role)
            OR lower(btrim(qp.job_role)) IN (SELECT role_key FROM aliased)
+           -- Sprint 43: every word of a multi-word query, in any order. "hotel
+           -- waiter" and "bank clerk" matched nothing, because matching was a
+           -- whole-string substring or a trigram. `:terms` is empty for a
+           -- one-word query, so this is false there.
+           OR (cardinality(CAST(:terms AS text[])) >= 2 AND NOT EXISTS (
+               SELECT 1 FROM unnest(CAST(:terms AS text[])) AS w(word)
+               WHERE lower(qp.job_role) NOT LIKE '%' || w.word || '%'
+           ))
            -- Generic word-level synonyms ("tech" -> "technology"), never
            -- role-specific -- affects only which rows are eligible to
            -- appear, never `scored`'s ranking below, which stays keyed on
@@ -513,8 +528,24 @@ scored AS (
            CASE WHEN r.role_key = q.norm THEN 4.0
                 WHEN r.role_key LIKE q.norm || '%' THEN 3.0
                 WHEN r.role_key LIKE '%' || q.norm || '%' THEN 2.0
+                -- All the words, in any order: above the fuzzy ceiling (0.9) and
+                -- below a whole-string "contains", so a guess never outranks
+                -- something the person literally typed.
+                WHEN cardinality(CAST(:terms AS text[])) >= 2 AND NOT EXISTS (
+                    SELECT 1 FROM unnest(CAST(:terms AS text[])) AS w(word)
+                    WHERE r.role_key NOT LIKE '%' || w.word || '%'
+                ) THEN 1.5
                 ELSE 0.9 * word_similarity(q.norm, r.role_key)
            END AS literal,
+           -- Sprint 43: a disability-track pack is demoted by one match tier (the
+           -- ORDER BY below subtracts 1.01) unless the query asked for one, or is
+           -- exactly its title (`literal` 4.0): somebody who typed "Pressman" in
+           -- full is not helped by being shown something else first. One tier, not
+           -- last place: where it is the only literal match, "hr executive" should
+           -- still reach it ahead of "Executive Housekeeper". It loses to an equally
+           -- good general pack, which is the case the demotion exists for.
+           -- `PWD/` is the code every one of them carries.
+           (r.qp_code LIKE 'PWD/%') AS disability_track,
            coalesce((SELECT max(a.score) FROM aliased a WHERE a.role_key = r.role_key), 0)
                AS via_alias,
            -- The alias that produced that max score, so the caller can name
@@ -538,7 +569,16 @@ SELECT s.slug, s.qp_code, s.job_role, s.nsqf_level, s.standards, s.variants,
        s.role_key, s.literal, s.via_alias, s.via_alias_surface_form, sec.name AS sector_name
 FROM scored s
 LEFT JOIN sectors sec ON sec.id = s.sector_id
-ORDER BY greatest(s.literal, s.via_alias) DESC, s.closeness DESC, s.standards DESC, s.job_role
+ORDER BY greatest(s.literal, s.via_alias)
+             - CASE WHEN s.disability_track AND s.literal < 4.0
+                         AND NOT CAST(:asks_disability AS boolean)
+                    THEN 1.01 ELSE 0 END DESC,
+         -- Sprint 43: on a tie, the role a curated alias vouches for beats one that
+         -- merely starts with the same letters. A half-typed alias and a literal
+         -- prefix both score 3.0, and `closeness` below always favoured the
+         -- literal one, so "war" listed Warper above General Duty Assistant.
+         (s.via_alias > 0) DESC,
+         s.closeness DESC, s.standards DESC, s.job_role
 LIMIT :limit
 """.replace("__REPRESENTATIVE_ORDER__", ROLE_REPRESENTATIVE_ORDER)
 )
@@ -564,6 +604,31 @@ def _pgvector_literal(vector: list[float]) -> str:
     return "[" + ",".join(repr(v) for v in vector) + "]"
 
 
+# Words that do not narrow a role: "assistant of the ward" and "assistant ward" are
+# the same ask. Kept to the few that carry no meaning in any sector.
+_QUERY_STOPWORDS = frozenset({"and", "of", "the", "in", "for", "a", "an", "to"})
+
+# A query that is itself about disability-track work. Only then does a
+# disability-track pack compete on equal terms.
+_ASKS_DISABILITY = ("divyang", "pwd", "disab")
+
+
+def _query_terms(cleaned: str) -> list[str]:
+    """The words an all-words match must find, or `[]` for a one-word query.
+
+    `%`, `_` and `\\` are stripped because the terms are spliced into `LIKE`
+    patterns, where they would be wildcards the person never meant. Nothing else
+    is stripped: splitting on punctuation would cut a Devanagari word at its
+    vowel signs, which Python does not count as alphanumeric.
+    """
+    seen: list[str] = []
+    for word in cleaned.lower().split():
+        word = "".join(ch for ch in word if ch not in "%_\\")
+        if word and word not in _QUERY_STOPWORDS and word not in seen:
+            seen.append(word)
+    return seen if len(seen) >= 2 else []
+
+
 def _literal_kind(score: float) -> str:
     if score >= 4.0:
         return "exact"
@@ -571,6 +636,8 @@ def _literal_kind(score: float) -> str:
         return "prefix"
     if score >= 2.0:
         return "contains"
+    if score >= 1.0:
+        return "words"
     return "fuzzy"
 
 
@@ -601,6 +668,8 @@ async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list
                 "synonym_terms": synonym_terms,
                 "query_embedding": query_embedding,
                 "semantic_min_similarity": SEMANTIC_MIN_SIMILARITY,
+                "terms": _query_terms(cleaned),
+                "asks_disability": any(t in cleaned.lower() for t in _ASKS_DISABILITY),
                 "limit": min(limit, MAX_ROLE_RESULTS),
             },
         )
@@ -737,27 +806,102 @@ async def standards_for_role(db: AsyncSession, slug: str) -> RoleStandards | Non
     return RoleStandards(qp=qp, sector_name=sector_name, variants=variants, standards=standards)
 
 
+@dataclass(frozen=True)
+class AliasReport:
+    """What is wrong, and what is merely ambiguous, in a set of role aliases."""
+
+    unresolved: list[str]
+    """Targets that name no current qualification with standards. Such an alias
+    matches nothing, silently."""
+    disability_track: list[tuple[str, str, str]]
+    """`(key, target, qp_code)`: the pack that would stand for the target is a
+    disability-track one (a `PWD/` code). The rule has always been "point at the
+    general pack"; this is the first check that could see a breach."""
+    shadowed: list[tuple[str, str]]
+    """`(key, literal role)`: the key *is* a role's exact title but is aliased
+    to a different role, so a typed title would send somebody elsewhere."""
+    prefix_collisions: dict[str, list[str]]
+    """Every prefix of at least `MIN_ALIAS_PREFIX` characters that two or more
+    different targets claim. Reported, never a failure: a typeahead is allowed to
+    be ambiguous, it just has to be known."""
+
+    @property
+    def failures(self) -> bool:
+        return bool(self.unresolved or self.disability_track or self.shadowed)
+
+
+def alias_prefix_collisions(aliases: Mapping[str, str]) -> dict[str, list[str]]:
+    """Prefixes claimed by more than one target. Pure, so it is tested without a corpus."""
+    claimed: dict[str, set[str]] = {}
+    for key, target in aliases.items():
+        for n in range(MIN_ALIAS_PREFIX, len(key) + 1):
+            claimed.setdefault(key[:n], set()).add(target)
+    return {p: sorted(t) for p, t in sorted(claimed.items()) if len(t) > 1}
+
+
+async def alias_problems(db: AsyncSession, aliases: Mapping[str, str] | None = None) -> AliasReport:
+    """Check role aliases against the corpus (Sprint 43, ADR-050).
+
+    Defaults to the authored `ROLE_ALIASES`; the tests pass their own. Editing
+    `role_aliases.py` is verified by running this against the real corpus
+    (`make check-role-aliases`), which is why it cannot run in CI.
+    """
+    aliases = ROLE_ALIASES if aliases is None else aliases
+    targets = sorted({role.lower().strip() for role in aliases.values()})
+    keys = sorted({key.lower().strip() for key in aliases})
+    # The same representative pick role search makes, by the same rule: this is
+    # what an alias actually resolves to.
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                WITH c AS (
+                    SELECT qp.qp_code, lower(btrim(qp.job_role)) AS role_key,
+                           (SELECT count(*) FROM qp_skills s WHERE s.qp_id = qp.id) AS standards
+                    FROM qualification_packs qp
+                    WHERE qp.is_current AND qp.job_role IS NOT NULL
+                )
+                SELECT DISTINCT ON (c.role_key) c.role_key, c.qp_code
+                FROM c
+                WHERE c.standards > 0
+                  AND (c.role_key = ANY(CAST(:targets AS text[]))
+                       OR c.role_key = ANY(CAST(:keys AS text[])))
+                ORDER BY c.role_key, {ROLE_REPRESENTATIVE_ORDER}
+                """
+            ),
+            {"targets": targets, "keys": keys},
+        )
+    ).all()
+    representative = {row.role_key: row.qp_code for row in rows}
+
+    unresolved = [t for t in targets if t not in representative]
+    disability_track = sorted(
+        (key, target, representative[target.lower().strip()])
+        for key, target in aliases.items()
+        if representative.get(target.lower().strip(), "").startswith("PWD/")
+    )
+    shadowed = sorted(
+        (key, key.lower().strip())
+        for key, target in aliases.items()
+        if key.lower().strip() in representative and key.lower().strip() != target.lower().strip()
+    )
+    return AliasReport(
+        unresolved=unresolved,
+        disability_track=disability_track,
+        shadowed=shadowed,
+        prefix_collisions=alias_prefix_collisions(
+            {k.lower().strip(): v for k, v in aliases.items()}
+        ),
+    )
+
+
 async def unresolved_aliases(db: AsyncSession) -> list[str]:
     """Alias targets that name no current qualification with standards.
 
-    Such an alias matches nothing and fails silently -- which is why editing
-    `role_aliases.py` is verified by running this, against the real corpus.
+    Kept for the callers that only want this one answer; `alias_problems` is the
+    full check.
     """
-    targets = sorted({role.lower().strip() for role in ROLE_ALIASES.values()})
-    rows = await db.execute(
-        text(
-            """
-            SELECT DISTINCT lower(btrim(qp.job_role)) AS role_key
-            FROM qualification_packs qp
-            WHERE qp.is_current
-              AND lower(btrim(qp.job_role)) = ANY(CAST(:targets AS text[]))
-              AND EXISTS (SELECT 1 FROM qp_skills s WHERE s.qp_id = qp.id)
-            """
-        ),
-        {"targets": targets},
-    )
-    found = {row.role_key for row in rows}
-    return [t for t in targets if t not in found]
+    return (await alias_problems(db)).unresolved
 
 
 # ---------------------------------------------------------------- context

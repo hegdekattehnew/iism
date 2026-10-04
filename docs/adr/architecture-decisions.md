@@ -2263,3 +2263,96 @@ the page asks.
   exists, it can add steps; it does not replace the evidence rule.
 - The page lives at `/career-paths`, not `/careers`, which is the company's own hiring page linked from
   the footer.
+
+---
+
+## ADR-050: Role Search Ranks Disability-Track Packs One Tier Lower, and They Are Never an Alias Target
+
+**Status:** Accepted (October 2026). Refines the role-search rules in ADR-041's search path and the
+alias rules written into `role_aliases.py` since Sprint 23. Introduces no migration and no external
+integration; scoring, the golden set and `make evaluate` are untouched.
+
+**Context:** Career ladders (ADR-049) and the profile's role picker both start from `search_roles`, so
+a wrong result there now starts a wrong ladder and a wrong profile. Running the search against the real
+corpus, which the small fixture corpus could not show, found four faults:
+
+1. **A disability-track pack could lead a general one.** All 69 roles that have a disability-track pack
+   carry a `PWD/` code, whether or not the title says "Divyangjan" (31 do not). 57 of the 69 exist **only**
+   as a disability-track pack and 12 have both kinds. `data entry operator` led with three Divyangjan packs.
+2. **Fourteen aliases pointed at a disability-track pack.** `cook`, `telecaller`, `salesman` and eleven more
+   resolved to three roles whose representative pack is `PWD/`-coded. The rule "point at the general pack"
+   had been written in `role_aliases.py` for twenty sprints, and the checker could not see a breach.
+3. **A half-typed alias lost to a literal prefix.** Both score 3.0, and the tie was broken by similarity to
+   the pack's name, which always favours the literal one: `war` listed Warper above General Duty Assistant.
+4. **Multi-word queries found nothing.** `hotel waiter` matched neither as a substring nor by trigram
+   (word similarity 0.54 against a 0.6 threshold).
+
+**Decision:**
+
+- **A disability-track pack is demoted by one match tier** unless the query asks for one (it contains
+  `divyang`, `pwd` or `disab`) or is exactly the pack's title. Implemented as a 1.01 subtraction from the
+  match score, so a disability-track *prefix* match (3.0) falls just below a general *contains* match (2.0)
+  and stays above weaker guesses. `ROLE_REPRESENTATIVE_ORDER`, shared with career ladders, now puts a
+  general pack before a disability-track one when a role has both.
+- **No alias may resolve to a disability-track pack, and none may shadow a role's exact title.**
+  `alias_problems()` replaces `unresolved_aliases()` and **fails** on both; it also **reports** every prefix
+  of three or more characters that two or more targets claim, as information, never a failure.
+- **A half-typed alias beats a literal prefix when they tie** (`via_alias > 0` ahead of `closeness`).
+- **A multi-word query matches a title containing every word, in any order**, scored 1.5: above the fuzzy
+  ceiling (0.9) and below a whole-string "contains" (2.0), so a guess never outranks something typed. A new
+  `words` match kind carries it.
+- **Withdraw-then-reapply is closed by the same logic** (BL-12.6): an application an employer has decided
+  on can no longer be withdrawn, so a rejection cannot be wiped by withdrawing and reapplying.
+
+**Options considered:** 1. Leave ranking alone and fix only the alias targets
+2. Demote disability-track packs to **last place**, whatever the match
+3. Demote by **one match tier** (chosen)
+4. Hide disability-track packs unless asked for
+
+**Trade-offs:**
+
+- Option 1: ✅ Smallest ❌ Leaves `data entry operator` and `barista` leading with a pack the person did not
+  ask for, and a ladder or profile anchored to it.
+- Option 2: ✅ Simple to state ❌ Tried first and rejected on the real corpus: `hr executive` has one literal
+  match, a disability-track pack, and last place ranked it below "Executive Housekeeper". A demotion that
+  buries the only literal match is worse than none.
+- Option 3: ✅ Loses to an equally good general pack, which is the case it exists for, and still reaches a
+  disability-track pack when it is the best answer ❌ A person who wants the disability track and does not
+  say so still sees it, one tier lower. The words `divyangjan`, `pwd` and `disab` lift it.
+- Option 4: ❌ A disability-track-only role (57 of them) would become unfindable to the people it is for.
+
+**Final decision:** Option 3.
+
+**What the real data showed** (726 queries: every fifth role title, plus 35 known-bad queries, before and
+after, 3,268 and 3,274 hits):
+
+- **11 top results changed, all explained.** Seven are the alias tie-break on three-letter prefixes
+  (`war`, `car`, `com`, `cou`, `dat`, `mob`, `sof`). `data entry operator` is the demotion.
+  `telecaller` now reaches *Call Center Executive*; `cook` and `salesman` lost their aliases (below).
+  No exact-title query changed.
+- **The exact-title exemption exists because the first version had no exception**: `pressman`,
+  `domestic it helpdesk attendant` and `solar pv installer - civil`, typed in full, were demoted below
+  something else. They exist only as disability-track packs.
+- **Aliases: 124 to 114.** Three targets had a general twin and were re-pointed (*Assistant Chef* to
+  *Kitchen Trainee*, *Customer Care Executive(Call Center)* to *Call Center Executive*). *Retail Sales
+  Associate* has no general pack, so its seven keys were removed rather than guessed, and `cook` was removed
+  because the corpus has a role literally named *Cook (Multi-Cuisine)*. The new checker's first run found
+  two more: `web developer` and `security analyst` are exact titles of roles that an alias was sending
+  elsewhere.
+- **Not fixed, and recorded:** the prefix collisions (`car`, `com`, `dat`, `mob`, `sof`, `war`) are
+  ambiguous by nature. The tie-break now favours an alias-backed role, but which of several alias-backed
+  roles leads is still arbitrary. Only a person who knows the labour market can curate that.
+
+**Consequences:**
+
+- **Coverage is unchanged and still thin**: 43 distinct roles of 3,417 have an alias (1.3%), in 17 of 43
+  sectors. The curated batch was deliberately not part of this sprint. Lay terms are labour-market
+  knowledge; nothing in the repository contains them, and logging what people type would conflict with
+  ADR-023.
+- **`make check-role-aliases` cannot run in CI** (it needs the 21,303-standard corpus). Its rule logic is
+  covered by tests on a fixture corpus instead.
+- **Role search reads the `role_aliases` table, not the dict.** An edit to `role_aliases.py` reaches search
+  only after the table is re-projected (`make seed`, or `_seed_role_aliases` alone), and the snapshot
+  comparison for this ADR first ran against a stale table.
+- Career ladders inherit the representative-pack rule, so a ladder's starting role is the general pack
+  where there is one.

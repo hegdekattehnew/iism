@@ -183,7 +183,7 @@ class RoleHit(BaseModel):
     # into this one row. Said on screen rather than hidden.
     variants: int = 1
     matched_on: str
-    match_kind: Literal["exact", "prefix", "contains", "fuzzy", "alias"]
+    match_kind: Literal["exact", "prefix", "contains", "words", "fuzzy", "alias"]
 
 
 class RoleStandardOut(SkillOut):

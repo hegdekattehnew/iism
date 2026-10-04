@@ -36,6 +36,7 @@ from api.modules.marketplace.models import (
 )
 from api.modules.matching import ScarceSkill, market_scarce_skills, match_jobs
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
+from api.modules.notifications import enqueue
 from api.modules.operations.models import TenantVerificationEvent
 
 log = structlog.get_logger("iism.ops")
@@ -118,10 +119,39 @@ async def set_verification(
     organisation appends a fresh decision with fresh evidence, which is a
     legitimate act (re-verification) and not a mistake to refuse.
     """
+    was_verified = tenant.verified_at is not None
     event = TenantVerificationEvent(
         tenant_id=tenant.id, decision=decision, note=note, actor_user_id=actor.id
     )
     db.add(event)
+
+    # **Told only when the badge actually changes** (Sprint 43, BL-9.2). A re-grant
+    # of an organisation that is already verified is a legitimate act and changes
+    # nothing the organisation can see; a revoke of one that never had the badge
+    # likewise. Mailing either would teach people to ignore the one email that
+    # means something. Queued before the commit, in the same transaction: a notice
+    # that failed to queue must not leave a badge changed with nobody told.
+    #
+    # The payload is the organisation's name and a link, and nothing else: the
+    # operator's note is evidence, not something to read out in an email, and an
+    # address is resolved at send time (ADR-023). Email only -- an organisation's
+    # members have no in-app inbox. An owner who signed up by phone alone has no
+    # address, so the row is marked skipped and that organisation is not told.
+    if decision == "granted" and not was_verified:
+        template = "organisation_verified"
+    elif decision != "granted" and was_verified:
+        template = "organisation_verification_revoked"
+    else:
+        template = None
+    if template is not None:
+        await enqueue(
+            db,
+            recipient_kind="tenant",
+            recipient_id=tenant.id,
+            channel="email",
+            template=template,
+            payload={"organisation": tenant.name, "path": f"/employer/{tenant.slug}/settings"},
+        )
 
     if decision == "granted":
         tenant.verified_at = func.now()

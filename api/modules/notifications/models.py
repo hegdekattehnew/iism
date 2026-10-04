@@ -63,6 +63,11 @@ TEMPLATES = (
     # organisation, the standard and the course -- never anything about the
     # candidate, who has not yet chosen to be known to this employer.
     "sponsor_offer",
+    # Sprint 43, BL-9.2. An operator granted or revoked an organisation's Verified
+    # badge. Email to the organisation, never in-app: its members have no inbox to
+    # read an in-app notice in. Sent only when the badge actually changes.
+    "organisation_verified",
+    "organisation_verification_revoked",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")
