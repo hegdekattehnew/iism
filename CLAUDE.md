@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(54 ADRs). Read it before making any structural decision — the summary below
+(55 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -392,6 +392,12 @@ split would have to turn into interfaces first; do not add to it casually.
 - **A dependency major arrives alone** (ADR-053). `dependabot.yml` groups minor and patch only, and holds TypeScript 7
   and ESLint 10 with the reason written beside each: `openapi-typescript` refuses TypeScript 7 as a peer, and
   `eslint-config-next`'s React plugin crashes under ESLint 10. Revisit them (BL-13.6) by removing the `ignore` entry.
+- **A table that references a person is either in the DPDP export or excused from it with a reason**
+  (ADR-055, `tests/test_privacy_coverage.py`). Erasure was always sound -- every foreign key into a person is
+  `CASCADE` or `SET NULL` -- but the export lagged it: alerts, ratings, sponsorship offers and notices were
+  deleted and never shown. The guard walks the schema and fails on the next one, naming what to do. It finds
+  foreign keys only, so a person's data stored *without* one (as `notifications` is) must be added to
+  `NON_FK_PERSONAL`. The export names nobody else: a rating's author is the organisation, never the person.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -771,6 +777,9 @@ split would have to turn into interfaces first; do not add to it casually.
 > delete and rewrite every row now leaves an operator's rows alone, retired ones included. Admin tier only, each
 > change audited, the checks the same as `make check-role-aliases`. Migration 0046. **Capability, not coverage:
 > 43 of 3,417 roles until a reviewer uses it.**
+> **Sprint 48 is done** (ADR-055): the DPDP export now shows what erasure deletes -- job alerts, ratings,
+> sponsorship offers and the notices addressed to a person, none of which had ever been exported -- and a guard
+> that walks the schema fails on the next table that is not. Erasure was already sound. No migration.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

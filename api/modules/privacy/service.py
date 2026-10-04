@@ -22,7 +22,7 @@ from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
-from api.modules.applications.models import Application, SavedJob
+from api.modules.applications.models import Application, ApplicationReview, SavedJob
 from api.modules.identity import Invitation, Membership, Tenant, User, lock_ownership_of
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
@@ -41,6 +41,7 @@ from api.modules.privacy.schemas import (
     OrganisationDeletionPreview,
     OrganisationFate,
 )
+from api.modules.skills import Skill
 
 log = structlog.get_logger("iism.privacy")
 
@@ -341,6 +342,132 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
     return preview
 
 
+async def _export_alerts(db: AsyncSession, profile_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Vacancies this person was told about without asking (Sprint 27). Theirs to see:
+    it is the record of every unsolicited message, and it was erased but never shown."""
+    rows = await db.execute(
+        select(JobAlert.created_at, Job.title, Tenant.name)
+        .join(Job, Job.id == JobAlert.job_id)
+        .join(Tenant, Tenant.id == Job.tenant_id)
+        .where(JobAlert.profile_id == profile_id)
+        .order_by(JobAlert.created_at)
+    )
+    return [
+        {"vacancy": title, "organisation": organisation, "alerted_at": _iso(at)}
+        for at, title, organisation in rows.all()
+    ]
+
+
+async def _export_sponsorship(db: AsyncSession, profile_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Offers to sponsor a standard they lack (Sprint 41, ADR-048). The organisation, the
+    vacancy and the standard -- never the person at the organisation who made the offer,
+    who is not this person's to be told and whom the candidate was never told either."""
+    rows = await db.execute(
+        select(
+            SponsorIntent.created_at, SponsorIntent.notified_at, Job.title, Tenant.name, Skill.name
+        )
+        .join(Job, Job.id == SponsorIntent.job_id)
+        .join(Tenant, Tenant.id == Job.tenant_id)
+        .outerjoin(Skill, Skill.id == SponsorIntent.skill_id)
+        .where(SponsorIntent.profile_id == profile_id)
+        .order_by(SponsorIntent.created_at)
+    )
+    return [
+        {
+            "vacancy": title,
+            "organisation": organisation,
+            "standard": standard,
+            "offered_at": _iso(offered_at),
+            # NULL when they had switched off unsolicited messages or reached the day's cap.
+            "told_at": _iso(notified_at),
+        }
+        for offered_at, notified_at, title, organisation, standard in rows.all()
+    ]
+
+
+async def _export_ratings(
+    db: AsyncSession, user: User, profile_id: uuid.UUID | None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Ratings about this person as a worker, and ratings this person wrote (Sprint 37).
+
+    **Received** carries the rating, the comment, the vacancy and the organisation that
+    gave it -- the organisation is who they dealt with, so naming it tells them nothing
+    new -- and nobody else: `author_user_id` is never exported. **Given** is what they wrote,
+    about a worker or an organisation, and describes the other party only by role, so
+    exporting an employer's own account does not hand them a worker's name.
+
+    A rating about an organisation is the organisation's reputation, not this person's, and
+    is exported only to the person who wrote it.
+    """
+    columns = (
+        ApplicationReview.rating,
+        ApplicationReview.comment,
+        ApplicationReview.subject_role,
+        ApplicationReview.created_at,
+        Job.title,
+        Tenant.name,
+    )
+
+    def query() -> Any:
+        return (
+            select(*columns)
+            .join(Application, Application.id == ApplicationReview.application_id)
+            .join(Job, Job.id == Application.job_id)
+            .join(Tenant, Tenant.id == Job.tenant_id)
+            .order_by(ApplicationReview.created_at)
+        )
+
+    def shaped(rows: Any, *, with_subject: bool) -> list[dict[str, Any]]:
+        return [
+            {
+                "rating": rating,
+                "comment": comment,
+                **(
+                    {"about": "a worker" if subject == "worker" else "the organisation"}
+                    if with_subject
+                    else {}
+                ),
+                "vacancy": title,
+                "organisation": organisation,
+                "at": _iso(at),
+            }
+            for rating, comment, subject, at, title, organisation in rows
+        ]
+
+    received: list[dict[str, Any]] = []
+    if profile_id is not None:
+        rows = await db.execute(
+            query().where(
+                Application.profile_id == profile_id, ApplicationReview.subject_role == "worker"
+            )
+        )
+        received = shaped(rows.all(), with_subject=False)
+    given_rows = await db.execute(query().where(ApplicationReview.author_user_id == user.id))
+    return received, shaped(given_rows.all(), with_subject=True)
+
+
+async def _export_notices(db: AsyncSession, user_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Everything the product has said to this person, in-app or by email. `Notification`
+    has no foreign key to the user (the row names a recipient and holds no address), so no
+    schema walk finds it -- which is why the coverage test lists it by name. The payload is
+    a vacancy title, an organisation or a status; never an address."""
+    rows = await db.scalars(
+        select(Notification)
+        .where(Notification.recipient_kind == "user", Notification.recipient_id == user_id)
+        .order_by(Notification.created_at)
+    )
+    return [
+        {
+            "template": n.template,
+            "channel": n.channel,
+            "detail": n.payload,
+            "sent_at": _iso(n.created_at),
+            "read_at": _iso(n.read_at),
+        }
+        for n in rows.all()
+    ]
+
+
 async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
     """Everything held about this person, as one JSON document.
 
@@ -404,6 +531,13 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             .order_by(Invitation.created_at)
         )
     ).all()
+
+    alerts = await _export_alerts(db, profile.id) if profile is not None else []
+    sponsorship = await _export_sponsorship(db, profile.id) if profile is not None else []
+    ratings_received, ratings_given = await _export_ratings(
+        db, user, profile.id if profile is not None else None
+    )
+    notices = await _export_notices(db, user.id)
 
     log.info("account.exported")
     return {
@@ -483,6 +617,15 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             }
             for invitation in sent_invitations
         ],
+        # Held about them and, until Sprint 48, erased without ever being shown: what the
+        # product told them unasked, what employers offered, what was said about them as a
+        # worker, and everything it has sent. `tests/test_privacy_coverage.py` is what stops
+        # the next table being the same.
+        "job_alerts": alerts,
+        "sponsorship_offers": sponsorship,
+        "ratings_received": ratings_received,
+        "ratings_given": ratings_given,
+        "notices": notices,
         "activity": [
             {
                 "event": event.name,

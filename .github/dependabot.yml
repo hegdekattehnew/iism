@@ -37,6 +37,11 @@ updates:
       # lint` crashes rather than reporting.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # `@types/node` follows the Node version CI runs (24), not the newest release: types
+      # for a newer major than the runtime describe an API that is not there (ADR-053).
+      # Move it when `setup-node`'s `node-version` moves, in the same change.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

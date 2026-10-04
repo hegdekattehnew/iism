@@ -954,7 +954,7 @@
     "consentMissing": "No consent is recorded for this account: it was created before consent was recorded. Read the notice — and if you do not agree, delete your account below.",
     "readNotice": "Read the privacy notice",
     "exportTitle": "Download your data",
-    "exportBody": "Everything we hold about you — your account, memberships, profile and activity — as one JSON file.",
+    "exportBody": "Everything we hold about you — your account, memberships, profile, applications, the alerts and offers we sent you, ratings, notices and activity — as one JSON file.",
     "exportButton": "Download my data",
     "exporting": "Preparing…",
     "exportError": "The download could not be prepared. Try again.",
