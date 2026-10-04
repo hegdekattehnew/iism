@@ -36,6 +36,7 @@ from api.core.security import (
     issue_token_pair,
     store_otp,
 )
+from api.core.slugs import add_with_unique_slug
 from api.core.text import slugify
 from api.modules.identity.invitations import PENDING_INVITE_KEY
 from api.modules.identity.models import Invitation, Membership, Tenant, User
@@ -430,13 +431,18 @@ async def provision_organisation(
     """
     await _refuse_duplicate_organisation(db, user, name)
     await _within_organisation_cap(db, user)
-    tenant = Tenant(
-        slug=await _unique_tenant_slug(db, name),
-        name=name.strip(),
-        tenant_type=tenant_type,
+    tenant = await add_with_unique_slug(
+        db,
+        Tenant.slug,
+        lambda: _unique_tenant_slug(db, name),
+        lambda slug: Tenant(slug=slug, name=name.strip(), tenant_type=tenant_type),
+        # Losing the slug may mean this person's *other tap* won it: a double-tap on
+        # "Create organisation" is one organisation, not `x` and `x-2`. Asked again
+        # now that the winner's membership is committed, the duplicate refusal
+        # answers it (Sprint 46); for two different people it passes and the loser
+        # takes the next free suffix.
+        after_collision=lambda: _refuse_duplicate_organisation(db, user, name),
     )
-    db.add(tenant)
-    await db.flush()
 
     db.add(Membership(user_id=user.id, tenant_id=tenant.id, role="owner"))
     await db.flush()

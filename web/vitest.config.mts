@@ -12,8 +12,11 @@ import { defineConfig } from "vitest/config";
  * branch that picks the wrong actor compiles perfectly.
  */
 export default defineConfig({
-  // The tsconfig says `react-jsx` for Next; esbuild needs telling directly.
-  esbuild: { jsx: "automatic" },
+  // No JSX option, deliberately. Under vitest 3 the tsconfig's `react-jsx` had to be
+  // repeated for esbuild (`esbuild: { jsx: "automatic" }`); vitest 5 runs on vite 8's
+  // oxc transform, which reads the tsconfig itself, and that old option is now a type
+  // error. Checked rather than assumed: with an explicit `oxc.jsx` setting removed,
+  // all 371 tests still pass, so keeping one would only be a second copy to drift.
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },

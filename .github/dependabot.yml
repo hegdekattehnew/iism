@@ -1,6 +1,14 @@
 # Weekly, grouped, so an advisory arrives as one reviewable PR rather than as
 # a silent vulnerability or a flood. `pip-audit` and `npm audit` in CI catch
 # what is already known; this is what keeps the pins from going stale.
+#
+# **Majors are never grouped with everything else.** The npm group used to be
+# `patterns: ["*"]`, so one major that cannot work -- here TypeScript 7, which
+# `openapi-typescript` refuses as a peer, and ESLint 10, which crashes inside the
+# React plugin that ships with `eslint-config-next` -- turned the whole weekly PR
+# red, and two such PRs sat open at once, neither mergeable, for thirteen days
+# while the safe bumps inside them waited. Minor and patch updates are grouped and
+# should pass; a major arrives alone, so it can be judged alone (Sprint 46).
 version: 2
 updates:
   - package-ecosystem: "uv"
@@ -10,6 +18,7 @@ updates:
     groups:
       python:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
@@ -17,6 +26,17 @@ updates:
     groups:
       web:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Held until upstream catches up; revisit when either condition changes.
+      # `openapi-typescript` (the generated client, `make gen-api`) declares a
+      # TypeScript `^5.x` peer, so `npm ci` fails outright on TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # `eslint-config-next`'s React plugin throws under ESLint 10, so `npm run
+      # lint` crashes rather than reporting.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

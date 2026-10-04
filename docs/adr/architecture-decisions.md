@@ -2511,3 +2511,65 @@ moved. **The backlog's premise was partly wrong:** `tech` leading with Technical
 - **Still advisory and still racy:** the three caps, and `_close_if_filled` (two hires landing together against one
   position close the vacancy at the head-count, by design). Not audited this sprint: slug uniqueness on publish.
 
+
+## ADR-053: Dependency Majors Arrive Alone, and a Held Major Carries Its Reason
+
+**Status:** Accepted (October 2026). Refines the "Dependabot opens grouped weekly updates" decision of Sprint 20.
+No migration and no external integration.
+
+**Context:** Five dependabot pull requests sat open, none mergeable: three GitHub Actions bumps and two overlapping
+npm PRs, 13 and 2 days old. The cause was our own configuration. `dependabot.yml` grouped every npm update
+(`patterns: ["*"]`), so a major version that could not work turned the whole weekly PR red, and the safe bumps inside
+it waited with it. The newest PR, merged with current `main` and run through every gate:
+
+| Attempt | Install | `tsc` | Tests | Lint | Build + budget |
+|---|---|---|---|---|---|
+| As dependabot sent it | **fails** | – | – | – | – |
+| TypeScript held at 5 | ok | **fails** | pass | **crashes** | **fails** |
+| Every major held back | ok | ok | 371 pass | ok | ok |
+
+- **TypeScript 7 cannot install.** `openapi-typescript`, which generates the TypeScript client (`make gen-api`),
+  declares a TypeScript `^5.x` peer, so `npm ci` fails with `ERESOLVE`.
+- **ESLint 10 crashes** inside the React plugin that ships with `eslint-config-next`, so `npm run lint` throws
+  rather than reporting.
+- **vitest 5 works, with one change.** It runs on vite 8's oxc transform, and the `esbuild: { jsx: "automatic" }` option
+  `vitest.config.mts` used is now a type error. The replacement was not added: with no JSX option at all all 371 tests
+  pass, because the transform reads the tsconfig itself. A first draft kept an explicit `oxc.jsx` setting and a comment
+  claiming it would make a future default change fail loudly; removing it showed nothing depended on it, so the claim
+  was false and the setting was deleted.
+
+**Decision:**
+
+- **Minor and patch updates are grouped; a major arrives as its own pull request.** Applies to the npm and uv groups.
+  GitHub Actions are not grouped, so each already arrives alone.
+- **TypeScript and ESLint majors are ignored, with the reason written in `dependabot.yml`** and a condition for revisiting
+  each: `openapi-typescript` accepting TypeScript 7, and `eslint-config-next`'s React plugin running under ESLint 10.
+  They appear as a backlog item (BL-13.6) rather than as red pull requests that remind nobody of anything.
+- **The safe subset was applied together** (react and react-dom 19.3.0, TanStack Query, next-intl, tailwind-merge,
+  axe-core, testing-library), plus **vitest 5 and jsdom 30**, which pass every gate. `@types/node` moved from 20 to 24 to
+  match the runtime CI uses (Node 24); types for a different major than the runtime describe an API that is not there.
+- **The three Actions bumps (checkout 4→7, setup-node 4→7, setup-uv 5→7) are not applied here.** They cannot be exercised
+  locally; each is a pull request whose own CI run is the test, merged one at a time.
+
+**Options considered:** 1. Leave the group as it was and close the red PRs by hand each week
+2. Ungroup everything (one PR per dependency)
+3. **Group minor and patch, isolate majors, hold the two that cannot work** (chosen)
+4. Pin everything and update by hand each quarter
+
+**Trade-offs:**
+
+- Option 1: ✅ No change ❌ The safe updates never land and the next advisory fix is buried in the same red PR.
+- Option 2: ✅ Each PR is independently mergeable ❌ Dozens of PRs a week for a team of one.
+- Option 3: ✅ The weekly PR should pass, a major is judged alone, and a held one costs a line of config and a backlog
+  item ❌ An `ignore` entry is a promise to come back; the backlog item and the stated condition are what keep it.
+- Option 4: ✅ Quiet ❌ This is how the lint toolchain ends up three majors behind with no idea what blocks it.
+
+**Consequences:**
+
+- **Revisit BL-13.6 when either condition changes.** Removing the `ignore` entry makes the PR reappear.
+- **`npm audit --omit=dev` (what CI runs) reports 0 vulnerabilities; a full `npm audit` reports a high-severity
+  `braces` advisory** reached only through `eslint-config-next`, in the lint toolchain and not shipped. Noted, not acted
+  on: the suggested fix is a downgrade to `eslint-config-next@14`.
+- **Newer npm prints `allow-scripts` warnings** for two packages with install scripts (`fsevents`, `unrs-resolver`).
+  Nothing fails, and the build and tests pass without approving them.
+

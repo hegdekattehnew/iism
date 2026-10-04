@@ -96,6 +96,7 @@ class World:
     job_slug: str
     course_slug: str
     skill_id: uuid.UUID
+    skill_slug: str
     candidates: list[dict[str, str]] = field(default_factory=list)
 
 
@@ -149,6 +150,7 @@ async def build_world(client: AsyncClient) -> World:
             job_slug=job.slug,
             course_slug=course.slug,
             skill_id=skill.id,
+            skill_slug=skill.slug,
         )
 
 
