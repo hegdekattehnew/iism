@@ -68,6 +68,10 @@ TEMPLATES = (
     # read an in-app notice in. Sent only when the badge actually changes.
     "organisation_verified",
     "organisation_verification_revoked",
+    # Sprint 44, BL-9.1. Somebody handed you an organisation. Email to the new
+    # owner: becoming the person who can delete it should not be silent. A
+    # phone-only account is `skipped`, as for every email here.
+    "ownership_received",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

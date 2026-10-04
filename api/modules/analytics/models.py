@@ -88,6 +88,10 @@ EVENT_NAMES = (
     # the person; the payload carries counts and whether the starting role was a
     # guess -- no standards, which would describe somebody.
     "career_ladder_viewed",
+    # Sprint 44, BL-9.1. Subject to the organisation; the payload says whether
+    # the person handing over stayed as an admin or left. One event for the act:
+    # recording `member_role_changed` as well would count one decision twice.
+    "ownership_transferred",
 )
 
 

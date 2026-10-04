@@ -69,6 +69,14 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "See your organisation profile:\n{link}\n\n"
             "If you think this is a mistake, please contact the IISM team.\n",
         ),
+        "ownership_received": (
+            "You are now an owner of {organisation} on IISM",
+            "You have been made an owner of {organisation} on IISM. Owners can "
+            "manage the team, change the organisation's profile and delete the "
+            "organisation.\n\n"
+            "See the team:\n{link}\n\n"
+            "If you were not expecting this, please contact the previous owner.\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -121,6 +129,14 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "पाठ्यक्रम अब भी प्रकाशित हैं, पर उन पर यह निशान नहीं दिखेगा।\n\n"
             "अपने संगठन की प्रोफ़ाइल देखें:\n{link}\n\n"
             "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम से संपर्क करें।\n",
+        ),
+        "ownership_received": (
+            "अब आप IISM पर {organisation} के स्वामी हैं",
+            "आपको IISM पर {organisation} का स्वामी बनाया गया है। स्वामी टीम का "
+            "प्रबंधन कर सकते हैं, संगठन की प्रोफ़ाइल बदल सकते हैं और संगठन को हटा "
+            "सकते हैं।\n\n"
+            "टीम देखें:\n{link}\n\n"
+            "यदि आपको इसकी अपेक्षा नहीं थी, तो कृपया पिछले स्वामी से संपर्क करें।\n",
         ),
     },
 }

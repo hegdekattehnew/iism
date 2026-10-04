@@ -720,6 +720,29 @@ export interface paths {
         patch: operations["set_member_role_org__org_slug__members__user_id__patch"];
         trace?: never;
     };
+    "/org/{org_slug}/transfer-ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transfer Ownership
+         * @description Owner only. Hand the organisation to a colleague and step down, in one act.
+         *
+         *     Returns the new owner. 409 if they already are one, 422 for yourself, 404 if
+         *     they are not a member -- invite them first.
+         */
+        post: operations["transfer_ownership_org__org_slug__transfer_ownership_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/leave": {
         parameters: {
             query?: never;
@@ -4278,6 +4301,28 @@ export interface components {
             /** Consent Version */
             consent_version?: string | null;
         };
+        /**
+         * OwnershipTransferIn
+         * @description Hand the organisation to somebody already in it.
+         *
+         *     `then` is what happens to the person handing over: stay as an `admin`
+         *     (the default -- it keeps them able to help and can be reversed by the new
+         *     owner) or `leave`. There is no "stay as owner": that is a role change, and
+         *     this act means exactly one thing.
+         */
+        OwnershipTransferIn: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Then
+             * @default admin
+             * @enum {string}
+             */
+            then: "admin" | "leave";
+        };
         /** PerformanceElementOut */
         PerformanceElementOut: {
             /** Name */
@@ -6366,6 +6411,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MemberRoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transfer_ownership_org__org_slug__transfer_ownership_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnershipTransferIn"];
             };
         };
         responses: {

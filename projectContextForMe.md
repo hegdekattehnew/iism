@@ -4,16 +4,14 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–43 built.** Sprints 41 and 42 are committed and pushed on
-`sprint-41` (PR into `main` not yet merged; `b1ab9c1`). **Sprint 43 is on `sprint-43`, cut from
-`sprint-41`** because migration 0043 and `careers/` live there — it will need rebasing onto `main`
-once that PR merges. Sprint 43 is *role search you can trust* (ADR-050): running the search against
-the real corpus found a disability-track pack leading a general one, fourteen aliases pointing at one,
-a half-typed alias losing to a literal prefix, and multi-word queries finding nothing. All four are
-fixed, plus two small stories (a rejected application can no longer be withdrawn and reapplied;
-an organisation is emailed when its Verified badge actually changes). **Alias coverage is unchanged
-and still thin: 43 distinct roles of 3,417** — the curated batch was deliberately left out. Monetisation
-and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-04 · **Sprints 1–44 built.** Sprints 41–43 are merged into `main` (PRs #17 and
+#18, `8ca2479`); **Sprint 44 is on `sprint-44`, cut from that, uncommitted.** Sprint 44 is *handing an
+organisation over as one act* (BL-9.1, ADR-051). Closing that gap exposed a race older than the feature:
+the last-owner guard was a check followed by a write with nothing between them, so two owners acting at the
+same moment — one demoting the other while being demoted, or both leaving — could leave an organisation with
+**no owner** (reproduced: both succeeded, owner count 0). Every ownership-changing act now takes a lock on
+the tenant row first and re-checks the caller's authority after it. **Alias coverage is unchanged and still
+thin: 43 distinct roles of 3,417.** Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -29,11 +27,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-43` (Sprint 43, **uncommitted**), cut from `sprint-41` (`b1ab9c1`: Sprints 41 and 42 plus the backlog and scope documents, pushed). `main` is at `9f339c7` and does not yet have either. |
-| **Last sprint** | 43 — role search trust (ADR-050), BL-12.6 (a rejection cannot be withdrawn), BL-9.2 (the Verified-badge email, migration 0044). Before it: 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | not yet chosen. Candidates: single-action ownership transfer (BL-9.1, needs a locking decision), the district skill-gap view (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,013 backend (`make check`, 2026-10-04), 364 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0044`; 50 ADRs |
+| **Branch** | `sprint-44` (Sprint 44, **uncommitted**), cut from `main` at `8ca2479`, which has Sprints 41–43. The old `sprint-41`, `sprint-43` and `fix/audit-2026-10` are deleted locally; `origin/sprint-41` and `origin/fix/audit-2026-10` are merged and still on the remote. |
+| **Last sprint** | 44 — BL-9.1, hand an organisation over in one act, and the ownership race it exposed (ADR-051, migration 0045). Before it: 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
+| **Tests** | 1,033 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0045`; 51 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -968,15 +966,14 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-43`, uncommitted**, cut from `sprint-41` at `b1ab9c1` (Sprints 41 and 42 and the
-backlog and scope documents, pushed to `origin/sprint-41`; its PR into `main` is not yet merged). Nothing
-on `sprint-43` is committed; commit only when the owner asks. Sprint 43's changes: `skills/service.py`
-(search SQL, representative order, `alias_problems`), `skills/role_aliases.py`, `skills/schemas.py`
-(`words` kind), `applications/{service,models}.py`, `operations/service.py`,
-`notifications/{models,templates}.py`, `migrations/versions/0044_*`, `scripts/check_role_aliases.py`,
-`web/src/components/{ApplyPanel,Notices}.tsx`, the messages, new tests
-(`test_role_search_trust.py`, `ApplyPanel.decided.test.tsx`) and edits to five existing ones, ADR-050,
-`CLAUDE.md`. It will need rebasing onto `main` after the Sprint 41/42 PR merges.
+**Working on `sprint-44`, uncommitted**, cut from `main` at `8ca2479` (the PR #18 merge, which carries Sprints
+41, 42 and 43). Commit only when the owner asks. Sprint 44's changes: `identity/{invitations,member_routes,
+schemas,__init__}.py` (the ownership lock, `transfer_ownership`, `lock_ownership_of`), `privacy/service.py`
+(erasure takes the lock), `analytics/models.py`, `notifications/{models,templates}.py`,
+`migrations/versions/0045_*`, `web/src/components/employer/TeamPanel.tsx` (+test), the messages,
+`web/src/lib/api-schema.d.ts`, new tests (`test_ownership_race.py`, `test_ownership_transfer.py`), ADR-051,
+`CLAUDE.md`. **Restart `make worker` after pulling it**: the new `ownership_received` template is only used
+when the worker drains.
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -1870,7 +1867,7 @@ placeholder, linked from the footer.
 - **Left for later:** the weaker-tier question above; a stored "current role" on the profile (a migration
   and a consent-style act); inference from `SkillRelation` (BL-6.2, still `[LATER]`); pay or demand on a step.
 
-### Sprint 43 — role search you can trust, and two small stories (done 2026-10-04, uncommitted)
+### Sprint 43 — role search you can trust, and two small stories (done 2026-10-04, merged in PR #18)
 
 Career ladders start from `search_roles`, so a wrong search result now starts a wrong ladder. The
 investigation that opened this sprint ran the search against the **real corpus**, which the small
@@ -1921,6 +1918,55 @@ contains them).
 - **Left for later:** the curated alias batch; an operator alias screen (the seed deletes the table on every
   run, so edits would vanish — it needs a source-of-truth redesign first); scoring synonym-admitted rows
   (`mfg`, `tech`); BL-9.1; BL-12.7/12.8 (see the backlog).
+
+### Sprint 44 — hand an organisation over in one act, and the race under it (done 2026-10-04, uncommitted)
+
+BL-9.1 was recorded as "needs a locking decision". Making the decision found a fault older than the story.
+Owner decisions, all taken as recommended: the person handing over **chooses** to stay as an admin or leave
+(default admin); the new owner **is emailed**; the **erasure path is fixed in the same sprint**.
+
+- **The race, reproduced before any fix (ADR-051).** `_refuse_if_last_owner` counted owners in one statement
+  and the caller wrote in another. Two sessions run at once — A demotes B while B demotes A, or both leave —
+  each saw two owners, each passed, and the owner count went to **0**. Account erasure asks the same question
+  through its own grouped count and had the same gap, and authority was checked once at the start of the
+  request, so an owner demoted in between still completed an owner-only act.
+- **The fix.** `_lock_ownership` takes `SELECT ... FOR NO KEY UPDATE` on the tenant row at the start of
+  `set_role`, `remove_member`/`leave`, the new `transfer_ownership` and (through `lock_ownership_of`, in
+  ascending id order) `delete_account`. `FOR NO KEY UPDATE` rather than `FOR UPDATE` so an invitation being
+  accepted — a membership insert, which takes `FOR KEY SHARE` on the tenant — is never held up.
+  `_require_owner_now` then re-reads the caller's membership with `populate_existing` and refuses with 403 if
+  they are no longer an owner. **Any new writer of `Membership.role` must take the lock first**; nothing
+  enforces that mechanically.
+- **The act.** `POST /org/{slug}/transfer-ownership` `{user_id, then: "admin"|"leave"}`. Target must already be
+  a member (an invitation cannot carry `owner`; invite as an admin first), not the caller (422), not already an
+  owner (409). Promotion and step-down commit together. One `ownership_transferred` event — not also
+  `member_role_changed`, which would count one decision twice. The new owner is queued an email
+  (`ownership_received`, `recipient_kind="user"`) **before** the commit; payload is the organisation's name and
+  a link. A phone-only account is `skipped`, as everywhere. Migration 0045 widens two CHECKs by hand.
+- **The UI** is an inline panel in `TeamPanel`, not a dialog (no Radix on this route's first load), with the
+  server's own sentence shown on a refusal. **Deviation from the plan:** no typed-name gate. The plan copied it
+  from organisation deletion, but that control destroys other people's records and this one does not, the new
+  owner can reverse it, and the members endpoint does not even carry the organisation's name.
+- **Testing needs committed rows.** The suite's `db` fixture is one rolled-back transaction, which cannot show
+  two sessions interleaving, so `tests/test_ownership_race.py` builds its own organisation through the
+  sessionmaker, widens the window with a sleep after the count (otherwise it passes by luck on a quiet
+  machine) and deletes everything afterwards.
+- **Verified.** `make check` 1,033 passed (1,013 + 20); web 371 (364 + 7) with `tsc` and `eslint` clean;
+  `make evaluate` holds; `alembic check` clean and 0045 round-trips; no route grew (heaviest `/profile` 678 of
+  684 KB). **Mutation-tested**: removing the lock (fails mutual demotion; fails the erasure race when removed
+  there), the authority re-check, the already-owner refusal and the self-transfer refusal each fails its own
+  test. **Live** with two throwaway organisations (13 of 13): an admin is refused, a sole owner still cannot
+  leave, a handover swaps the roles and the old owner can no longer invite an admin, handing back
+  with `leave` removes the leaver, exactly two `ownership_transferred` events and no `member_role_changed`, and
+  the worker log showed exactly **two** ownership emails (plus the one invitation). Everything created was
+  erased through the app's own routes. My first live script died on a script bug (separate `asyncio.run` calls
+  sharing one engine across loops) and left two throwaway accounts and two organisations; they were found by
+  tag, erased the same way and the database confirmed empty.
+- **Not built:** inviting somebody **as** owner, handing over to a non-member, undo, approval by two owners, an
+  in-app inbox for organisation members (the email is the only notice).
+- **Left for later:** BL-12.7 district skill-gap view; BL-12.8 credit chips (blocked); BL-12.11 PWA device
+  check; BL-12.14 synonym-row scoring; BL-12.15 operator alias screen; the curated alias batch; BL-5.3 real
+  embeddings; BL-1.3 monetisation.
 
 ### Also outstanding, in rough order
 
@@ -2016,8 +2062,8 @@ remain queued behind whichever the owner picks.
 - **A learner-facing notice when a provider marks "contacted"**. Found in Sprint 24 and
   deliberately not built. *(Its sibling — notifying applicants when an organisation deletes itself
   — was closed on 2026-09-23 along with the organisation-deletion route.)*
-- **Ownership transfer as one act.** Sprint 25 makes it possible — promote, then leave — but it is
-  two steps and the second can fail on its own. A single "hand over and leave" would be safer.
+- ~~**Ownership transfer as one act.**~~ **Done 2026-10-04 (Sprint 44)**: `POST /org/{slug}/transfer-ownership`,
+  and the race that made the old two-step unsafe is closed. See the Sprint 44 entry.
 - **`CLAUDE.md` cites ADR-026 for the siblings-not-generalisations rule.** ADR-026 is *Supply
   Acquisition Strategy*; that rule has no ADR and lives only in `CLAUDE.md`. Either write it as one
   or stop citing a number for it.

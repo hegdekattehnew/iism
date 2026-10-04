@@ -396,3 +396,16 @@ class MemberOut(BaseModel):
 
 class MemberRoleIn(BaseModel):
     role: MembershipRole
+
+
+class OwnershipTransferIn(BaseModel):
+    """Hand the organisation to somebody already in it.
+
+    `then` is what happens to the person handing over: stay as an `admin`
+    (the default -- it keeps them able to help and can be reversed by the new
+    owner) or `leave`. There is no "stay as owner": that is a role change, and
+    this act means exactly one thing.
+    """
+
+    user_id: uuid.UUID
+    then: Literal["admin", "leave"] = "admin"

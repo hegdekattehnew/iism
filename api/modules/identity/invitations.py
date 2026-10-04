@@ -20,7 +20,9 @@ Three rules live here, and **here only**:
 * **The last owner.** Nobody may be removed, demoted or allowed to leave if
   they are the only owner left. One function answers this for all three paths,
   because Sprint 15's finding was that a guard each handler must remember is a
-  guard that eventually is not there.
+  guard that eventually is not there. (Sprint 44) The answer is only true while
+  nobody else is changing the answer, so every act that changes who owns an
+  organisation first takes `_lock_ownership` -- see its docstring.
 * **Enumeration.** Inviting an address that already has an account and one that
   does not must be **indistinguishable to the caller**. Sprint 12 shipped an
   oracle of exactly this shape -- two responses differing by one field -- and
@@ -100,6 +102,63 @@ async def _owner_count(db: AsyncSession, tenant_id: uuid.UUID) -> int:
     ) or 0
 
 
+async def _lock_ownership(db: AsyncSession, tenant_id: uuid.UUID) -> None:
+    """Make "who owns this organisation" a thing one transaction at a time decides.
+
+    `_refuse_if_last_owner` counts owners in one statement and the caller writes
+    in another. Under READ COMMITTED two owners acting at the same moment each
+    count two and each pass: A demotes B while B demotes A, or both leave, and the
+    organisation has nobody in charge -- the outcome Sprint 25 exists to prevent,
+    reachable until Sprint 44 by two people pressing a button together.
+
+    The lock is on the **tenant row**, as `FOR NO KEY UPDATE`: it queues every
+    other act that changes ownership of *this* organisation behind this one, and
+    it does not block a membership insert (which takes `FOR KEY SHARE` on the
+    tenant through its foreign key), so an invitation being accepted is never
+    held up by it. An advisory lock would work too and be invisible in
+    `pg_locks` joins; SERIALIZABLE would put a retry loop around the whole app for
+    one rare act. Held until the commit, and taken **before** the count, never
+    after it.
+
+    Callers taking more than one (account erasure) must do so in ascending id
+    order. Nothing else holds two, so that is the only way this can deadlock.
+    """
+    await db.execute(
+        select(Tenant.id).where(Tenant.id == tenant_id).with_for_update(key_share=True)
+    )
+
+
+async def lock_ownership_of(db: AsyncSession, tenant_ids: list[uuid.UUID]) -> None:
+    """`_lock_ownership` for several organisations, in the one order that cannot deadlock.
+
+    Account erasure is the only caller that holds more than one: somebody who
+    belongs to three organisations erasing themselves asks the last-owner
+    question of all three. Ascending id is what makes two such erasures, which
+    may name the same organisations in different orders, queue instead of
+    waiting on each other.
+    """
+    for tenant_id in sorted(set(tenant_ids)):
+        await _lock_ownership(db, tenant_id)
+
+
+async def _require_owner_now(
+    db: AsyncSession, tenant_id: uuid.UUID, user_id: uuid.UUID
+) -> Membership:
+    """Whether this person is **still** an owner, asked after the lock is held.
+
+    The route checked `MEMBER_MANAGE` when the request arrived, from a membership
+    read some time ago. Another owner may have demoted them since, and an owner-only
+    act must not complete on authority that has been withdrawn. 403, not 404: they
+    belonged here a moment ago, so existence is not news to them.
+    """
+    membership = await _membership_of(db, tenant_id, user_id)
+    if membership is None or membership.role != "owner":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "You are no longer an owner of this organisation"
+        )
+    return membership
+
+
 async def _refuse_if_last_owner(db: AsyncSession, membership: Membership) -> None:
     """The one place that answers "would this leave nobody in charge?".
 
@@ -122,8 +181,13 @@ async def _refuse_if_last_owner(db: AsyncSession, membership: Membership) -> Non
 async def _membership_of(
     db: AsyncSession, tenant_id: uuid.UUID, user_id: uuid.UUID
 ) -> Membership | None:
+    # `populate_existing`: after `_lock_ownership` this is the read that must see
+    # what the *other* transaction just committed, not the copy the identity map
+    # has held since the request's own permission check.
     return await db.scalar(
-        select(Membership).where(Membership.tenant_id == tenant_id, Membership.user_id == user_id)
+        select(Membership)
+        .where(Membership.tenant_id == tenant_id, Membership.user_id == user_id)
+        .execution_options(populate_existing=True)
     )
 
 
@@ -510,6 +574,8 @@ async def set_role(
     """
     if role not in ("owner", *INVITABLE_ROLES):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown role")
+    await _lock_ownership(db, tenant_id)
+    await _require_owner_now(db, tenant_id, actor_user_id)
     membership = await _member_or_404(db, tenant_id, user_id)
     user = await db.get(User, user_id)
     # `_member_or_404` resolved a membership, and `memberships.user_id` is a
@@ -554,6 +620,10 @@ async def remove_member(
     the only honest place to measure. `self` in the payload keeps the two
     distinguishable, the way `job_closed` carries `automatic`.
     """
+    await _lock_ownership(db, tenant_id)
+    if actor_user_id != user_id:
+        # Removing a colleague is an owner's act; leaving is anybody's.
+        await _require_owner_now(db, tenant_id, actor_user_id)
     membership = await _member_or_404(db, tenant_id, user_id)
     await _refuse_if_last_owner(db, membership)
     await db.delete(membership)
@@ -570,3 +640,81 @@ async def remove_member(
 async def leave(db: AsyncSession, *, tenant_id: uuid.UUID, user: User) -> None:
     """Show yourself out. The same guard, because it is the same question."""
     await remove_member(db, tenant_id=tenant_id, actor_user_id=user.id, user_id=user.id)
+
+
+async def transfer_ownership(
+    db: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    to_user_id: uuid.UUID,
+    then: str,
+) -> tuple[Membership, User]:
+    """Hand an organisation to a colleague, and step down, as **one** act.
+
+    Until Sprint 44 this was two requests -- promote, then leave -- and the
+    second could fail on its own, leaving two owners where one meant to go, or
+    (when somebody else raced it) none. Here the promotion and the step-down
+    commit together or not at all, behind the ownership lock, with the caller's
+    authority re-read after it.
+
+    **The target must already be a member.** An invitation cannot carry
+    `owner` (`INVITABLE_ROLES`), so somebody outside is reached by inviting
+    them as an admin first. Giving the organisation to an address that has not
+    yet proved it holds the mailbox is how an organisation ends up owned by a
+    typo.
+
+    The new owner is queued an email in the same transaction, **before** the
+    commit: if the notice cannot be written, nothing has changed and nobody has
+    been made an owner in silence. It names the organisation and links to the
+    team page; it holds no address.
+    """
+    if to_user_id == actor_user_id:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Choose somebody else to hand the organisation to",
+        )
+    await _lock_ownership(db, tenant_id)
+    actor = await _require_owner_now(db, tenant_id, actor_user_id)
+    target = await _member_or_404(db, tenant_id, to_user_id)
+    if target.role == "owner":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "They are already an owner. To step down yourself, change your own role.",
+        )
+    user = await db.get(User, to_user_id)
+    # `_member_or_404` resolved a membership, and `memberships.user_id` is a
+    # foreign key, so the row is there.
+    assert user is not None  # noqa: S101
+    tenant = await db.get(Tenant, tenant_id)
+    assert tenant is not None  # noqa: S101
+
+    target.role = "owner"
+    if then == "leave":
+        await db.delete(actor)
+    else:
+        actor.role = "admin"
+
+    # Inside the function because `notifications` imports this package for
+    # `Invitation`; a module-level import here is the cycle `tests/test_import_order.py`
+    # exists to catch.
+    from api.modules.notifications import enqueue
+
+    await enqueue(
+        db,
+        recipient_kind="user",
+        recipient_id=to_user_id,
+        channel="email",
+        template="ownership_received",
+        payload={"organisation": tenant.name, "path": f"/employer/{tenant.slug}/team"},
+    )
+    await db.commit()
+    await db.refresh(target)
+    await _record_for_tenant(
+        db,
+        "ownership_transferred",
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        payload={"then": then},
+    )
+    return target, user

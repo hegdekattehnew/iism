@@ -2356,3 +2356,81 @@ after, 3,268 and 3,274 hits):
   comparison for this ADR first ran against a stale table.
 - Career ladders inherit the representative-pack rule, so a ladder's starting role is the general pack
   where there is one.
+
+
+## ADR-051: Changing Who Owns an Organisation Is Serialised per Organisation, and Handing It Over Is One Act
+
+**Status:** Accepted (October 2026). Refines the "last owner" rule of Sprint 25 (ADR-038/039) and adds BL-9.1.
+One migration (0045, two CHECK widenings). No external integration; scoring is untouched.
+
+**Context:** Sprint 25 made it impossible to empty an organisation of owners: removing, demoting or leaving
+as the only owner is a 409, asked in one function (`_refuse_if_last_owner`) for all three paths. Handing an
+organisation to somebody else was then two requests — promote a colleague, then leave — and the second could
+fail on its own. Closing that gap raised the question the backlog called "the locking decision", and answering
+it exposed a fault older than the feature:
+
+1. **The last-owner guard was a check followed by a write, with nothing between them.** Under READ COMMITTED,
+   two owners acting at the same moment each count two owners and each pass. A demotes B while B demotes A,
+   or both leave, and the organisation has **nobody in charge** — the outcome Sprint 25 exists to prevent.
+   Reproduced before any fix: both requests returned success and the owner count was **0**.
+2. **Account erasure asks the same question through its own grouped count** and had the same gap: an owner
+   erasing their account while the other owner leaves.
+3. **Authority was checked once, at the start of the request.** An owner demoted in between still completed
+   an owner-only act.
+
+**Decision:**
+
+- **Every act that changes who owns an organisation first takes a lock on the tenant row**
+  (`SELECT ... FOR NO KEY UPDATE`, `_lock_ownership`): role change, removal, leaving, the new handover, and
+  account erasure. Taken **before** the count and held until the commit. Erasure locks every organisation the
+  account belongs to in **ascending id order** (`lock_ownership_of`), the only place more than one is held.
+- **After the lock, the caller's authority is re-read** (`_require_owner_now`, 403) with
+  `populate_existing`, so an owner-only act cannot complete on authority another transaction has withdrawn.
+  Leaving is anybody's act and skips it.
+- **`POST /org/{slug}/transfer-ownership`** `{user_id, then: "admin" | "leave"}`, owner only. The promotion and
+  the step-down commit together. The target must already be a **member** (an invitation cannot carry `owner`,
+  so somebody outside is invited as an admin first), must not be the caller (422) and must not already be an
+  owner (409: that is a role change, and this act means one thing). `then` defaults to `admin`; there is no
+  "stay as owner".
+- **One analytics event** (`ownership_transferred`, payload `{then}`), not also `member_role_changed`, which
+  would count one decision twice.
+- **The new owner is emailed** (`ownership_received`, `recipient_kind="user"`), queued **before** the commit so
+  a notice that cannot be written leaves nobody made an owner in silence. The payload is the organisation's
+  name and a link — no address. A phone-only account is `skipped`, as for every email here.
+
+**Options considered:** 1. Fix only the handover, leave the guard as it was
+2. Advisory lock keyed on the tenant id
+3. `SERIALIZABLE` transactions for these functions
+4. **Row lock on the tenant, `FOR NO KEY UPDATE`** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ Smallest ❌ Ships a new way to reach the old race, and leaves the old paths racing.
+- Option 2: ✅ No row involved ❌ Invisible in the usual lock views, and nothing in the schema says what it
+  protects.
+- Option 3: ✅ Strongest guarantee ❌ Serialisation failures need a retry loop around the whole request layer
+  for one rare act.
+- Option 4: ✅ Visible, local to one organisation, needs no retry, and `FOR NO KEY UPDATE` does not conflict
+  with the `FOR KEY SHARE` a membership insert takes through its foreign key, so an invitation being accepted
+  is never held up ❌ It also serialises organisation-profile edits for the few milliseconds it is held, which
+  nobody will notice.
+
+**Measured:** four tests run two real sessions at once through the service (mutual demotion, mutual leaving, an
+owner erasing against the other leaving, and a demoted owner's stale authority) — each **fails without the
+lock** and passes with it. Removing the lock, the authority re-check, the already-owner refusal or the
+self-transfer refusal each fails exactly its own test. Live, with throwaway organisations: 13 of 13 checks and
+exactly two ownership emails for two handovers.
+
+**Consequences:**
+
+- **The race tests need committed rows.** The suite's `db` fixture is one rolled-back transaction, which cannot
+  show two sessions interleaving, so `tests/test_ownership_race.py` builds its own organisation through the
+  sessionmaker, deletes it afterwards, and widens the window on purpose (a sleep after the count) so the result
+  does not depend on scheduler timing.
+- **Any new writer of `Membership.role` must take `_lock_ownership` first.** `tests/test_module_boundaries.py`
+  cannot see that; this ADR and the docstring on `_lock_ownership` are where it is written down.
+- **The UI is an inline panel, not a dialog.** One choice and one button, and a modal would put Radix's dialog
+  on the team page's first load. No typed-name gate, unlike organisation deletion: nothing here destroys anybody
+  else's records and the new owner can reverse it.
+- Not built: inviting somebody **as** owner, handing over to a non-member, undo, approval by two owners.
+

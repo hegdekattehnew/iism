@@ -105,6 +105,34 @@ async def set_member_role(
     )
 
 
+@router.post("/transfer-ownership", response_model=schemas.MemberOut)
+async def transfer_ownership(
+    payload: schemas.OwnershipTransferIn,
+    context: TenantContext = CanManage,
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.MemberOut:
+    """Owner only. Hand the organisation to a colleague and step down, in one act.
+
+    Returns the new owner. 409 if they already are one, 422 for yourself, 404 if
+    they are not a member -- invite them first.
+    """
+    membership, user = await service.transfer_ownership(
+        db,
+        tenant_id=context.tenant.id,
+        actor_user_id=context.user.id,
+        to_user_id=payload.user_id,
+        then=payload.then,
+    )
+    return schemas.MemberOut(
+        user_id=user.id,
+        role=membership.role,
+        full_name=user.full_name,
+        email=user.email,
+        since=membership.created_at,
+        is_you=False,
+    )
+
+
 @router.delete("/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_member(
     user_id: uuid.UUID,
