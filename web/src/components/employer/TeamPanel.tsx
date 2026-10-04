@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Select, Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { isSignedOut } from "@/lib/http";
+import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 import { api } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 
@@ -41,6 +41,11 @@ export function TeamPanel({ org }: { org: string }) {
   const [role, setRole] = useState<"admin" | "member">("member");
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Who the owner is in the middle of handing the organisation to, if anybody:
+  // one at a time, so two open panels cannot each be confirmed.
+  const [handing, setHanding] = useState<string | null>(null);
+  const [then, setThen] = useState<"admin" | "leave">("admin");
+  const [handedTo, setHandedTo] = useState<string | null>(null);
 
   const membersKey = ["org", org, "members"];
   const invitesKey = ["org", org, "invitations"];
@@ -155,6 +160,36 @@ export function TeamPanel({ org }: { org: string }) {
       setError(Number(e.message) === 409 ? t("errorLastOwner") : t("errorGeneric")),
   });
 
+  const handOver = useMutation({
+    mutationFn: async ({ userId, name }: { userId: string; name: string }) => {
+      setError(null);
+      setHandedTo(null);
+      const { error: err, response } = await api.POST("/org/{org_slug}/transfer-ownership", {
+        params: { path: { org_slug: org } },
+        body: { user_id: userId, then },
+      });
+      const status = response.status;
+      if (err) throw new ApiError(status, readDetail(err));
+      return name;
+    },
+    onSuccess: async (name) => {
+      setHanding(null);
+      if (then === "leave") {
+        // They are no longer a member: the list would 404 where it was, and the
+        // context switcher still offers an organisation they have left.
+        await qc.invalidateQueries({ queryKey: ["me"] });
+        router.push("/");
+        return;
+      }
+      setHandedTo(name);
+      await qc.invalidateQueries({ queryKey: membersKey });
+    },
+    // The server's own sentence: "already an owner" and "you are no longer an
+    // owner" are different facts and "something went wrong" names neither. The
+    // generic line is the fallback for a failure that carried nothing.
+    onError: (e: Error) => setError(detailOf(e) ?? t("errorGeneric")),
+  });
+
   const leave = useMutation({
     mutationFn: async () => {
       setError(null);
@@ -248,7 +283,66 @@ export function TeamPanel({ org }: { org: string }) {
                     >
                       {remove.isPending ? t("removing") : t("remove")}
                     </Button>
+                    {member.role !== "owner" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setThen("admin");
+                          setHanding(handing === member.user_id ? null : member.user_id);
+                        }}
+                      >
+                        {t("handOver")}
+                      </Button>
+                    )}
                   </div>
+                )}
+
+                {canManage && handing === member.user_id && (
+                  // Inline, not a dialog: it is one choice and one button, and a
+                  // modal would put Radix's dialog on this route's first load.
+                  <fieldset className="mt-4 rounded-lg border border-border-token p-4">
+                    <legend className="px-1 text-sm font-semibold">
+                      {t("handOverHeading", { name: nameOf(member) })}
+                    </legend>
+                    <p className="text-sm text-muted">
+                      {t("handOverBody", { name: nameOf(member) })}
+                    </p>
+                    <p className="mt-3 text-sm font-medium">{t("handOverThen")}</p>
+                    {(["admin", "leave"] as const).map((choice) => (
+                      <label key={choice} className="mt-1.5 flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name={`then-${member.user_id}`}
+                          checked={then === choice}
+                          onChange={() => setThen(choice)}
+                        />
+                        {choice === "admin" ? t("handOverStay") : t("handOverLeave")}
+                      </label>
+                    ))}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={handOver.isPending}
+                        onClick={() =>
+                          handOver.mutate({ userId: member.user_id, name: nameOf(member) })
+                        }
+                      >
+                        {handOver.isPending
+                          ? t("handOverWorking")
+                          : t("handOverConfirm", { name: nameOf(member) })}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={handOver.isPending}
+                        onClick={() => setHanding(null)}
+                      >
+                        {t("handOverCancel")}
+                      </Button>
+                    </div>
+                  </fieldset>
                 )}
 
                 {member.is_you && (
@@ -272,7 +366,13 @@ export function TeamPanel({ org }: { org: string }) {
         ))}
       </ul>
 
-      {!canManage && <p className="mt-3 text-sm text-muted">{t("onlyOwnerNote")}</p>}
+      {handedTo && (
+        <p role="status" className="mt-3 text-sm text-success-text">
+          {t("handedOver", { name: handedTo })}
+        </p>
+      )}
+
+      {!canManage && !handedTo && <p className="mt-3 text-sm text-muted">{t("onlyOwnerNote")}</p>}
 
       {canInvite && (
         <>

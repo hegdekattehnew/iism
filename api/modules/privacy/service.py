@@ -23,7 +23,7 @@ from api.core.security import revoke_all_for_user
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, SavedJob
-from api.modules.identity import Invitation, Membership, Tenant, User
+from api.modules.identity import Invitation, Membership, Tenant, User, lock_ownership_of
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateProfile,
@@ -261,6 +261,12 @@ async def _tell_applicants_the_organisation_is_gone(db: AsyncSession, tenant: Te
 
 async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
     """Erase the account and everything only it holds. Returns what went."""
+    # Before the preview, which is where "is this the only other owner?" is
+    # counted: the answer has to hold until our own commit, or an owner erasing
+    # themselves while a colleague leaves empties the organisation (Sprint 44).
+    await lock_ownership_of(
+        db, [t.id for _, t in await _memberships(db, user.id) if t.tenant_type != "personal"]
+    )
     preview = await deletion_preview(db, user)
     if preview.blocked_by:
         names = ", ".join(o.name for o in preview.blocked_by)

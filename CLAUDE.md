@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(50 ADRs). Read it before making any structural decision — the summary below
+(51 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -102,6 +102,18 @@ api/                     FastAPI modular monolith
                          and 403 (staff, but this tier lacks the permission).
                          `scripts/grant_staff.py --tier` is still the only writer of either
                          column.
+                         (Sprint 44, BL-9.1, ADR-051) **Changing who owns an organisation is
+                         serialised per organisation.** `invitations._lock_ownership` takes
+                         `FOR NO KEY UPDATE` on the tenant row before the last-owner count, in
+                         `set_role`, `remove_member`/`leave`, `transfer_ownership` and (via the
+                         exported `lock_ownership_of`, ascending id order) account erasure;
+                         `_require_owner_now` then re-reads the caller's membership and 403s an
+                         owner who was demoted meanwhile. Before it, two owners acting at once could
+                         leave an organisation with none. **Any new writer of `Membership.role` must
+                         take the lock first.** `POST /org/{slug}/transfer-ownership` hands an
+                         organisation to an existing member and steps the caller down (`admin`) or
+                         out (`leave`) in one commit, emails the new owner, and records one
+                         `ownership_transferred` event.
     marketplace/         Jobs, courses and their skill links (ADR-001). publishing.py is
                          the employer's write path and course_publishing.py the provider's;
                          they are siblings, not one generalisation (ADR-026).
@@ -712,6 +724,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > organisation is emailed when its Verified badge actually changes (BL-9.2, migration 0044). **Alias
 > coverage is unchanged: 43 distinct roles of 3,417.** §11 of `projectContextForMe.md` carries what is
 > next and a standing assessment of the three pillars — jobs, sellable courses, gig work.
+> **Sprint 44 is done** (ADR-051): *handing an organisation over as one act* (BL-9.1). It exposed a race older
+> than the feature — the last-owner guard was a check followed by a write, so two owners acting together could
+> leave an organisation with no owner (reproduced, owner count 0). Every ownership change now takes a lock on
+> the tenant row and re-checks the caller's authority after it, erasure included, and each guard has a test that
+> fails without it. Migration 0045.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

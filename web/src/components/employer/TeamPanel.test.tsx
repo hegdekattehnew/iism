@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TeamPanel } from "@/components/employer/TeamPanel";
-import { renderUi, resetWorld } from "@/test/harness";
+import { renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
 vi.mock("@/lib/org", async () => (await import("@/test/harness")).orgMock);
@@ -204,5 +204,99 @@ describe("TeamPanel — inviting", () => {
 
     expect(await screen.findByText("Accepted")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Revoke" })).toBeNull();
+  });
+});
+
+describe("TeamPanel — handing the organisation over", () => {
+  const admin = member({ user_id: "u3", role: "admin", full_name: "Anita Rao", is_you: false });
+  const otherOwner = member({ user_id: "u4", role: "owner", full_name: "Dev Patel", is_you: false });
+
+  const open = async () => {
+    renderUi(panel());
+    fireEvent.click(await screen.findAllByRole("button", { name: "Hand over ownership…" }).then((b) => b[0]));
+  };
+
+  it("offers it to an owner, on everybody who is not already one", async () => {
+    world_([member(), colleague, admin, otherOwner]);
+    renderUi(panel());
+    await screen.findByText("Rahul Verma");
+    // Rahul and Anita; not yourself, and not Dev, who already is an owner.
+    expect(screen.getAllByRole("button", { name: "Hand over ownership…" })).toHaveLength(2);
+  });
+
+  it("offers nothing to an admin, who cannot do it", async () => {
+    world_([member({ role: "admin" }), colleague]);
+    renderUi(panel());
+    await screen.findByText("Rahul Verma");
+    expect(screen.queryByRole("button", { name: "Hand over ownership…" })).toBeNull();
+  });
+
+  it("stays as an admin unless told otherwise, and says who becomes the owner", async () => {
+    await open();
+    expect(screen.getByRole("radio", { name: "Stay on as an admin" })).toHaveProperty(
+      "checked",
+      true,
+    );
+    expect(screen.getByRole("radio", { name: "Leave the organisation" })).toHaveProperty(
+      "checked",
+      false,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Hand over to Rahul Verma" }));
+
+    await waitFor(() =>
+      expect(POST).toHaveBeenCalledWith("/org/{org_slug}/transfer-ownership", {
+        params: { path: { org_slug: "apollo-care" } },
+        body: { user_id: "u2", then: "admin" },
+      }),
+    );
+    expect(await screen.findByText("Rahul Verma is now an owner.")).toBeTruthy();
+    expect(world.push).not.toHaveBeenCalled();
+  });
+
+  it("leaves the organisation, and the screen with it, when asked to", async () => {
+    await open();
+    fireEvent.click(screen.getByRole("radio", { name: "Leave the organisation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hand over to Rahul Verma" }));
+
+    await waitFor(() =>
+      expect(POST).toHaveBeenCalledWith(
+        "/org/{org_slug}/transfer-ownership",
+        expect.objectContaining({ body: { user_id: "u2", then: "leave" } }),
+      ),
+    );
+    await waitFor(() => expect(world.push).toHaveBeenCalledWith("/"));
+  });
+
+  it("sends nothing when cancelled", async () => {
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("button", { name: "Hand over to Rahul Verma" })).toBeNull();
+    expect(POST).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's own sentence rather than saying something went wrong", async () => {
+    POST.mockResolvedValue({
+      data: undefined,
+      error: { detail: "You are no longer an owner of this organisation" },
+      response: { status: 403 },
+    });
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Hand over to Rahul Verma" }));
+
+    expect(
+      await screen.findByText("You are no longer an owner of this organisation"),
+    ).toBeTruthy();
+    expect(world.push).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the generic line for a failure that carried nothing", async () => {
+    POST.mockResolvedValue({
+      data: undefined,
+      error: { oops: true },
+      response: { status: 500 },
+    });
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Hand over to Rahul Verma" }));
+    expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
   });
 });

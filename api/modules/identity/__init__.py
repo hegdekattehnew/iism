@@ -1,6 +1,7 @@
 """Public interface of the identity module (ADR-009, ADR-010, ADR-032)."""
 
 from api.modules.identity.dependencies import get_current_candidate
+from api.modules.identity.invitations import lock_ownership_of
 from api.modules.identity.member_routes import public_router as invitation_router
 from api.modules.identity.member_routes import router as team_router
 from api.modules.identity.models import (
@@ -23,6 +24,7 @@ __all__ = [
     "INVITABLE_ROLES",
     "Invitation",
     "invitation_router",
+    "lock_ownership_of",
     "MEMBERSHIP_ROLES",
     "TENANT_TYPES",
     "Membership",
