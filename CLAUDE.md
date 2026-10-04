@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(53 ADRs). Read it before making any structural decision — the summary below
+(54 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -166,7 +166,13 @@ api/                     FastAPI modular monolith
                          `unresolved_aliases()`: it **fails** an alias that resolves to a
                          disability-track pack or shadows a role's exact title, and reports
                          ambiguous prefixes. **Role search reads the `role_aliases` table, not
-                         the dict**: edit `role_aliases.py`, then re-project (`make seed`).
+                         the dict.** (Sprint 47, ADR-054) **The table is the source of truth and
+                         the dict only seeds**: `alias_admin.py` lets an admin-tier operator add and
+                         retire aliases on `/admin` (the checks are `alias_problems`, not a copy),
+                         `sync_seed_aliases` never touches a `source='operator'` row -- retired ones
+                         included -- and every change is a `role_alias_events` row. A seed that still
+                         names a retired key cannot bring it back. `make check-role-aliases` checks
+                         the table.
     geography/           State, District, SubDistrict, plus the service that resolves a
                          written place name on write. Its own module: jobs and
                          profiles reference it and neither is a skill.
@@ -760,6 +766,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > jsdom 30 are adopted and TypeScript 7 / ESLint 10 are held with their reasons. And a double-tap on "Create
 > vacancy", "Create course" or "Create organisation" was a 500 (two requests choosing one slug), now a second
 > vacancy with the next suffix, or the duplicate refusal for one person's second organisation.
+> **Sprint 47 is done** (ADR-054): an operator can edit role aliases on `/admin`, so fixing role-search coverage no
+> longer needs an engineer. The table is now the source of truth and the dict only seeds; the seed that used to
+> delete and rewrite every row now leaves an operator's rows alone, retired ones included. Admin tier only, each
+> change audited, the checks the same as `make check-role-aliases`. Migration 0046. **Capability, not coverage:
+> 43 of 3,417 roles until a reviewer uses it.**
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

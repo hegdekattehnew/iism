@@ -4,13 +4,13 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–46 built.** Sprints 41–45 are merged into `main` (PRs #17–#20,
-`03dd835`); **Sprint 46 is on `sprint-46`, cut from that, uncommitted.** Sprint 46 is *dependency triage, and the
-last race the Sprint 45 audit had not reached* (ADR-053). Five dependabot PRs were open and unmergeable because
-**our own config grouped every major with everything else**; the newest could not even `npm ci`. The safe subset,
-vitest 5 and jsdom 30 are adopted, and **TypeScript 7 and ESLint 10 are held with their reasons**. And a double-tap on
-"Create vacancy", "Create course" or "Create organisation" was a **500** (two requests choosing one slug). **Alias
-coverage is unchanged and still thin: 43 distinct roles of 3,417.** Monetisation and real external integrations stay
+**Last updated:** 2026-10-04 · **Sprints 1–47 built.** Sprints 41–46 are merged into `main` (PRs #17–#21,
+`cb0928c`); **Sprint 47 is on `sprint-47`, cut from that, uncommitted.** Sprint 47 is *let a reviewer fix role-search
+coverage without an engineer* (BL-12.15, ADR-054). The curated alias batch needs somebody who knows the labour market,
+and none had been written because that person could not work: aliases lived in a Python dict that the seed projected
+into the table by **deleting every row and rewriting it**. The table is now the source of truth, an admin-tier operator
+adds and retires aliases on `/admin`, and the seed never touches an operator's rows. **This raises capability, not
+coverage: 43 distinct roles of 3,417 until a reviewer uses it.** Monetisation and real external integrations stay
 deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
@@ -27,11 +27,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-46` (Sprint 46, **uncommitted**), cut from `main` at `03dd835`, which has Sprints 41–45 (PRs #17–#20). Every merged branch is deleted, locally and on `origin`. **Five dependabot branches are still open on the remote** — after Sprint 46 merges, the two npm ones are superseded and can be closed; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
-| **Last sprint** | 46 — dependency triage (the config that made every major poison the weekly PR, the safe subset, vitest 5, held majors) and the slug-uniqueness races (ADR-053, no migration). Before it: 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Branch** | `sprint-47` (Sprint 47, **uncommitted**), cut from `main` at `cb0928c`, which has Sprints 41–46 (PRs #17–#21). Every merged branch is deleted, locally and on `origin`. **Five dependabot branches are still open on the remote**: the two npm ones are superseded by Sprint 46 and can be closed; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Last sprint** | 47 — an operator screen for role aliases, the table as source of truth, an audit trail (ADR-054, migration 0046). Before it: 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a minimum cell size too, because a small district's counts identify people) (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,060 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0045` (Sprints 45 and 46 added none); 53 ADRs |
+| **Tests** | 1,095 backend (`make check`, 2026-10-04), 385 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0046`; 54 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -966,12 +966,13 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-46`, uncommitted**, cut from `main` at `03dd835` (the PR #20 merge, which carries Sprints
-41–45). Commit only when the owner asks. Sprint 46's changes: `.github/dependabot.yml`, `web/package.json`,
-`web/package-lock.json`, `web/vitest.config.mts`, `api/core/slugs.py` (new), `identity/service.py` and
-`marketplace/{publishing,course_publishing}.py` (the three slug callers), `tests/concurrency.py` (+`skill_slug`),
-`tests/test_slug_races.py` (new), ADR-053, `CLAUDE.md`, the backlog document. **No migration.** The generated client
-is unchanged.
+**Working on `sprint-47`, uncommitted**, cut from `main` at `cb0928c` (the PR #21 merge, which carries Sprints
+41–46). Commit only when the owner asks. Sprint 47's changes: `skills/{hierarchy,alias_admin (new),service,
+role_aliases,__init__}.py`, `operations/{routes,schemas}.py`, `core/authorization.py` (`OPS_ALIAS_EDIT`),
+`scripts/{seed_skills,check_role_aliases}.py`, `migrations/versions/0046_*`, `web/src/components/ops/RoleAliasEditor.tsx`
+(+test), `web/src/lib/ops.ts`, `web/src/app/[locale]/admin/page.tsx`, the messages, `web/src/lib/api-schema.d.ts`,
+`constraints.test.ts`, new tests (`test_role_alias_admin.py`, `test_role_alias_race.py`), ADR-054, `CLAUDE.md`, the
+backlog document. **No worker restart is needed** (nothing the worker runs changed).
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -2064,6 +2065,49 @@ that cannot work are **held with their reasons recorded** rather than left open 
   Everything created was erased and the database confirmed empty.
 - **Left for later:** BL-13.6 (revisit the held majors); the district skill-gap view (needs a ranking, and is a demo until
   there are more than 42 candidates); BL-12.15; the curated alias batch; BL-5.3; BL-12.11; BL-1.3.
+
+### Sprint 47 — an operator screen for role aliases (done 2026-10-04, uncommitted)
+
+Owner decisions, as recommended: the table is the source of truth with the dict only seeding what is missing; **admin tier
+only**; and the screen without the optional worklist.
+
+- **The problem was structural, not a missing form.** `scripts/seed_skills.py` ran `DELETE FROM role_aliases` and rewrote
+  it from the dict on every run, so only an engineer could add an alias, every batch needed a commit and a deploy, and
+  anything added another way vanished at the next seed. That is why the curated batch — which needs somebody who knows what a
+  ward attendant is called in Kanpur — had never started.
+- **The model (ADR-054, migration 0046).** `role_aliases` gains `source` (`seed`|`operator`), `retired_at`, `created_at`.
+  The seed (`sync_seed_aliases`) inserts what is missing, updates `seed` rows and removes seed rows the dict dropped, and
+  **never touches an `operator` row, retired ones included**. An operator *retires* rather than deletes, handing the row to
+  themselves, so a dict that still names the key cannot revive it. `role_alias_events` is the append-only audit record; it
+  **names** the alias (key and target copied) instead of referencing it, because the seed may delete the row an event
+  describes. Role search gained one filter, `retired_at IS NULL`.
+- **Validity is the checker's rules from the same function** (`alias_problems`), not a copy: a target that names nothing, a
+  disability-track target and a key that is a role's exact title are refusals (422; a taken term is 409); an ambiguous
+  prefix is a warning. The target is stored as the corpus spells it. **`make check-role-aliases` now checks the table**,
+  which is what an operator's edits live in.
+- **API** under `/ops/role-aliases` (list, `check` as a dry run, add, `{id}/retire`, `history`), behind a new admin-only
+  `OPS_ALIAS_EDIT`. **The screen** is a panel on `/admin`: the target is *picked from role search, never typed*, the dry run
+  runs as they type so a bad alias is heard before the button is pressed, and the server's own sentence is shown on a
+  refusal. A support-tier operator gets 403 and a sentence, not a broken panel.
+- **Tested as a property, because the seed is the dangerous part.** An operator's row survives a re-seed whether or not
+  the dict names it, a retired one is not revived, and replacing the sync with the old delete-and-rewrite fails five tests.
+  Eight mutations of the service each fail a test; a ninth case — two operators adding one term at once — is a 201 and a 409
+  on committed rows and the test fails without the `IntegrityError` handling (the Sprint 45 harness).
+- **One of my test expectations was wrong, not the code:** a one-character term is refused by the *schema* first (FastAPI's
+  own 422 body), so the service's own message is tested directly.
+- **Verified.** `make check` 1,095 passed (1,060 + 35); web 385 (371 + 14) with `tsc`, `eslint`, build and the 684 KB
+  budget clean; `make evaluate` holds; `alembic check` clean and 0046 round-trips; the real dev table synced as a no-op
+  (114 rows, all seed). **Live** against the running API as the seeded operator, 16 of 16: the dry-run refusals, add, search
+  finding the role *through the alias* at once, a duplicate 409, retire, search no longer finding it, history newest-first, a
+  re-seed leaving the retired operator row alone. I deleted my own throwaway alias and its two audit rows from the dev
+  database afterwards (an operator cannot, by design) and confirmed 114 aliases, none operator-owned, no events. **Browser**
+  at 375px: no overflow, and by luck it showed the refusal — "ayah" is already a starter alias, so the live check said so and
+  kept Add disabled.
+- **Not built:** editing a target in place (retire, then add — deliberately, so the history says what happened); the
+  preferred-role-title worklist (typed searches are not logged, ADR-023, and 42 candidates would show nothing); a read-only
+  view for the support tier.
+- **Left for later:** the alias batch itself — **coverage is unchanged at 43 of 3,417 until somebody uses the screen**;
+  BL-13.6 (revisit TypeScript 7 and ESLint 10); the district skill-gap view; BL-5.3; BL-12.11; BL-1.3.
 
 ### Also outstanding, in rough order
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import OperatorContext, Permission, require_operator
 from api.core.database import get_db_session
+from api.modules import skills
 from api.modules.operations import schemas, service
 
 router = APIRouter(prefix="/ops", tags=["operations"])
@@ -18,6 +19,7 @@ CanReadOrgs = Depends(require_operator(Permission.OPS_ORG_READ))
 CanVerifyOrgs = Depends(require_operator(Permission.OPS_ORG_VERIFY))
 CanReadProgrammes = Depends(require_operator(Permission.OPS_PROGRAMME_READ))
 CanVerifyCandidates = Depends(require_operator(Permission.OPS_CANDIDATE_VERIFY))
+CanEditAliases = Depends(require_operator(Permission.OPS_ALIAS_EDIT))
 
 
 @router.get("/organisations", response_model=list[schemas.UnverifiedOrganisation])
@@ -228,3 +230,91 @@ def _detail(tenant, history) -> schemas.OrganisationVerificationOut:  # type: ig
             for event, name in history
         ],
     )
+
+
+# ------------------------------------------------------------ role aliases (Sprint 47)
+#
+# The rules and the writes are `skills.alias_admin`'s; these routes carry the permission and
+# nothing else. Declared before nothing and after everything: none of these paths collides with
+# a `/ops/organisations` or `/ops/programmes` route.
+
+
+def _check_out(check: skills.AliasCheck) -> schemas.RoleAliasCheckOut:
+    return schemas.RoleAliasCheckOut(
+        ok=check.ok,
+        surface_form=check.surface_form,
+        target=schemas.AliasTargetOut(**vars(check.target)) if check.target else None,
+        problems=check.problems,
+        warnings=check.warnings,
+        existing=check.existing,
+    )
+
+
+@router.get("/role-aliases", response_model=schemas.RoleAliasListOut)
+async def list_role_aliases(
+    q: str | None = Query(None, max_length=80),
+    limit: int = Query(100, ge=1, le=300),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEditAliases,
+) -> schemas.RoleAliasListOut:
+    """Live aliases, alphabetical, filtered by the term or its target."""
+    rows, total = await skills.list_aliases(db, query=q, limit=limit)
+    return schemas.RoleAliasListOut(
+        items=[schemas.RoleAliasOut.model_validate(r) for r in rows], total=total
+    )
+
+
+@router.post("/role-aliases/check", response_model=schemas.RoleAliasCheckOut)
+async def check_role_alias(
+    payload: schemas.RoleAliasIn,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEditAliases,
+) -> schemas.RoleAliasCheckOut:
+    """Dry run: the same checks `POST /role-aliases` applies, and nothing written."""
+    return _check_out(await skills.check_alias(db, payload.surface_form, payload.job_role))
+
+
+@router.post(
+    "/role-aliases", response_model=schemas.RoleAliasOut, status_code=status.HTTP_201_CREATED
+)
+async def add_role_alias(
+    payload: schemas.RoleAliasIn,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEditAliases,
+) -> schemas.RoleAliasOut:
+    """Add an alias, or revive a retired one. 422 if it would be wrong, 409 if the term is taken."""
+    alias = await skills.add_alias(
+        db,
+        surface_form=payload.surface_form,
+        job_role=payload.job_role,
+        note=payload.note,
+        actor_user_id=context.user.id,
+    )
+    return schemas.RoleAliasOut.model_validate(alias)
+
+
+@router.post("/role-aliases/{alias_id}/retire", response_model=schemas.RoleAliasOut)
+async def retire_role_alias(
+    alias_id: uuid.UUID,
+    payload: schemas.RoleAliasRetireIn,
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEditAliases,
+) -> schemas.RoleAliasOut:
+    """Withdraw an alias. Kept, not deleted, so a seed that still names it cannot bring it back."""
+    alias = await skills.retire_alias(
+        db, alias_id, note=payload.note, actor_user_id=context.user.id
+    )
+    return schemas.RoleAliasOut.model_validate(alias)
+
+
+@router.get("/role-aliases/history", response_model=list[schemas.RoleAliasEventOut])
+async def role_alias_history(
+    limit: int = Query(30, ge=1, le=200),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEditAliases,
+) -> list[schemas.RoleAliasEventOut]:
+    """The most recent operator decisions about aliases, newest first."""
+    return [
+        schemas.RoleAliasEventOut.model_validate(e)
+        for e in await skills.recent_events(db, limit=limit)
+    ]

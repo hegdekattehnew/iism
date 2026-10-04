@@ -2059,6 +2059,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/role-aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Role Aliases
+         * @description Live aliases, alphabetical, filtered by the term or its target.
+         */
+        get: operations["list_role_aliases_ops_role_aliases_get"];
+        put?: never;
+        /**
+         * Add Role Alias
+         * @description Add an alias, or revive a retired one. 422 if it would be wrong, 409 if the term is taken.
+         */
+        post: operations["add_role_alias_ops_role_aliases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/role-aliases/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Role Alias
+         * @description Dry run: the same checks `POST /role-aliases` applies, and nothing written.
+         */
+        post: operations["check_role_alias_ops_role_aliases_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/role-aliases/{alias_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire Role Alias
+         * @description Withdraw an alias. Kept, not deleted, so a seed that still names it cannot bring it back.
+         */
+        post: operations["retire_role_alias_ops_role_aliases__alias_id__retire_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/role-aliases/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Role Alias History
+         * @description The most recent operator decisions about aliases, newest first.
+         */
+        get: operations["role_alias_history_ops_role_aliases_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates/{job_slug}/{reference}/training": {
         parameters: {
             query?: never;
@@ -2357,6 +2441,24 @@ export interface components {
              * @enum {string}
              */
             script: "latin" | "devanagari" | "transliteration";
+        };
+        /**
+         * AliasTargetOut
+         * @description The role an alias would find: the pack that stands for it, as role search names it.
+         */
+        AliasTargetOut: {
+            /** Job Role */
+            job_role: string;
+            /** Slug */
+            slug: string;
+            /** Qp Code */
+            qp_code: string;
+            /** Nsqf Level */
+            nsqf_level?: number | null;
+            /** Standards Count */
+            standards_count: number;
+            /** Sector Name */
+            sector_name?: string | null;
         };
         /**
          * ApplicantOut
@@ -4529,6 +4631,93 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * RoleAliasCheckOut
+         * @description What adding this alias would do, with nothing written.
+         */
+        RoleAliasCheckOut: {
+            /** Ok */
+            ok: boolean;
+            /** Surface Form */
+            surface_form: string;
+            target?: components["schemas"]["AliasTargetOut"] | null;
+            /** Problems */
+            problems?: string[];
+            /** Warnings */
+            warnings?: string[];
+            /** Existing */
+            existing?: ("active" | "retired") | null;
+        };
+        /** RoleAliasEventOut */
+        RoleAliasEventOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "added" | "retired";
+            /** Surface Form */
+            surface_form: string;
+            /** Job Role */
+            job_role: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * RoleAliasIn
+         * @description A term somebody might type, and the role it should find.
+         *
+         *     The limits mirror `skills.alias_admin` (`MIN_KEY_LENGTH`, `MAX_KEY_LENGTH`,
+         *     `MAX_NOTE_LENGTH`) and `web/src/lib/constraints.test.ts` holds the form to them. The
+         *     target is the role's name as the corpus spells it; the screen offers it from role
+         *     search so it is picked, not typed.
+         */
+        RoleAliasIn: {
+            /** Surface Form */
+            surface_form: string;
+            /** Job Role */
+            job_role: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** RoleAliasListOut */
+        RoleAliasListOut: {
+            /** Items */
+            items: components["schemas"]["RoleAliasOut"][];
+            /** Total */
+            total: number;
+        };
+        /** RoleAliasOut */
+        RoleAliasOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Surface Form */
+            surface_form: string;
+            /** Job Role */
+            job_role: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "seed" | "operator";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** RoleAliasRetireIn */
+        RoleAliasRetireIn: {
+            /** Note */
+            note?: string | null;
         };
         /**
          * RoleHit
@@ -8758,6 +8947,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgrammeDistrictsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_role_aliases_ops_role_aliases_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAliasListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_role_alias_ops_role_aliases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAliasIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAliasOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_role_alias_ops_role_aliases_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAliasIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAliasCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retire_role_alias_ops_role_aliases__alias_id__retire_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alias_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAliasRetireIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAliasOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    role_alias_history_ops_role_aliases_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAliasEventOut"][];
                 };
             };
             /** @description Validation Error */

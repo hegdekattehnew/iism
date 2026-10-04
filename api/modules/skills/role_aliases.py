@@ -11,11 +11,14 @@ Same move as `DISTRICT_ALIASES` in the geography service ("Bengaluru" is what an
 employer writes; the corpus says BENGALURU URBAN) and `scripts/legacy_skill_map.py`:
 one auditable file, rather than vocabulary scattered through SQL.
 
-This dict is the *authored* source of truth, reviewable in a diff; at runtime
-`_ROLE_SEARCH_SQL` (`api/modules/skills/service.py`) queries the `role_aliases`
-table instead, which `scripts/seed_skills.py` replaces wholesale from this dict
-on every run -- the same relationship `SKILLS` in that script has to
-`skill_aliases`.
+**This dict only seeds** (Sprint 47, ADR-054). At runtime `_ROLE_SEARCH_SQL`
+(`api/modules/skills/service.py`) queries the `role_aliases` table, which is the source
+of truth: `scripts/seed_skills.py` inserts what is missing, keeps its own
+(`source='seed'`) rows current and never touches a row an operator owns. An operator adds
+and retires aliases on `/admin` (`skills/alias_admin.py`), with the checks below applied
+by the screen as well as by `make check-role-aliases`. The dict is still the right home for
+the starter list, reviewable in a diff; it is no longer the only way in, and a key removed
+from it is removed from the table only if no operator has taken ownership of that row.
 
 Rules for editing it:
 

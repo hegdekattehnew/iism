@@ -51,6 +51,16 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/ops/RoleAliasEditor.tsx",
+    label: "RoleAliasIn",
+    expect: {
+      // Literals, not the `ALIAS_*` constants: the constants feed the hint text, and
+      // this pins the numbers themselves against `RoleAliasIn` on the server.
+      surface_form: ["minLength={2}", "maxLength={80}"],
+      note: ["maxLength={300}"],
+    },
+  },
+  {
     file: "components/employer/CourseEditor.tsx",
     label: "CourseIn",
     expect: {

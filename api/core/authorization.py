@@ -88,6 +88,9 @@ class Permission(StrEnum):
     # Sprint 35, BL-3.2: the same evidence pattern ADR-042 gives an
     # organisation's badge, for a candidate's own certification claim.
     OPS_CANDIDATE_VERIFY = "ops:candidate:verify"
+    # Sprint 47, BL-12.15. Editing role aliases changes every candidate's role search, the same
+    # public blast radius that kept `OPS_ORG_VERIFY` off the support tier.
+    OPS_ALIAS_EDIT = "ops:alias:edit"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -143,6 +146,7 @@ OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.OPS_ORG_VERIFY,
         Permission.OPS_PROGRAMME_READ,
         Permission.OPS_CANDIDATE_VERIFY,
+        Permission.OPS_ALIAS_EDIT,
     }
 )
 
