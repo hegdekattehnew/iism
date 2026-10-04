@@ -33,6 +33,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from api.core.slugs import add_with_unique_slug
 from api.modules.geography import resolve_location
 from api.modules.marketplace.listings import (
     load_with_skills,
@@ -168,19 +169,22 @@ def _require_gig_has_a_place(payload: JobIn, district_id: uuid.UUID | None) -> N
 async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
     location = await resolve_location(db, payload.location_state, payload.location_district)
     _require_gig_has_a_place(payload, location.district_id)
-    job = Job(
-        slug=await unique_slug(db, Job.slug, payload.title, payload.location_district),
-        tenant_id=tenant_id,
-        # Explicit. `Job.status` defaults to "published" at the model level, so
-        # omitting this would put an unfinished listing straight in front of
-        # candidates.
-        status="draft",
-        state_id=location.state_id,
-        district_id=location.district_id,
-        **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
+    job = await add_with_unique_slug(
+        db,
+        Job.slug,
+        lambda: unique_slug(db, Job.slug, payload.title, payload.location_district),
+        lambda slug: Job(
+            slug=slug,
+            tenant_id=tenant_id,
+            # Explicit. `Job.status` defaults to "published" at the model level, so
+            # omitting this would put an unfinished listing straight in front of
+            # candidates.
+            status="draft",
+            state_id=location.state_id,
+            district_id=location.district_id,
+            **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
+        ),
     )
-    db.add(job)
-    await db.flush()
     await _write_skills(db, job, payload.skills)
     await db.commit()
     return await _load(db, job.id)

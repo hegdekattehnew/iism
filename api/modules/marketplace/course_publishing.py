@@ -31,6 +31,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from api.core.slugs import add_with_unique_slug
 from api.modules.marketplace.listings import (
     load_with_skills,
     resolve_standards,
@@ -119,17 +120,20 @@ async def get_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Cours
 
 
 async def create_course(db: AsyncSession, tenant_id: uuid.UUID, payload: CourseIn) -> Course:
-    course = Course(
-        slug=await unique_slug(db, Course.slug, payload.title),
-        tenant_id=tenant_id,
-        # Explicit. `Course.status` defaults to "published" at the model level,
-        # so omitting this would put an unfinished syllabus in front of
-        # candidates. The seed sets `published` on purpose; a form must not.
-        status="draft",
-        **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
+    course = await add_with_unique_slug(
+        db,
+        Course.slug,
+        lambda: unique_slug(db, Course.slug, payload.title),
+        lambda slug: Course(
+            slug=slug,
+            tenant_id=tenant_id,
+            # Explicit. `Course.status` defaults to "published" at the model level,
+            # so omitting this would put an unfinished syllabus in front of
+            # candidates. The seed sets `published` on purpose; a form must not.
+            status="draft",
+            **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
+        ),
     )
-    db.add(course)
-    await db.flush()
     await _write_skills(db, course, payload.skills)
     await db.commit()
     return await _load(db, course.id)

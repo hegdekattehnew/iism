@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(52 ADRs). Read it before making any structural decision — the summary below
+(53 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -377,6 +377,15 @@ split would have to turn into interfaces first; do not add to it casually.
   (committed rows, real requests, hold a row lock until `pg_stat_activity` shows both waiting). A test that passes
   before the fix proves nothing: one double-submit test did, because a new candidate's first two requests race to
   create their *profile* -- a different race that hid the one under test.
+- **A slug chosen from a read is inserted through `add_with_unique_slug`** (`api/core/slugs.py`, Sprint 46). Two requests
+  for the same name each see a slug free and each pick it; the unique index refuses the second, which used to be a 500
+  -- and a double-tap on "Create vacancy" is exactly that. The helper inserts in a savepoint and chooses again, and
+  treats a violation as a collision **only if the slug is now taken**. Organisation creation passes
+  `after_collision=_refuse_duplicate_organisation`, so one person's double tap is the 409 Sprint 26 intended, not
+  `x` and `x-2`. Used by jobs, courses and organisations; a new slugged table uses it too.
+- **A dependency major arrives alone** (ADR-053). `dependabot.yml` groups minor and patch only, and holds TypeScript 7
+  and ESLint 10 with the reason written beside each: `openapi-typescript` refuses TypeScript 7 as a peer, and
+  `eslint-config-next`'s React plugin crashes under ESLint 10. Revisit them (BL-13.6) by removing the `ignore` entry.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -746,6 +755,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > lost update that could overwrite a rejection or leave contact visible after a revocation; and re-applying twice
 > emailed the employer twice. Row locks plus the constraint as arbiter. Alongside it, BL-12.14: an abbreviation now
 > works across a multi-word role search (`mfg technician`, `mfg operator`), scored below everything the person typed.
+> **Sprint 46 is done** (ADR-053): dependency triage and the last race the audit had not reached. Five dependabot PRs
+> were unmergeable because our own config grouped every major with everything else; the safe subset, vitest 5 and
+> jsdom 30 are adopted and TypeScript 7 / ESLint 10 are held with their reasons. And a double-tap on "Create
+> vacancy", "Create course" or "Create organisation" was a 500 (two requests choosing one slug), now a second
+> vacancy with the next suffix, or the duplicate refusal for one person's second organisation.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

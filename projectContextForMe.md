@@ -4,15 +4,14 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–45 built.** Sprints 41–44 are merged into `main` (PRs #17–#19,
-`7ba7547`); **Sprint 45 is on `sprint-45`, cut from that, uncommitted.** Sprint 45 is *the same blind spot as
-Sprint 44, on the paths people use most* (ADR-052). The suite runs every test inside one rolled-back transaction,
-so two requests can never overlap; reading the other check-then-write paths and then **reproducing each suspicion
-with two real requests** found a double-tap on Apply returning a **500**, a candidate's withdrawal and an
-employer's decision overwriting each other (a rejection wiped, or contact left visible after a revocation), and a
-re-apply emailing the employer twice. Fixed with row locks plus the unique constraint as arbiter. Also BL-12.14:
-abbreviations now work across a multi-word role search. **Alias coverage is unchanged and still thin: 43 distinct
-roles of 3,417.** Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-04 · **Sprints 1–46 built.** Sprints 41–45 are merged into `main` (PRs #17–#20,
+`03dd835`); **Sprint 46 is on `sprint-46`, cut from that, uncommitted.** Sprint 46 is *dependency triage, and the
+last race the Sprint 45 audit had not reached* (ADR-053). Five dependabot PRs were open and unmergeable because
+**our own config grouped every major with everything else**; the newest could not even `npm ci`. The safe subset,
+vitest 5 and jsdom 30 are adopted, and **TypeScript 7 and ESLint 10 are held with their reasons**. And a double-tap on
+"Create vacancy", "Create course" or "Create organisation" was a **500** (two requests choosing one slug). **Alias
+coverage is unchanged and still thin: 43 distinct roles of 3,417.** Monetisation and real external integrations stay
+deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -28,11 +27,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-45` (Sprint 45, **uncommitted**), cut from `main` at `7ba7547`, which has Sprints 41–44 (PRs #17–#19). Every merged branch is deleted, locally and on `origin`; five unmerged dependabot branches remain on the remote. |
-| **Last sprint** | 45 — a concurrency audit of the candidate-facing writes (double-submit 500s, withdraw-vs-decision lost updates) and BL-12.14, abbreviations in multi-word role search (ADR-052, no migration). Before it: 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Branch** | `sprint-46` (Sprint 46, **uncommitted**), cut from `main` at `03dd835`, which has Sprints 41–45 (PRs #17–#20). Every merged branch is deleted, locally and on `origin`. **Five dependabot branches are still open on the remote** — after Sprint 46 merges, the two npm ones are superseded and can be closed; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Last sprint** | 46 — dependency triage (the config that made every major poison the weekly PR, the safe subset, vitest 5, held majors) and the slug-uniqueness races (ADR-053, no migration). Before it: 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a minimum cell size too, because a small district's counts identify people) (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,055 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0045` (Sprint 45 added none); 52 ADRs |
+| **Tests** | 1,060 backend (`make check`, 2026-10-04), 371 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0045` (Sprints 45 and 46 added none); 53 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -967,11 +966,12 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-45`, uncommitted**, cut from `main` at `7ba7547` (the PR #19 merge, which carries Sprints
-41–44). Commit only when the owner asks. Sprint 45's changes: `applications/{service,employer_service}.py` and
-`interests/{service,provider_service}.py` (row locks, savepointed inserts), `skills/service.py` (the two synonym
-tiers and `_term_groups`), new tests (`tests/concurrency.py`, `test_concurrency_audit.py`,
-`test_role_search_synonyms.py`), ADR-052, `CLAUDE.md`, the backlog document. **No migration and no web change.**
+**Working on `sprint-46`, uncommitted**, cut from `main` at `03dd835` (the PR #20 merge, which carries Sprints
+41–45). Commit only when the owner asks. Sprint 46's changes: `.github/dependabot.yml`, `web/package.json`,
+`web/package-lock.json`, `web/vitest.config.mts`, `api/core/slugs.py` (new), `identity/service.py` and
+`marketplace/{publishing,course_publishing}.py` (the three slug callers), `tests/concurrency.py` (+`skill_slug`),
+`tests/test_slug_races.py` (new), ADR-053, `CLAUDE.md`, the backlog document. **No migration.** The generated client
+is unchanged.
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -2019,6 +2019,51 @@ decisions, as recommended: the audit plus BL-12.14 (not the district view), and 
   Throwaway candidates erased.
 - **Left for later:** the district skill-gap view (BL-12.7, needs a minimum cell size and a ranking rather than a
   threshold); slug-uniqueness races; BL-12.15; the curated alias batch; BL-5.3; BL-12.11; BL-1.3.
+
+### Sprint 46 — dependency triage, and the last race the audit had not reached (done 2026-10-04, uncommitted)
+
+Owner decisions, as recommended: dependency triage plus the slug races (not the district view), and the two majors
+that cannot work are **held with their reasons recorded** rather than left open as red PRs.
+
+- **The cause was our config, not the packages.** `dependabot.yml` grouped every npm update (`patterns: ["*"]`), so one
+  major that cannot work turned the whole weekly PR red — and two such PRs (13 and 2 days old) sat open while the safe
+  bumps inside them waited. Probed in a throwaway worktree, merged with current `main`, through every gate: **as sent,
+  `npm ci` fails** (`openapi-typescript` declares a TypeScript `^5.x` peer and the bump moves to 7); with TypeScript
+  held, install is fine but `tsc` fails (vitest 5's `esbuild.jsx` option is gone), **lint crashes** (ESLint 10 throws
+  inside `eslint-config-next`'s React plugin) and the build fails on the same `tsc` error; with **every major held, all
+  gates pass**.
+- **What was adopted:** the safe subset (react and react-dom 19.3.0, TanStack Query 5.104, next-intl 4.14.9,
+  tailwind-merge 3.7, axe-core 4.13, testing-library, `@types/react` 19.3), **vitest 5 and jsdom 30** (371 tests pass,
+  `tsc`, lint, build and the 684 KB budget clean, `/profile` still 678), and `@types/node` 20 → 24 to match CI's
+  Node 24. **A first draft of the vitest config kept an explicit `oxc.jsx` setting with a comment claiming it would fail
+  loudly if a default changed; removing it showed all 371 tests pass without it, so the claim was false and the setting
+  was deleted** — the config now says why it has no JSX option.
+- **What is held, and why (`dependabot.yml`, BL-13.6):** TypeScript 7 until `openapi-typescript` accepts it; ESLint 10 until
+  `eslint-config-next`'s React plugin runs under it. Grouping is now minor and patch only, so a major arrives alone.
+- **Not applied, and why:** the three GitHub Actions bumps cannot be exercised locally; each is its own PR, merged one at
+  a time and judged by its CI run. **I cannot read PR status from here** (no `gh`), so that check is the owner's.
+- **Observed, not acted on:** a full `npm audit` reports a high `braces` advisory reached only through
+  `eslint-config-next` (lint toolchain, not shipped); CI audits `--omit=dev` and that reports 0. Newer npm also prints
+  `allow-scripts` warnings for `fsevents` and `unrs-resolver`; nothing fails.
+- **The slug races.** `unique_slug` and `_unique_tenant_slug` read the slugs taken, pick the first free one and insert
+  later. Four tests reproduced it on the unfixed code as unhandled `UniqueViolationError`s on `ix_jobs_slug`,
+  `ix_courses_slug` and `ix_tenants_slug` — **500s**, and the likeliest of the check-then-write races for one person to
+  hit, because an employer double-tapping "Create vacancy" posts the same title and district milliseconds apart.
+- **The fix is `api/core/slugs.py`'s `add_with_unique_slug`**: insert in a savepoint and choose again, so a second vacancy
+  with the same title takes the next suffix (`x`, `x-2`…). It lives in `core/` because identity cannot import marketplace.
+  A violation counts as a collision **only if the slug is now taken** — any other `IntegrityError` is raised as it was
+  rather than retried five times into a misleading "try again". **Organisation creation passes
+  `after_collision=_refuse_duplicate_organisation`**, so one person's double-tap is the 409 Sprint 26 intended rather than
+  `x` and `x-2`; two *different* people with the same name both succeed with different slugs. This also means
+  `_refuse_duplicate_organisation` — itself a check-then-write — is now covered where it mattered.
+- **Verified.** `make check` 1,060 passed (1,055 + 5); `make evaluate` holds; the generated client is unchanged. Four
+  mutations of the helper each fail a test — one escaped at first (the "only if the slug is taken" guard, which no test
+  provoked) and a fifth test was written for it. **Live** against the running API with the demo employer and a
+  throwaway candidate: four simultaneous "create vacancy" requests gave four 201s with four different slugs; three
+  simultaneous "create organisation" requests by one person gave one 201 and two 409s with exactly one organisation.
+  Everything created was erased and the database confirmed empty.
+- **Left for later:** BL-13.6 (revisit the held majors); the district skill-gap view (needs a ranking, and is a demo until
+  there are more than 42 candidates); BL-12.15; the curated alias batch; BL-5.3; BL-12.11; BL-1.3.
 
 ### Also outstanding, in rough order
 
