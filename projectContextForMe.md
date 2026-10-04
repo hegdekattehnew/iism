@@ -4,14 +4,13 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–47 built.** Sprints 41–46 are merged into `main` (PRs #17–#21,
-`cb0928c`); **Sprint 47 is on `sprint-47`, cut from that, uncommitted.** Sprint 47 is *let a reviewer fix role-search
-coverage without an engineer* (BL-12.15, ADR-054). The curated alias batch needs somebody who knows the labour market,
-and none had been written because that person could not work: aliases lived in a Python dict that the seed projected
-into the table by **deleting every row and rewriting it**. The table is now the source of truth, an admin-tier operator
-adds and retires aliases on `/admin`, and the seed never touches an operator's rows. **This raises capability, not
-coverage: 43 distinct roles of 3,417 until a reviewer uses it.** Monetisation and real external integrations stay
-deferred by the owner.
+**Last updated:** 2026-10-04 · **Sprints 1–48 built.** Sprints 41–47 are merged into `main` (PRs #17–#24,
+`242ac19`); **Sprint 48 is on `sprint-48`, cut from that, uncommitted.** Sprint 48 is *what erasure deletes, the export
+shows* (ADR-055). A scan of every foreign key into a person found erasure sound — all `CASCADE` or `SET NULL` — and the
+**export lagging it**: job alerts, ratings, sponsorship offers and the notices addressed to a person were erased correctly and
+never shown to them. The export carries them now, and a **guard that walks the schema** fails on the next table that is
+not. **Alias coverage is unchanged and still thin: 43 distinct roles of 3,417**, and the screen to fix it exists since Sprint
+47. Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -27,11 +26,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-47` (Sprint 47, **uncommitted**), cut from `main` at `cb0928c`, which has Sprints 41–46 (PRs #17–#21). Every merged branch is deleted, locally and on `origin`. **Five dependabot branches are still open on the remote**: the two npm ones are superseded by Sprint 46 and can be closed; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
-| **Last sprint** | 47 — an operator screen for role aliases, the table as source of truth, an audit trail (ADR-054, migration 0046). Before it: 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Branch** | `sprint-48` (Sprint 48, **uncommitted**), cut from `main` at `242ac19`, which has Sprints 41–47 (PRs #17–#24). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Last sprint** | 48 — the export shows what erasure deletes, plus a schema-walking guard (ADR-055, no migration). Before it: 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a minimum cell size too, because a small district's counts identify people) (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,095 backend (`make check`, 2026-10-04), 385 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0046`; 54 ADRs |
+| **Tests** | 1,106 backend (`make check`, 2026-10-04), 385 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0046` (Sprint 48 added none); 55 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -966,13 +965,10 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-47`, uncommitted**, cut from `main` at `cb0928c` (the PR #21 merge, which carries Sprints
-41–46). Commit only when the owner asks. Sprint 47's changes: `skills/{hierarchy,alias_admin (new),service,
-role_aliases,__init__}.py`, `operations/{routes,schemas}.py`, `core/authorization.py` (`OPS_ALIAS_EDIT`),
-`scripts/{seed_skills,check_role_aliases}.py`, `migrations/versions/0046_*`, `web/src/components/ops/RoleAliasEditor.tsx`
-(+test), `web/src/lib/ops.ts`, `web/src/app/[locale]/admin/page.tsx`, the messages, `web/src/lib/api-schema.d.ts`,
-`constraints.test.ts`, new tests (`test_role_alias_admin.py`, `test_role_alias_race.py`), ADR-054, `CLAUDE.md`, the
-backlog document. **No worker restart is needed** (nothing the worker runs changed).
+**Working on `sprint-48`, uncommitted**, cut from `main` at `242ac19` (the PR #24 merge, which carries Sprints
+41–47). Commit only when the owner asks. Sprint 48's changes: `privacy/service.py` (four export helpers and five new keys),
+`.github/dependabot.yml` (the `@types/node` ignore), the `exportBody` string in en/hi/ms, `tests/test_privacy_coverage.py`
+(new), ADR-055, `CLAUDE.md`, the backlog document. **No migration, no new endpoint** (the generated client is unchanged).
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -2108,6 +2104,45 @@ only**; and the screen without the optional worklist.
   view for the support tier.
 - **Left for later:** the alias batch itself — **coverage is unchanged at 43 of 3,417 until somebody uses the screen**;
   BL-13.6 (revisit TypeScript 7 and ESLint 10); the district skill-gap view; BL-5.3; BL-12.11; BL-1.3.
+
+### Sprint 48 — what erasure deletes, the export shows (done 2026-10-04, uncommitted)
+
+Owner decisions, as recommended: **a review whose author erases their account stays, author blanked**; notices **are** in the
+export; and the privacy work plus the maintenance item (not the district view).
+
+- **The scan.** Every foreign key into `users`, `candidate_profiles` and `tenants` is `CASCADE` or `SET NULL`: erasure cannot be
+  blocked by a stray constraint and leaves no row behind. The gap was the other half — read against `export_account`, four things
+  held about a person were erased and **never shown**: **job alerts** (Sprint 27), **ratings** (37), **sponsorship offers** (41)
+  and the **notices** addressed to them. "We delete it but cannot show it" is the awkward half to be missing.
+- **The export** now carries `job_alerts`, `sponsorship_offers`, `ratings_received`, `ratings_given` and `notices` (small helpers
+  beside `export_account`; an empty account exports empty lists). **Nobody else is named**: a received rating shows the rating, the
+  comment, the vacancy and the organisation that gave it, never `author_user_id`; an offer shows the organisation, vacancy and
+  standard, never who made it; a rating the person *gave* describes the other party only by role ("a worker", "the
+  organisation"), so an employer's export does not hand them a worker's name; a rating about an organisation is the
+  organisation's, and goes only to its author. The `exportBody` line the Account page shows was updated in en/hi/ms.
+- **The guard** (`tests/test_privacy_coverage.py`, ADR-055) walks the SQLAlchemy metadata for every table with a foreign key into a
+  person, plus `notifications` **by name** (it has no foreign key — the row names a recipient and holds no address — so no schema
+  walk finds it). Each must be in `EXPORTED` (mapped to a real key of the document) or `EXEMPT` with a written reason; the three
+  exemptions are operators' audit trails. It asserts it **found** tables first, fails on a stale entry, and a second test feeds it
+  a table that does not exist. **Honest limit: it sees foreign keys only**, so the next `notifications`-shaped table must be
+  added to `NON_FK_PERSONAL` by whoever writes it.
+- **The two halves are held to each other**: a test exports a candidate with one of everything, erases the account, and asserts every
+  record the export showed is gone.
+- **Mutation-checked, and every one fails its own test**: dropping each of the five keys, leaking an author id, naming who made an
+  offer, widening received ratings to the organisation's, emptying ratings given, and un-listing a table from the guard. One
+  mutation's pattern did not match after ruff reformatted the line and was re-run by hand.
+- **Maintenance.** `@types/node` majors are ignored in `dependabot.yml` with the reason (it follows CI's Node 24, ADR-053), so the
+  24→26 PR stops reopening. **The Python lock PR was probed in a throwaway worktree** merged with `main`: three bumps (fastapi
+  0.141.1→0.142.2, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9), lint and format clean, `mypy` clean, **1,095 backend tests pass** —
+  safe to merge. **My first probe installed without `--extra dev`** (the flag CI uses), so ruff and pytest were missing and every
+  step failed with "No such file"; I read the log rather than the exit codes, found it, and re-ran correctly.
+- **Verified.** `make check` 1,106 passed (1,095 + 11); web 385 with `tsc` and lint clean; `make evaluate` holds. **Live** against
+  the running API with a throwaway candidate and organisation, 14 of 14: all five keys present, no employer id, address, author or
+  `offered_by` anywhere in the text, the employer's own export showing the rating they wrote "about a worker" and not the
+  candidate's phone or id, erasure leaving no record the export had shown. Everything erased and the database confirmed empty.
+- **Not done:** a retention limit on sent notifications (they accumulate while the account lives, hold vacancy and organisation
+  names and no address, and are erased with it); the district skill-gap view.
+- **Left for later:** the alias batch itself; BL-13.6; BL-12.7; BL-5.3; BL-12.11; BL-1.3.
 
 ### Also outstanding, in rough order
 

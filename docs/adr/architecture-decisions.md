@@ -2636,3 +2636,57 @@ commit and a deploy, and an alias added any other way vanished at the next seed.
   candidates' preferred-role titles (counts only, hidden below three) was considered and left out; with 42 candidates it
   would show nothing.
 
+
+## ADR-055: What Erasure Deletes, the Export Shows, and a Guard Keeps Them in Step
+
+**Status:** Accepted (October 2026). Refines the DPDP export and erasure of Sprint 20 (ADR-023 adjacent). No migration and no
+external integration.
+
+**Context:** Export and erasure are the two halves of the rights of access and of erasure, and only one half had been kept in
+step with the schema. A scan of every foreign key into `users`, `candidate_profiles` and `tenants` found the erasure side
+sound: **all of them are `CASCADE` or `SET NULL`**, so no stray constraint can block an erasure or leave a row behind. The export
+side was not. Four things held about a person were erased correctly and **never shown to them**: job alerts (Sprint 27), ratings
+(Sprint 37), sponsorship offers (Sprint 41) and the notices addressed to them. "We delete it but cannot show it" is the awkward
+half to be missing, and nothing would have caught the next table being the same.
+
+**Decision:**
+
+- **The export now carries all four** (`job_alerts`, `sponsorship_offers`, `ratings_received`, `ratings_given`, `notices`), built
+  by small helpers beside `export_account`. An empty account exports empty lists, not missing keys.
+- **Nobody else is named.** A received rating shows the rating, the comment, the vacancy and the **organisation** that gave it
+  (who they dealt with, so naming it tells them nothing new) and never `author_user_id`. A sponsorship offer names the
+  organisation, the vacancy and the standard, never the person who made it. A rating given by the person describes the other
+  party **only by role** ("a worker", "the organisation"), so exporting an employer's account does not hand them a worker's name.
+  A rating about an organisation is that organisation's reputation, not its member's, and goes only to the person who wrote it.
+- **A review whose author later erases their account stays, with the author blanked** (the existing `SET NULL`). Deleting it would
+  change another person's earned reputation, and the review is about *them*. This is stated here and was an owner decision.
+- **A structural guard** (`tests/test_privacy_coverage.py`) walks the SQLAlchemy metadata for every table with a foreign key into
+  a person, plus `notifications` by name (the row names a recipient and holds no address, so no schema walk finds it). Each must be
+  in `EXPORTED`, mapped to a real key of the document, or in `EXEMPT` with a written reason. It asserts it **found** tables before
+  asserting anything about them, fails on a stale entry, and a second test feeds it a table that does not exist, as the
+  route-delegation guard does. The three exemptions are operators' audit trails, not data held about a data subject.
+- **The two halves are held to each other**: a test exports a candidate who has one of everything, then erases the account and
+  asserts every record the export showed is gone.
+
+**Options considered:** 1. Add the four fields and nothing else
+2. Add them and a written checklist for the next table
+3. **Add them and a guard that fails on the next one** (chosen)
+4. Generate the export from the schema automatically
+
+**Trade-offs:**
+
+- Option 1: ✅ Smallest ❌ The next table repeats the gap. The Sprint 27, 37 and 41 tables are the proof.
+- Option 2: ✅ Cheap ❌ A checklist is what was already there, in the form of this project's own conventions, and was not followed.
+- Option 3: ✅ A forgotten table fails a build, with the instruction for fixing it in the message ❌ A new table needs one line in
+  one of two lists, which is the intended friction.
+- Option 4: ✅ Never out of date ❌ A generic dump cannot decide what to withhold. Whom a rating is "by" is a privacy decision per
+  table, and an automatic export would make it silently.
+
+**Consequences:**
+
+- **Any new table that references a person fails `test_every_such_table_is_exported_or_excused` until it is handled.**
+- The guard sees foreign keys. A person's data stored **without** one, as `notifications` is, must be added to `NON_FK_PERSONAL`
+  by whoever writes it; the guard cannot find what the schema does not link.
+- Not done: a retention limit on sent notifications, which accumulate for as long as the account lives. They hold vacancy and
+  organisation names, no address, and are erased with the account.
+
