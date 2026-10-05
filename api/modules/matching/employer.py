@@ -18,6 +18,7 @@ worst possible outcome.
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,9 +31,9 @@ from api.modules.marketplace.models import (
     JobSkill,
     open_job,
 )
+from api.modules.matching.retrieval import best_candidates_for, retrieval_limit
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
 from api.modules.matching.service import (
-    RETRIEVAL_LIMIT,
     attained_level,
     requirements_for,
     weights_from_settings,
@@ -74,42 +75,50 @@ class ScarceSkill:
     held_by: int
 
 
+# Profile ids per `IN (...)`: asyncpg refuses a statement with more than 32,767 bind
+# parameters, and a pool is a few hundred per vacancy times however many vacancies.
+_IN_CHUNK = 5_000
+
+
+def _chunks(items: list[uuid.UUID]) -> list[list[uuid.UUID]]:
+    return [items[i : i + _IN_CHUNK] for i in range(0, len(items), _IN_CHUNK)]
+
+
 async def _pool_held(
     db: AsyncSession, profile_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, list[HeldSkill]]:
-    """Held skills for many candidates in one query.
+    """Held skills for many candidates in one query per chunk of five thousand.
 
     Per-candidate loading is the obvious shape and the wrong one: it turns a
     twenty-row ranking into twenty round trips, and the cost lands on the page
     an employer looks at first.
     """
-    if not profile_ids:
-        return {}
-    rows = (
-        await db.execute(
-            select(
-                CandidateSkill.profile_id,
-                CandidateSkill.skill_id,
-                Skill.concept_id,
-                Skill.name,
-                CandidateSkill.proficiency,
-                CandidateSkill.source,
-            )
-            .join(Skill, Skill.id == CandidateSkill.skill_id)
-            .where(CandidateSkill.profile_id.in_(profile_ids))
-        )
-    ).all()
     out: dict[uuid.UUID, list[HeldSkill]] = {}
-    for r in rows:
-        out.setdefault(r.profile_id, []).append(
-            HeldSkill(
-                skill_id=r.skill_id,
-                concept_id=r.concept_id,
-                name=r.name,
-                proficiency=r.proficiency,
-                source=r.source,
+    for chunk in _chunks(profile_ids):
+        rows = (
+            await db.execute(
+                select(
+                    CandidateSkill.profile_id,
+                    CandidateSkill.skill_id,
+                    Skill.concept_id,
+                    Skill.name,
+                    CandidateSkill.proficiency,
+                    CandidateSkill.source,
+                )
+                .join(Skill, Skill.id == CandidateSkill.skill_id)
+                .where(CandidateSkill.profile_id.in_(chunk))
             )
-        )
+        ).all()
+        for r in rows:
+            out.setdefault(r.profile_id, []).append(
+                HeldSkill(
+                    skill_id=r.skill_id,
+                    concept_id=r.concept_id,
+                    name=r.name,
+                    proficiency=r.proficiency,
+                    source=r.source,
+                )
+            )
     return out
 
 
@@ -120,62 +129,38 @@ async def _candidates_for_jobs(
 
     This ran once per job, so the overview an employer opens first grew by
     thirteen statements with every vacancy they posted -- 18 for one, 57 for
-    four (Sprint 20). Now: requirements for all jobs, one retrieval over the
-    union of their standards, then held skills and profiles for the union of
-    candidates. The pools are partitioned in memory and the scorer is unchanged.
+    four (Sprint 20). Now: requirements for all jobs, one window query that picks
+    each vacancy's best candidates (Sprint 49), then held skills and profiles for
+    the union of those. The scorer is unchanged.
     `tests/test_matching.py` counts the statements for one vacancy and for four.
     """
     if not jobs:
         return {}
     requirements = await requirements_for(db, [job.id for job in jobs])
-    concept_keys = {r.concept_id for reqs in requirements.values() for r in reqs if r.concept_id}
-    skill_keys = {r.skill_id for reqs in requirements.values() for r in reqs}
-    if not skill_keys:
+    if not any(requirements.values()):
         return {job.id: [] for job in jobs}
 
-    # Retrieval, mirrored: only candidates sharing at least one required
-    # standard. Someone with nothing in common scores zero, and a page of zeroes
-    # is not a shortlist.
-    rows = (
-        await db.execute(
-            select(CandidateSkill.profile_id, Skill.id, Skill.concept_id)
-            .join(Skill, Skill.id == CandidateSkill.skill_id)
-            .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
-            .distinct()
-        )
-    ).all()
-    by_concept: dict[uuid.UUID, set[uuid.UUID]] = {}
-    by_skill: dict[uuid.UUID, set[uuid.UUID]] = {}
-    for profile_id, skill_id, concept_id in rows:
-        by_skill.setdefault(skill_id, set()).add(profile_id)
-        if concept_id:
-            by_concept.setdefault(concept_id, set()).add(profile_id)
-
-    pools: dict[uuid.UUID, list[uuid.UUID]] = {}
-    for job in jobs:
-        members: set[uuid.UUID] = set()
-        for r in requirements.get(job.id, []):
-            members |= by_skill.get(r.skill_id, set())
-            if r.concept_id:
-                members |= by_concept.get(r.concept_id, set())
-        # Sorted before the cap, so which candidates survive it is a fact about
-        # the data rather than about the order Postgres happened to return rows.
-        pools[job.id] = sorted(members, key=str)[:RETRIEVAL_LIMIT]
+    # Retrieval, mirrored (`retrieval.py`): for each vacancy the K candidates with the
+    # highest bound on the score, among those sharing at least one required
+    # standard -- someone with nothing in common scores zero, and a page of zeroes is
+    # not a shortlist. Chosen by the database with a window per vacancy; the Python
+    # this replaces loaded every pair that touched any vacancy and cut the survivors
+    # by UUID order, so at 50,000 candidates 2.2 of a shortlist's true top 20 were
+    # returned and a popular standard took 16 seconds (Sprint 49).
+    weights = weights_from_settings()
+    pools = await best_candidates_for(
+        db, [job.id for job in jobs], limit=retrieval_limit(), weights=weights
+    )
 
     everyone = list({pid for pool in pools.values() for pid in pool})
     held_by_profile = await _pool_held(db, everyone)
-    profiles = (
-        {
-            p.id: p
-            for p in (
-                await db.scalars(select(CandidateProfile).where(CandidateProfile.id.in_(everyone)))
-            ).all()
-        }
-        if everyone
-        else {}
-    )
+    profiles: dict[uuid.UUID, CandidateProfile] = {}
+    for chunk in _chunks(everyone):
+        for p in (
+            await db.scalars(select(CandidateProfile).where(CandidateProfile.id.in_(chunk)))
+        ).all():
+            profiles[p.id] = p
 
-    weights = weights_from_settings()
     out: dict[uuid.UUID, list[ScoredCandidate]] = {}
     for job in jobs:
         reqs = requirements.get(job.id, [])
@@ -428,20 +413,37 @@ async def _scarce_skills(
     if not required:
         return []
 
+    # Held counts are only the *second* sort key, after how many vacancies ask for
+    # the standard, so they only matter for standards tied with the last one that
+    # can make the list. Counting holders for every standard in demand scanned the
+    # whole of `candidate_skills` (~460 ms at 890,000 rows) to rank eight; counting
+    # them for the contenders touches the rows those standards actually have.
+    by_demand = sorted(required, key=lambda r: -r.required_by)
+    cutoff = by_demand[min(limit, len(by_demand)) - 1].required_by
+    contenders = [r for r in required if r.required_by >= cutoff]
+
     # Held counts, compared at concept level for the same reason the scorer
     # does: a candidate and an employer who picked different rows for one
     # standard are talking about the same skill.
-    held_rows = (
-        await db.execute(
-            select(
-                Skill.id,
-                Skill.concept_id,
-                func.count(func.distinct(CandidateSkill.profile_id)).label("held_by"),
+    concept_ids = list({r.concept_id for r in contenders if r.concept_id})
+    skill_ids = [r.id for r in contenders]
+    held_rows: list[Any] = []
+    for i in range(0, max(len(concept_ids), len(skill_ids)), _IN_CHUNK):
+        held_rows += (
+            await db.execute(
+                select(
+                    Skill.id,
+                    Skill.concept_id,
+                    func.count(func.distinct(CandidateSkill.profile_id)).label("held_by"),
+                )
+                .join(CandidateSkill, CandidateSkill.skill_id == Skill.id)
+                .where(
+                    Skill.concept_id.in_(concept_ids[i : i + _IN_CHUNK])
+                    | Skill.id.in_(skill_ids[i : i + _IN_CHUNK])
+                )
+                .group_by(Skill.id, Skill.concept_id)
             )
-            .join(CandidateSkill, CandidateSkill.skill_id == Skill.id)
-            .group_by(Skill.id, Skill.concept_id)
-        )
-    ).all()
+        ).all()
     by_concept: dict[uuid.UUID, int] = {}
     by_skill: dict[uuid.UUID, int] = {}
     for r in held_rows:
@@ -456,7 +458,7 @@ async def _scarce_skills(
             required_by=r.required_by,
             held_by=(by_concept.get(r.concept_id, 0) if r.concept_id else by_skill.get(r.id, 0)),
         )
-        for r in required
+        for r in contenders
     ]
     # Most demanded and least supplied first.
     scarce.sort(key=lambda s: (-s.required_by, s.held_by, s.name))

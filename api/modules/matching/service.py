@@ -28,6 +28,7 @@ from api.modules.marketplace.models import (
     JobSkill,
     open_job,
 )
+from api.modules.matching.retrieval import best_jobs_for, retrieval_limit
 from api.modules.matching.scoring import (
     HeldSkill,
     MatchResult,
@@ -39,10 +40,6 @@ from api.modules.matching.scoring import (
 from api.modules.skills import standards_for_role
 from api.modules.skills.hierarchy import QpEntryRoute, QpSkill, QualificationPack
 from api.modules.skills.models import Skill
-
-# How many jobs survive retrieval to be scored. Generous relative to the current
-# catalogue and cheap to raise; it exists so the shape is right, not to ration.
-RETRIEVAL_LIMIT = 500
 
 
 def weights_from_settings() -> ScoreWeights:
@@ -244,35 +241,21 @@ async def match_jobs(
         # skills, which is what the interface shows.
         return []
 
-    concept_keys = [h.concept_id for h in held if h.concept_id]
-    skill_keys = [h.skill_id for h in held]
+    weights = weights_from_settings()
 
-    # Retrieval: only jobs sharing at least one required standard with the
-    # candidate. A job with nothing in common cannot score above zero, so
-    # scoring it would be work spent to produce a row nobody sees.
-    retrieval = (
-        select(Job.id)
-        .join(JobSkill, JobSkill.job_id == Job.id)
-        .join(Skill, Skill.id == JobSkill.skill_id)
-        .where(open_job())
-        .where(Skill.concept_id.in_(concept_keys) | Skill.id.in_(skill_keys))
-    )
-    if state_id is not None:
-        retrieval = retrieval.where(Job.state_id == state_id)
-    # Ordered before the cap so which jobs survive it is at least reproducible.
-    # Still arbitrary with respect to fit: the real fix is ranking retrieval by
-    # shared-standard count, which is out of scope until the catalogue is large
-    # enough for the cap to bite. Without the ORDER BY, which 500 survived was
-    # Postgres's choice, and could change between two identical requests.
-    job_ids = list(
-        (await db.scalars(retrieval.distinct().order_by(Job.id).limit(RETRIEVAL_LIMIT))).all()
+    # Retrieval: the K open vacancies with the highest *bound* on the score, among
+    # those sharing at least one required standard (`retrieval.py`). It used to cut
+    # by `Job.id`, which kept an arbitrary 500 -- measured at 5,000 vacancies, 2.8
+    # of a candidate's true top 20 survived it. The bound ranks rows for loading
+    # and nothing else: the scoring below is the one scorer.
+    job_ids = await best_jobs_for(
+        db, held, state_id=state_id, limit=retrieval_limit(), weights=weights
     )
     if not job_ids:
         return []
 
     requirements = await requirements_for(db, job_ids)
     jobs = {j.id: j for j in (await db.scalars(select(Job).where(Job.id.in_(job_ids)))).all()}
-    weights = weights_from_settings()
 
     scored = [
         ScoredJob(

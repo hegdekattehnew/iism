@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # RFC 7518 §3.2: an HMAC key for SHA-256 must be at least as long as the hash.
@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     # Analytics events carry no name, phone or email, but they are tied to an
     # account, and data kept "just in case" is data held without a purpose.
     analytics_retention_days: int = 365
+    # Notifications are the one place the product keeps what it has *said* to a person
+    # (Sprint 49). Delivered email and read in-app notices go after this many days;
+    # an in-app notice nobody has opened is kept twice as long, because it may be an
+    # offer they have not seen. At least a week: nothing that reads the table looks
+    # back further than a day, and a shorter floor would only be a way to lose a notice
+    # before a person could.
+    notification_retention_days: int = Field(default=90, ge=7)
 
     # --- abuse protection ---
     # Per minute. Signed-in requests are limited per *user*, anonymous ones per
@@ -127,6 +134,12 @@ class Settings(BaseSettings):
     # re-tune this story explicitly defers -- `make evaluate` must stay
     # bit-identical while this is 0.
     match_weight_semantic: float = 0.0
+    # Sprint 49 (ADR-056). How many vacancies (for a candidate) or candidates (for one
+    # vacancy) survive retrieval to be scored. They are the K *best* by a bound on the
+    # score, not an arbitrary K, so raising it buys recall at the price of scoring
+    # more rows; the benchmark (`make benchmark`) is how to choose. At least 20,
+    # the page size, or a page could not be filled.
+    match_retrieval_limit: int = Field(default=500, ge=20)
 
     # --- embeddings (ADR-013, ADR-031) ---
     # `"hashing"` (the placeholder, `HashingEmbeddingProvider`) is the default

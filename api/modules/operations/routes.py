@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.authorization import OperatorContext, Permission, require_operator
 from api.core.database import get_db_session
 from api.modules import skills
-from api.modules.operations import schemas, service
+from api.modules.operations import schemas, service, skill_gap
 
 router = APIRouter(prefix="/ops", tags=["operations"])
 
@@ -208,6 +208,60 @@ async def programme_districts(
         programme=name,
         districts=[
             schemas.DistrictBreakdownOut(district=r.district, enrolled=r.enrolled) for r in rows
+        ],
+    )
+
+
+@router.get("/districts", response_model=schemas.DistrictOptionsOut)
+async def districts_with_demand(
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadProgrammes,
+) -> schemas.DistrictOptionsOut:
+    """Districts with an open vacancy, for the skill-gap picker (Sprint 49, BL-12.7)."""
+    rows = await skill_gap.districts_with_demand(db)
+    return schemas.DistrictOptionsOut(
+        districts=[
+            schemas.DistrictOptionOut(
+                id=r.district_id, name=r.district, state=r.state, vacancies=r.vacancies
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.get("/districts/{district_id}/skill-gap", response_model=schemas.DistrictSkillGapOut)
+async def district_skill_gap(
+    district_id: uuid.UUID,
+    limit: int = Query(15, ge=1, le=50),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanReadProgrammes,
+) -> schemas.DistrictSkillGapOut:
+    """Where one district's open vacancies ask for standards its residents do not hold,
+    ranked by shortfall (Sprint 49, BL-12.7). Counts of one to four residents are not
+    shown -- see `operations.skill_gap`."""
+    gap = await skill_gap.district_skill_gap(db, district_id, limit=limit)
+    if gap is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+    return schemas.DistrictSkillGapOut(
+        district=schemas.DistrictOptionOut(
+            id=gap.district_id, name=gap.district, state=gap.state, vacancies=gap.vacancies
+        ),
+        positions=gap.positions,
+        residents=gap.residents,
+        residents_below_minimum=gap.residents_below_minimum,
+        minimum_cell=skill_gap.MIN_CELL_SIZE,
+        standards=[
+            schemas.DistrictGapRowOut(
+                nos_code=r.nos_code,
+                name=r.name,
+                vacancies=r.vacancies,
+                demand=r.demand,
+                supply=r.supply,
+                supply_below_minimum=r.supply_below_minimum,
+                shortfall=r.shortfall,
+                shortfall_is_minimum=r.shortfall_is_minimum,
+            )
+            for r in gap.standards
         ],
     )
 

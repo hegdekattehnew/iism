@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(55 ADRs). Read it before making any structural decision — the summary below
+(59 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -202,6 +202,16 @@ api/                     FastAPI modular monolith
                          importance a flat 3, every compulsory standard mandatory, the
                          experience floor the lowest entry route rounded up -- and
                          `entry_routes_for_job` now shares `_entry_fit` with it.
+                         (Sprint 49, ADR-056) **Retrieval ranks before it caps.** `retrieval.py` keeps the K
+                         (`MATCH_RETRIEVAL_LIMIT`, default 500) rows with the highest **upper bound** on the
+                         score -- coverage and the mandatory count from the database, level, experience and
+                         evidence taken as full marks, the cap applied as `score_match` applies it -- instead
+                         of the first K by `Job.id` / UUID order. At 50,000 candidates and 5,000 vacancies that
+                         took the share of a true top 20 that was returned from **2.9 and 1.2 of 20 to 20 of
+                         20**. The bound **ranks rows for loading and is never returned, stored or shown**; every
+                         number a person sees is still `score_match`'s. `tests/test_retrieval.py` holds it never
+                         below the score *and* tight, and `make seed-scale` / `make benchmark` are how to check a
+                         change to either side.
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
@@ -253,6 +263,9 @@ api/                     FastAPI modular monolith
     notifications/       The outbox (ADR-006): queued inside the request, sent by the
                          worker. The row names a recipient and never holds an
                          address -- that is resolved at send time.
+                         (Sprint 49, ADR-058) A worker cron purges delivered email and read notices after
+                         `NOTIFICATION_RETENTION_DAYS` (90), an unopened notice after twice that, and **never a
+                         `pending` row**.
     alerts/              Telling a candidate about a vacancy they did not go
                          looking for, and closing one whose date has passed.
                          Both run in the **worker**, never in a request. Uses
@@ -296,6 +309,10 @@ api/                     FastAPI modular monolith
                          email to the organisation, **only when the badge actually flips**, in the
                          decision's own transaction; the payload is the name and a link, never the
                          operator's note or an address.
+                         (Sprint 49, BL-12.7, ADR-057) `skill_gap.py` is the district skill-gap view
+                         (`/ops/districts`, `.../skill-gap`; `OPS_PROGRAMME_READ`): every standard an open vacancy
+                         in the district requires, ranked by shortfall, **a supply of one to four residents never
+                         shown** (`MIN_CELL_SIZE = 5`) and the shortfall beside it a minimum.
     assessment/          (Sprint 35, BL-3.1) The one webhook an assessment provider
                          calls. No model of its own: ADR-023 names "assessment results"
                          among the data an encryption path must exist for before it is
@@ -398,6 +415,20 @@ split would have to turn into interfaces first; do not add to it casually.
   deleted and never shown. The guard walks the schema and fails on the next one, naming what to do. It finds
   foreign keys only, so a person's data stored *without* one (as `notifications` is) must be added to
   `NON_FK_PERSONAL`. The export names nobody else: a rating's author is the organisation, never the person.
+- **A cap ranks before it cuts** (ADR-056). Retrieval used to keep an arbitrary K and let the scorer order them, so the page
+  looked right while the best matches were never in front of it -- 2.9 and 1.2 of a true top 20 at 50,000 candidates, found only
+  because Sprint 49 built a database big enough to ask. Anything that bounds a set before a ranking takes the best of it by a
+  figure that cannot undercut the ranking's own. `make seed-scale && make benchmark` measure recall against exhaustive truth on
+  a separate `iism_scale` database; both scripts refuse any database whose name does not end in `_scale`. **A bound that passes
+  "never below the score" can still be wrong**: an over-count satisfies it, which is why the test also asserts it is tight.
+- **An `IN (...)` list is bounded or chunked.** asyncpg refuses a statement with more than 32,767 bind parameters; the employer
+  path crashed on a 47,109-candidate pool. Load by chunks of 5,000, or keep the set in the database.
+- **A count of people in a place is suppressed below five** (ADR-057, `operations.skill_gap.suppress`), and anything computed
+  beside a hidden count (a shortfall against a public demand) is computed from the hidden maximum and flagged a minimum, and
+  ranked on what is shown. `/ops/programmes/{name}/districts` has not adopted this yet.
+- **Every route's audience is a line in a list** (ADR-059, `tests/test_authorization_matrix.py`): an anonymous caller gets 401 from
+  every route not in `PUBLIC_ROUTES`, a stranger to an organisation cannot tell a real slug from none, and the back office is
+  checked against the permission *read off the route*. It guards the doors, not whose row a permitted caller reaches.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -780,6 +811,16 @@ split would have to turn into interfaces first; do not add to it casually.
 > **Sprint 48 is done** (ADR-055): the DPDP export now shows what erasure deletes -- job alerts, ratings,
 > sponsorship offers and the notices addressed to a person, none of which had ever been exported -- and a guard
 > that walks the schema fails on the next table that is not. Erasure was already sound. No migration.
+>
+> **Sprint 49 is done** (ADR-056 to ADR-059): *matching you can trust at volume*. A scale harness (`make seed-scale`,
+> `make benchmark`, a separate `iism_scale` database) showed that retrieval cut by an arbitrary key before ranking:
+> at 50,000 candidates and 5,000 vacancies only **2.9 of a candidate's true top 20 vacancies, and 1.2 of an employer's
+> true top 20 candidates, were ever returned** -- the page looked right because the scorer ordered what it was given.
+> Retrieval now keeps the K best by an upper bound on the score (20 of 20 on both sides at K = 500), the employer path
+> is one window query that no longer crashes past 32,767 bind parameters, and scarce skills cost a fifth of what they did.
+> Alongside: the district skill-gap view (BL-12.7) with small counts suppressed, a retention limit on notifications,
+> and an authorization matrix that reads every route's audience from the route table. **At the default K the employer
+> shortlist misses its 300 ms target (p95 569 ms); K = 150 meets it with the same recall -- the owner's call.** No migration.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

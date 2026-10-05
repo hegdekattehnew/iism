@@ -2059,6 +2059,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/districts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Districts With Demand
+         * @description Districts with an open vacancy, for the skill-gap picker (Sprint 49, BL-12.7).
+         */
+        get: operations["districts_with_demand_ops_districts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/districts/{district_id}/skill-gap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * District Skill Gap
+         * @description Where one district's open vacancies ask for standards its residents do not hold,
+         *     ranked by shortfall (Sprint 49, BL-12.7). Counts of one to four residents are not
+         *     shown -- see `operations.skill_gap`.
+         */
+        get: operations["district_skill_gap_ops_districts__district_id__skill_gap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ops/role-aliases": {
         parameters: {
             query?: never;
@@ -3197,6 +3239,54 @@ export interface components {
             /** Enrolled */
             enrolled: number;
         };
+        /**
+         * DistrictGapRowOut
+         * @description One standard employers in the district ask for.
+         *
+         *     `supply` is `null` when one to four residents hold it: a small count of people in a
+         *     place nearly describes them, so it is not shown (`operations.skill_gap`). The
+         *     shortfall is then computed against the largest hidden value and is a minimum.
+         */
+        DistrictGapRowOut: {
+            /** Nos Code */
+            nos_code?: string | null;
+            /** Name */
+            name: string;
+            /** Vacancies */
+            vacancies: number;
+            /** Demand */
+            demand: number;
+            /** Supply */
+            supply?: number | null;
+            /** Supply Below Minimum */
+            supply_below_minimum: boolean;
+            /** Shortfall */
+            shortfall: number;
+            /** Shortfall Is Minimum */
+            shortfall_is_minimum: boolean;
+        };
+        /**
+         * DistrictOptionOut
+         * @description A district with at least one open vacancy, for the picker.
+         */
+        DistrictOptionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** State */
+            state?: string | null;
+            /** Vacancies */
+            vacancies: number;
+        };
+        /** DistrictOptionsOut */
+        DistrictOptionsOut: {
+            /** Districts */
+            districts?: components["schemas"]["DistrictOptionOut"][];
+        };
         /** DistrictOut */
         DistrictOut: {
             /**
@@ -3210,6 +3300,20 @@ export interface components {
             name?: string | null;
             /** State Id */
             state_id?: string | null;
+        };
+        /** DistrictSkillGapOut */
+        DistrictSkillGapOut: {
+            district: components["schemas"]["DistrictOptionOut"];
+            /** Positions */
+            positions: number;
+            /** Residents */
+            residents?: number | null;
+            /** Residents Below Minimum */
+            residents_below_minimum: boolean;
+            /** Minimum Cell */
+            minimum_cell: number;
+            /** Standards */
+            standards?: components["schemas"]["DistrictGapRowOut"][];
         };
         /** EducationOut */
         EducationOut: {
@@ -8947,6 +9051,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgrammeDistrictsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    districts_with_demand_ops_districts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistrictOptionsOut"];
+                };
+            };
+        };
+    };
+    district_skill_gap_ops_districts__district_id__skill_gap_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                district_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistrictSkillGapOut"];
                 };
             };
             /** @description Validation Error */

@@ -156,6 +156,49 @@ class ProgrammeDistrictsOut(BaseModel):
     districts: list[DistrictBreakdownOut] = Field(default_factory=list)
 
 
+# ------------------------------------------------------------ district skill gap (Sprint 49)
+
+
+class DistrictOptionOut(BaseModel):
+    """A district with at least one open vacancy, for the picker."""
+
+    id: uuid.UUID
+    name: str
+    state: str | None = None
+    vacancies: int
+
+
+class DistrictOptionsOut(BaseModel):
+    districts: list[DistrictOptionOut] = Field(default_factory=list)
+
+
+class DistrictGapRowOut(BaseModel):
+    """One standard employers in the district ask for.
+
+    `supply` is `null` when one to four residents hold it: a small count of people in a
+    place nearly describes them, so it is not shown (`operations.skill_gap`). The
+    shortfall is then computed against the largest hidden value and is a minimum.
+    """
+
+    nos_code: str | None = None
+    name: str
+    vacancies: int
+    demand: int
+    supply: int | None = None
+    supply_below_minimum: bool
+    shortfall: int
+    shortfall_is_minimum: bool
+
+
+class DistrictSkillGapOut(BaseModel):
+    district: DistrictOptionOut
+    positions: int
+    residents: int | None = None
+    residents_below_minimum: bool
+    minimum_cell: int
+    standards: list[DistrictGapRowOut] = Field(default_factory=list)
+
+
 # ------------------------------------------------------------ role aliases (Sprint 47)
 
 
