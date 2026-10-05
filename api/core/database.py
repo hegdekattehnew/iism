@@ -36,6 +36,7 @@ def get_engine() -> AsyncEngine:
             if settings.db_statement_timeout_ms > 0
             else {}
         )
+        server_settings["jit"] = "on" if settings.db_jit else "off"
         _engine = create_async_engine(
             settings.database_url,
             echo=settings.db_echo,

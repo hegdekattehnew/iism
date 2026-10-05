@@ -204,6 +204,8 @@ async def test_the_cost_does_not_grow_with_the_roles(db, n_roles) -> None:
     finally:
         event.remove(connection, "before_cursor_execute", count)
 
-    # Held skills, the profile, its preferred locations, the packs, their
-    # standards and their routes: six reads however many roles are asked about.
-    assert len(seen) <= 6, f"{len(seen)} statements for {n_roles} role(s)"
+    # Held skills, the profile's four columns, its preferred locations, the packs, their
+    # sector, their standards and their routes: seven reads however many roles are asked
+    # about. (Six before Sprint 50: `candidate_facts` took the profile from the session when
+    # it was already there, and fetched it with its seven eager collections when it was not.)
+    assert len(seen) <= 7, f"{len(seen)} statements for {n_roles} role(s)"

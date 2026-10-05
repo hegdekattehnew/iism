@@ -696,8 +696,9 @@ class TestProgrammeByDistrict:
         await db.commit()
 
         rows = await service.programme_by_district(db, "DISTRICT-TEST")
-        by_name = {r.district: r.enrolled for r in rows}
-        assert by_name == {"Breakdown District": 1, "Unknown": 1}
+        # One each: under the minimum, so named and not counted (ADR-057).
+        assert {r.district for r in rows} == {"Breakdown District", "Unknown"}
+        assert all(r.enrolled is None and r.below_minimum for r in rows)
 
     async def test_two_districts_with_one_name_stay_two_rows(self, db: AsyncSession) -> None:
         """Grouping on the name merged Bilaspur in two states into one bar. Two
@@ -718,10 +719,63 @@ class TestProgrammeByDistrict:
         await db.commit()
 
         rows = await service.programme_by_district(db, "TWIN-TEST")
-        assert {r.district: r.enrolled for r in rows} == {
-            "Twin Town (Twin State A)": 2,
-            "Twin Town (Twin State B)": 1,
+        assert {r.district for r in rows} == {
+            "Twin Town (Twin State A)",
+            "Twin Town (Twin State B)",
         }
+
+    async def _district(
+        self, db: AsyncSession, code: int, name: str, programme: str, n: int
+    ) -> District:
+        state = await db.scalar(select(State).where(State.state_code == 9190))
+        if state is None:
+            state = State(state_code=9190, slug="small-count-state", name="Small Count State")
+            db.add(state)
+            await db.flush()
+        district = District(district_code=code, name=name, state_id=state.id)
+        db.add(district)
+        await db.flush()
+        for _ in range(n):
+            candidate = await _enrolled_candidate(db, programme=programme, skill_id=None)
+            candidate.district_id = district.id
+        return district
+
+    async def test_a_count_of_one_to_four_is_not_shown_and_five_is(self, db: AsyncSession) -> None:
+        for code, n in ((9191, 1), (9192, 4), (9193, 5), (9194, 12)):
+            await self._district(db, code, f"District {n}", "SMALL-COUNT", n)
+        await db.commit()
+
+        rows = {r.district: r for r in await service.programme_by_district(db, "SMALL-COUNT")}
+
+        assert (rows["District 1"].enrolled, rows["District 1"].below_minimum) == (None, True)
+        assert (rows["District 4"].enrolled, rows["District 4"].below_minimum) == (None, True)
+        assert (rows["District 5"].enrolled, rows["District 5"].below_minimum) == (5, False)
+        assert (rows["District 12"].enrolled, rows["District 12"].below_minimum) == (12, False)
+
+    async def test_rows_are_ranked_on_what_is_shown(self, db: AsyncSession) -> None:
+        """A district of one and a district of four, named so the larger sorts *first*
+        alphabetically-reversed, must come out in name order: ranked on the true counts, 'Zed'
+        (four) would lead 'Alpha' (one) and the order would say which is smaller."""
+        await self._district(db, 9195, "Alpha", "RANK-COUNT", 1)
+        await self._district(db, 9196, "Zed", "RANK-COUNT", 4)
+        await self._district(db, 9197, "Mid", "RANK-COUNT", 6)
+        await db.commit()
+
+        rows = await service.programme_by_district(db, "RANK-COUNT")
+
+        assert [r.district for r in rows] == ["Mid", "Alpha", "Zed"]
+
+    async def test_the_route_never_sends_a_hidden_count(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        await self._district(db, 9198, "Tiny", "ROUTE-SMALL", 3)
+        await db.commit()
+        headers = await _operator(client, db, tier="support")
+
+        body = (await client.get("/ops/programmes/ROUTE-SMALL/districts", headers=headers)).json()
+
+        assert body["districts"] == [{"district": "Tiny", "enrolled": None, "below_minimum": True}]
+        assert "3" not in str(body["districts"])
 
     async def test_an_unrecognised_programme_reports_no_rows(self, db: AsyncSession) -> None:
         assert await service.programme_by_district(db, "no-such-programme") == []
@@ -745,7 +799,10 @@ class TestProgrammeByDistrict:
         assert allowed.status_code == 200
         body = allowed.json()
         assert body["programme"] == "PMKVY-DISTRICT-ROUTE"
-        assert body["districts"] == [{"district": "Unknown", "enrolled": 1}]
+        assert body["minimum_cell"] == 5
+        assert body["districts"] == [
+            {"district": "Unknown", "enrolled": None, "below_minimum": True}
+        ]
 
 
 class TestPlatformDashboard:

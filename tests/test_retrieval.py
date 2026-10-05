@@ -30,7 +30,7 @@ from api.modules.matching import employer as employer_module
 from api.modules.matching import match_jobs
 from api.modules.matching import service as service_module
 from api.modules.matching.employer import _pool_held, _scarce_skills, candidates_for_job
-from api.modules.matching.retrieval import bounded_candidates, bounded_jobs
+from api.modules.matching.retrieval import bounded_candidates, bounded_jobs, bounded_pairs
 from api.modules.matching.scoring import ScoreWeights, score_match
 from api.modules.matching.service import (
     _held_skills,
@@ -532,3 +532,70 @@ class TestScarceSkillsStillRankExactly:
         assert [s.name for s in three] == ["A", "C", "G"]
         assert [s.name for s in everything] == ["A", "C", "G", "D", "F", "B", "E"]
         assert {s.name: s.held_by for s in everything} == supply
+
+
+class TestTheBatchedPairs:
+    """`bounded_pairs` (Sprint 50): the same pairs by two routes, one of which builds far fewer."""
+
+    @pytest.mark.parametrize("seed", [49, 7, 21, 3])
+    @pytest.mark.parametrize("name", WEIGHTINGS)
+    async def test_the_anchored_route_finds_exactly_the_pairs_the_full_route_does(
+        self, db: AsyncSession, seed: int, name: str
+    ) -> None:
+        weights = WEIGHTINGS[name]
+        _jobs, profiles = await _random_world(db, seed=seed)
+        ids = [p.id for p in profiles]
+        min_bound = 0.595 - 1e-9
+        assert min_bound > weights.mandatory_gap_cap, "the anchored route would not be taken"
+
+        def rows(prune: bool):  # type: ignore[no-untyped-def]
+            return bounded_pairs(ids, weights, min_bound=min_bound, prune=prune)
+
+        full = {(r.profile_id, r.job_id): r.bound for r in (await db.execute(rows(False))).all()}
+        anchored = {(r.profile_id, r.job_id): r.bound for r in (await db.execute(rows(True))).all()}
+
+        assert anchored.keys() == full.keys()
+        assert all(anchored[k] == pytest.approx(full[k]) for k in full)
+        assert len(full) > 5, f"seed {seed}: too few eligible pairs to say anything"
+
+    async def test_a_vacancy_with_no_mandatory_standard_is_still_found(
+        self, db: AsyncSession
+    ) -> None:
+        """No anchor exists for it, so it takes the other branch of the union."""
+        a, b = _skill(0), _skill(1)
+        db.add_all([a, b])
+        await db.flush()
+        tenant = await _employer(db)
+        job = await _job(db, tenant, "none-mandatory", [(a, 3, False), (b, 3, False)])
+        person = await _candidate(db, 1, [(a, "certified"), (b, "certified")])
+        weights = ScoreWeights()
+        found = (await db.execute(bounded_pairs([person.id], weights, min_bound=0.595))).all()
+        assert [(r.profile_id, r.job_id) for r in found] == [(person.id, job.id)]
+
+    async def test_a_mandatory_standard_nobody_holds_makes_a_vacancy_unreachable(
+        self, db: AsyncSession
+    ) -> None:
+        a, gate = _skill(0), _skill(1)
+        db.add_all([a, gate])
+        await db.flush()
+        tenant = await _employer(db)
+        await _job(db, tenant, "gated", [(a, 5, False), (gate, 1, True)])
+        person = await _candidate(db, 1, [(a, "certified")])
+        weights = ScoreWeights()
+        assert (await db.execute(bounded_pairs([person.id], weights, min_bound=0.595))).all() == []
+
+    async def test_a_threshold_at_or_below_the_cap_takes_the_full_route(
+        self, db: AsyncSession
+    ) -> None:
+        """Below the cap a pair missing a mandatory standard *can* qualify, so anchoring would
+        drop it. The dispatcher must notice."""
+        a, gate = _skill(0), _skill(1)
+        db.add_all([a, gate])
+        await db.flush()
+        tenant = await _employer(db)
+        job = await _job(db, tenant, "gated", [(a, 5, False), (gate, 1, True)])
+        person = await _candidate(db, 1, [(a, "certified")])
+        weights = ScoreWeights()
+        low = weights.mandatory_gap_cap - 0.05
+        found = (await db.execute(bounded_pairs([person.id], weights, min_bound=low))).all()
+        assert [(r.profile_id, r.job_id) for r in found] == [(person.id, job.id)]

@@ -3237,7 +3237,12 @@ export interface components {
             /** District */
             district: string;
             /** Enrolled */
-            enrolled: number;
+            enrolled?: number | null;
+            /**
+             * Below Minimum
+             * @default false
+             */
+            below_minimum: boolean;
         };
         /**
          * DistrictGapRowOut
@@ -4609,6 +4614,8 @@ export interface components {
         ProgrammeDistrictsOut: {
             /** Programme */
             programme: string;
+            /** Minimum Cell */
+            minimum_cell: number;
             /** Districts */
             districts?: components["schemas"]["DistrictBreakdownOut"][];
         };

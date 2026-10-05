@@ -206,8 +206,12 @@ async def programme_districts(
     rows = await service.programme_by_district(db, name)
     return schemas.ProgrammeDistrictsOut(
         programme=name,
+        minimum_cell=skill_gap.MIN_CELL_SIZE,
         districts=[
-            schemas.DistrictBreakdownOut(district=r.district, enrolled=r.enrolled) for r in rows
+            schemas.DistrictBreakdownOut(
+                district=r.district, enrolled=r.enrolled, below_minimum=r.below_minimum
+            )
+            for r in rows
         ],
     )
 

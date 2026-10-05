@@ -159,6 +159,13 @@ class Settings(BaseSettings):
     # Makefile does exactly that for the importer and the seed, which run
     # legitimately long statements through this same engine.
     db_statement_timeout_ms: int = 15000
+    # Postgres compiles a query to machine code once its estimated cost passes
+    # `jit_above_cost` (100,000), and for the few heavy aggregates this product runs it costs
+    # more than it saves: the batched programme report took 37 s for 10,000 candidates with it
+    # and 18 s without, ~600 ms of it in compilation per chunk (Sprint 50). Every cheap query is
+    # unaffected either way. Off by default, which is the standard advice for an OLTP service; set
+    # true to put the server's own default back.
+    db_jit: bool = False
 
     @property
     def is_development(self) -> bool:

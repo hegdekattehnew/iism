@@ -4,16 +4,14 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-05 · **Sprints 1–49 built.** Sprints 41–48 are merged into `main` (PRs #17–#25,
-`09097d1`); **Sprint 49 is on `sprint-49`, cut from that, uncommitted.** Sprint 49 is *matching you can trust at volume*
-(ADR-056 to ADR-059). A scale harness — a separate `iism_scale` database, 50,042 synthetic candidates and 5,148 open
-vacancies — showed that **retrieval cut by an arbitrary key before ranking**: only **2.9 of a candidate's true top 20
-vacancies, and 1.2 of an employer's true top 20 candidates, were ever returned**; the page looked right because the scorer
-ordered what it was handed. Retrieval now keeps the K best by an upper bound on the score (**20 of 20 on both sides**), the
-employer path no longer loads every pair into Python (or crashes past 32,767 bind parameters), and the district skill-gap view,
-a notification retention limit and an authorization matrix shipped beside it. **At the default K the employer shortlist misses
-its 300 ms target (p95 569 ms); K = 150 meets it at the same recall — the owner's call.** Alias coverage is unchanged and still thin:
-43 distinct roles of 3,417. Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-05 · **Sprints 1–50 built.** Sprints 41–49 are merged into `main` (PRs #17–#26, `9daccce`); **Sprint 50
+is on `sprint-50`, cut from that, uncommitted.** Sprint 50 is *scale the rest* (ADR-060): the same harness that found Sprint 49's
+retrieval flaw, pointed at everything else that loops per row. Three paths were **broken, not slow**: `programme_report` ran
+`match_jobs` once per enrolled candidate (133 ms each, so 22 minutes for 10,000, and a bind-limit failure past 32,767); the embedding
+sweeps stalled for ever behind rows they cannot embed; and the notification drain walked 500,000 in-app rows to find a few emails. All
+fixed, plus the employer overview (20 s to 2.5 s, now true totals), the inbox, and the programme-by-district view now hides counts under
+five. **K stays 500** (the owner's decision). Alias coverage is unchanged: 43 distinct roles of 3,417. Monetisation and real external
+integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -29,11 +27,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-49` (Sprint 49, **uncommitted**), cut from `main` at `09097d1`, which has Sprints 41–48 (PRs #17–#25). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
-| **Last sprint** | 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | not yet chosen. Candidates: **the retrieval K default** (owner decision: 500 as approved, or 150 — see Sprint 49), `/ops/programmes/{name}/districts` adopting the small-count rule (ADR-057), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,162 backend (`make check`, 2026-10-05), 389 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0046` (Sprint 49 added none); 59 ADRs |
+| **Branch** | `sprint-50` (Sprint 50, **uncommitted**), cut from `main` at `9daccce`, which has Sprints 41–49 (PRs #17–#26). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Last sprint** | 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: public `q` search at volume (**not measured**), the erasure notice loop and `closes_at` index (listed, unbuilt), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
+| **Tests** | backend counts in the Sprint 50 entry (`make check`, 2026-10-05), 390 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0047` (Sprint 50: two indexes); 60 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -974,15 +972,13 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-49`, uncommitted**, cut from `main` at `09097d1` (the PR #25 merge, which carries Sprints
-41–48). Commit only when the owner asks. Sprint 49's changes: `matching/retrieval.py` (new), `matching/service.py` and
-`matching/employer.py` (retrieval, chunked loads, scarce skills), `core/config.py` (`match_retrieval_limit`,
-`notification_retention_days`), `core/authorization.py` (a `permission` attribute on `require_operator`'s dependency),
-`operations/{skill_gap.py (new),routes,schemas}.py`, `notifications/{service,tasks}.py`, `worker.py`,
-`scripts/{seed_scale,benchmark_matching}.py` (new), `Makefile` (`seed-scale`, `benchmark`, `drop-scale`), `.env.example`,
-`web/src/components/ops/DistrictSkillGap.tsx` (+ test), `web/src/lib/ops.ts`, `web/src/app/[locale]/admin/page.tsx`, the generated
-`api-schema.d.ts`, `ops.districtGap` in en/hi/ms, five new test files, ADR-056 to ADR-059, `CLAUDE.md`, the backlog document.
-**No migration.** Two new endpoints (`GET /ops/districts`, `GET /ops/districts/{district_id}/skill-gap`).
+**Working on `sprint-50`, uncommitted**, cut from `main` at `9daccce` (the PR #26 merge, which carries Sprints
+41–49). Commit only when the owner asks. Sprint 50's changes: `matching/batch.py` (new), `matching/retrieval.py` (`bounded_pairs`, anchored and
+full routes, `candidate_pair_facts`, `pool_counts`), `matching/{employer,service,tasks,__init__}.py`, `operations/{service,routes,schemas}.py`,
+`applications/{employer_service,models}.py`, `alerts/service.py`, `notifications/models.py`, `marketplace/models.py` (a docstring),
+`core/{config,database}.py` (`DB_JIT`), `migrations/versions/0047_scale_indexes.py`, `scripts/{seed_scale,benchmark_matching}.py`,
+`web/src/components/{charts/ranked-bar-list,ops/ProgrammeDashboard}.tsx` (+ test), the generated `api-schema.d.ts`, en/hi/ms strings, six new test
+files, ADR-060, `CLAUDE.md`, the backlog document. **Migration 0047; no new endpoint** (two response fields on an existing one).
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -2232,6 +2228,66 @@ Owner decisions, as recommended: **scope A–E** (harness, retrieval, district v
 - **Not done:** `/ops/programmes/{name}/districts` adopting the small-count rule; the true (uncapped) pool size on the employer
   overview (`pool`/`ready`/`nearly` are counts over the K retrieved, as they always were); an index for the in-app retention delete.
 - **Left for later:** the alias batch itself; BL-13.6; BL-5.3; BL-12.11; BL-1.3.
+
+### Sprint 50 — scale the rest (done 2026-10-05, uncommitted)
+
+Owner decisions: **keep K = 500**, and **"scale the rest"** as the theme.
+
+- **The method.** Sprint 49's harness, extended with deterministic opt-in extras (`--skill-less`, `--enrolled`, `--applicants`,
+  `--notifications`; the default dataset is byte-identical, so Sprint 49's numbers still compare) and benchmark sections for each path
+  that tolerate old code, so **the same file measured `main` (from a clean worktree, `PYTHONPATH` set) and the branch**. A read-only audit
+  of the code produced the list; every item below was then measured, not assumed.
+- **Programme report (ADR-060).** It ran `match_jobs` once per enrolled candidate: **133 ms each, 22 minutes for 10,000**, and an
+  `IN (every id)` that fails past 32,767. `matching/batch.py::profiles_with_serious_match` scores only the pairs whose retrieval bound can reach
+  60 (`bound >= 0.595`), best first, in rounds, up to K — **the same answer as the loop**, which `tests/test_matching_batch.py` keeps as its
+  oracle on three random marketplaces. 50 enrolled: 6.7 s → 0.15 s; 10,000: **17.6 s**. Getting there took three corrections found with
+  `EXPLAIN ANALYZE`: the first pair query built 3.2 million pairs per 1,000 candidates (5.2 s, spilling to disk), so it was **anchored** on each
+  vacancy's rarest mandatory standard (285 thousand pairs, 0.8 s; a test holds both routes to identical output); the planner then joined in the
+  wrong order until the intermediate was forced with a **`MATERIALIZED` CTE**; and **JIT** was adding ~600 ms a chunk (37 s → 18 s with it off, now
+  `DB_JIT=false`, tested through the engine).
+- **Employer overview.** `job_pools` scored every sharer of every vacancy and loaded each as a full profile to read three integers. `ready` and
+  `nearly` are *defined* by the mandatory-missing count the SQL already computes, so `retrieval.pool_counts` does it with one aggregate:
+  **20 s → 2.5 s unloaded** for the heaviest harness employer (54 vacancies, 1.39 million sharing pairs), and the counts are now **true totals**
+  (before: 27,000, because it counted the K retrieved). A test compares them with scoring every sharer, on three random worlds.
+  `candidates_total` is an `EXISTS` per profile.
+- **Embedding sweeps.** `LIMIT 100` with no `ORDER BY`: a row with no text keeps `embedding IS NULL` and was picked first on every tick, so
+  once a batch's worth existed nothing behind them was ever embedded (profiles are created lazily, so skill-less ones are ordinary). Now ordered
+  by `embedding_computed_at ASC NULLS FIRST`, the unembeddable row is **stamped** and goes to the back, the batch's skill ids are one query, and the
+  batch is 250. Tests: 7 unembeddable rows ahead of one embeddable in a batch of 5; a row looked at long ago goes before one looked at recently.
+- **Notification drain** (migration 0047). In-app rows are never moved off `pending`, so the `(status, created_at)` index walked all of them: **267-311 ms
+  a tick at 500,000 → 71-120 ms** with a partial index on `(created_at) WHERE status='pending' AND channel='email'`. Plus `(job_id, status)` on
+  applications. `alembic check` clean; down/up round trip run on the scale database.
+- **Inbox.** A status change re-ran the whole inbox to return one row (3.5 s at 5,000 applicants); it now scores that one applicant (a spy test asserts
+  it is given exactly one id). Profiles load column-only (`lazyload("*")`) on the inbox, the shortlist and `candidate_facts`; `score_profiles` is chunked
+  (a 40,000-id test). **`tests/test_role_scoring.py`'s "six statements" bound became seven**, deliberately and with the reason in the test.
+- **Programme-by-district** hides counts of one to four (`skill_gap.suppress`, "Unknown" included) and ranks on what is shown; the bars sum to *at most*
+  the enrolled total and the panel says so. This closes ADR-057's recorded follow-up.
+- **Alert sweep:** 10 vacancies per five minutes drained 120 an hour, so more than ~2,900 new vacancies a day never drained; now 30.
+- **Measured under load, so read the ratios.** The machine ran at load average 6-12 (Chrome, a VM) and single numbers moved 2-4x, including untouched
+  paths; old and new were **interleaved three times**: programme report 8.5/13.6/15.9 s → 0.24/0.31/0.24 s; overview 36/60/50 s → 5.9/7.9/5.6 s;
+  inbox 8.0/15.8/11.0 s → 2.7/3.3/3.1 s. **Recall is unchanged at 20 of 20 on both sides; `make evaluate` is bit-identical.**
+- **Mutation-checked, and every one fails its own test**: the batch (threshold off by one, retrieval limit ignored, no carry between rounds, strict `>`),
+  the anchored route (anchor on any standard, no-mandatory vacancies dropped, anchored below the cap), pool counts (ready `<= 1`, nearly `== 2`, pool of the
+  ready only, zero-share vacancy omitted, total counting empty profiles), the sweeps (no `ORDER BY`, not stamped, nulls last, newest first), the district rule
+  (hidden count sent, ranked on the true count), the inbox (not column-only, whole-inbox reload, unchunked facts, whole-profile `candidate_facts`) and the JIT
+  setting. **Survivors, all equivalent or fixed**: "anchor chosen as the most popular" (any anchor is correct; the choice is only for speed), and three tests of
+  mine that were weaker than I thought (a statement count that `db.get` satisfied because the profile was already in the session; an ordering test passing by
+  heap order; a status-change test that could not tell one applicant from thirty) were strengthened and re-run.
+- **A measurement that fooled me.** The first "after" benchmark of the drain read 6-10 ms and the first interleaved comparison showed no change: the
+  benchmark's own 200 pending email rows are *consumed* by the first run, so later runs measured an empty queue. The controlled before/after (267 → 81 ms,
+  with the plan showing `ix_notifications_pending_email`) was taken on a freshly seeded database; re-seed before comparing the drain.
+- **Verified.** `make check` **1,209 passed** (1,162 + 47) with ruff, format and `mypy` clean; web **390** with `tsc` and lint clean;
+  `npm run build && npm run budget` passes (`/admin` 662 of 684 KB); `make evaluate` bit-identical; `alembic check` clean and 0047 down/up on the scale
+  database. **Live** against the running API on the real dev database: the employer overview's pool/ready/nearly are **identical to the pre-sprint values**
+  for all five Apollo Care vacancies, the demo candidate's matches are unchanged (8; 88/60/45/45), the programme report and its district view answer (the
+  eight districts all read "fewer than 5"), and **the batch and the old loop agree on all 42 dev profiles (15 serious each)**. The dev programme's 20 enrolled
+  candidates hold no standard, which is why `matched` is 0. **Migration 0047 is deliberately not applied to the dev database** — run `make migrate`.
+  **One web test, `ApplyPanel.decided`, flaked in two of four full runs** while the machine's load average was 20-33 (Docker Desktop and Chrome, not this work);
+  it passes alone and on a rerun, and nothing here touches it. The backend suite took 8.5 minutes under the same load, against 105 seconds when quiet.
+- **Not done:** public `q` search was **not measured** and has no trigram index; the erasure notice loop (one ORM object per applicant); a `closes_at`
+  index; `corpus_stats` stays uncached on purpose. The overview still joins one row per (vacancy, sharer) pair, so an employer with hundreds of
+  vacancies will feel it. 10,000 enrolled is still 17.6 s as a request.
+- **Left for later:** the alias batch itself; BL-13.6; BL-5.3; BL-12.11; BL-1.3. **Restart `make worker`** for the larger embedding batch and sweep size.
 
 ### Also outstanding, in rough order
 

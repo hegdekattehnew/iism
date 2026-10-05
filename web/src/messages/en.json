@@ -1500,7 +1500,9 @@
       "hired": "Hired",
       "failed": "That programme could not be loaded.",
       "byDistrict": "Enrolled, by district",
-      "noDistricts": "No district data yet."
+      "noDistricts": "No district data yet.",
+      "fewerThan": "fewer than {min}",
+      "districtNote": "A count of fewer than {min} is not shown, so a small district describes nobody; the bars add up to at most the enrolled total."
     },
     "districtGap": {
       "title": "District skill gap",

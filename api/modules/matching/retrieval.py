@@ -146,8 +146,9 @@ async def best_jobs_for(
     return list((await db.scalars(query)).all())
 
 
-def bounded_candidates(job_ids: Sequence[uuid.UUID], weights: ScoreWeights) -> Select[Any]:
-    """`(job_id, profile_id, bound)` for every candidate sharing a standard with a vacancy.
+def candidate_pair_facts(job_ids: Sequence[uuid.UUID]) -> Select[Any]:
+    """`(job_id, profile_id, earned, total, mandatory_missing)` for every candidate sharing a
+    standard with a vacancy -- the facts the bound and the overview's counts are both made from.
 
     Done in the database, per vacancy: the version this replaces loaded every
     `(candidate, standard)` pair that touched any of the vacancies into Python and
@@ -207,15 +208,52 @@ def bounded_candidates(job_ids: Sequence[uuid.UUID], weights: ScoreWeights) -> S
         .group_by(pairs.c.job_id, pairs.c.profile_id)
         .cte("matched")
     )
-    bound = retrieval_bound(
+    return select(
+        matched.c.job_id,
+        matched.c.profile_id,
         matched.c.earned,
         totals.c.total,
-        totals.c.mandatory_total - matched.c.mandatory_held,
-        weights,
-    )
-    return select(matched.c.job_id, matched.c.profile_id, bound.label("bound")).join(
-        totals, totals.c.job_id == matched.c.job_id
-    )
+        (totals.c.mandatory_total - matched.c.mandatory_held).label("mandatory_missing"),
+    ).join(totals, totals.c.job_id == matched.c.job_id)
+
+
+def bounded_candidates(job_ids: Sequence[uuid.UUID], weights: ScoreWeights) -> Select[Any]:
+    """`(job_id, profile_id, bound)` for every candidate sharing a standard with a vacancy."""
+    facts = candidate_pair_facts(job_ids).subquery("facts")
+    bound = retrieval_bound(facts.c.earned, facts.c.total, facts.c.mandatory_missing, weights)
+    return select(facts.c.job_id, facts.c.profile_id, bound.label("bound"))
+
+
+async def pool_counts(
+    db: AsyncSession, job_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int, int]]:
+    """`(pool, ready, nearly)` per vacancy: every candidate sharing a standard, those missing no
+    mandatory standard, and those missing exactly one.
+
+    Counted in the database from the same pair facts the bound uses, with **no scoring and no
+    candidate loaded**. `ready` and `nearly` are *defined* by the mandatory-missing count, which
+    is exactly what the scorer reports as `missing_mandatory` -- so running `score_match` over
+    every sharer to read one integer off each result was a 20-second page for an employer with
+    54 vacancies (Sprint 50). And these are the true totals: the pool used to be counted over
+    the K candidates retrieved, so a vacancy with more sharers than that undercounted.
+    """
+    if not job_ids:
+        return {}
+    facts = candidate_pair_facts(job_ids).subquery("facts")
+    rows = (
+        await db.execute(
+            select(
+                facts.c.job_id,
+                func.count(),
+                func.count().filter(facts.c.mandatory_missing == 0),
+                func.count().filter(facts.c.mandatory_missing == 1),
+            ).group_by(facts.c.job_id)
+        )
+    ).all()
+    out = dict.fromkeys(job_ids, (0, 0, 0))
+    for job_id, pool, ready, nearly in rows:
+        out[job_id] = (pool, ready, nearly)
+    return out
 
 
 async def best_candidates_for(
@@ -254,3 +292,273 @@ async def best_candidates_for(
     for job_id, profile_id in rows:
         out[job_id].append(profile_id)
     return out
+
+
+def bounded_pairs(
+    profile_ids: Sequence[uuid.UUID],
+    weights: ScoreWeights,
+    *,
+    min_bound: float = 0.0,
+    prune: bool = True,
+) -> Select[Any]:
+    """`(profile_id, job_id, bound)` for many candidates at once, open vacancies only.
+
+    With `prune` (the default) and a `min_bound` above the mandatory cap, this takes the
+    anchored route below; otherwise the full one. The two return **the same pairs** --
+    `tests/test_retrieval.py` holds them to it -- and differ only in how many pairs the
+    database has to build to find them.
+    """
+    if prune and min_bound > weights.mandatory_gap_cap:
+        return _bounded_pairs_anchored(profile_ids, weights, min_bound)
+    return _bounded_pairs_full(profile_ids, weights, min_bound)
+
+
+def _bounded_pairs_anchored(
+    profile_ids: Sequence[uuid.UUID], weights: ScoreWeights, min_bound: float
+) -> Select[Any]:
+    """The same pairs, built without enumerating every (candidate, vacancy) that shares a standard.
+
+    Sound only for a `min_bound` above the mandatory cap (the caller checks): a pair with a
+    mandatory standard missing is bounded by the cap, so every pair at or above `min_bound`
+    holds **all** of its vacancy's mandatory standards -- in particular the one the fewest
+    candidates in this batch hold. So a vacancy with a mandatory standard is probed only through
+    that anchor (the candidates holding it), and the pairs found are then measured exactly.
+    A vacancy with no mandatory standard has no anchor and takes the full route; those are rare
+    in practice, and a pair there still has to share a standard to count.
+
+    Measured on 1,000 candidates against 5,148 vacancies: 3.2 million pairs built the full way
+    (5.2 s, with the aggregation spilling to disk), 285 thousand this way (0.8 s).
+    """
+    holder = aliased(Skill)
+    required = aliased(Skill)
+    held = (
+        select(
+            CandidateSkill.profile_id.label("profile_id"),
+            func.coalesce(holder.concept_id, holder.id).label("key"),
+        )
+        .join(holder, holder.id == CandidateSkill.skill_id)
+        .where(CandidateSkill.profile_id.in_(list(profile_ids)))
+        .distinct()
+        .cte("held")
+    )
+    req = (
+        select(
+            JobSkill.id.label("req_id"),
+            JobSkill.job_id.label("job_id"),
+            func.coalesce(required.concept_id, required.id).label("key"),
+            func.greatest(JobSkill.importance, 1).label("weight"),
+            JobSkill.is_mandatory.label("is_mandatory"),
+        )
+        .select_from(JobSkill)
+        .join(required, required.id == JobSkill.skill_id)
+        .join(Job, Job.id == JobSkill.job_id)
+        .where(open_job())
+        .cte("req")
+    )
+    totals = (
+        select(
+            req.c.job_id,
+            func.sum(req.c.weight).label("total"),
+            func.count().filter(req.c.is_mandatory).label("mandatory_total"),
+        )
+        .group_by(req.c.job_id)
+        .cte("totals")
+    )
+    popularity = select(held.c.key, func.count().label("n")).group_by(held.c.key).cte("popularity")
+    # Each vacancy's anchor: its mandatory standard held by the fewest candidates here. Ties on the
+    # requirement id, so the choice is deterministic. Any choice would be *correct*; this one is
+    # fast. A mandatory standard nobody here holds gives n = 0 and so no candidate pairs at all,
+    # which is right: nobody here can be eligible for that vacancy.
+    anchor = (
+        select(req.c.job_id, req.c.key)
+        .select_from(req)
+        .outerjoin(popularity, popularity.c.key == req.c.key)
+        .where(req.c.is_mandatory)
+        .distinct(req.c.job_id)
+        .order_by(req.c.job_id, func.coalesce(popularity.c.n, 0), req.c.req_id)
+        .cte("anchor")
+    )
+    probed = (
+        select(held.c.profile_id, anchor.c.job_id)
+        .select_from(anchor)
+        .join(held, held.c.key == anchor.c.key)
+        .cte("probed")
+    )
+    # The anchored pairs joined to their vacancy's requirement rows, **materialised**: left to
+    # itself the planner joins every candidate's holdings to every requirement first (4 million
+    # rows) and only then to the 285 thousand anchored pairs, which is the whole saving thrown
+    # away -- seen in EXPLAIN ANALYZE, not guessed. The fence makes the order the one described.
+    probed_req = (
+        select(
+            probed.c.profile_id,
+            probed.c.job_id,
+            req.c.key,
+            req.c.weight,
+            req.c.is_mandatory,
+        )
+        .select_from(probed)
+        .join(req, req.c.job_id == probed.c.job_id)
+        .cte("probed_req")
+        .prefix_with("MATERIALIZED")
+    )
+    held_b = held.alias("held_b")
+    anchored = (
+        select(
+            probed_req.c.profile_id,
+            probed_req.c.job_id,
+            func.sum(probed_req.c.weight).label("earned"),
+            func.count().filter(probed_req.c.is_mandatory).label("mandatory_held"),
+        )
+        .select_from(probed_req)
+        .join(
+            held_b,
+            (held_b.c.profile_id == probed_req.c.profile_id) & (held_b.c.key == probed_req.c.key),
+        )
+        .group_by(probed_req.c.profile_id, probed_req.c.job_id)
+    )
+    unanchored = (
+        select(
+            held.c.profile_id,
+            req.c.job_id,
+            func.sum(req.c.weight).label("earned"),
+            func.count().filter(req.c.is_mandatory).label("mandatory_held"),
+        )
+        .select_from(held)
+        .join(req, req.c.key == held.c.key)
+        .join(totals, totals.c.job_id == req.c.job_id)
+        .where(totals.c.mandatory_total == 0)
+        .group_by(held.c.profile_id, req.c.job_id)
+    )
+    matched = anchored.union_all(unanchored).cte("matched")
+    bound = retrieval_bound(
+        matched.c.earned,
+        totals.c.total,
+        totals.c.mandatory_total - matched.c.mandatory_held,
+        weights,
+    )
+    return (
+        select(matched.c.profile_id, matched.c.job_id, bound.label("bound"))
+        .join(totals, totals.c.job_id == matched.c.job_id)
+        .where(bound >= min_bound)
+    )
+
+
+def _bounded_pairs_full(
+    profile_ids: Sequence[uuid.UUID], weights: ScoreWeights, min_bound: float
+) -> Select[Any]:
+    """Every (candidate, vacancy) pair sharing a standard, bounded, then filtered.
+
+    The batch form of `bounded_jobs`, for a caller that asks one question of a *group* of
+    people -- "does this candidate have any serious match" -- and so must not run the
+    per-candidate query once per person (`match_jobs` costs ~100 ms; ten thousand
+    enrolled candidates is twenty minutes). It walks from the candidates' held standards to
+    the requirements that satisfy them and groups by pair.
+
+    No DISTINCT is needed, unlike `bounded_candidates`: `held` is already one row per
+    `(profile, key)` and each requirement row appears once, so a join produces each
+    `(profile, requirement)` exactly once -- a candidate holding two rows of one concept still
+    counts once, because the two collapse in `held`, not afterwards.
+
+    `min_bound` prunes in the database. A pair with a missing mandatory standard is bounded by
+    the cap, so a caller asking for a bound above the cap never sees one.
+    """
+    holder = aliased(Skill)
+    required = aliased(Skill)
+    held = (
+        select(
+            CandidateSkill.profile_id.label("profile_id"),
+            func.coalesce(holder.concept_id, holder.id).label("key"),
+        )
+        .join(holder, holder.id == CandidateSkill.skill_id)
+        .where(CandidateSkill.profile_id.in_(list(profile_ids)))
+        .distinct()
+        .cte("held")
+    )
+    req = (
+        select(
+            JobSkill.job_id.label("job_id"),
+            func.coalesce(required.concept_id, required.id).label("key"),
+            func.greatest(JobSkill.importance, 1).label("weight"),
+            JobSkill.is_mandatory.label("is_mandatory"),
+        )
+        .select_from(JobSkill)
+        .join(required, required.id == JobSkill.skill_id)
+        .join(Job, Job.id == JobSkill.job_id)
+        .where(open_job())
+        .where(required.concept_id.in_(select(held.c.key)) | required.id.in_(select(held.c.key)))
+        .cte("req")
+    )
+    matched = (
+        select(
+            held.c.profile_id,
+            req.c.job_id,
+            func.sum(req.c.weight).label("earned"),
+            func.count().filter(req.c.is_mandatory).label("mandatory_held"),
+        )
+        .select_from(held)
+        .join(req, req.c.key == held.c.key)
+        .group_by(held.c.profile_id, req.c.job_id)
+        .cte("matched")
+    )
+    weight = func.greatest(JobSkill.importance, 1)
+    totals = (
+        select(
+            JobSkill.job_id.label("job_id"),
+            func.sum(weight).label("total"),
+            func.count().filter(JobSkill.is_mandatory).label("mandatory_total"),
+        )
+        .where(JobSkill.job_id.in_(select(matched.c.job_id).distinct()))
+        .group_by(JobSkill.job_id)
+        .cte("totals")
+    )
+    bound = retrieval_bound(
+        matched.c.earned,
+        totals.c.total,
+        totals.c.mandatory_total - matched.c.mandatory_held,
+        weights,
+    )
+    return (
+        select(matched.c.profile_id, matched.c.job_id, bound.label("bound"))
+        .join(totals, totals.c.job_id == matched.c.job_id)
+        .where(bound >= min_bound)
+    )
+
+
+async def best_pairs(
+    db: AsyncSession,
+    profile_ids: Sequence[uuid.UUID],
+    *,
+    weights: ScoreWeights,
+    min_bound: float,
+    first: int,
+    last: int,
+) -> list[tuple[uuid.UUID, uuid.UUID, float]]:
+    """Each profile's pairs ranked `first..last` (1-based) by bound, ties on the vacancy id.
+
+    Ranked among the pairs at or above `min_bound` only. That is the same rank
+    `best_jobs_for` gives them among *all* of a candidate's pairs, because the pairs above a
+    bound are by definition the highest-ranked ones -- so "rank <= K" here means what it means
+    there.
+    """
+    if not profile_ids:
+        return []
+    bounded = bounded_pairs(profile_ids, weights, min_bound=min_bound).subquery("bounded")
+    ranked = select(
+        bounded.c.profile_id,
+        bounded.c.job_id,
+        bounded.c.bound,
+        func.row_number()
+        .over(
+            partition_by=bounded.c.profile_id,
+            order_by=(bounded.c.bound.desc(), bounded.c.job_id),
+        )
+        .label("rank"),
+    ).subquery("ranked")
+    rows = (
+        await db.execute(
+            select(ranked.c.profile_id, ranked.c.job_id, ranked.c.bound).where(
+                ranked.c.rank >= first, ranked.c.rank <= last
+            )
+        )
+    ).all()
+    return [(r.profile_id, r.job_id, float(r.bound)) for r in rows]

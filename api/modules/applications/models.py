@@ -91,6 +91,10 @@ class Application(Base):
         CheckConstraint(one_of("status", APPLICATION_STATUSES), name="ck_application_status"),
         Index("ix_applications_job_id", "job_id"),
         Index("ix_applications_profile_id", "profile_id"),
+        # The employer overview counts live and untriaged applications per vacancy with one
+        # `GROUP BY job_id, status` (`matching.employer._application_counts`); this lets it read
+        # the index alone.
+        Index("ix_applications_job_status", "job_id", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

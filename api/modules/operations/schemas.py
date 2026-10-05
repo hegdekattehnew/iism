@@ -145,7 +145,10 @@ class DistrictBreakdownOut(BaseModel):
     never resolved, never omitted -- the bars still sum to `enrolled`."""
 
     district: str
-    enrolled: int
+    # `null` when one to four live there: not shown (ADR-057), so the bars no longer add up to
+    # `enrolled` and are not meant to.
+    enrolled: int | None = None
+    below_minimum: bool = False
 
 
 class ProgrammeDistrictsOut(BaseModel):
@@ -153,6 +156,7 @@ class ProgrammeDistrictsOut(BaseModel):
     separate, heavier query from `programme_report`'s own four numbers."""
 
     programme: str
+    minimum_cell: int
     districts: list[DistrictBreakdownOut] = Field(default_factory=list)
 
 

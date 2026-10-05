@@ -34,10 +34,15 @@ from api.modules.marketplace.models import (
     Job,
     posted_job,
 )
-from api.modules.matching import ScarceSkill, market_scarce_skills, match_jobs
+from api.modules.matching import (
+    ScarceSkill,
+    market_scarce_skills,
+    profiles_with_serious_match,
+)
 from api.modules.matching.scoring import SERIOUS_MATCH_SCORE
 from api.modules.notifications import enqueue
 from api.modules.operations.models import TenantVerificationEvent
+from api.modules.operations.skill_gap import MIN_CELL_SIZE, suppress
 
 log = structlog.get_logger("iism.ops")
 
@@ -390,22 +395,23 @@ async def programme_report(db: AsyncSession, programme: str) -> ProgrammeReport:
     if not profile_ids:
         return ProgrammeReport(programme=programme, enrolled=0, matched=0, applied=0, hired=0)
 
-    matched = 0
-    for profile_id in profile_ids:
-        scored = await match_jobs(db, profile_id)
-        if any(s.result.score >= SERIOUS_MATCH_SCORE for s in scored):
-            matched += 1
+    # One batched question, not a `match_jobs` per person (Sprint 50): the loop this replaced
+    # cost ~133 ms an enrolled candidate and, past 32,767 of them, failed on a bind limit.
+    matched = len(await profiles_with_serious_match(db, profile_ids, min_score=SERIOUS_MATCH_SCORE))
 
+    # Joined on the programme rather than `IN (every enrolled id)`: no list, so no ceiling.
+    enrolled_here = CandidateProfile.enrolled_via_programme == programme
     applied = await db.scalar(
-        select(func.count(func.distinct(Application.profile_id))).where(
-            Application.profile_id.in_(profile_ids)
-        )
+        select(func.count(func.distinct(Application.profile_id)))
+        .select_from(Application)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(enrolled_here)
     )
     hired = await db.scalar(
-        select(func.count(func.distinct(Application.profile_id))).where(
-            Application.profile_id.in_(profile_ids),
-            Application.status.in_(WAS_HIRED_STATUSES),
-        )
+        select(func.count(func.distinct(Application.profile_id)))
+        .select_from(Application)
+        .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
+        .where(enrolled_here, Application.status.in_(WAS_HIRED_STATUSES))
     )
     return ProgrammeReport(
         programme=programme,
@@ -435,10 +441,16 @@ async def known_programmes(db: AsyncSession) -> list[str]:
 
 @dataclass(frozen=True)
 class DistrictBreakdown:
-    """How many of one programme's enrolled candidates live in one district."""
+    """How many of one programme's enrolled candidates live in one district.
+
+    `enrolled` is `None` when one to four do (Sprint 50, ADR-057): a count of people in a place
+    that small nearly describes them, so it is not shown -- the same rule, and the same function
+    (`skill_gap.suppress`), as the district skill-gap view.
+    """
 
     district: str
-    enrolled: int
+    enrolled: int | None
+    below_minimum: bool = False
 
 
 async def programme_by_district(db: AsyncSession, programme: str) -> list[DistrictBreakdown]:
@@ -450,10 +462,11 @@ async def programme_by_district(db: AsyncSession, programme: str) -> list[Distri
     numbers should not also pay for this `GROUP BY` every time.
 
     A candidate with no resolved `district_id` rolls up into `"Unknown"`
-    rather than being dropped, so the bars this feeds still sum to
-    `programme_report`'s own `enrolled` count for the same programme --
-    **no id is better than a wrong one**, but a candidate is not invisible
-    just because their district never resolved.
+    rather than being dropped -- **no id is better than a wrong one**, but a
+    candidate is not invisible just because their district never resolved.
+    Before Sprint 50 the bars therefore summed to `programme_report`'s own
+    `enrolled`; with a count of one to four no longer shown (ADR-057) they
+    sum to *at most* that, by design, and the page says so.
     """
     # Grouped by the district's id, not its name: three names (Bilaspur,
     # Hamirpur, Pratapgarh) belong to two districts each, and eight districts
@@ -471,14 +484,21 @@ async def programme_by_district(db: AsyncSession, programme: str) -> list[Distri
     # Two bars both called "Bilaspur" tell the reader nothing, so a name that
     # appears twice carries its state.
     seen = Counter(name for _id, name, _state, _n in rows if name)
-    result = [
-        DistrictBreakdown(
-            district=(f"{name} ({state})" if seen[name] > 1 else name) if name else "Unknown",
-            enrolled=count,
+    result = []
+    for _id, name, state, count in rows:
+        shown, hidden = suppress(count)
+        result.append(
+            DistrictBreakdown(
+                district=(f"{name} ({state})" if seen[name] > 1 else name) if name else "Unknown",
+                enrolled=shown,
+                below_minimum=hidden,
+            )
         )
-        for _id, name, state, count in rows
-    ]
-    # Most enrolled first, so the bars read like a ranking rather than an
-    # alphabetical list.
-    result.sort(key=lambda d: (-d.enrolled, d.district))
+    # Most enrolled first, so the bars read like a ranking rather than an alphabetical list --
+    # **ranked on what is shown**. A hidden count sorts as the largest value it could hide, so
+    # the order tells the reader nothing the figures do not: two districts of one and four
+    # come out in name order, which they would not if the true count decided.
+    result.sort(
+        key=lambda d: (-(d.enrolled if d.enrolled is not None else MIN_CELL_SIZE - 1), d.district)
+    )
     return result

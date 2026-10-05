@@ -18,6 +18,8 @@ export interface RankedBarItem {
   max?: number;
   /** Pre-formatted by the caller -- this component computes nothing. */
   secondary?: string;
+  /** Shown in place of the number, for a value the server chose not to send ("fewer than 5"). */
+  valueLabel?: string;
   tone?: "brand" | "warning" | "danger";
 }
 
@@ -62,7 +64,9 @@ export function RankedBarList({
           <>
             <div className="flex items-baseline justify-between gap-2 text-sm">
               <span className="truncate font-medium">{item.label}</span>
-              <span className="shrink-0 tabular-nums text-muted">{fmt(item.value)}</span>
+              <span className="shrink-0 tabular-nums text-muted">
+                {item.valueLabel ?? fmt(item.value)}
+              </span>
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-muted">
               <div
