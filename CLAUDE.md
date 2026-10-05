@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(59 ADRs). Read it before making any structural decision — the summary below
+(60 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -212,6 +212,13 @@ api/                     FastAPI modular monolith
                          number a person sees is still `score_match`'s. `tests/test_retrieval.py` holds it never
                          below the score *and* tight, and `make seed-scale` / `make benchmark` are how to check a
                          change to either side.
+                         (Sprint 50, ADR-060) `batch.py` asks one question of many candidates --
+                         `profiles_with_serious_match`, what `programme_report` needs -- by scoring only the
+                         pairs whose bound can reach the threshold, **the same answer as the `match_jobs` loop
+                         it replaced** (kept as the test's oracle). `retrieval.pool_counts` computes the
+                         employer overview's `pool`/`ready`/`nearly` in the database with no scoring, so they
+                         are true totals. **Profiles load as columns (`lazyload("*")`) wherever the seven
+                         eager collections are unread.**
     applications/        Applying, withdrawing, saving a vacancy, and the employer's
                          inbox. Holds the product's **one deliberate disclosure**:
                          a candidate's contact reaches an employer because they
@@ -429,6 +436,15 @@ split would have to turn into interfaces first; do not add to it casually.
 - **Every route's audience is a line in a list** (ADR-059, `tests/test_authorization_matrix.py`): an anonymous caller gets 401 from
   every route not in `PUBLIC_ROUTES`, a stranger to an organisation cannot tell a real slug from none, and the back office is
   checked against the permission *read off the route*. It guards the doors, not whose row a permitted caller reaches.
+- **A count is computed where the rows are, and a question about many people is asked once** (ADR-060). `ready` and `nearly` are
+  defined by the mandatory-missing count the SQL already has, so scoring every sharer to read it was a 20-second page; `programme_report`
+  ran `match_jobs` per enrolled candidate (133 ms each; a failure past 32,767). Before writing a loop over rows in a request, run
+  `make seed-scale` with the extras you need (`--enrolled`, `--applicants`, `--notifications`, `--skill-less`) and `make benchmark`.
+- **A sweep that takes `LIMIT n` orders by when it last looked** (ADR-060). A row it cannot process stays selectable, so without an
+  order the same rows are picked first for ever; the embedding sweeps stalled behind skill-less profiles. Stamp what you could not do.
+- **Postgres JIT is off** (`DB_JIT`). It cost ~600 ms a chunk on a heavy aggregate and bought nothing; test it before turning it back on.
+- **Take a benchmark baseline from a clean `git worktree` of `main` with `PYTHONPATH` set, and interleave old and new runs.** The
+  machine's load moved single numbers by 2-4x during Sprint 50; ratios between interleaved runs are what survived.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -821,6 +837,13 @@ split would have to turn into interfaces first; do not add to it casually.
 > Alongside: the district skill-gap view (BL-12.7) with small counts suppressed, a retention limit on notifications,
 > and an authorization matrix that reads every route's audience from the route table. **At the default K the employer
 > shortlist misses its 300 ms target (p95 569 ms); K = 150 meets it with the same recall -- the owner's call.** No migration.
+>
+> **Sprint 50 is done** (ADR-060): *scale the rest*. Measured on the same harness, three paths were not slow but broken: the
+> programme report ran `match_jobs` once per enrolled candidate (22 minutes for 10,000, a failure past 32,767), the embedding
+> sweeps stalled behind rows they cannot embed, and the notification drain walked 500,000 in-app rows to find a few emails.
+> The report now asks one batch question (17.6 s for 10,000, the same answer as the loop, which the test keeps as its oracle),
+> the employer overview counts in the database (20 s to 2.5 s, true totals), and a status change returns one row instead of rescoring
+> the inbox. Migration 0047, JIT off, and the programme-by-district view hides counts under five. K stays 500.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

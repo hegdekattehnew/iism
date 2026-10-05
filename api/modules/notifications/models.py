@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, Index, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -88,6 +88,15 @@ class Notification(Base):
         CheckConstraint(one_of("status", STATUSES), name="ck_notification_status"),
         # The drain's own query: oldest pending first.
         Index("ix_notifications_pending", "status", "created_at"),
+        # ...and what it actually wants (Sprint 50). In-app notices are never moved off `pending`
+        # (only the email loop sets a status), so the index above makes every minute's tick walk
+        # the whole in-app backlog to find a few email rows: 267 ms at 500,000 rows and growing
+        # with every alert until the 90-day purge. This one holds only what the drain can send.
+        Index(
+            "ix_notifications_pending_email",
+            "created_at",
+            postgresql_where=text("status = 'pending' AND channel = 'email'"),
+        ),
         # The candidate's unread list.
         Index("ix_notifications_recipient", "recipient_kind", "recipient_id", "read_at"),
     )

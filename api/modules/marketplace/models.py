@@ -100,6 +100,11 @@ class _EmbeddingColumns:
     vector that no longer describes what this row now holds, and the sweep is
     the only thing that ever fills it back in.
 
+    `embedding_computed_at` is **when the sweep last looked at this row**, which is the
+    same as when it computed the vector except for a row with nothing to embed (no declared
+    standard): that one is stamped and left NULL, so the sweep, which orders on it, does not
+    keep picking the same unembeddable rows first (Sprint 50).
+
     `embedding_provider`/`embedding_model` are not decoration -- ADR-031 states
     plainly that "every stored vector records the provider, model identifier
     and model version... no vector's provenance is ever ambiguous", which

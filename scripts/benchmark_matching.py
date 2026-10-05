@@ -158,6 +158,118 @@ def _recall(returned: list[tuple[uuid.UUID, int]], truth: list[tuple]) -> tuple[
     return overlap, at_least / denom, regret
 
 
+async def _paths(db, args: argparse.Namespace) -> None:  # type: ignore[no-untyped-def]
+    """The rest of the product at volume (Sprint 50): everything but retrieval.
+
+    Each section calls the same service function a request or a cron calls, and tolerates the
+    function not existing yet, so the **same file measures `main` and the branch**: the baseline
+    is taken from a clean worktree of `main` (see the context file's gotcha on `nohup` and `git`).
+    """
+    from sqlalchemy import func
+
+    from api.modules.applications.employer_service import inbox
+    from api.modules.marketplace.models import CandidateSkill
+    from api.modules.notifications import drain
+    from api.modules.operations import service as ops
+
+    def ms(since: float) -> float:
+        return (time.perf_counter() - since) * 1000
+
+    print("\n== programme report (operator view)")
+    t0 = time.perf_counter()
+    small = await ops.programme_report(db, "SCALE-PROGRAMME-SMALL")
+    took = ms(t0)
+    if small.enrolled:
+        per = took / small.enrolled
+        print(
+            f"   {small.enrolled} enrolled: {took:,.0f} ms ({small.matched} matched)   "
+            f"{per:,.0f} ms per enrolled candidate; at 10,000 that is {per * 10_000 / 1000:,.0f} s"
+        )
+    else:
+        print("   no SCALE-PROGRAMME-SMALL rows: seed with --enrolled")
+    if args.large_programme:
+        t0 = time.perf_counter()
+        large = await ops.programme_report(db, "SCALE-PROGRAMME")
+        print(
+            f"   {large.enrolled:,} enrolled: {ms(t0):,.0f} ms ({large.matched:,} matched, "
+            f"{large.applied:,} applied)"
+        )
+
+    print("\n== employer overview (the heaviest employer)")
+    from api.modules.matching import employer as employer_module
+
+    top = (
+        await db.execute(
+            text(
+                "SELECT tenant_id, count(*) n FROM jobs WHERE status = 'published' "
+                "AND closed_at IS NULL GROUP BY tenant_id ORDER BY n DESC LIMIT 1"
+            )
+        )
+    ).first()
+    if top is not None:
+        t0 = time.perf_counter()
+        pools = await employer_module.job_pools(db, top[0])
+        print(
+            f"   job_pools over {len(pools):,} vacancies: {ms(t0):,.0f} ms   "
+            f"(sum of pools {sum(p.pool for p in pools):,}, ready {sum(p.ready for p in pools):,})"
+        )
+    t0 = time.perf_counter()
+    total_fn = getattr(employer_module, "candidates_total", None)
+    if total_fn is not None:
+        total = await total_fn(db)
+    else:
+        total = await db.scalar(select(func.count(func.distinct(CandidateSkill.profile_id)))) or 0
+    print(f"   candidates_total ({total:,}): {ms(t0):,.0f} ms")
+
+    print("\n== notification drain (200 email rows pending behind the in-app backlog)")
+    backlog = await db.scalar(text("SELECT count(*) FROM notifications WHERE status = 'pending'"))
+    times = []
+    for _ in range(3):
+        t0 = time.perf_counter()
+        counts = await drain(db, limit=50)
+        times.append(ms(t0))
+        print(f"   tick: {times[-1]:,.0f} ms  {counts}")
+    print(
+        f"   {backlog:,} pending rows at the start; median tick {statistics.median(times):,.0f} ms"
+    )
+
+    print("\n== employer inbox (one vacancy, many applicants)")
+    job = (await db.scalars(select(Job).where(Job.slug == "scale-job-1"))).first()
+    if job is not None:
+        t0 = time.perf_counter()
+        _job, rows = await inbox(db, job.tenant_id, job.slug)
+        print(f"   {len(rows):,} applicants ranked: {ms(t0):,.0f} ms")
+
+    if args.embed:
+        print("\n== embedding sweep (profiles; ticks of the worker's cron)")
+        from api.modules.matching import tasks as match_tasks
+
+        sql = text(
+            "SELECT count(*) FILTER (WHERE embedding IS NOT NULL), "
+            "count(*) FILTER (WHERE embedding IS NULL AND EXISTS "
+            "  (SELECT 1 FROM candidate_skills s WHERE s.profile_id = candidate_profiles.id)) "
+            "FROM candidate_profiles"
+        )
+        before = (await db.execute(sql)).one()
+        for n in range(1, 4):
+            t0 = time.perf_counter()
+            await match_tasks._refresh_profiles(db)
+            now = (await db.execute(sql)).one()
+            print(
+                f"   tick {n}: {ms(t0):,.0f} ms   embedded {now[0] - before[0]:,} more   "
+                f"({now[1]:,} with skills still waiting)"
+            )
+            before = now
+
+    if args.sweep:
+        print("\n== alert sweep (10 vacancies, as the worker's cron runs it)")
+        from api.modules.alerts.service import sweep
+
+        t0 = time.perf_counter()
+        result = await sweep(db, limit=10)
+        print(f"   {ms(t0):,.0f} ms   {result}")
+
+
 async def main(args: argparse.Namespace) -> None:
     name = make_url(get_settings().database_url).database or ""
     if not name.endswith("_scale"):
@@ -266,6 +378,9 @@ async def main(args: argparse.Namespace) -> None:
                     f"shortfall {floor}{r.shortfall:,}"
                 )
 
+        if not args.no_paths:
+            await _paths(db, args)
+
         if args.no_truth:
             await dispose_engine()
             return
@@ -306,5 +421,9 @@ if __name__ == "__main__":
     ap.add_argument("--truth-candidates", type=int, default=12)
     ap.add_argument("--truth-vacancies", type=int, default=5, help="each scores every sharer")
     ap.add_argument("--no-truth", action="store_true", help="latency only")
+    ap.add_argument("--no-paths", action="store_true", help="skip the non-retrieval sections")
+    ap.add_argument("--large-programme", action="store_true", help="also report 10,000 enrolled")
+    ap.add_argument("--embed", action="store_true", help="three embedding-sweep ticks (writes)")
+    ap.add_argument("--sweep", action="store_true", help="one alert sweep of 10 vacancies (writes)")
     ap.add_argument("--seed", type=int, default=7)
     asyncio.run(main(ap.parse_args()))

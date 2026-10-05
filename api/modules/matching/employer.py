@@ -22,6 +22,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import lazyload
 
 from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import (
@@ -31,7 +32,7 @@ from api.modules.marketplace.models import (
     JobSkill,
     open_job,
 )
-from api.modules.matching.retrieval import best_candidates_for, retrieval_limit
+from api.modules.matching.retrieval import best_candidates_for, pool_counts, retrieval_limit
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
 from api.modules.matching.service import (
     attained_level,
@@ -156,8 +157,15 @@ async def _candidates_for_jobs(
     held_by_profile = await _pool_held(db, everyone)
     profiles: dict[uuid.UUID, CandidateProfile] = {}
     for chunk in _chunks(everyone):
+        # Column-only (Sprint 50): the seven eager collections of a `CandidateProfile` are read
+        # by nothing here, and loading them for every retrieved candidate was most of what a
+        # shortlist cost beyond the retrieval itself.
         for p in (
-            await db.scalars(select(CandidateProfile).where(CandidateProfile.id.in_(chunk)))
+            await db.scalars(
+                select(CandidateProfile)
+                .where(CandidateProfile.id.in_(chunk))
+                .options(lazyload("*"))
+            )
         ).all():
             profiles[p.id] = p
 
@@ -225,18 +233,18 @@ async def score_profiles(
         return {}
     requirements = (await requirements_for(db, [job.id])).get(job.id, [])
     held_by_profile = await _pool_held(db, profile_ids)
-    facts: dict[uuid.UUID, tuple[int | None, list[float] | None]] = {
-        row.id: (row.years_experience, row.embedding)
+    facts: dict[uuid.UUID, tuple[int | None, list[float] | None]] = {}
+    for chunk in _chunks(list(profile_ids)):
         for row in (
             await db.execute(
                 select(
                     CandidateProfile.id,
                     CandidateProfile.years_experience,
                     CandidateProfile.embedding,
-                ).where(CandidateProfile.id.in_(profile_ids))
+                ).where(CandidateProfile.id.in_(chunk))
             )
-        ).all()
-    }
+        ).all():
+            facts[row.id] = (row.years_experience, row.embedding)
     weights = weights_from_settings()
     return {
         pid: score_match(
@@ -325,18 +333,22 @@ async def job_pools(db: AsyncSession, tenant_id: uuid.UUID) -> list[JobPool]:
             )
         ).all()
     )
-    scored_by_job = await _candidates_for_jobs(db, jobs)
+    # Counted in the database, not scored: `ready` and `nearly` are defined by the mandatory-missing
+    # count the retrieval SQL already has, so there is nothing for `score_match` to add. This used
+    # to score every sharer of every vacancy and load each as a full profile to read three
+    # integers -- 20 s for an employer with 54 vacancies at 50,000 candidates (Sprint 50).
+    pool_by_job = await pool_counts(db, [job.id for job in jobs])
     counts = await _application_counts(db, [job.id for job in jobs])
     pools: list[JobPool] = []
     for job in jobs:
-        scored = scored_by_job[job.id]
+        pool, ready, nearly = pool_by_job[job.id]
         live, new = counts.get(job.id, (0, 0))
         pools.append(
             JobPool(
                 job=job,
-                pool=len(scored),
-                ready=sum(1 for s in scored if s.result.missing_mandatory == 0),
-                nearly=sum(1 for s in scored if s.result.missing_mandatory == 1),
+                pool=pool,
+                ready=ready,
+                nearly=nearly,
                 applications=live,
                 new_applications=new,
             )
@@ -465,6 +477,21 @@ async def _scarce_skills(
     return scarce[:limit]
 
 
+async def candidates_total(db: AsyncSession) -> int:
+    """Profiles that have declared at least one standard.
+
+    An `EXISTS` per profile rather than `count(distinct profile_id)` over every `candidate_skills`
+    row, which read 890,000 index entries to answer a question about 50,000 people.
+    """
+    has_skill = select(CandidateSkill.id).where(CandidateSkill.profile_id == CandidateProfile.id)
+    return int(
+        await db.scalar(
+            select(func.count()).select_from(CandidateProfile).where(has_skill.exists())
+        )
+        or 0
+    )
+
+
 @dataclass(frozen=True)
 class ConsoleOverview:
     """Everything the employer overview answers, in one read.
@@ -495,7 +522,7 @@ async def console_overview(db: AsyncSession, tenant_id: uuid.UUID) -> ConsoleOve
     """
     pools = await job_pools(db, tenant_id)
     scarce = await scarce_skills(db, tenant_id)
-    total = await db.scalar(select(func.count(func.distinct(CandidateSkill.profile_id)))) or 0
+    total = await candidates_total(db)
 
     from api.modules.analytics import record
 

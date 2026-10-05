@@ -75,9 +75,17 @@ export function ProgrammeDashboard() {
                 items={districtRows.map((d) => ({
                   key: d.district,
                   label: d.district,
-                  value: d.enrolled,
+                  // A count of one to four arrives as `null` and is written, never computed.
+                  value: d.enrolled ?? 0,
+                  valueLabel:
+                    d.enrolled === null || d.enrolled === undefined
+                      ? t("fewerThan", { min: districts.data?.minimum_cell ?? 5 })
+                      : undefined,
                 }))}
               />
+              <p className="mt-3 text-xs text-muted">
+                {t("districtNote", { min: districts.data?.minimum_cell ?? 5 })}
+              </p>
             </>
           )}
         </>

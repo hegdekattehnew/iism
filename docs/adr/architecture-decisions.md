@@ -2903,3 +2903,97 @@ is covered the day it exists, and asks four questions of every one:
   else's application) needs a real resource per route and stays with each module's own tests. Saying otherwise would be the false claim this
   project has made before.
 - **A new public route is a one-line addition with a reason**, which is the intended friction.
+
+
+## ADR-060: A Count Is Computed Where the Rows Are, a Question About Many People Is Asked Once, and a Sweep Cannot Stall Behind What It Cannot Do
+
+**Status:** Accepted (October 2026). Extends ADR-056's scale work to the rest of the product. Migration 0047 (two indexes, no data change).
+
+**Context:** Sprint 49 measured matching retrieval at 50,042 candidates and 5,148 vacancies and found it returning 2.9 and 1.2 of a true top
+twenty. Sprint 50 asked the same of everything else that loops per row, loads an unbounded set or scans -- a read-only audit of the code,
+then a measurement of each finding with the same harness (`make seed-scale --skill-less 150 --enrolled 10000 --applicants 5000
+--notifications 500000`, then `make benchmark`). Three were not slow but **broken**:
+
+- `programme_report` called `match_jobs` once per enrolled candidate, in one HTTP request, and built `IN (every enrolled id)`.
+  Measured: **133 ms a candidate**, so ten thousand enrolled is twenty-two minutes -- against a 15-second statement timeout, the report
+  stopped working at about 140 candidates -- and past 32,767 it failed on asyncpg's bind-parameter limit before the time mattered.
+- The embedding sweeps picked `LIMIT 100` with no `ORDER BY`. A row with nothing to embed (a profile with no declared standard, which
+  `ensure_profile` creates routinely) keeps `embedding IS NULL`, so the same rows were returned first on every tick; once a batch's worth existed,
+  **nothing behind them was ever embedded**. Invisible in the harness until it was seeded with skill-less profiles.
+- The notification drain walked every accumulated in-app notice to find email rows: in-app rows are never moved off `pending`, and the index
+  is `(status, created_at)` with no `channel`.
+
+**Decision:**
+
+- **A question about many people is asked once** (`matching/batch.py`, `profiles_with_serious_match`). "Does this candidate have any serious
+  match" needs only the pairs that *can* reach 60, and the retrieval bound says which: `score - 0.5 <= 100 * bound` (ADR-056), so a pair
+  scoring 60 has a bound of at least 0.595. The database finds each candidate's pairs at or above that, best first, and **only those** are
+  scored, exactly, through `score_match` -- a *selection* of which pairs to score, never a second scorer. The same retrieval limit K applies,
+  so the answer is the loop's, pair for pair; `tests/test_matching_batch.py` keeps the loop as the oracle on three random marketplaces.
+  `applied` and `hired` are joins on the programme, so no list exists to hit a ceiling.
+- **The pair query is pruned by an anchor** (`retrieval._bounded_pairs_anchored`). A pair above the mandatory cap holds *every* mandatory
+  standard of its vacancy, so a vacancy need only be probed through its rarest mandatory standard among the candidates in the batch. That
+  builds 285 thousand pairs where the full route builds 3.2 million (1,000 candidates against 5,148 vacancies: 0.8 s against 5.2 s), and
+  the two routes are held to **identical output** by a test. The join order had to be forced with a `MATERIALIZED` CTE: left alone the planner
+  joined first and filtered after, throwing the saving away -- found with `EXPLAIN ANALYZE`, not by reading.
+- **A count is computed where the rows are.** `job_pools` scored every sharer of every vacancy and loaded each as a full profile to read three
+  integers. `ready` and `nearly` are *defined* by the number of mandatory standards missing, which the retrieval SQL already has, so the
+  scorer adds nothing: one aggregate over the same pair facts the bound is built from (`retrieval.pool_counts`). The counts are now **true
+  totals** (the pool used to be counted over the K retrieved, a limit ADR-056 recorded). `candidates_total` is an `EXISTS` per profile rather
+  than a `count(distinct)` over 890,000 rows.
+- **A profile is loaded as columns when nothing reads its collections.** Every `CandidateProfile` load runs seven eager `selectin` queries
+  (`marketplace/models.py`); nothing in `matching/`, `alerts/` or the inbox reads them. Those paths use `lazyload("*")`, and `candidate_facts`
+  selects its four columns instead of `db.get`.
+- **A status change returns the one row that changed.** It re-ran the whole inbox -- load and score every applicant -- so each shortlist click
+  cost as much as opening the page (3.5 s at 5,000). A score is a function of one candidate and one vacancy; `score_profiles` is chunked
+  as well, since a popular vacancy can draw more than 32,767.
+- **A sweep orders by when it last looked** (`embedding_computed_at ASC NULLS FIRST`) and stamps a row it could not embed, so unembeddable rows
+  go to the back after one look. The skill ids for a batch are one query, not one per row, and the batch is 250.
+- **Two indexes (migration 0047):** `ix_notifications_pending_email`, partial on `(created_at) WHERE status = 'pending' AND channel = 'email'`
+  (a drain tick walked 500,000 rows to find 200), and `ix_applications_job_status` on `(job_id, status)`.
+- **JIT is off for every connection** (`DB_JIT`, default false). Postgres compiled the programme report's aggregates at about 600 ms a chunk
+  and bought nothing; every cheap query is unaffected either way. 37 s became 18 s for ten thousand candidates.
+- **The programme-by-district view adopts the small-count rule** (`skill_gap.suppress`, ADR-057): one to four is "fewer than 5", the
+  "Unknown" bucket included, and districts are ranked on what is shown. The bars now sum to *at most* the enrolled total, by design, and the
+  page says so.
+- **The alert sweep takes 30 vacancies a tick, not 10.** Ten every five minutes is 120 an hour, so a catalogue taking more than about 2,900
+  new vacancies a day never drained.
+
+**Measured** (same dataset, checksum unchanged; **the machine was under load, load average 6-12, so absolute times are inflated and the
+old and new runs were interleaved three times to compare**). Unloaded figures where I have them are marked *q*.
+
+| Path | Before | After |
+|---|---|---|
+| Programme report, 50 enrolled | 8.5 / 13.6 / 15.9 s (*q* 6.7 s) | 0.24 / 0.31 / 0.24 s (*q* 0.15 s) |
+| Programme report, 10,000 enrolled | ~22 min (extrapolated; fails past 32,767) | 17.6 s *q* (37 s with JIT on) |
+| Employer overview, 54 vacancies | 36 / 60 / 50 s (*q* 20 s) | 5.9 / 7.9 / 5.6 s (*q* 2.5 s); counts now true totals |
+| Employer inbox, 5,000 applicants | 8.0 / 15.8 / 11.0 s (*q* 3.5 s) | 2.7 / 3.3 / 3.1 s |
+| `candidates_for_job` p50 | 660 / 990 / 1,340 ms | 364 / 827 / 412 ms |
+| Notification drain tick, 500,000 in-app pending | *q* 267-311 ms | *q* 71-120 ms (a partial-index scan) |
+| Embedding sweep | 100 a tick, stalls behind unembeddable rows | 250 a tick, cannot stall |
+
+Recall against exhaustive truth is **unchanged at 20 of 20 on both sides** (K = 500), and `make evaluate` is bit-identical.
+
+**Options considered for the programme report:** 1. Cache or precompute it nightly
+2. Make `match_jobs` itself cheaper and keep the loop
+3. **Ask the batch question once** (chosen)
+4. Report an approximation (any pair with a bound over 0.595)
+
+**Trade-offs:**
+
+- Option 1: ✅ Constant-time reads ❌ A stale number on a page an operator reads to see whether a programme is working; and it hides that the loop does not scale.
+- Option 2: ✅ No new module ❌ 133 ms is already mostly the SQL and the scoring of 500 vacancies; ten thousand of them is still minutes.
+- Option 3: ✅ The same answer, proven by an oracle ❌ A second query shape to keep in step with `bounded_jobs`, which is why the two routes and the loop are tested against each other.
+- Option 4: ✅ Fastest ❌ A bound is not a score; reporting it would be the second scorer ADR-036 forbids.
+
+**Consequences:**
+
+- **10,000 enrolled still takes 17.6 s as a request.** No single statement approaches the 15-second statement timeout (each chunk is a few seconds), but the
+  operator waits that long. It is a report, not a page load; if programmes reach tens of thousands the next step is a nightly materialised figure, which
+  should be a decision, not a default.
+- **The employer overview still joins one row per (vacancy, sharer) pair**: 2.5 s unloaded for the heaviest harness employer (54 vacancies, 1.39 million
+  sharing pairs). An employer with hundreds of vacancies would pay for it; the page should then show the first fifty.
+- `set_status_and_reload` no longer returns a row from a freshly sorted list, so nothing about order is implied by it.
+- Not done, and recorded: public `q` search (`_text_filter`) was **not measured** and has no trigram index; the erasure notice loop builds one ORM object per
+  applicant; `closes_at` has no index; `corpus_stats` runs eleven counts per homepage hit and is deliberately not cached (a cached count is the "number did not
+  move" bug in `CLAUDE.md`).

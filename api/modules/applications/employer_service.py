@@ -15,6 +15,7 @@ import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import lazyload
 
 from api.modules.analytics import record
 from api.modules.applications.models import FILLED_STATUSES, WAS_HIRED_STATUSES, Application
@@ -57,6 +58,10 @@ async def inbox(
             .join(CandidateProfile, CandidateProfile.id == Application.profile_id)
             .join(User, User.id == CandidateProfile.user_id)
             .where(Application.job_id == job.id)
+            # Column-only: a profile's seven collections are eager by default and nothing here
+            # reads them, so five thousand applicants was thirty-five thousand extra rows' worth
+            # of queries for a screen that shows a headline and a score.
+            .options(lazyload("*"))
         )
     ).all()
     if not rows:
@@ -192,11 +197,24 @@ async def set_status_and_reload(
     crashing.
     """
     application = await set_status(db, tenant_id, job_slug, application_id, new_status)
-    _job, rows = await inbox(db, tenant_id, job_slug)
-    for row in rows:
-        if row[0].id == application.id:
-            return row
-    raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+    # **One row, not the whole inbox** (Sprint 50). This used to re-run `inbox()` -- load and
+    # score every applicant -- to return the one row that changed, so each shortlist click cost
+    # as much as opening the page (3.5 s at 5,000 applicants). A score is a function of one
+    # candidate and one vacancy, so scoring just this applicant gives the same number.
+    job = await _job_of(db, tenant_id, job_slug)
+    found = (
+        await db.execute(
+            select(CandidateProfile, User)
+            .join(User, User.id == CandidateProfile.user_id)
+            .where(CandidateProfile.id == application.profile_id)
+            .options(lazyload("*"))
+        )
+    ).first()
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+    profile, user = found
+    scores = await score_profiles(db, job, [profile.id])
+    return application, profile, user, scores[profile.id]
 
 
 async def _close_if_filled(db: AsyncSession, job: Job) -> bool:

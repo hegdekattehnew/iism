@@ -88,7 +88,18 @@ async def candidate_facts(db: AsyncSession, profile_id: uuid.UUID) -> CandidateF
     someone lives and where they will work are different facts, and either makes
     a vacancy local to them.
     """
-    profile = await db.get(CandidateProfile, profile_id)
+    # Four columns, not `db.get(CandidateProfile)`: that loaded the profile *and* its seven eager
+    # collections -- seven extra queries on every call, and `match_jobs` makes one per request.
+    profile = (
+        await db.execute(
+            select(
+                CandidateProfile.years_experience,
+                CandidateProfile.embedding,
+                CandidateProfile.state_id,
+                CandidateProfile.district_id,
+            ).where(CandidateProfile.id == profile_id)
+        )
+    ).first()
     preferred = (
         await db.execute(
             select(

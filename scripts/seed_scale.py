@@ -37,6 +37,7 @@ candidate's evidence and their standards.
 import argparse
 import asyncio
 import sys
+from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
@@ -46,6 +47,12 @@ from api.core.database import dispose_engine, get_engine, get_sessionmaker
 
 PHONE_PREFIX = "+9170"
 SLUG_PREFIX = "scale-job-"
+# Programmes the opt-in `--enrolled` seeding creates. A small one beside the large one, so the
+# benchmark can time the old per-candidate report on fifty people and extrapolate rather than wait
+# an hour for it on ten thousand.
+PROGRAMME_SMALL = "SCALE-PROGRAMME-SMALL"
+PROGRAMME_LARGE = "SCALE-PROGRAMME"
+SMALL_SIZE = 50
 
 # A hash of two strings as a number in [0, 1). Deterministic, and independent of
 # plan shape -- `random()` after `setseed()` is not, once a join reorders.
@@ -71,8 +78,88 @@ def _guard() -> str:
     return name
 
 
+@dataclass(frozen=True)
+class Extras:
+    """Things the retrieval benchmark never needed and the rest of the product does."""
+
+    skill_less: int = 0
+    enrolled: int = 0
+    applicants: int = 0
+    notifications: int = 0
+
+
+async def _extras(db, go, candidates: int, e: Extras) -> None:  # type: ignore[no-untyped-def]
+    """Deterministic like everything here: rows are named by an index, never by `random()`."""
+    profile = "md5('scale-profile-' || i)::uuid"
+    if e.skill_less:
+        # The first N profiles hold no standard at all -- lazily created profiles are common,
+        # and they are the rows an embedding sweep cannot embed.
+        print(f"  {e.skill_less:,} candidates with no declared standard")
+        await go(
+            f"DELETE FROM candidate_skills WHERE profile_id IN "
+            f"(SELECT {profile} FROM generate_series(1, :n) i)",
+            n=e.skill_less,
+        )
+    if e.enrolled:
+        first = e.skill_less + 1
+        print(f"  {e.enrolled:,} enrolled in {PROGRAMME_LARGE} ({SMALL_SIZE} in {PROGRAMME_SMALL})")
+        await go(
+            f"UPDATE candidate_profiles SET enrolled_via_programme = :tag WHERE id IN "
+            f"(SELECT {profile} FROM generate_series(CAST(:a AS int), CAST(:b AS int)) i)",
+            tag=PROGRAMME_SMALL,
+            a=first,
+            b=first + SMALL_SIZE - 1,
+        )
+        await go(
+            f"UPDATE candidate_profiles SET enrolled_via_programme = :tag WHERE id IN "
+            f"(SELECT {profile} FROM generate_series(CAST(:a AS int), CAST(:b AS int)) i)",
+            tag=PROGRAMME_LARGE,
+            a=first + SMALL_SIZE,
+            b=first + SMALL_SIZE + e.enrolled - 1,
+        )
+    if e.applicants:
+        print(f"  {e.applicants:,} applicants to scale-job-1")
+        await go(
+            "INSERT INTO applications (id, job_id, profile_id, status, contact_shared_at) "
+            f"SELECT md5('scale-app-' || i)::uuid, md5('scale-job-1')::uuid, {profile}, "
+            "       'applied', now() FROM generate_series(1, :n) i",
+            n=e.applicants,
+        )
+    if e.notifications:
+        print(f"  {e.notifications:,} pending in-app notifications and 200 pending email")
+        await go(
+            "INSERT INTO notifications (id, recipient_kind, recipient_id, channel, template, "
+            "                           payload, locale, status, attempts, created_at) "
+            "SELECT md5('scale-note-' || i)::uuid, 'user', "
+            "       md5('scale-user-' || (1 + i % :c))::uuid, 'in_app', 'job_alert', "
+            '       \'{"scale": true, "vacancy": "x", "organisation": "y", '
+            '         "path": "/jobs/x"}\'::jsonb, '
+            "       'en', 'pending', 0, now() - ((i % 80) || ' days')::interval "
+            "FROM generate_series(1, :n) i",
+            n=e.notifications,
+            c=candidates,
+        )
+        await go(
+            "INSERT INTO notifications (id, recipient_kind, recipient_id, channel, template, "
+            "                           payload, locale, status, attempts, created_at) "
+            "SELECT md5('scale-mail-' || i)::uuid, 'user', "
+            "       md5('scale-user-' || (1 + i % :c))::uuid, 'email', 'job_alert', "
+            '       \'{"scale": true, "vacancy": "x", "organisation": "y", '
+            '         "path": "/jobs/x"}\'::jsonb, '
+            "       'en', 'pending', 0, now() - (i || ' minutes')::interval "
+            "FROM generate_series(1, 200) i",
+            c=candidates,
+        )
+
+
 async def _run(
-    candidates: int, vacancies: int, skew: float, per_cand: int, per_job: int, districts: int
+    candidates: int,
+    vacancies: int,
+    skew: float,
+    per_cand: int,
+    per_job: int,
+    districts: int,
+    extras: "Extras",
 ) -> None:
     name = _guard()
     async with get_sessionmaker()() as db:
@@ -81,6 +168,8 @@ async def _run(
             await db.execute(text(sql), params)
 
         print(f"database {name}: clearing earlier synthetic rows")
+        # Notifications carry no foreign key, so nothing cascades to them.
+        await go("DELETE FROM notifications WHERE payload->>'scale' = 'true'")
         await go(
             "DELETE FROM candidate_skills WHERE profile_id IN "
             "(SELECT p.id FROM candidate_profiles p JOIN users u ON u.id = p.user_id "
@@ -213,6 +302,9 @@ async def _run(
                 sp=SLUG_PREFIX + "%",
                 k=placed,
             )
+        # --- opt-in extras (Sprint 50). Off by default, so a plain `make seed-scale` is
+        # byte-identical to the dataset Sprint 49's numbers were taken on.
+        await _extras(db, go, candidates, extras)
         await db.commit()
 
     # ANALYZE outside the transaction: the planner's choices are what is being
@@ -249,6 +341,10 @@ def main() -> None:
     p.add_argument("--skills-per-candidate", type=int, default=20)
     p.add_argument("--skills-per-vacancy", type=int, default=5)
     p.add_argument("--districts", type=int, default=25, help="spread rows over this many; 0 = none")
+    p.add_argument("--skill-less", type=int, default=0, help="candidates holding no standard")
+    p.add_argument("--enrolled", type=int, default=0, help="candidates enrolled in a programme")
+    p.add_argument("--applicants", type=int, default=0, help="applications to scale-job-1")
+    p.add_argument("--notifications", type=int, default=0, help="pending in-app notifications")
     a = p.parse_args()
     if a.skew < 1.0:
         sys.exit("--skew must be at least 1 (1 is uniform)")
@@ -260,6 +356,7 @@ def main() -> None:
             a.skills_per_candidate,
             a.skills_per_vacancy,
             a.districts,
+            Extras(a.skill_less, a.enrolled, a.applicants, a.notifications),
         )
     )
 

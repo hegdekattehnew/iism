@@ -72,4 +72,43 @@ describe("ProgrammeDashboard", () => {
     expect(await screen.findByText("Nagpur")).toBeTruthy();
     expect(screen.getByText("9")).toBeTruthy();
   });
+
+  it("writes a count the server withheld as 'fewer than 5' and never as a number", async () => {
+    GET.mockImplementation(async (path: string) => {
+      if (path === "/ops/programmes") {
+        return { data: { programmes: ["P"] }, error: undefined, response: { status: 200 } };
+      }
+      if (path === "/ops/programmes/{name}") {
+        return {
+          data: { programme: "P", enrolled: 13, matched: 1, applied: 1, hired: 0 },
+          error: undefined,
+          response: { status: 200 },
+        };
+      }
+      if (path === "/ops/programmes/{name}/districts") {
+        return {
+          data: {
+            programme: "P",
+            minimum_cell: 5,
+            districts: [
+              { district: "Nagpur", enrolled: 9, below_minimum: false },
+              { district: "Tiny Town", enrolled: null, below_minimum: true },
+            ],
+          },
+          error: undefined,
+          response: { status: 200 },
+        };
+      }
+      return { data: undefined, error: undefined, response: { status: 200 } };
+    });
+    renderUi(<ProgrammeDashboard />);
+    const select = await screen.findByRole("combobox");
+    (select as HTMLSelectElement).value = "P";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(await screen.findByText("Tiny Town")).toBeTruthy();
+    expect(screen.getByText("fewer than 5")).toBeTruthy();
+    expect(screen.getByText("9")).toBeTruthy();
+    expect(screen.getByText(/A count of fewer than 5 is not shown/)).toBeTruthy();
+  });
 });

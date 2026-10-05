@@ -8,6 +8,7 @@ The employer console is the same `score_match` with its arguments the other way
 round, which is why it lives here rather than in a module of its own.
 """
 
+from api.modules.matching.batch import profiles_with_serious_match
 from api.modules.matching.employer import (
     JobPool,
     ScarceSkill,
@@ -76,6 +77,7 @@ __all__ = [
     "provider_org_router",
     "courses_closing_gap",
     "match_jobs",
+    "profiles_with_serious_match",
     "mount_employer_console",
     "router",
     "score_against_roles",

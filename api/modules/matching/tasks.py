@@ -13,6 +13,7 @@ mirroring the alert sweep's own "claim, then do the work" shape -- cheap when
 there is nothing new, one indexed query returning no rows.
 """
 
+import uuid
 from typing import Any
 
 import structlog
@@ -25,8 +26,10 @@ log = structlog.get_logger("iism.matching")
 
 # One sweep's worth. Bounded so a backlog after a bulk import cannot make one
 # tick of the worker run for minutes; the next tick picks up where this one
-# left off, the same reasoning `RETRIEVAL_LIMIT` uses for scoring.
-BATCH_SIZE = 100
+# left off. 250 rather than 100 (Sprint 50): at 100 every two minutes a 50,000-
+# profile backfill took seventeen hours, and a tick of 250 is about a second and
+# a half now that the skill ids for the whole batch are read in one query.
+BATCH_SIZE = 250
 
 
 async def refresh_embeddings(ctx: dict[str, Any]) -> dict[str, int]:
@@ -59,21 +62,36 @@ async def _refresh_jobs(db: AsyncSession) -> int:
                 # `embedding IS NULL` alone never revisited the old ones.
                 Job.embedding.is_(None) | Job.embedding_model.is_distinct_from(provider.model),
             )
+            # **Never-looked-at first, then the longest ago** (Sprint 50). Without an order,
+            # `LIMIT` returned the same rows every tick, and a row that cannot be embedded stays
+            # `embedding IS NULL` for ever -- so once a batch's worth of them existed they held
+            # the head of the queue and nothing behind them was ever embedded.
+            .order_by(Job.embedding_computed_at.asc().nulls_first(), Job.id)
             .limit(BATCH_SIZE)
         )
     )
     if not jobs:
         return 0
 
-    for job in jobs:
-        skill_ids = list(
-            await db.scalars(select(JobSkill.skill_id).where(JobSkill.job_id == job.id))
+    skills_by_job: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for job_id, skill_id in (
+        await db.execute(
+            select(JobSkill.job_id, JobSkill.skill_id).where(
+                JobSkill.job_id.in_([job.id for job in jobs])
+            )
         )
-        text = await embedding_text_for_skills(db, skill_ids)
+    ).all():
+        skills_by_job.setdefault(job_id, []).append(skill_id)
+
+    for job in jobs:
+        text = await embedding_text_for_skills(db, skills_by_job.get(job.id, []))
         if not text:
             # Nothing to embed yet (a job whose standards carry no corpus
             # text at all) -- leave NULL rather than store a meaningless
             # zero vector that would then compare as "similar to nothing".
+            # Stamp that it was looked at, so it goes to the back of the queue
+            # instead of being picked again first on the next tick.
+            job.embedding_computed_at = func.now()
             continue
         job.embedding = provider.embed(text)
         job.embedding_provider = provider.name
@@ -96,22 +114,34 @@ async def _refresh_profiles(db: AsyncSession) -> int:
                 CandidateProfile.embedding.is_(None)
                 | CandidateProfile.embedding_model.is_distinct_from(provider.model)
             )
+            # See `_refresh_jobs`: a profile with no declared standard cannot be embedded and
+            # is common (the profile is created lazily), so without this order a hundred of
+            # them stop the sweep for everyone else.
+            .order_by(
+                CandidateProfile.embedding_computed_at.asc().nulls_first(), CandidateProfile.id
+            )
             .limit(BATCH_SIZE)
         )
     )
     if not profiles:
         return 0
 
-    for profile in profiles:
-        skill_ids = list(
-            await db.scalars(
-                select(CandidateSkill.skill_id).where(CandidateSkill.profile_id == profile.id)
+    skills_by_profile: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for profile_id, skill_id in (
+        await db.execute(
+            select(CandidateSkill.profile_id, CandidateSkill.skill_id).where(
+                CandidateSkill.profile_id.in_([profile.id for profile in profiles])
             )
         )
-        text = await embedding_text_for_skills(db, skill_ids)
+    ).all():
+        skills_by_profile.setdefault(profile_id, []).append(skill_id)
+
+    for profile in profiles:
+        text = await embedding_text_for_skills(db, skills_by_profile.get(profile.id, []))
         if not text:
             # No declared skills yet -- nothing to embed, and there is
             # nothing for `score_match`'s semantic term to compare either way.
+            profile.embedding_computed_at = func.now()
             continue
         profile.embedding = provider.embed(text)
         profile.embedding_provider = provider.name

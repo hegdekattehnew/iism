@@ -349,3 +349,117 @@ class TestInvalidationOnWrite:
         await db.commit()
         await db.refresh(job)
         assert job.embedding is None
+
+
+class TestASweepCannotStallBehindWhatItCannotEmbed:
+    """Sprint 50. A profile with no declared standard has no text, stays `embedding IS NULL`,
+    and was picked again first on every tick: `LIMIT` with no `ORDER BY` returned the same
+    rows. A hundred of them -- profiles are created lazily, so that is ordinary -- and nothing
+    behind them was ever embedded."""
+
+    async def test_profiles_behind_unembeddable_ones_are_still_embedded(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        from api.modules.marketplace.models import CandidateSkill
+        from api.modules.matching import tasks
+
+        monkeypatch.setattr(tasks, "BATCH_SIZE", 5)
+        skill = await _skill_with_criteria(db, "stall-profile-skill", criteria=["Greet people"])
+
+        async def profile(n: int, with_skill: bool) -> CandidateProfile:
+            user = User(phone=f"+9196{n:08d}")
+            db.add(user)
+            await db.flush()
+            # Fixed ids, so the tie-break among never-looked-at rows is not luck: the one that
+            # can be embedded sorts *last*, and the sweep has to get to it on the second tick.
+            p = CandidateProfile(user_id=user.id, id=uuid.UUID(int=n + 1))
+            db.add(p)
+            await db.flush()
+            if with_skill:
+                db.add(CandidateSkill(profile_id=p.id, skill_id=skill.id, proficiency=3))
+            return p
+
+        # Created first, so heap order puts them ahead of the one that can be embedded.
+        for n in range(7):
+            await profile(n, with_skill=False)
+        skilled = await profile(99, with_skill=True)
+        await db.commit()
+
+        await _refresh_profiles(db)
+        await _refresh_profiles(db)
+        await db.refresh(skilled)
+
+        assert skilled.embedding is not None, "the sweep never got past the unembeddable rows"
+
+    async def test_the_row_looked_at_longest_ago_goes_first(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        """Rows already stamped recently queue behind one stamped long ago -- which is what a
+        profile that has just been given its first skill looks like."""
+        from datetime import UTC, datetime, timedelta
+
+        from api.modules.marketplace.models import CandidateSkill
+        from api.modules.matching import tasks
+
+        monkeypatch.setattr(tasks, "BATCH_SIZE", 5)
+        skill = await _skill_with_criteria(db, "order-profile-skill", criteria=["Greet people"])
+        recent = datetime.now(UTC) - timedelta(hours=1)
+        long_ago = datetime.now(UTC) - timedelta(days=30)
+        for n in range(7):
+            user = User(phone=f"+9194{n:08d}")
+            db.add(user)
+            await db.flush()
+            db.add(CandidateProfile(user_id=user.id, embedding_computed_at=recent))
+        user = User(phone="+919400009999")
+        db.add(user)
+        await db.flush()
+        skilled = CandidateProfile(user_id=user.id, embedding_computed_at=long_ago)
+        db.add(skilled)
+        await db.flush()
+        db.add(CandidateSkill(profile_id=skilled.id, skill_id=skill.id, proficiency=3))
+        await db.commit()
+
+        await _refresh_profiles(db)
+        await db.refresh(skilled)
+
+        assert skilled.embedding is not None, "a row looked at long ago did not go first"
+
+    async def test_an_unembeddable_row_is_looked_at_and_goes_to_the_back(
+        self, db: AsyncSession
+    ) -> None:
+        user = User(phone=f"+9195{uuid.uuid4().int % 100000000:08d}")
+        db.add(user)
+        await db.flush()
+        empty = CandidateProfile(user_id=user.id)
+        db.add(empty)
+        await db.commit()
+        assert empty.embedding_computed_at is None
+
+        await _refresh_profiles(db)
+        await db.refresh(empty)
+
+        assert empty.embedding is None
+        assert empty.embedding_computed_at is not None
+
+    async def test_jobs_behind_unembeddable_ones_are_still_embedded(
+        self, db: AsyncSession, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        from api.modules.matching import tasks
+
+        monkeypatch.setattr(tasks, "BATCH_SIZE", 5)
+        tenant = Tenant(slug="stall-job-employer", name="Stall Co", tenant_type="employer")
+        db.add(tenant)
+        await db.flush()
+        for n in range(7):  # published, with no standard at all
+            db.add(
+                Job(slug=f"stall-empty-{n}", tenant_id=tenant.id, title="Empty", status="published")
+            )
+        await db.flush()
+        skill = await _skill_with_criteria(db, "stall-job-skill", criteria=["Stack shelves"])
+        skilled = await _published_job_with_skill(db, skill)
+
+        await _refresh_jobs(db)
+        await _refresh_jobs(db)
+        await db.refresh(skilled)
+
+        assert skilled.embedding is not None, "the sweep never got past the unembeddable rows"

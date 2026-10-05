@@ -44,8 +44,11 @@ from api.modules.notifications import enqueue
 log = structlog.get_logger("iism.alerts")
 
 # How many vacancies one sweep will consider. The cron runs often; a backlog
-# drains over a few minutes rather than in one long transaction.
-MAX_JOBS_PER_SWEEP = 10
+# drains over a few minutes rather than in one long transaction. 30 rather than 10
+# (Sprint 50): ten every five minutes is 120 vacancies an hour, so a catalogue taking
+# more than about 2,900 new vacancies a day never drained; thirty is 360 an hour, and a
+# sweep is a few seconds now that the shortlist no longer loads whole profiles.
+MAX_JOBS_PER_SWEEP = 30
 
 
 @dataclass(frozen=True)
