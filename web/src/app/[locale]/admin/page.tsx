@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { DistrictSkillGap } from "@/components/ops/DistrictSkillGap";
 import { OperatorDashboard } from "@/components/ops/OperatorDashboard";
 import { OperatorOnly } from "@/components/ops/OperatorOnly";
 import { ProgrammeDashboard } from "@/components/ops/ProgrammeDashboard";
@@ -29,6 +30,9 @@ export default async function Page({
         <OperatorDashboard />
         <div className="mt-10">
           <ProgrammeDashboard />
+        </div>
+        <div className="mt-10">
+          <DistrictSkillGap />
         </div>
         <div className="mt-10">
           <h1 className="text-3xl font-bold tracking-tight">{t("queueTitle")}</h1>

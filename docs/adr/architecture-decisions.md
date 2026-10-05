@@ -2690,3 +2690,216 @@ half to be missing, and nothing would have caught the next table being the same.
 - Not done: a retention limit on sent notifications, which accumulate for as long as the account lives. They hold vacancy and
   organisation names, no address, and are erased with the account.
 
+
+
+## ADR-056: Retrieval Ranks Before It Caps, and What It Ranks By Is a Bound, Not a Second Scorer
+
+**Status:** Accepted (October 2026). Refines ADR-007's two-stage matching and leaves ADR-036 and ADR-037 standing. No migration and
+no external integration.
+
+**Context:** Matching retrieves a bounded set and scores only that, because scoring everyone against everything does not survive
+growth (ADR-007). Until now the bound was a cap of 500 applied **before** ranking, by an arbitrary key: `Job.id` for a candidate's
+vacancies and the UUID's text for a vacancy's candidates. The code said so, in a comment: ranking retrieval by fit was "out of scope
+until the catalogue is large enough for the cap to bite". Nobody had looked at whether it bit, because every number this project
+quotes comes from 42 candidates and 151 vacancies.
+
+Sprint 49 built a harness (`make seed-scale`, `make benchmark`): a separate database `iism_scale`, deterministic synthetic rows
+(50,042 candidates, 890,778 candidate skills, 5,148 open vacancies; the commonest standard held by 46,025 candidates), skewed
+popularity, and mixed evidence, level floors and experience floors so that the number being measured is not flattered by a
+uniform world. Recall is measured against **exhaustive truth**: every vacancy (or candidate) sharing a standard, scored through the
+same `score_match`, with no cap and no proxy.
+
+| At 50,042 candidates, 5,148 vacancies | Before | After (K = 500) |
+|---|---|---|
+| Candidate: true top 20 vacancies returned | **2.9 of 20** | **20 of 20** |
+| Employer: true top 20 candidates returned | **1.2 of 20** | **20 of 20** |
+| Employer: points the best returned is short of the best that existed (mean / max) | 3.0 / 11 | 0 / 0 |
+| `match_jobs` latency, p50 / p95 | 92 / 185 ms | 108 / 186 ms |
+| `candidates_for_job` latency, p50 / p95 | 921 / 1,148 ms | 462 / 569 ms |
+| Scarce skills, one employer / whole market | 495 / 470 ms | 119 / 108 ms |
+
+The page *looked* right throughout, because the scorer ordered correctly whatever it was handed. The best matches were never in
+front of it. Two further defects sat in the employer path: it loaded every `(candidate, standard)` pair that touched any of the
+vacancies into Python (16 seconds for a popular standard) and then filtered with `IN (every candidate)`, which **crashes past
+asyncpg's 32,767 bind parameters** -- a pool of 47,109 sharers did exactly that when uncapped.
+
+**Decision:**
+
+- **Retrieval keeps the K highest *upper bounds* on the score** (`api/modules/matching/retrieval.py`). The score is coverage plus
+  level, experience and evidence, capped when a mandatory standard is missing. Coverage and the mandatory count come from the
+  database in one aggregation; the other three components are not known without loading the person, so they are taken as full
+  marks (each is at most 1). The cap is applied to that exactly as `score_match` applies it. The result can only overstate:
+  `score - 0.5 <= 100 * bound` for every pair, the half point being the scorer's own rounding. A pair outside the K therefore cannot
+  have a higher unrounded score than the K-th pair's bound.
+- **It is a retrieval ranking and never a score.** It is not returned, stored, logged or shown; every number a person sees still comes
+  from `score_match` (ADR-036, ADR-037). The rule that stops the two drifting is a test, not a comment: `tests/test_retrieval.py`
+  asserts the bound is never below the score, for two weightings, over a randomised marketplace with concepts spanning two rows,
+  mixed evidence, level and experience floors and mandatory standards -- **and that it is tight** when nothing else varies, which a
+  bare "never below" cannot see (an over-count passes it).
+- **The employer side is one window query per vacancy**, not a load into Python: `row_number() over (partition by vacancy order by
+  bound desc, profile id) <= K`. It walks *from the requirements* to the skill rows that satisfy them and on to the holders through
+  `candidate_skills.skill_id`'s index; the first version let the planner build every candidate's held keys across the table, which
+  it answered with a scan of all 890,778 rows (about 350 ms) -- caught by `EXPLAIN ANALYZE`, not by a test.
+- **Held-skill and profile loads are chunked** at 5,000 ids per `IN`, so no pool, and no number of vacancies, can reach the ceiling.
+- **Scarce skills count holders only for the contenders.** Holders are the *second* sort key, after how many vacancies ask for the
+  standard, so they matter only for standards tied with the last one that can make the list.
+- **K is a setting** (`MATCH_RETRIEVAL_LIMIT`, default 500, at least 20). It is chosen by measuring, which the harness now makes
+  possible; the default is the number the owner approved, and the table below is the evidence for changing it.
+
+| K | Candidate overlap | Employer overlap | `candidates_for_job` p95 |
+|---|---|---|---|
+| 20 | 18.2 / 20 | 12.5 / 20 | 137 ms |
+| 50 | 20 / 20 | 17.0 / 20 | 218 ms |
+| 150 | 20 / 20 | 20 / 20 | 273 ms |
+| **500** | **20 / 20** | **20 / 20** | **569 ms** |
+
+**Options considered:** 1. Raise or remove the cap
+2. Rank by a plain count of shared standards
+3. **Rank by an upper bound on the score** (chosen)
+4. Precompute a candidate-by-vacancy score table, or use pgvector nearest-neighbour search
+
+**Trade-offs:**
+
+- Option 1: ✅ No new code ❌ Removing it is the 16-second, 32,767-parameter crash; raising it only moves where the page falls over.
+- Option 2: ✅ Trivial ❌ Ignores importance and the mandatory cap, so a candidate missing one mandatory standard ranks level with one
+  who holds everything. The cap test fails it.
+- Option 3: ✅ Comes with a stated guarantee and a test that holds it; uses the scorer's own weights and cap, from configuration
+  ❌ A second statement of the cap rule, which is why it is test-guarded; loosest when evidence, level and experience vary, which is
+  what the K = 50 row shows.
+- Option 4: ✅ Constant-time reads ❌ Stored scores go stale on every profile or vacancy edit, and an approximate nearest-neighbour search
+  is the generated ranking ADR-036 forbids deciding a match.
+
+**Consequences:**
+
+- **The default K = 500 misses the employer latency target I set (p95 at or under 300 ms): 569 ms at this size.** K = 150 meets it
+  (273 ms) with identical recall on this data. The data is synthetic and its skew steeper than the real corpus will be, so this
+  is a measured trade-off for the owner to set, not a conclusion.
+- **`JobPool.pool`, `ready` and `nearly` are still counts over what was retrieved** (at most K), as they always were: a vacancy with
+  more than K sharers undercounts them. Counting the true pool needs a second aggregate and is not done.
+- **The retrieval cost is bounded by K, not by the catalogue**; the cost of the *aggregation* still grows with the number of holders
+  of a vacancy's standards (about 50-100 ms at 47,000).
+- Turning `match_weight_semantic` up widens the bound's headroom automatically (it is read from the same weights), at some cost in
+  recall for the same K. Re-run `make benchmark` with it.
+- The harness is a measuring instrument, not a promise: the absolute numbers will differ on real data. The structural findings
+  (a cut by `Job.id` or UUID order; a pair-load that cannot run past 32,767 ids) do not depend on the skew.
+
+---
+
+## ADR-057: A District's Skill Gap Is Ranked by Shortfall, and a Count of Fewer Than Five Residents Is Never Shown
+
+**Status:** Accepted (October 2026). Completes BL-12.7. No migration; read-only, operator-only, beside the programme report
+(`OPS_PROGRAMME_READ`, so support and admin tiers, ADR-044).
+
+**Context:** A district official's question is "of what employers here want, where is the gap widest". The first version of this
+story asked for the "scarce" standards, which needs a threshold nobody has a basis for. It also has a privacy problem the other
+operator reports do not: supply is a count of **people in a place**. In a small district "two residents hold this standard" is
+nearly a description of them.
+
+**Decision:**
+
+- **Every standard an open vacancy in the district requires is listed, ranked by shortfall.** No threshold decides what appears.
+  Demand is the head-count (`Job.positions`) of the district's *open* vacancies (`open_job()`), a standard a vacancy lists twice
+  through two rows of one concept counting once. Supply is the number of distinct *residents* (`CandidateProfile.district_id`, where
+  they live, not where they said they would work) holding it, compared at concept level as the scorer does. Shortfall is
+  `max(0, demand - supply)` and is **per standard**: one resident holds several, so the column does not sum to a number of people.
+- **A supply of one to four is not shown** (`MIN_CELL_SIZE = 5`, a constant in `operations/skill_gap.py`, not a setting: a privacy
+  floor that an environment variable can lower is not a floor). The row says "fewer than 5". Zero is shown: an absence describes
+  nobody. The district's resident total is suppressed the same way.
+- **Demand beside a hidden supply would let the reader subtract it back**, so the shortfall for such a row is computed against the
+  largest hidden value (4) and flagged `shortfall_is_minimum`. **Rows are ranked on what is shown**, so the order leaks nothing the
+  figures do not: a test asserts two standards with equal demand and hidden supplies of 1 and 4 come out in name order, which they
+  would not if the true supply decided.
+- The panel renders what the server says and computes nothing, so it cannot print a number the API withheld.
+
+**Options considered:** 1. A "scarce" list with a cut-off
+2. **Everything demanded, ranked by shortfall, small supplies suppressed** (chosen)
+3. Show exact counts to operators, who are trusted
+4. Round every count to the nearest five
+
+**Trade-offs:**
+
+- Option 1: ✅ Short list ❌ The threshold is invented, and what falls under it is invisible, which is the gap a district official most wants.
+- Option 2: ✅ No invented line; the privacy rule is one function (`suppress`) with one constant ❌ A small district's page is mostly "fewer than 5"
+  and minimum shortfalls, which is accurate about how little is known.
+- Option 3: ✅ Simplest ❌ An operator's trust is not the data subject's consent, and a screenshot leaves the room.
+- Option 4: ✅ Hides small cells too ❌ Rounds the large, useful counts to nothing finer than five.
+
+**Consequences:**
+
+- **`/ops/programmes/{name}/districts` still shows exact per-district enrolment, including cells under five.** That is the Sprint 40 view
+  and was not changed here; it is the same class of disclosure and should adopt `suppress` -- recorded, not done.
+- Measured on the scale harness (46 districts with demand): 43-52 ms per district. On the 42-candidate dev data the view is a
+  demonstration; the harness spreads synthetic rows over 25 districts so it can be exercised at size.
+- Residents are counted if they hold *any* declared standard, so the total is "residents with a declared standard", not residents.
+
+---
+
+## ADR-058: Notifications Are Kept for Ninety Days, an Unopened Notice for a Hundred and Eighty, and a Message Still Owed Never Goes
+
+**Status:** Accepted (October 2026). Closes the item ADR-055 recorded as not done. No migration.
+
+**Context:** The outbox is the one table that keeps what the product has *said* to a person, and nothing ever removed a row. An
+email delivered in 2026 would sit with its payload (a vacancy title, an organisation's name) for as long as the database does.
+Data kept "just in case" is data held without a purpose (DPDP Act 2023); analytics events already have a purge for the same reason.
+
+**Decision:** a worker cron (`purge_expired_notifications`, 03:15 India time, fifteen minutes after the analytics purge) deletes, by
+`created_at`, three classes counted separately in the log:
+
+- **delivered** -- email that is `sent`, `skipped` or terminally `failed`, older than `NOTIFICATION_RETENTION_DAYS` (default 90, at least 7);
+- **read** -- an in-app notice the person opened, older than the same period;
+- **unread** -- an in-app notice nobody opened, after **twice** the period. The list shows the newest fifty regardless of age and an
+  unopened notice may be an offer to sponsor a standard (ADR-048) that the person has not yet seen.
+
+A `pending` message is **never** deleted however old: it is still owed, and the drain will send it or fail it.
+
+**Options considered:** 1. Leave it
+2. **Three classes, one setting** (chosen)
+3. Delete everything past the period regardless of state
+4. Archive to a second table
+
+**Trade-offs:**
+
+- Option 1: ✅ No work ❌ Unbounded growth of a table of personal communications.
+- Option 2: ✅ Never deletes what is owed or unseen ❌ Two ages from one setting is a rule to remember; it is written beside the code.
+- Option 3: ✅ Simplest ❌ Deletes an unseen offer, and could delete a message the drain has not yet sent.
+- Option 4: ✅ Reversible ❌ Keeps the data, which is the thing being removed.
+
+**Consequences:**
+
+- The DPDP export (ADR-055) shows what exists, so it shows less after a purge. That is the correct reading of "what the product holds".
+- No index serves the in-app delete (`created_at` alone), so it is a nightly sequential scan. Fine at today's size; add one when the table
+  is large enough for it to matter.
+- Nothing else reads old notifications: the alert and sponsorship daily caps count `job_alerts` and `sponsor_intents`, not this table.
+
+---
+
+## ADR-059: Every Route's Audience Is Stated, and a Test Reads It Back From the Route Table
+
+**Status:** Accepted (October 2026). A test-only change plus one attribute on `require_operator`'s dependency.
+
+**Context:** Every authorization guard here is a dependency a route must remember to declare, and the project's record is that it
+sometimes did not: three of eight publishing writes without the tenant-type check, a candidate able to read the employer console.
+Each was found by hand, sprints later.
+
+**Decision:** `tests/test_authorization_matrix.py` builds the list of operations from the OpenAPI schema, so a route added tomorrow
+is covered the day it exists, and asks four questions of every one:
+
+- **Anonymous.** Every route not named in `PUBLIC_ROUTES` -- each with its reason -- answers 401. A route that forgot its guard answers
+  200, 404 or 422 and the failure names it. The list is itself checked: an entry for a route that no longer exists fails, and so does one
+  that answers 401.
+- **A stranger to an organisation.** For every `/org/{slug}/...` route, a candidate with no organisation and the owner of a *different* one
+  each get the same 404 -- status and body -- for an organisation that exists as for one that does not (ADR-038).
+- **The back office.** A signed-in non-operator gets a 404 byte-identical to an unrouted path on every `/ops` route (ADR-042); a support
+  operator gets 403 exactly where `TIER_PERMISSIONS["support"]` lacks the route's permission (ADR-044). **The permission is read off the
+  route** -- `require_operator`'s dependency now carries a `permission` attribute -- rather than restated in a second list.
+- **A partner key.** A user's bearer token opens no `/partners` route.
+
+**Consequences:**
+
+- Written against the current code it **found nothing wrong**: two entries in the first draft of `PUBLIC_ROUTES` were corrected by running it
+  (`/auth/logout` is public by design, the refresh token being the credential; `/invitations/{token}/accept` requires sign-in), which is the
+  intended use of the list. Each check was shown to fail when its guard is removed.
+- **It guards the doors, not the rooms.** Whether a permitted caller can reach *another person's* row (one candidate withdrawing somebody
+  else's application) needs a real resource per route and stays with each module's own tests. Saying otherwise would be the false claim this
+  project has made before.
+- **A new public route is a one-line addition with a reason**, which is the intended friction.

@@ -251,3 +251,40 @@ export function useRetireAlias() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ALIASES }),
   });
 }
+
+export type DistrictOptions =
+  paths["/ops/districts"]["get"]["responses"]["200"]["content"]["application/json"];
+export type DistrictSkillGap =
+  paths["/ops/districts/{district_id}/skill-gap"]["get"]["responses"]["200"]["content"]["application/json"];
+
+/** Districts with an open vacancy, for the skill-gap picker (Sprint 49, BL-12.7). */
+export function useDistrictsWithDemand() {
+  return useQuery({
+    queryKey: ["ops", "districts"] as const,
+    retry: false,
+    queryFn: async () => {
+      const result = await api.GET("/ops/districts", {});
+      const status = result.response.status;
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      return result.data;
+    },
+  });
+}
+
+/** Where one district's open vacancies ask for standards its residents do not hold.
+ *  Counts of one to four residents arrive as `null`, never as a number. */
+export function useDistrictSkillGap(districtId: string | null) {
+  return useQuery({
+    queryKey: ["ops", "district", districtId, "skill-gap"] as const,
+    enabled: districtId !== null,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/ops/districts/{district_id}/skill-gap", {
+        params: { path: { district_id: districtId as string } },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+  });
+}

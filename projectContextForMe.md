@@ -4,13 +4,16 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-04 · **Sprints 1–48 built.** Sprints 41–47 are merged into `main` (PRs #17–#24,
-`242ac19`); **Sprint 48 is on `sprint-48`, cut from that, uncommitted.** Sprint 48 is *what erasure deletes, the export
-shows* (ADR-055). A scan of every foreign key into a person found erasure sound — all `CASCADE` or `SET NULL` — and the
-**export lagging it**: job alerts, ratings, sponsorship offers and the notices addressed to a person were erased correctly and
-never shown to them. The export carries them now, and a **guard that walks the schema** fails on the next table that is
-not. **Alias coverage is unchanged and still thin: 43 distinct roles of 3,417**, and the screen to fix it exists since Sprint
-47. Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-05 · **Sprints 1–49 built.** Sprints 41–48 are merged into `main` (PRs #17–#25,
+`09097d1`); **Sprint 49 is on `sprint-49`, cut from that, uncommitted.** Sprint 49 is *matching you can trust at volume*
+(ADR-056 to ADR-059). A scale harness — a separate `iism_scale` database, 50,042 synthetic candidates and 5,148 open
+vacancies — showed that **retrieval cut by an arbitrary key before ranking**: only **2.9 of a candidate's true top 20
+vacancies, and 1.2 of an employer's true top 20 candidates, were ever returned**; the page looked right because the scorer
+ordered what it was handed. Retrieval now keeps the K best by an upper bound on the score (**20 of 20 on both sides**), the
+employer path no longer loads every pair into Python (or crashes past 32,767 bind parameters), and the district skill-gap view,
+a notification retention limit and an authorization matrix shipped beside it. **At the default K the employer shortlist misses
+its 300 ms target (p95 569 ms); K = 150 meets it at the same recall — the owner's call.** Alias coverage is unchanged and still thin:
+43 distinct roles of 3,417. Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -26,11 +29,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-48` (Sprint 48, **uncommitted**), cut from `main` at `242ac19`, which has Sprints 41–47 (PRs #17–#24). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
-| **Last sprint** | 48 — the export shows what erasure deletes, plus a schema-walking guard (ADR-055, no migration). Before it: 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | not yet chosen. Candidates: the district skill-gap view (needs a minimum cell size too, because a small district's counts identify people) (needs a "scarce" threshold), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
-| **Tests** | 1,106 backend (`make check`, 2026-10-04), 385 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0046` (Sprint 48 added none); 55 ADRs |
+| **Branch** | `sprint-49` (Sprint 49, **uncommitted**), cut from `main` at `09097d1`, which has Sprints 41–48 (PRs #17–#25). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Last sprint** | 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | not yet chosen. Candidates: **the retrieval K default** (owner decision: 500 as approved, or 150 — see Sprint 49), `/ops/programmes/{name}/districts` adopting the small-count rule (ADR-057), course credit chips (blocked: no course links to a qualification), scoring synonym-admitted rows in role search, and the curated alias batch if someone with labour-market knowledge can review it. `BL-1.3` stays not started. |
+| **Tests** | 1,162 backend (`make check`, 2026-10-05), 389 web (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0046` (Sprint 49 added none); 59 ADRs |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -952,6 +955,12 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
     registered.** A "stand or fall together" test that rolls back and then looks for the tenant finds
     nothing. Prove ordering with a spy on `enqueue` and `commit` instead.
 
+70. **A benchmark run from `nohup` or a background script may use the wrong `git`.** In Sprint 49 a script's `git stash` failed with
+   `/usr/local/bin/git: Bad CPU type in executable` (an x86 binary ahead of the arm64 one on that PATH), so the "old code" baseline
+   silently ran the **new** code and printed a perfect 20/20. It was noticed only because the number was too good. Take a baseline
+   from a clean `git worktree add /tmp/x main` with `PYTHONPATH=/tmp/x` (and check `python -c "import api; print(api.__file__)"`),
+   never from a stash.
+
 ## 9. Conventions that must not be broken
 
 - No business logic in route handlers — validate and delegate to a service.
@@ -965,10 +974,15 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-48`, uncommitted**, cut from `main` at `242ac19` (the PR #24 merge, which carries Sprints
-41–47). Commit only when the owner asks. Sprint 48's changes: `privacy/service.py` (four export helpers and five new keys),
-`.github/dependabot.yml` (the `@types/node` ignore), the `exportBody` string in en/hi/ms, `tests/test_privacy_coverage.py`
-(new), ADR-055, `CLAUDE.md`, the backlog document. **No migration, no new endpoint** (the generated client is unchanged).
+**Working on `sprint-49`, uncommitted**, cut from `main` at `09097d1` (the PR #25 merge, which carries Sprints
+41–48). Commit only when the owner asks. Sprint 49's changes: `matching/retrieval.py` (new), `matching/service.py` and
+`matching/employer.py` (retrieval, chunked loads, scarce skills), `core/config.py` (`match_retrieval_limit`,
+`notification_retention_days`), `core/authorization.py` (a `permission` attribute on `require_operator`'s dependency),
+`operations/{skill_gap.py (new),routes,schemas}.py`, `notifications/{service,tasks}.py`, `worker.py`,
+`scripts/{seed_scale,benchmark_matching}.py` (new), `Makefile` (`seed-scale`, `benchmark`, `drop-scale`), `.env.example`,
+`web/src/components/ops/DistrictSkillGap.tsx` (+ test), `web/src/lib/ops.ts`, `web/src/app/[locale]/admin/page.tsx`, the generated
+`api-schema.d.ts`, `ops.districtGap` in en/hi/ms, five new test files, ADR-056 to ADR-059, `CLAUDE.md`, the backlog document.
+**No migration.** Two new endpoints (`GET /ops/districts`, `GET /ops/districts/{district_id}/skill-gap`).
 
 **Earlier, 2026-10-02: `v2/foundations` merged and was deleted.** PR #14 (`v2/foundations` → `main`, head
 `8e7e179`) merged into `main` at `b15e0c6`; both CI jobs passed on that exact commit (checked via
@@ -2143,6 +2157,81 @@ export; and the privacy work plus the maintenance item (not the district view).
 - **Not done:** a retention limit on sent notifications (they accumulate while the account lives, hold vacancy and organisation
   names and no address, and are erased with it); the district skill-gap view.
 - **Left for later:** the alias batch itself; BL-13.6; BL-12.7; BL-5.3; BL-12.11; BL-1.3.
+
+### Sprint 49 — matching you can trust at volume (done 2026-10-05, uncommitted)
+
+Owner decisions, as recommended: **scope A–E** (harness, retrieval, district view, notification retention, authorization matrix);
+**a separate `iism_scale` database**; **K as a setting, default 500**; **minimum cell size 5**.
+
+- **The finding.** Every number this project quotes comes from 42 candidates and 151 vacancies, so the retrieval stage had never run
+  against a catalogue larger than its own cap. `match_jobs` cut by `Job.id` and `_candidates_for_jobs` by the UUID's text, *before*
+  ranking; the scorer then ordered an arbitrary 500. Measured against **exhaustive truth** on 50,042 candidates / 5,148 vacancies:
+  **2.9 of 20** of a candidate's true top vacancies and **1.2 of 20** of an employer's true top candidates were returned (best-missed
+  regret mean 9.6 / 3.0 points). The code's own comment had said the cap would bite once the catalogue grew. A pool of 47,109 sharers
+  also **crashes past asyncpg's 32,767 bind parameters**, and the load-everything-into-Python path took 16 s.
+- **The harness** (`make seed-scale`, `make benchmark`, `make drop-scale`). `iism_scale` is created from a copy of the dev database;
+  synthetic rows are **deterministic** (ids and every draw are hashes of an index — two runs gave an identical checksum), skewed
+  (`--skew`, default 3; the commonest standard held by 46,025 candidates), and **noisy on purpose**: evidence source, level floor and
+  experience floor are drawn at random, because the first version (all `self_declared`, no level floors) showed perfect recall at
+  K = 50 for a reason that had nothing to do with the bound being good. **Both scripts refuse any database not ending `_scale`**,
+  and a test runs them against `iism`, `iism_test`, `iism_scale_backup` and `scale` to prove it.
+- **The fix** (`matching/retrieval.py`, ADR-056). Keep the K highest **upper bounds** on the score: coverage and the mandatory count
+  from the database, level / experience / evidence taken as full marks, the cap applied exactly as `score_match` applies it. It is
+  a retrieval ranking and **never a score** — not returned, stored or shown. The employer side is one window query per vacancy
+  (`row_number() ... <= K`); loads of held skills and profiles are chunked at 5,000; scarce skills count holders only for the standards
+  tied with the last that can make the list.
+- **Measured, before → after (K = 500).** Candidate overlap 2.9 → **20 / 20**; employer overlap 1.2 → **20 / 20**; employer shortlist
+  p50/p95 921/1,148 → **462/569 ms**; scarce skills 495/470 → **119/108 ms**; `match_jobs` p95 185 → 186 ms (unchanged). K sweep:
+  K = 150 gives 20/20 on both sides at **273 ms p95**; K = 50 gives 20 and 17.0; K = 20 gives 18.2 and 12.5. **`make evaluate` output
+  is bit-identical** (diffed against `main`'s). **The default misses the 300 ms employer target I set; K = 150 meets it** — the owner's call,
+  and the synthetic skew is steeper than the real corpus will be.
+- **`EXPLAIN ANALYZE` found a second cost no test would**: the first window query let the planner build every candidate's held keys
+  across the table (a scan of all 890,778 rows, ~350 ms). Driving the join *from the vacancy's standards* through
+  `candidate_skills.skill_id`'s index took retrieval from ~300 ms to 18–96 ms.
+- **A test caught an imprecise claim of mine**: I had written `bound >= score / 100`; the scorer *rounds* (`round(raw * 100)`), so
+  `score / 100` can exceed the unrounded bound by up to 0.005. The claim, the docstring and the assertion now say what is true
+  (`score - 0.5 <= 100 * bound`). A second test asserts the bound is **tight** when nothing else varies, because a bare "never below"
+  passes an over-count (a candidate holding two rows of one concept was being counted twice, hidden by the mandatory cap).
+- **District skill-gap view** (BL-12.7, ADR-057). `GET /ops/districts`, `GET /ops/districts/{id}/skill-gap` (`OPS_PROGRAMME_READ`) and
+  a panel on `/admin`. Every standard an open vacancy in the district requires, **ranked by shortfall — no "scarce" threshold**.
+  **A supply of one to four residents is never shown** (`MIN_CELL_SIZE = 5`, a constant — a privacy floor an env var can lower is not
+  a floor); the shortfall beside it is computed from the hidden maximum (4) and flagged a minimum, and **rows are ranked on what is
+  shown**, so the order leaks nothing the figures do not. Zero is shown (an absence describes nobody). The panel computes nothing.
+  Live on the dev data: Pune 16 vacancies, 7 residents, "Employability Skills (60 Hours)" demand 4, supply 0. **Honest limit:
+  `/ops/programmes/{name}/districts` still shows exact per-district counts, including cells under five** — the same class of disclosure,
+  recorded and not changed.
+- **Notification retention** (ADR-058). A worker cron (03:15 India time) deletes delivered email and **read** in-app notices after
+  `NOTIFICATION_RETENTION_DAYS` (90, floor 7) and an **unread** notice after twice that; **a `pending` row is never deleted**. Nothing
+  else reads old notifications (the alert and sponsorship caps count other tables). No index serves the in-app delete — a nightly scan.
+- **Authorization matrix** (ADR-059, `tests/test_authorization_matrix.py`). Built from the OpenAPI schema, so a new route is covered the
+  day it exists: **anonymous** gets 401 from every route not in `PUBLIC_ROUTES` (each with a reason; stale or 401-answering entries fail);
+  **a stranger to an organisation** — a candidate with none, and the owner of a *different* one — gets the same 404, status and body,
+  for a real slug as for none, on every `/org/{slug}/...` route; **the back office** is 404 byte-identical to an unrouted path for a
+  non-operator, and 403 for a support operator exactly where `TIER_PERMISSIONS["support"]` lacks the route's permission — **read off the
+  route** (`require_operator`'s dependency now carries `.permission`); **a user's token opens no `/partners` route**. Written against the
+  current code it **found nothing wrong**; two entries of my first `PUBLIC_ROUTES` were corrected by running it. **It guards the doors,
+  not whose row a permitted caller reaches** — that needs a real resource per route and stays with each module's tests.
+- **Mutation-checked, and every one fails its own test**: retrieval (cap dropped from the bound, evidence headroom removed, ranking
+  ignoring the bound on each side, no DISTINCT per requirement row, tie-break dropped, held loads not chunked, scarce contenders cut
+  to `limit`), skill gap (floor inclusive, shortfall from the true supply, closed vacancies counted, supply not limited to the district,
+  no per-vacancy de-dup, resident total not suppressed, zero hidden), retention (pending deleted, unread kept 1×, unread deleted
+  regardless of age, task ignoring the setting, skipped kept), the matrix (a guard removed, 403 for 404, a non-operator told 403, the tier
+  check removed) and both harness guards. **Three survivors, all mine, all fixed or explained**: two tests that were weaker than I thought
+  (a mandatory cap masking a double count; one lucky row order passing a tie test) were strengthened and re-run; one mutant
+  ("a non-member's 404 body differs") is **equivalent** — "no such organisation" and "not a member" share one branch, so changing its text
+  changes both identically; the 403 mutant proves the status check bites.
+- **A script bug that nearly cost the baseline**: my background benchmark script called `git stash`, and in a `nohup` environment `git`
+  resolved to an x86 binary ("Bad CPU type"), so the "old code" run silently used the **new** code and printed 20/20. I noticed because
+  the numbers were too good, and took the true baseline from a clean worktree of `main` with `PYTHONPATH` set (checked that `api` imported
+  from the worktree).
+- **Verified.** `make check` **1,162 passed** (1,106 + 56) with ruff, format and `mypy` clean; web **389** with `tsc` and lint clean;
+  `npm run build && npm run budget` passes (`/admin` 662 KB of 684). **Live** against the running API on the real dev database:
+  an operator reads `/ops/districts` and a district's gap (anonymous 401), the demo employer's overview and a demo candidate's matches
+  render with no `bound` in any payload, and the panel renders in the browser in **English and Hindi** (no missing keys; "5 से कम …"
+  note). The scale database is left in place (`make drop-scale` removes it); **the dev database was never touched**.
+- **Not done:** `/ops/programmes/{name}/districts` adopting the small-count rule; the true (uncapped) pool size on the employer
+  overview (`pool`/`ready`/`nearly` are counts over the K retrieved, as they always were); an index for the in-app retention delete.
+- **Left for later:** the alias batch itself; BL-13.6; BL-5.3; BL-12.11; BL-1.3.
 
 ### Also outstanding, in rough order
 

@@ -11,11 +11,11 @@ Two rules, both learned elsewhere in this project:
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider
@@ -193,3 +193,54 @@ async def mark_all_read(db: AsyncSession, user_id: uuid.UUID) -> int:
     )
     await db.commit()
     return int(getattr(result, "rowcount", 0) or 0)
+
+
+async def purge_expired(db: AsyncSession, *, retention_days: int) -> dict[str, int]:
+    """Delete what is past its retention, and nothing that is still owed or unseen.
+
+    The outbox is the one table that keeps what the product *said* to a person, and
+    nothing ever removed a row: an email delivered in 2026 would sit, with its payload
+    -- a vacancy title, an organisation's name -- for as long as the database does. Data
+    kept "just in case" is data held without a purpose (DPDP Act 2023), which is the
+    reason the analytics events already have a purge (`analytics.purge_expired`).
+
+    Three classes, counted separately so the log says which:
+
+    * **delivered** -- an email that was `sent`, `skipped` or terminally `failed`, older
+      than `retention_days`. A `pending` row is never touched, however old: it is still
+      owed, and the drain will either send it or fail it.
+    * **read** -- an in-app notice the person opened, older than `retention_days`.
+    * **unread** -- an in-app notice nobody opened, kept **twice** as long. The list
+      shows the newest fifty regardless of age, and an unopened notice may be an offer
+      to sponsor a standard (ADR-048) that the person has not yet seen.
+
+    Age is `created_at`, not `sent_at`, because a skipped row has no `sent_at`.
+    """
+    now = func.now()
+    delivered = await db.execute(
+        delete(Notification).where(
+            Notification.channel == "email",
+            Notification.status.in_(("sent", "skipped", "failed")),
+            Notification.created_at < now - timedelta(days=retention_days),
+        )
+    )
+    read = await db.execute(
+        delete(Notification).where(
+            Notification.channel == "in_app",
+            Notification.read_at.is_not(None),
+            Notification.created_at < now - timedelta(days=retention_days),
+        )
+    )
+    unread = await db.execute(
+        delete(Notification).where(
+            Notification.channel == "in_app",
+            Notification.read_at.is_(None),
+            Notification.created_at < now - timedelta(days=2 * retention_days),
+        )
+    )
+    await db.commit()
+    return {
+        "delivered": int(getattr(delivered, "rowcount", 0) or 0),
+        "read": int(getattr(read, "rowcount", 0) or 0),
+        "unread": int(getattr(unread, "rowcount", 0) or 0),
+    }

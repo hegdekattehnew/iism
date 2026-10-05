@@ -1501,6 +1501,25 @@
       "failed": "That programme could not be loaded.",
       "byDistrict": "Enrolled, by district",
       "noDistricts": "No district data yet."
+    },
+    "districtGap": {
+      "title": "District skill gap",
+      "subtitle": "What employers in a district ask for, against the standards its residents hold, ranked by shortfall.",
+      "choose": "Choose a district",
+      "none": "No district has an open vacancy yet.",
+      "vacancies": "{count, plural, one {# open vacancy} other {# open vacancies}}",
+      "places": "{count, plural, one {# place} other {# places}}",
+      "residents": "{count} residents with a declared standard",
+      "residentsHidden": "Fewer than {min} residents with a declared standard",
+      "standard": "Standard",
+      "demand": "Places asked for",
+      "supply": "Residents who hold it",
+      "shortfall": "Shortfall",
+      "fewerThan": "fewer than {min}",
+      "atLeast": "at least {count}",
+      "failed": "That district could not be loaded.",
+      "empty": "No open vacancy in this district asks for a standard yet.",
+      "note": "A count of fewer than {min} residents is not shown, so a small district describes nobody. Shortfall is per standard: one resident holds several."
     }
   },
   "reviews": {

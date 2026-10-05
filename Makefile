@@ -77,6 +77,30 @@ evaluate: ## Score the matcher against the hand-labelled golden set
 monetisation-metrics: ## Report ADR-025's click-through and enrolment-conversion metrics (ADR-047)
 	$(NO_TIMEOUT) $(PY) scripts/report_conversion_metrics.py
 
+# ---------------------------------------------------------------- scale harness
+# A separate database, never the dev one: `scripts/seed_scale.py` refuses any name that
+# does not end in `_scale`. It is created from a copy of the dev database so it carries
+# the real taxonomy and vacancies, then filled with synthetic candidates and vacancies.
+SCALE_DB ?= iism_scale
+SCALE_URL := postgresql+asyncpg://iism:iism@localhost:5433/$(SCALE_DB)
+
+.PHONY: seed-scale
+seed-scale: ## Build the scale-harness database (iism_scale): make seed-scale [SCALE_ARGS="--candidates 50000"]
+	@docker exec $(PG) psql -U iism -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$(SCALE_DB)'" | grep -q 1 \
+	  || { echo "creating $(SCALE_DB) from a copy of the dev database..."; \
+	       docker exec $(PG) psql -q -U iism -d postgres -c "CREATE DATABASE $(SCALE_DB)" \
+	       && docker exec $(PG) pg_dump -U iism -d iism --no-owner --no-privileges \
+	          | docker exec -i $(PG) psql -q -U iism -d $(SCALE_DB) -v ON_ERROR_STOP=1 > /dev/null; }
+	DATABASE_URL=$(SCALE_URL) $(NO_TIMEOUT) $(PY) scripts/seed_scale.py $(SCALE_ARGS)
+
+.PHONY: benchmark
+benchmark: ## Latency and recall of matching on the scale harness: make benchmark [BENCH_ARGS="--truth 6"]
+	DATABASE_URL=$(SCALE_URL) $(NO_TIMEOUT) $(PY) scripts/benchmark_matching.py $(BENCH_ARGS)
+
+.PHONY: drop-scale
+drop-scale: ## Drop the scale-harness database
+	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS $(SCALE_DB)"
+
 .PHONY: check-role-aliases
 check-role-aliases: ## Verify every role_aliases.py target names a real, current qualification
 	$(NO_TIMEOUT) $(PY) scripts/check_role_aliases.py

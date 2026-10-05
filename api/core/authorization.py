@@ -380,4 +380,8 @@ def require_operator(
         structlog.contextvars.bind_contextvars(operator=True, staff_tier=user.staff_tier)
         return OperatorContext(user=user, permissions=granted)
 
+    # Named on the callable so a test can read which permission a route asks for from
+    # the route table itself, instead of a second list that would drift from it
+    # (`tests/test_authorization_matrix.py`).
+    dependency.permission = permission  # type: ignore[attr-defined]
     return dependency
