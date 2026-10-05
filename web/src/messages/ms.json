@@ -544,9 +544,21 @@
     "criteria": "Assessable criteria",
     "awardingBodies": "Awarding bodies",
     "sectors": "Sectors",
-    "coverage": "States and districts covered",
+    "coverage": "States and districts in our location data",
     "entryRoutes": "Documented ways in",
-    "footnote": "Counted live from the platform database, not illustrative."
+    "footnote": "Counted live from the platform database, not illustrative.",
+    "peopleHeading": "Who is here, and what has been done",
+    "peopleSub": "Counted live. Each figure says exactly what it counts.",
+    "jobSeekers": "Job seekers",
+    "signedUp": "{count} signed up",
+    "employers": "Employers",
+    "hiringNow": "{count} hiring now",
+    "providers": "Training providers",
+    "withCourse": "{count} with a published course",
+    "applications": "Applications made",
+    "hires": "Hires",
+    "districtsWithVacancy": "Districts with an open vacancy",
+    "demoNote": "These figures come from a demonstration database, not from real use."
   },
   "employerConsole": {
     "matchScore": "{score}% match",

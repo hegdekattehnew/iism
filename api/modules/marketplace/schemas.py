@@ -473,7 +473,7 @@ class CandidateProfileUpdateFull(BaseModel):
 
 
 class CorpusStatsOut(BaseModel):
-    """What the platform holds, counted live. Backs the landing page."""
+    """What the platform holds and what has been done on it, counted live (landing page)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -488,3 +488,17 @@ class CorpusStatsOut(BaseModel):
     jobs_posted: int
     jobs_open: int
     courses: int
+    # Who is here and what they have done (Sprint 50.5). Each broad figure has its narrow
+    # sibling (`profiles`/`job_seekers`, `employers`/`employers_hiring`, ...) so the page can
+    # name the narrower one underneath when they differ.
+    job_seekers: int
+    profiles: int
+    employers: int
+    employers_hiring: int
+    providers: int
+    providers_with_course: int
+    applications: int
+    hires: int
+    districts_with_vacancy: int
+    # True when the figures describe a demonstration database, not real use.
+    demo: bool

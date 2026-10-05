@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { api } from "@/lib/api";
 import { MARKETPLACE_COUNTS, SKILL_COUNT } from "@/lib/counts";
+import { useFormatCount } from "@/lib/format";
 
 type Kind = "skills" | "jobs" | "courses";
 
@@ -21,7 +22,6 @@ type Kind = "skills" | "jobs" | "courses";
  */
 export function LiveCount({ kind }: { kind: Kind }) {
   const t = useTranslations("browse");
-  const locale = useLocale();
 
   const skills = useQuery({
     queryKey: SKILL_COUNT,
@@ -35,12 +35,8 @@ export function LiveCount({ kind }: { kind: Kind }) {
     enabled: kind !== "skills",
   });
 
-  // Indian grouping, the same rule `StatsBand` applies -- 21,303 not 21303.
-  // The two sit within a screen of each other on the homepage, and an
-  // unformatted number beside a formatted one reads as a different kind of
-  // number rather than a larger one.
-  const fmt = (n: number) =>
-    new Intl.NumberFormat(locale === "hi" ? "hi-IN" : "en-IN").format(n);
+  // Indian grouping, the one rule `lib/format.ts` owns: 21,303 not 21303.
+  const fmt = useFormatCount();
 
   const counts = marketplace.data;
   const value =

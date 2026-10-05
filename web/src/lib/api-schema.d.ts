@@ -2933,7 +2933,7 @@ export interface components {
         };
         /**
          * CorpusStatsOut
-         * @description What the platform holds, counted live. Backs the landing page.
+         * @description What the platform holds and what has been done on it, counted live (landing page).
          */
         CorpusStatsOut: {
             /** Standards */
@@ -2958,6 +2958,26 @@ export interface components {
             jobs_open: number;
             /** Courses */
             courses: number;
+            /** Job Seekers */
+            job_seekers: number;
+            /** Profiles */
+            profiles: number;
+            /** Employers */
+            employers: number;
+            /** Employers Hiring */
+            employers_hiring: number;
+            /** Providers */
+            providers: number;
+            /** Providers With Course */
+            providers_with_course: number;
+            /** Applications */
+            applications: number;
+            /** Hires */
+            hires: number;
+            /** Districts With Vacancy */
+            districts_with_vacancy: number;
+            /** Demo */
+            demo: boolean;
         };
         /** CourseDetail */
         CourseDetail: {

@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(60 ADRs). Read it before making any structural decision — the summary below
+(61 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -445,6 +445,10 @@ split would have to turn into interfaces first; do not add to it casually.
 - **Postgres JIT is off** (`DB_JIT`). It cost ~600 ms a chunk on a heavy aggregate and bought nothing; test it before turning it back on.
 - **Take a benchmark baseline from a clean `git worktree` of `main` with `PYTHONPATH` set, and interleave old and new runs.** The
   machine's load moved single numbers by 2-4x during Sprint 50; ratios between interleaved runs are what survived.
+- **A public figure about people names what it counts and leads with the defensible number** (ADR-061). "Job seeker" is a profile with a declared standard
+  (`marketplace.skilled_profile()`, one definition for the homepage and the employer console), because a profile row is created by a visit; "signed up" is the line
+  underneath. A hire is `hired` or `completed`, never a `no_show`. **A true zero renders `0` and a small number shows**; a database that is not production's own says so
+  (`demo`, which is also true for any `*_scale` database). Figures are one uncached statement.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -844,6 +848,10 @@ split would have to turn into interfaces first; do not add to it casually.
 > The report now asks one batch question (17.6 s for 10,000, the same answer as the loop, which the test keeps as its oracle),
 > the employer overview counts in the database (20 s to 2.5 s, true totals), and a status change returns one row instead of rescoring
 > the inbox. Migration 0047, JIT off, and the programme-by-district view hides counts under five. K stays 500.
+>
+> **Sprint 50.5 is done** (ADR-061): the homepage now shows who is here and what has been done -- job seekers, employers, training providers, applications, hires and districts
+> with an open vacancy -- each defined where it is computed, with the narrower figure named underneath when it differs, a true zero shown as `0`, and a footnote when the
+> figures come from a demonstration database. One uncached statement. No migration.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

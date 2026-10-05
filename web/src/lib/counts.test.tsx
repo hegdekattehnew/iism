@@ -24,6 +24,7 @@ import {
   providerDashboardKey,
 } from "@/lib/counts";
 import { useOrgCourseMutations, useOrgJobMutations } from "@/lib/org";
+import { useProfileMutations } from "@/lib/profile";
 
 const ok = { data: { slug: "a-vacancy" }, error: null, response: { status: 200 } };
 
@@ -125,5 +126,29 @@ describe("a course that changes the catalogue", () => {
     });
     expect(stale(MARKETPLACE_COUNTS)).toBe(true);
     expect(stale(CORPUS_STATS)).toBe(true);
+  });
+});
+
+describe("a job seeker's declared standard moves a public figure (Sprint 50.5)", () => {
+  // "Job seekers" on the homepage is the profiles that have declared a standard, so adding,
+  // adding in bulk and removing one are all catalogue-of-people writes.
+  it("marks the counts stale when a standard is added, added in bulk, or removed", async () => {
+    for (const change of [
+      (m: ReturnType<typeof useProfileMutations>) =>
+        m.addSkill.mutateAsync({ skill_slug: "a-standard", proficiency: 3 }),
+      (m: ReturnType<typeof useProfileMutations>) =>
+        m.addSkillsBulk.mutateAsync({
+          items: [{ skill_slug: "a-standard", proficiency: 3 }],
+        }),
+      (m: ReturnType<typeof useProfileMutations>) => m.removeSkill.mutateAsync("a-standard"),
+    ]) {
+      qc.setQueryData(CORPUS_STATS, { job_seekers: 1 });
+      const { result } = renderHook(() => useProfileMutations(), { wrapper });
+      await act(async () => {
+        await change(result.current);
+      });
+      expect(stale(CORPUS_STATS)).toBe(true);
+      qc.clear();
+    }
   });
 });

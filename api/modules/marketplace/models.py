@@ -16,6 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     and_,
     func,
+    select,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -285,6 +286,22 @@ def posted_job() -> ColumnElement[bool]:
     bookmarked closed vacancy.
     """
     return Job.status == "published"
+
+
+def skilled_profile() -> ColumnElement[bool]:
+    """A profile that has declared at least one standard: the product's meaning of "job seeker".
+
+    One definition for every count of people (Sprint 50.5): the homepage's job-seekers figure and
+    the employer console's `candidates_total` read it, so they cannot disagree. A profile row
+    alone is **not** a candidate -- `ensure_profile` creates one lazily on a visit -- so counting
+    rows would let browsing inflate the figure, and an empty profile is nobody an employer could
+    be shown. An `EXISTS` per profile, not a `count(distinct profile_id)` over `candidate_skills`:
+    the latter reads every held standard (890,000 at 50,000 profiles) to answer a question about
+    the people.
+    """
+    return (
+        select(CandidateSkill.id).where(CandidateSkill.profile_id == CandidateProfile.id).exists()
+    )
 
 
 class JobSkill(Base):

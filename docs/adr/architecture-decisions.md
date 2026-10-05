@@ -2997,3 +2997,57 @@ Recall against exhaustive truth is **unchanged at 20 of 20 on both sides** (K = 
 - Not done, and recorded: public `q` search (`_text_filter`) was **not measured** and has no trigram index; the erasure notice loop builds one ORM object per
   applicant; `closes_at` has no index; `corpus_stats` runs eleven counts per homepage hit and is deliberately not cached (a cached count is the "number did not
   move" bug in `CLAUDE.md`).
+
+
+## ADR-061: A Public Figure About People Names What It Counts, Leads With the Defensible Number, and a Demonstration Says So
+
+**Status:** Accepted (October 2026). Sprint 50.5. No migration; one new field on an existing public endpoint.
+
+**Context:** The homepage band showed what the platform *holds* (standards, qualifications, sectors, vacancies, courses) and nothing about the people and activity on it.
+For a sales conversation that is the wrong way round: how many job seekers, how many employers, how many hired is the first question a buyer asks. The owner asked for
+those numbers, and chose to **always show the true count, however small**. That choice makes the definitions the whole of the work, because a real figure that is easy to
+inflate is the one a buyer catches. Three internal figures already disagreed: `candidates_total` (profiles with a declared standard), `platform_dashboard.candidates` (every
+profile row, including the empty ones lazy creation makes), and the homepage's own `states` and `districts` (the geography *master list*, not places with activity).
+
+**Decision:**
+
+- **Six figures, each with its definition written where it is computed** (`marketplace/stats.py`), and where a broad and a narrow figure differ **both are returned and the
+  page names the narrow one underneath**, the `jobs_posted` / `jobs_open` pattern:
+  - **Job seekers**: a profile with at least one declared standard (`marketplace.skilled_profile()`, now the one definition, shared with the employer console). It leads, because
+    a profile row is created lazily on a visit and so is inflatable by browsing; "signed up" (every profile) is the line underneath.
+  - **Employers** and **training providers**: `Tenant.tenant_type`, personal workspaces excluded (every candidate owns one); "hiring now" is an open vacancy, "with a published
+    course" a published course.
+  - **Applications**: every one made, withdrawn included (the candidate did apply).
+  - **Hires**: `hired` or `completed`. A `no_show` was hired but left the seat empty, so it is not a hire to count. A person hired twice counts twice, which is why the label
+    says "hires", never "people hired".
+  - **Districts with an open vacancy**: `count(distinct district_id)` over `open_job()`; the master-list figure is relabelled "states and districts in our location data" so
+    the two never read as one claim.
+- **A true zero renders `0`, and a small number is shown.** No tile is hidden below a floor, because a tile that vanishes when small reads as a regression on the day it returns.
+- **A demonstration says so** (`demo` on the response, a footnote on the band, en/hi/ms). It is true for anything but `ENVIRONMENT=production` **and for any database whose name ends
+  `_scale`**, so the benchmark harness's 50,000 synthetic candidates can never read as traction, even under the environment name `production`.
+- **One statement, still uncached.** Every count is a scalar subquery in one `SELECT`: nineteen figures in one round trip (17 ms on the dev database, 56 ms at 50,000 profiles).
+  Not cached: a cached count is the "I added a job and the number did not move" bug, and a person who has just applied or signed up expects the same. `StatsBand` therefore has no
+  `staleTime`, and applying, withdrawing and adding or removing a standard invalidate the public counts.
+- **Places, never people in a place.** No figure is sliced by district, so ADR-057's small-cell rule is not engaged, and a national total is an aggregate ADR-037 allows. A
+  "districts with a job seeker" figure was deliberately not built.
+
+**Options considered:** 1. Lead with every profile
+2. **Lead with the defensible figure and name the broad one underneath** (chosen)
+3. Hide a tile until it passes a floor
+4. Cache the figures for a minute
+
+**Trade-offs:**
+
+- Option 1: ✅ A bigger number ❌ Inflatable by browsing; the first buyer who asks "what is a job seeker?" ends the conversation.
+- Option 2: ✅ Every figure survives the question; the number and its definition arrive together ❌ The headline is smaller than the broad count (22, not 42 on the dev database).
+- Option 3: ✅ Looks better early ❌ Different tiles on different days, and a vanishing tile reads as a bug.
+- Option 4: ✅ Fewer queries ❌ The exact bug the existing figures were rewritten to avoid.
+
+**Consequences:**
+
+- **The dev database reads as small and says it is a demonstration** (22 job seekers, 102 employers, 60 providers, 18 applications, 1 hire, 21 districts). That is the owner's choice and
+  is true; a sales demo wants a database that has real use in it, not a larger synthetic one.
+- Employers (102) and providers (60) on the dev database are mostly fixture organisations; "hiring now" (97) and "with a published course" (60) are what a seeded database makes look
+  active. The `demo` footnote is what keeps that honest.
+- `/marketplace/counts` still duplicates three of `/stats`'s figures and is read only by `LiveCount`; merging them was not worth the churn.
+- Malay `stats` strings are still English (the locale is not in the switcher).
