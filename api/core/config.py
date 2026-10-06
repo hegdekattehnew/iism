@@ -96,6 +96,16 @@ class Settings(BaseSettings):
     # JSON only. A job description is a few kilobytes; nothing legitimate needs
     # more, and an unbounded body is a cheap way to exhaust a worker's memory.
     max_request_body_bytes: int = 256 * 1024
+    # A bulk upload (Sprint 51, ADR-063) is a spreadsheet, not a form: 200 rows with long
+    # descriptions is a few hundred kilobytes, so those two paths (and only those) take this
+    # larger body. Every other route keeps the limit above.
+    max_bulk_body_bytes: int = 2 * 1024 * 1024
+    # Rows per uploaded file, and rows an organisation may create in a rolling 24 hours -- lower
+    # until an operator has verified it. Drafts are invisible, so the cap bounds clutter and
+    # abuse of the write path, not what a visitor can see; publishing is a separate step.
+    bulk_max_rows: int = Field(default=200, ge=1)
+    bulk_rows_per_day_unverified: int = Field(default=100, ge=1)
+    bulk_rows_per_day_verified: int = Field(default=500, ge=1)
 
     # Applying is cheap for a candidate and expensive for an employer reading
     # the inbox. The per-minute write limit stops a script; this stops a day of

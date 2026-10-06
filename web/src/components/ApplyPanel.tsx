@@ -8,6 +8,7 @@ import { Area } from "@/components/profile/fields";
 import { Alert, Button, ButtonLink } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useIsSignedIn } from "@/lib/auth";
+import { invalidatePublicCounts } from "@/lib/counts";
 import type { components } from "@/lib/api-schema";
 import { useMemberships } from "@/lib/org";
 
@@ -100,6 +101,8 @@ export function ApplyPanel({
       setConfirming(false);
       setMessage("");
       await qc.invalidateQueries({ queryKey: ["me", "applications"] });
+      // "Applications made" is a public figure.
+      invalidatePublicCounts(qc);
     },
     onError: (e: Error) => {
       const status = Number(e.message);
@@ -127,6 +130,7 @@ export function ApplyPanel({
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["me", "applications"] });
+      invalidatePublicCounts(qc);
     },
     onError: (e: Error) =>
       setError(Number(e.message) === 409 ? t("errorWithdrawDecided") : t("errorGeneric")),

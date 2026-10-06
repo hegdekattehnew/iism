@@ -544,9 +544,20 @@
     "criteria": "Assessable criteria",
     "awardingBodies": "Awarding bodies",
     "sectors": "Sectors",
-    "coverage": "States and districts covered",
     "entryRoutes": "Documented ways in",
-    "footnote": "Counted live from the platform database, not illustrative."
+    "footnote": "Counted live from the platform database, not illustrative.",
+    "peopleHeading": "Who is here, and what has been done",
+    "peopleSub": "Counted live. Each figure says exactly what it counts.",
+    "jobSeekers": "Job seekers",
+    "signedUp": "{count} signed up",
+    "employers": "Employers",
+    "hiringNow": "{count} hiring now",
+    "providers": "Training providers",
+    "withCourse": "{count} with a published course",
+    "applications": "Applications made",
+    "hires": "Hires",
+    "districtsWithVacancy": "Districts with an open vacancy",
+    "demoNote": "These figures come from a demonstration database, not from real use."
   },
   "employerConsole": {
     "matchScore": "{score}% match",
@@ -731,7 +742,8 @@
       "ready": "Ready",
       "nearly": "Nearly ready",
       "newApplications": "New applications"
-    }
+    },
+    "uploadJobs": "Upload a spreadsheet"
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -914,7 +926,8 @@
       "byCourse": "Interest by course",
       "noCourses": "No published courses yet.",
       "interestSecondary": "{live} currently live"
-    }
+    },
+    "uploadCourses": "Upload a spreadsheet"
   },
   "chooser": {
     "title": "I'm here to…",
@@ -1582,5 +1595,61 @@
     "noEntry": "This qualification does not publish an entry route.",
     "note": "Built from the national qualification framework. It shows roles that share standards with yours, not a promise of a job or a promotion.",
     "error": "Could not load this just now. Try again in a moment."
+  },
+  "bulkUpload": {
+    "back": "Back to your workspace",
+    "step1": "1. Get the template",
+    "templateHelp": "Open it in Excel or Google Sheets, fill in one row for each listing, then save or export it as CSV (UTF-8). Only the title is required. Leave a cell empty to skip it.",
+    "downloadTemplate": "Download the template",
+    "step2": "2. Choose your file",
+    "chooseFile": "Your CSV file (up to 200 rows, 2 MB)",
+    "tooBig": "That file is larger than 2 MB. Split it and upload the parts one at a time.",
+    "checking": "Checking your file. Nothing is saved yet.",
+    "step3": "3. Review. Nothing has been saved yet",
+    "step3Done": "3. Result",
+    "summary": "{ok} ready, {warnings} with a warning, {errors} with a problem, {skipped} skipped.",
+    "limitLine": "You can create {remaining} more in the next 24 hours (the limit is {limit}; it is higher once an operator has verified your organisation).",
+    "acknowledge": "I understand the {count} rows with a problem will be skipped and I can fix them and upload the file again.",
+    "downloadErrors": "Download the rows to fix",
+    "apply": "Create {count} drafts",
+    "applying": "Creating drafts…",
+    "draftsNote": "These are saved as drafts that only your organisation can see. You publish them in the next step.",
+    "created": "{count} drafts created.",
+    "step4": "4. Publish",
+    "publish": "Publish these {count}",
+    "confirmPublish": "Yes, publish",
+    "cancel": "Cancel",
+    "publishedSummary": "{published} published, {refused} not published.",
+    "another": "Upload another file",
+    "failed": "Something went wrong. Check your file and try again.",
+    "tableCaption": "What each row of your file would create",
+    "colRow": "Row",
+    "colTitle": "Title",
+    "colResult": "Result",
+    "colDetails": "Details",
+    "status": {
+      "ok": "Ready",
+      "warning": "Warning",
+      "error": "Problem",
+      "skip": "Skipped"
+    },
+    "standardsCount": "{count, plural, one {# standard} other {# standards}}",
+    "fromRole": "from the job role",
+    "jobs": {
+      "title": "Upload vacancies from a spreadsheet",
+      "intro": "Create many vacancies at once. They are saved as drafts first, so you can check them before anyone can see them.",
+      "standardsHelp": "For standards, list National Occupational Standard codes (for example HC/N0001) separated by semicolons, or write a job role in the job_role column and its compulsory standards are listed here for you to review.",
+      "publishNote": "Publishing makes a vacancy visible to everyone. A vacancy with no required standard cannot be published.",
+      "publishConfirm": "Publish {count} vacancies? They become visible to everyone straight away.",
+      "viewList": "Go to your vacancies"
+    },
+    "courses": {
+      "title": "Upload courses from a spreadsheet",
+      "intro": "Create many courses at once. They are saved as drafts first, so you can check them before anyone can see them.",
+      "standardsHelp": "For standards, list National Occupational Standard codes (for example HC/N0001) separated by semicolons, or write a job role in the job_role column and its compulsory standards are listed here for you to review.",
+      "publishNote": "Publishing makes a course visible to everyone. A course that teaches no standard cannot be published.",
+      "publishConfirm": "Publish {count} courses? They become visible to everyone straight away.",
+      "viewList": "Go to your courses"
+    }
   }
 }

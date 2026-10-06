@@ -31,6 +31,7 @@ from api.modules.marketplace.models import (
     Job,
     JobSkill,
     open_job,
+    skilled_profile,
 )
 from api.modules.matching.retrieval import best_candidates_for, pool_counts, retrieval_limit
 from api.modules.matching.scoring import HeldSkill, MatchResult, score_match
@@ -478,18 +479,10 @@ async def _scarce_skills(
 
 
 async def candidates_total(db: AsyncSession) -> int:
-    """Profiles that have declared at least one standard.
-
-    An `EXISTS` per profile rather than `count(distinct profile_id)` over every `candidate_skills`
-    row, which read 890,000 index entries to answer a question about 50,000 people.
-    """
-    has_skill = select(CandidateSkill.id).where(CandidateSkill.profile_id == CandidateProfile.id)
-    return int(
-        await db.scalar(
-            select(func.count()).select_from(CandidateProfile).where(has_skill.exists())
-        )
-        or 0
-    )
+    """Profiles that have declared at least one standard (`marketplace.skilled_profile`, the one
+    definition of a job seeker, shared with the homepage)."""
+    counted = select(func.count()).select_from(CandidateProfile).where(skilled_profile())
+    return int(await db.scalar(counted) or 0)
 
 
 @dataclass(frozen=True)

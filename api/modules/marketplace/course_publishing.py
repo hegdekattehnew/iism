@@ -119,7 +119,14 @@ async def get_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> Cours
     return await _load(db, course.id)
 
 
-async def create_course(db: AsyncSession, tenant_id: uuid.UUID, payload: CourseIn) -> Course:
+async def create_course(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    payload: CourseIn,
+    *,
+    external_ref: str | None = None,
+) -> Course:
+    """A draft course. `external_ref` is the provider's own id (bulk upload only)."""
     course = await add_with_unique_slug(
         db,
         Course.slug,
@@ -131,6 +138,7 @@ async def create_course(db: AsyncSession, tenant_id: uuid.UUID, payload: CourseI
             # so omitting this would put an unfinished syllabus in front of
             # candidates. The seed sets `published` on purpose; a form must not.
             status="draft",
+            external_ref=external_ref,
             **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
         ),
     )

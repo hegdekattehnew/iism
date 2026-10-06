@@ -2997,3 +2997,128 @@ Recall against exhaustive truth is **unchanged at 20 of 20 on both sides** (K = 
 - Not done, and recorded: public `q` search (`_text_filter`) was **not measured** and has no trigram index; the erasure notice loop builds one ORM object per
   applicant; `closes_at` has no index; `corpus_stats` runs eleven counts per homepage hit and is deliberately not cached (a cached count is the "number did not
   move" bug in `CLAUDE.md`).
+
+
+## ADR-061: A Public Figure About People Names What It Counts, Leads With the Defensible Number, and a Demonstration Says So
+
+**Status:** Accepted (October 2026). Sprint 50.5. No migration; one new field on an existing public endpoint.
+
+**Context:** The homepage band showed what the platform *holds* (standards, qualifications, sectors, vacancies, courses) and nothing about the people and activity on it.
+For a sales conversation that is the wrong way round: how many job seekers, how many employers, how many hired is the first question a buyer asks. The owner asked for
+those numbers, and chose to **always show the true count, however small**. That choice makes the definitions the whole of the work, because a real figure that is easy to
+inflate is the one a buyer catches. Three internal figures already disagreed: `candidates_total` (profiles with a declared standard), `platform_dashboard.candidates` (every
+profile row, including the empty ones lazy creation makes), and the homepage's own `states` and `districts` (the geography *master list*, not places with activity).
+
+**Decision:**
+
+- **Six figures, each with its definition written where it is computed** (`marketplace/stats.py`), and where a broad and a narrow figure differ **both are returned and the
+  page names the narrow one underneath**, the `jobs_posted` / `jobs_open` pattern:
+  - **Job seekers**: a profile with at least one declared standard (`marketplace.skilled_profile()`, now the one definition, shared with the employer console). It leads, because
+    a profile row is created lazily on a visit and so is inflatable by browsing; "signed up" (every profile) is the line underneath.
+  - **Employers** and **training providers**: `Tenant.tenant_type`, personal workspaces excluded (every candidate owns one); "hiring now" is an open vacancy, "with a published
+    course" a published course.
+  - **Applications**: every one made, withdrawn included (the candidate did apply).
+  - **Hires**: `hired` or `completed`. A `no_show` was hired but left the seat empty, so it is not a hire to count. A person hired twice counts twice, which is why the label
+    says "hires", never "people hired".
+  - **Districts with an open vacancy**: `count(distinct district_id)` over `open_job()`; the master-list figure is relabelled "states and districts in our location data" so
+    the two never read as one claim.
+- **A true zero renders `0`, and a small number is shown.** No tile is hidden below a floor, because a tile that vanishes when small reads as a regression on the day it returns.
+- **A demonstration says so** (`demo` on the response, a footnote on the band, en/hi/ms). It is true for anything but `ENVIRONMENT=production` **and for any database whose name ends
+  `_scale`**, so the benchmark harness's 50,000 synthetic candidates can never read as traction, even under the environment name `production`.
+- **One statement, still uncached.** Every count is a scalar subquery in one `SELECT`: nineteen figures in one round trip (17 ms on the dev database, 56 ms at 50,000 profiles).
+  Not cached: a cached count is the "I added a job and the number did not move" bug, and a person who has just applied or signed up expects the same. `StatsBand` therefore has no
+  `staleTime`, and applying, withdrawing and adding or removing a standard invalidate the public counts.
+- **Places, never people in a place.** No figure is sliced by district, so ADR-057's small-cell rule is not engaged, and a national total is an aggregate ADR-037 allows. A
+  "districts with a job seeker" figure was deliberately not built.
+
+**Options considered:** 1. Lead with every profile
+2. **Lead with the defensible figure and name the broad one underneath** (chosen)
+3. Hide a tile until it passes a floor
+4. Cache the figures for a minute
+
+**Trade-offs:**
+
+- Option 1: ✅ A bigger number ❌ Inflatable by browsing; the first buyer who asks "what is a job seeker?" ends the conversation.
+- Option 2: ✅ Every figure survives the question; the number and its definition arrive together ❌ The headline is smaller than the broad count (22, not 42 on the dev database).
+- Option 3: ✅ Looks better early ❌ Different tiles on different days, and a vanishing tile reads as a bug.
+- Option 4: ✅ Fewer queries ❌ The exact bug the existing figures were rewritten to avoid.
+
+**Consequences:**
+
+- **The dev database reads as small and says it is a demonstration** (22 job seekers, 102 employers, 60 providers, 18 applications, 1 hire, 21 districts). That is the owner's choice and
+  is true; a sales demo wants a database that has real use in it, not a larger synthetic one.
+- Employers (102) and providers (60) on the dev database are mostly fixture organisations; "hiring now" (97) and "with a published course" (60) are what a seeded database makes look
+  active. The `demo` footnote is what keeps that honest.
+- `/marketplace/counts` still duplicates three of `/stats`'s figures and is read only by `LiveCount`; merging them was not worth the churn.
+- Malay `stats` strings are still English (the locale is not in the switcher).
+
+
+## ADR-063: A Spreadsheet Is Many Writes Through the One Writer, Checked Before It Is Applied, Applied as Drafts, and Published as a Separate Act
+
+**Status:** Accepted (October 2026). Sprint 51. Migration 0048. (ADR-062 is held for Sprint 52's browser-test dependency.)
+
+**Context:** A vacancy takes about 35-45 interactions to create: a twelve-field form, then each required standard is a search against 21,303 standards, a pick, an Add and
+optional importance and mandatory settings, then a Save (always a draft) and a separate Publish. Thirty vacancies is roughly a thousand interactions. The people the product
+is built for are the ones with many: a staffing agency, a multi-centre training partner (Sprint 26 refused to cap organisations per account for exactly them). Government
+agencies already had a bulk path; employers and providers had none, and supply loaded by an engineer running a seed script is the thing that stops an owner onboarding a
+partner. The owner chose: codes **and** a job-role column together, an upload that creates **drafts** with an explicit publish step, caps that are **higher once Verified**,
+and vacancies and courses **in one sprint on one engine**.
+
+**Decision:**
+
+- **A CSV, UTF-8 (a BOM is tolerated), sent as the raw `text/csv` request body.** No multipart, no new dependency (the standard library's `csv`), and no CSV library shipped to
+  the client: the browser reads the file with `file.text()` and posts it. XLSX is deferred; Excel exports "CSV UTF-8". The route declares the body in its OpenAPI
+  (`openapi_extra`), so the generated client types it as a `string`.
+- **Three acts, each its own request** (`marketplace/bulk.py`, `bulk_routes.py`): **check** (a dry run that writes nothing), **apply** (re-validates, never trusting a prior
+  check, then creates each valid row as a **draft**) and **publish** (`set_published`'s own rules per slug, so a vacancy with no standard, or a gig with no place, is refused
+  exactly as it is one at a time). A bad row never blocks a good one; the response carries a downloadable CSV of the original rows plus an `error` column, so the loop is
+  fix and upload again.
+- **Bulk goes through `create_job` and `create_course`, never beside them** (ADR-026: one writer). Those commit, so an upload is **per row**, not all-or-nothing, and a crash
+  leaves a partial upload that re-uploading skips safely. Both writers validate before they write, so a refusal leaves nothing pending to roll back.
+- **Idempotent, because fix-and-re-upload makes it essential.** An optional `external_ref` is unique per organisation (a partial unique index, `external_ref IS NOT NULL`). Without
+  one, a row matching an existing listing of the same organisation on normalised title (vacancies: and district and employment type) is **skipped and names the slug it matched**.
+  A repeat inside one file points at its first row. Never silently duplicated, never silently updated; update-by-reference is a later story.
+- **Standards by code, or by job role, and a role is never guessed.** `Skill.nos_code` is unique across the corpus, so a code is safe in a spreadsheet; a name is not (1,778 names
+  are shared by 4,838 standards). `standards` is `CODE[:importance[:M]]` for a vacancy and `CODE[:level]` for a course, `;`-separated. A `job_role` resolves by **exact title or
+  active alias only, never fuzzy** (the careers rule: a guess is a claim about somebody else); a near miss is shown as a hint and never applied. It expands to the **compulsory**
+  standards of the representative pack at importance 3, and **mandatory defaults to no** (`role_standards_mandatory=yes` opts in), because making every compulsory unit
+  mandatory caps every candidate missing one at 45 (ADR-036) and a role's units are rarely all a real employer's must-haves. Explicitly listed standards win over the expansion.
+  More than 50 resulting standards is an error (the largest real role has 65, the median is 6); a disability-track-only role is a warning (ADR-050). **The review lists every
+  expanded standard by code and name**, so nobody applies a mapping they have not seen.
+- **Caps.** 200 rows a file (413 past it, the file refused whole); a 2 MiB body for the two upload paths **and only those** (`body_limit_for`, every other route keeps 256 KB);
+  and a rolling 24-hour creation cap per organisation, **100 unverified and 500 verified**, counted from `created_at` over every creation path so a hand-made listing counts, and
+  applied identically by check and apply. Drafts are invisible, so the cap bounds clutter and abuse of the write path, not what a visitor can see. A phone number or email in a
+  description is a **warning**, not a block (a description is public once published).
+- **The route order is part of the design.** `/jobs/bulk/publish` would be captured by `/jobs/{slug}/publish` with `bulk` as the slug, so the bulk router is included **before**
+  `publishing_router`; a test asserts it.
+- **Two analytics events** (`jobs_bulk_uploaded`, `courses_bulk_uploaded`), counts only: rows, created, skipped, rejected. Recorded after the business commit, as `record()`
+  requires.
+- **The screen is a route of its own** (`/employer/[org]/jobs/upload`, `.../courses/upload`): `/employer/[org]` has 12 KB of first-load headroom against the budget and a CSV screen
+  must not spend it. Download the template (served by the API, so there is one list of columns), choose a file, review (an `aria-live` summary, a per-row table, the standards each
+  row resolved to), acknowledge the rows that will be skipped, create drafts, then publish with a confirmation that says the consequence in words. The server's own sentence is
+  shown on any failure; a 401 is "signed out", never "your file is wrong".
+
+**Options considered:** 1. A form-per-row grid in the browser
+2. **A CSV through a check, apply and publish sequence on the existing writers** (chosen)
+3. XLSX first
+4. All-or-nothing apply in one transaction
+5. Apply through the worker
+
+**Trade-offs:**
+
+- Option 1: ✅ No file format to explain ❌ The same thousand interactions, now in one page; no way to hand over a partner's existing inventory.
+- Option 2: ✅ No dependency, one writer, a re-uploadable loop ❌ A person must save as CSV; a crash can leave a partial upload.
+- Option 3: ✅ What a non-technical person has open ❌ A dependency that must justify itself (ADR-053) for a format every spreadsheet can already export.
+- Option 4: ✅ No partial state ❌ One bad row blocks 199 good ones, and a 200-row transaction holds locks for the whole upload; `create_job` commits by design.
+- Option 5: ✅ No request timeout to think about ❌ A 200-row apply takes about 2.5 s in a request, which is the bound; ADR-006 is about work that does not belong in a handler, and this
+  does. Revisit above 200 rows.
+
+**Consequences:**
+
+- **Measured on the 50,000-candidate scale database:** a 200-row check is 0.06 s and a 200-row apply 2.4 s for vacancies and 2.6 s for courses.
+- The standards step is the hardest for a person to get right. The role column removes it for the common case; the codes remain for those who know them, and a vacancy with no
+  standard is a warning at check time and a refusal at publish time, not a silent success.
+- **The role expansion decides what many vacancies require.** It is exact-or-alias, shows its working and defaults to non-mandatory; whether that default is right is the thing to
+  watch with the first real partner.
+- There is still **no verification gate on publishing**, for a hand-made vacancy or a bulk one. This widens nothing, and the unverified cap is what limits it.
+- A partner or ATS pushing by API key (a `ServiceAccount`-to-tenant binding and a write scope) and an upload history are later stories, as is update-by-`external_ref`.

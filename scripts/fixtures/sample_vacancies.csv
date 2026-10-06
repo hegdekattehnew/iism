@@ -1,0 +1,5 @@
+external_ref,title,description,state,district,employment_type,positions,experience_min_years,experience_max_years,salary_min_inr,salary_max_inr,nsqf_level_min,closes_at,standards,job_role,role_standards_mandatory
+SAMPLE-V1,Ward attendant,"Day shift at a 120-bed hospital. Training on the job.",Tamil Nadu,Chennai,full_time,2,0,3,15000,20000,3,2026-12-31,HSS/N6012:4:M; HSS/N6002:3,,
+SAMPLE-V2,General duty assistant,,Maharashtra,Pune,full_time,1,,,,,,,,General Duty Assistant,no
+SAMPLE-V3,Warehouse associate,"Picking and packing, two shifts.",Maharashtra,Pune,full_time,4,0,2,14000,18000,,2026-12-31,,Warehouse Associate,yes
+SAMPLE-V4,Weekend ward helper (one week),"A one-week cover for the weekend roster.",Tamil Nadu,Chennai,gig,1,,,,,,2026-11-15,HSS/N6012:3,,

@@ -166,7 +166,14 @@ def _require_gig_has_a_place(payload: JobIn, district_id: uuid.UUID | None) -> N
         )
 
 
-async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> Job:
+async def create_job(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    payload: JobIn,
+    *,
+    external_ref: str | None = None,
+) -> Job:
+    """A draft vacancy. `external_ref` is the organisation's own id (bulk upload only)."""
     location = await resolve_location(db, payload.location_state, payload.location_district)
     _require_gig_has_a_place(payload, location.district_id)
     job = await add_with_unique_slug(
@@ -182,6 +189,7 @@ async def create_job(db: AsyncSession, tenant_id: uuid.UUID, payload: JobIn) -> 
             status="draft",
             state_id=location.state_id,
             district_id=location.district_id,
+            external_ref=external_ref,
             **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
         ),
     )

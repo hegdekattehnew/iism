@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { invalidatePublicCounts } from "@/lib/counts";
 import { ApiError, readDetail } from "@/lib/http";
 import type { paths } from "@/lib/api-schema";
 
@@ -94,6 +95,12 @@ export function useCandidateDashboard() {
 export function useProfileMutations() {
   const qc = useQueryClient();
   const write = (data: unknown) => qc.setQueryData(["profile"], data);
+  // A declared standard is what makes a profile a "job seeker" on the homepage, so adding or
+  // removing one moves a public figure.
+  const writeSkills = (data: unknown) => {
+    write(data);
+    invalidatePublicCounts(qc);
+  };
 
   const saveDetails = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
@@ -164,7 +171,7 @@ export function useProfileMutations() {
       if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
-    onSuccess: write,
+    onSuccess: writeSkills,
   });
 
   // Several standards in one request: the ones ticked from a suggested role.
@@ -183,7 +190,7 @@ export function useProfileMutations() {
         throw new ApiError(response.status, readDetail(error));
       return data;
     },
-    onSuccess: write,
+    onSuccess: writeSkills,
   });
 
   const removeSkill = useMutation({
@@ -195,7 +202,7 @@ export function useProfileMutations() {
       if (error) throw new ApiError(response.status, readDetail(error));
       return data;
     },
-    onSuccess: write,
+    onSuccess: writeSkills,
   });
 
   const finishOnboarding = useMutation({
