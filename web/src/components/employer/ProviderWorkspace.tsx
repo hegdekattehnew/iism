@@ -144,7 +144,12 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
           <h2 className="text-lg font-semibold">{t("yourCourses")}</h2>
           <p className="mt-1 text-sm text-muted">{t("yourCoursesNote")}</p>
         </div>
-        <Button onClick={() => setEditing("new")}>{t("newCourse")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={`/employer/${orgSlug}/courses/upload`} variant="secondary">
+            {t("uploadCourses")}
+          </ButtonLink>
+          <Button onClick={() => setEditing("new")}>{t("newCourse")}</Button>
+        </div>
       </div>
 
       {actionFailed && (

@@ -1064,6 +1064,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/jobs/bulk/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jobs Template
+         * @description The columns, with two example rows. Served here so there is one list of them.
+         */
+        get: operations["jobs_template_org__org_slug__jobs_bulk_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/bulk/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Jobs
+         * @description Validate every row and say what an apply would do. Writes nothing.
+         */
+        post: operations["check_jobs_org__org_slug__jobs_bulk_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/bulk/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Jobs
+         * @description Check the file again, then create each valid row as a **draft**. Never publishes.
+         */
+        post: operations["apply_jobs_org__org_slug__jobs_bulk_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/bulk/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Jobs
+         * @description Publish a batch through the single route's own rules, reporting each refusal.
+         */
+        post: operations["publish_jobs_org__org_slug__jobs_bulk_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/bulk/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Courses Template */
+        get: operations["courses_template_org__org_slug__courses_bulk_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/bulk/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Courses */
+        post: operations["check_courses_org__org_slug__courses_bulk_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/bulk/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Courses */
+        post: operations["apply_courses_org__org_slug__courses_bulk_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/courses/bulk/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Courses */
+        post: operations["publish_courses_org__org_slug__courses_bulk_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/jobs": {
         parameters: {
             query?: never;
@@ -2633,6 +2781,105 @@ export interface components {
             added: number;
             /** Updated */
             updated: number;
+        };
+        /** BulkPublishIn */
+        BulkPublishIn: {
+            /** Slugs */
+            slugs: string[];
+        };
+        /** BulkPublishOut */
+        BulkPublishOut: {
+            /** Results */
+            results: components["schemas"]["BulkPublishRowOut"][];
+            /** Published */
+            published: number;
+            /** Refused */
+            refused: number;
+        };
+        /** BulkPublishRowOut */
+        BulkPublishRowOut: {
+            /** Slug */
+            slug: string;
+            /** Published */
+            published: boolean;
+            /** Message */
+            message?: string | null;
+        };
+        /** BulkReportOut */
+        BulkReportOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "jobs" | "courses";
+            /** Applied */
+            applied: boolean;
+            /** Rows */
+            rows: components["schemas"]["BulkRowOut"][];
+            /** Notes */
+            notes?: string[];
+            /** Ok */
+            ok: number;
+            /** Warnings */
+            warnings: number;
+            /** Errors */
+            errors: number;
+            /** Skipped */
+            skipped: number;
+            /** Created */
+            created: number;
+            /** Daily Limit */
+            daily_limit: number;
+            /** Remaining Today */
+            remaining_today: number;
+            /** Errors Csv */
+            errors_csv?: string | null;
+        };
+        /** BulkRowOut */
+        BulkRowOut: {
+            /** Row */
+            row: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "skip";
+            /** Title */
+            title?: string | null;
+            /** External Ref */
+            external_ref?: string | null;
+            /** Messages */
+            messages?: string[];
+            /** Standards */
+            standards?: components["schemas"]["BulkStandardOut"][];
+            /** Slug */
+            slug?: string | null;
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+        };
+        /**
+         * BulkStandardOut
+         * @description A standard a row will require or teach, and whether the row listed it or its role gave it.
+         */
+        BulkStandardOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "listed" | "role";
+            /** Importance */
+            importance?: number | null;
+            /** Mandatory */
+            mandatory?: boolean | null;
+            /** Level */
+            level?: number | null;
         };
         /**
          * CandidateCardOut
@@ -7306,6 +7553,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateProfileFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jobs_template_org__org_slug__jobs_bulk_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_jobs_org__org_slug__jobs_bulk_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_jobs_org__org_slug__jobs_bulk_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_jobs_org__org_slug__jobs_bulk_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkPublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPublishOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    courses_template_org__org_slug__courses_bulk_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_courses_org__org_slug__courses_bulk_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_courses_org__org_slug__courses_bulk_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_courses_org__org_slug__courses_bulk_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkPublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPublishOut"];
                 };
             };
             /** @description Validation Error */

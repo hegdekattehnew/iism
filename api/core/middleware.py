@@ -19,6 +19,7 @@ interpolated path, which puts a customer's slug in every log line.
 """
 
 import json
+import re
 import time
 import uuid
 
@@ -214,6 +215,21 @@ class _BodyTooLarge(Exception):
     pass
 
 
+# The two bulk-upload steps that carry a file (Sprint 51). Publishing a batch carries a list of
+# slugs, so it keeps the ordinary limit.
+_BULK_UPLOAD_PATH = re.compile(r"^/org/[^/]+/(jobs|courses)/bulk/(check|apply)$")
+
+
+def body_limit_for(path: str) -> int:
+    """The largest body this path may carry: a spreadsheet's allowance for the two bulk-upload
+    routes and the ordinary limit for everything else, so one wide exception cannot widen the
+    API's whole attack surface."""
+    settings = get_settings()
+    if _BULK_UPLOAD_PATH.match(path):
+        return settings.max_bulk_body_bytes
+    return settings.max_request_body_bytes
+
+
 class BodySizeLimitMiddleware:
     """Refuse a request body larger than `max_request_body_bytes`.
 
@@ -231,7 +247,7 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        limit = get_settings().max_request_body_bytes
+        limit = body_limit_for(scope["path"])
         for name, value in scope["headers"]:
             if name == b"content-length":
                 try:

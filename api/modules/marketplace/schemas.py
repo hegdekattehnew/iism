@@ -502,3 +502,65 @@ class CorpusStatsOut(BaseModel):
     districts_with_vacancy: int
     # True when the figures describe a demonstration database, not real use.
     demo: bool
+
+
+# ---------------------------------------------------------------------------
+# Bulk upload (Sprint 51, ADR-063). Output only: the input is the file itself, sent as
+# `text/csv`, so the limits live in `JobIn` / `CourseIn` and the rows are validated by them.
+# ---------------------------------------------------------------------------
+
+
+class BulkStandardOut(BaseModel):
+    """A standard a row will require or teach, and whether the row listed it or its role gave it."""
+
+    code: str
+    name: str
+    origin: Literal["listed", "role"]
+    importance: int | None = None
+    mandatory: bool | None = None
+    level: float | None = None
+
+
+class BulkRowOut(BaseModel):
+    row: int
+    status: Literal["ok", "warning", "error", "skip"]
+    title: str | None = None
+    external_ref: str | None = None
+    messages: list[str] = Field(default_factory=list)
+    standards: list[BulkStandardOut] = Field(default_factory=list)
+    # The slug created (after an apply), or the one a skipped row matched.
+    slug: str | None = None
+    created: bool = False
+
+
+class BulkReportOut(BaseModel):
+    kind: Literal["jobs", "courses"]
+    applied: bool
+    rows: list[BulkRowOut]
+    notes: list[str] = Field(default_factory=list)
+    ok: int
+    warnings: int
+    errors: int
+    skipped: int
+    created: int
+    # Rows this organisation may still create in the rolling 24 hours, and the limit itself.
+    daily_limit: int
+    remaining_today: int
+    # The failed rows as uploaded plus an `error` column: fix them, upload the whole file again.
+    errors_csv: str | None = None
+
+
+class BulkPublishIn(BaseModel):
+    slugs: list[str] = Field(min_length=1, max_length=200)
+
+
+class BulkPublishRowOut(BaseModel):
+    slug: str
+    published: bool
+    message: str | None = None
+
+
+class BulkPublishOut(BaseModel):
+    results: list[BulkPublishRowOut]
+    published: int
+    refused: int

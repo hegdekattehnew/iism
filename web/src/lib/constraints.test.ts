@@ -147,3 +147,28 @@ describe("forms mirror the server's constraints", () => {
     });
   });
 });
+
+/**
+ * The upload screen refuses what the server would, before sending it. Both numbers are
+ * the server's own, read from its source so that changing one without the other fails
+ * here rather than as a 413 somebody meets in production.
+ */
+describe("the bulk upload screen mirrors the server's limits", () => {
+  const screen = read("components/employer/BulkUpload.tsx");
+  const root = join(SRC, "..", "..");
+  const config = readFileSync(join(root, "api/core/config.py"), "utf8");
+  const schemas = readFileSync(join(root, "api/modules/marketplace/schemas.py"), "utf8");
+
+  it("refuses a file larger than max_bulk_body_bytes", () => {
+    expect(config).toContain("max_bulk_body_bytes: int = 2 * 1024 * 1024");
+    expect(screen).toContain("MAX_FILE_BYTES = 2 * 1024 * 1024");
+  });
+
+  it("publishes in batches no larger than BulkPublishIn allows", () => {
+    const at = schemas.indexOf("class BulkPublishIn");
+    expect(at).toBeGreaterThan(-1);
+    expect(schemas.slice(at, at + 300)).toContain("max_length=200");
+    expect(screen).toContain("PUBLISH_BATCH = 200");
+  });
+});
+

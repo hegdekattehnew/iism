@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(61 ADRs). Read it before making any structural decision — the summary below
+(62 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -119,6 +119,12 @@ api/                     FastAPI modular monolith
                          they are siblings, not one generalisation (ADR-026).
                          listings.py is what they *do* share: which standards exist,
                          the refusal of retired ones, slug uniqueness, eager loading.
+                         bulk.py + bulk_routes.py (Sprint 51, ADR-063) are many writes through
+                         those two writers: a CSV is **checked** (writes nothing), **applied** as
+                         drafts, then **published** as a separate act. It calls `create_job` /
+                         `create_course` and never writes a row itself, and the bulk router is
+                         included **before** `publishing_router` or `/jobs/bulk/publish` is
+                         captured by `/jobs/{slug}/publish`.
                          partner_routes.py (Sprint 33) is the external-system actor's one
                          endpoint, gated by `core.security.get_service_account` rather than
                          `require()` -- same `service.list_jobs` the public listing calls,
@@ -449,6 +455,12 @@ split would have to turn into interfaces first; do not add to it casually.
   (`marketplace.skilled_profile()`, one definition for the homepage and the employer console), because a profile row is created by a visit; "signed up" is the line
   underneath. A hire is `hired` or `completed`, never a `no_show`. **A true zero renders `0` and a small number shows**; a database that is not production's own says so
   (`demo`, which is also true for any `*_scale` database). Figures are one uncached statement.
+- **A bulk upload checks, then creates drafts, then publishes, and never guesses** (ADR-063). The file is a raw `text/csv` body (no multipart, no CSV library on the client);
+  `bulk.run(..., apply=False)` writes nothing and `apply=True` re-validates and creates **through `create_job`/`create_course`**, per row, so a bad row never blocks a good one
+  and a crash leaves a partial upload that re-uploading skips. Idempotency is `external_ref` (unique per organisation) or a normalised title(+district+type) match, which names
+  the slug it matched. **A `job_role` is exact title or alias only, never fuzzy; it expands to the compulsory standards, importance 3, mandatory defaulting to no.** The 24-hour
+  cap (100 unverified, 500 verified) counts every creation path and is applied identically by check and apply. A mutation-check run needs `PYTHONDONTWRITEBYTECODE=1`: a
+  stale `.pyc` left by a mutated `api/main.py` made five tests 404 and made earlier "killed" results meaningless.
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -852,6 +864,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > **Sprint 50.5 is done** (ADR-061): the homepage now shows who is here and what has been done -- job seekers, employers, training providers, applications, hires and districts
 > with an open vacancy -- each defined where it is computed, with the narrower figure named underneath when it differs, a true zero shown as `0`, and a footnote when the
 > figures come from a demonstration database. One uncached statement. No migration.
+>
+> **Sprint 51 is done** (ADR-063): an employer or a training provider can **upload a spreadsheet of vacancies or courses**. The file is checked first (nothing is written), then
+> created as drafts, then published as a separate, confirmed act; a row naming a `job_role` expands to that role's compulsory standards, shown for review, never guessed.
+> Re-uploading a corrected file creates only what is new. Caps are 100 rows a day unverified and 500 verified. A 200-row apply takes about 2.5 s. Migration 0048
+> (`external_ref` and two events). Mutation-checked: 11 engine rules and 6 screen guards each fail a test when broken.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

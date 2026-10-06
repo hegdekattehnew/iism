@@ -17,6 +17,7 @@ from sqlalchemy import (
     and_,
     func,
     select,
+    text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -155,6 +156,16 @@ class Job(_EmbeddingColumns, Base):
         # planner can actually use; a lone column index still scans drafts.
         Index("ix_jobs_status_state", "status", "location_state"),
         Index("ix_jobs_status_employment", "status", "employment_type"),
+        # The organisation's own id for this vacancy, from a bulk upload (Sprint 51). Unique per
+        # organisation and only where it is given, so a re-upload of a corrected file skips what
+        # already exists instead of duplicating it.
+        Index(
+            "uq_jobs_tenant_external_ref",
+            "tenant_id",
+            "external_ref",
+            unique=True,
+            postgresql_where=text("external_ref IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -190,6 +201,10 @@ class Job(_EmbeddingColumns, Base):
     nsqf_level_min: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), default=None)
 
     status: Mapped[str] = mapped_column(default="published")
+
+    # The employer's own reference, written only by a bulk upload (`marketplace.bulk`). Optional,
+    # and unique within one organisation; never shown to a visitor.
+    external_ref: Mapped[str | None] = mapped_column(default=None)
 
     # How many people are being hired. The reason this is a column rather than
     # an assumption of one: "hired" did nothing to the vacancy for twenty-six
@@ -346,6 +361,13 @@ class Course(Base):
         Index("ix_courses_status", "status"),
         Index("ix_courses_status_mode", "status", "mode"),
         Index("ix_courses_status_language", "status", "language"),
+        Index(
+            "uq_courses_tenant_external_ref",
+            "tenant_id",
+            "external_ref",
+            unique=True,
+            postgresql_where=text("external_ref IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -369,6 +391,8 @@ class Course(Base):
     qualification_pack_code: Mapped[str | None] = mapped_column(default=None)
 
     status: Mapped[str] = mapped_column(default="published")
+    # The provider's own reference, written only by a bulk upload (see `Job.external_ref`).
+    external_ref: Mapped[str | None] = mapped_column(default=None)
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR, Computed(_TSV, persisted=True), nullable=True
     )

@@ -92,6 +92,10 @@ EVENT_NAMES = (
     # the person handing over stayed as an admin or left. One event for the act:
     # recording `member_role_changed` as well would count one decision twice.
     "ownership_transferred",
+    # Sprint 51, BL-14. A bulk upload that created listings. Subject to the organisation; the
+    # payload is counts only (rows, created, skipped, rejected) and never a row's content.
+    "jobs_bulk_uploaded",
+    "courses_bulk_uploaded",
 )
 
 

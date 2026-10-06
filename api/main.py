@@ -41,6 +41,7 @@ from api.modules.identity import router as auth_router
 from api.modules.interests import provider_router as interests_provider_router
 from api.modules.interests import router as interests_router
 from api.modules.marketplace import (
+    bulk_router,
     course_publishing_router,
     courses_router,
     jobs_router,
@@ -152,6 +153,9 @@ app.include_router(organisation_router)
 app.include_router(team_router)
 app.include_router(invitation_router)
 app.include_router(profile_router)
+# Before `publishing_router`: `/jobs/bulk/publish` would otherwise be captured by
+# `/jobs/{slug}/publish` with `bulk` as the slug.
+app.include_router(bulk_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)

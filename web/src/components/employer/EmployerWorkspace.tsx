@@ -151,7 +151,12 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
           <h2 className="text-lg font-semibold">{t("yourVacancies")}</h2>
           <p className="mt-1 text-sm text-muted">{t("yourVacanciesNote")}</p>
         </div>
-        <Button onClick={() => setEditing("new")}>{t("newJob")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={`/employer/${orgSlug}/jobs/upload`} variant="secondary">
+            {t("uploadJobs")}
+          </ButtonLink>
+          <Button onClick={() => setEditing("new")}>{t("newJob")}</Button>
+        </div>
       </div>
 
       {actionFailed && (

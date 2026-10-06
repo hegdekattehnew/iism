@@ -3051,3 +3051,74 @@ profile row, including the empty ones lazy creation makes), and the homepage's o
   active. The `demo` footnote is what keeps that honest.
 - `/marketplace/counts` still duplicates three of `/stats`'s figures and is read only by `LiveCount`; merging them was not worth the churn.
 - Malay `stats` strings are still English (the locale is not in the switcher).
+
+
+## ADR-063: A Spreadsheet Is Many Writes Through the One Writer, Checked Before It Is Applied, Applied as Drafts, and Published as a Separate Act
+
+**Status:** Accepted (October 2026). Sprint 51. Migration 0048. (ADR-062 is held for Sprint 52's browser-test dependency.)
+
+**Context:** A vacancy takes about 35-45 interactions to create: a twelve-field form, then each required standard is a search against 21,303 standards, a pick, an Add and
+optional importance and mandatory settings, then a Save (always a draft) and a separate Publish. Thirty vacancies is roughly a thousand interactions. The people the product
+is built for are the ones with many: a staffing agency, a multi-centre training partner (Sprint 26 refused to cap organisations per account for exactly them). Government
+agencies already had a bulk path; employers and providers had none, and supply loaded by an engineer running a seed script is the thing that stops an owner onboarding a
+partner. The owner chose: codes **and** a job-role column together, an upload that creates **drafts** with an explicit publish step, caps that are **higher once Verified**,
+and vacancies and courses **in one sprint on one engine**.
+
+**Decision:**
+
+- **A CSV, UTF-8 (a BOM is tolerated), sent as the raw `text/csv` request body.** No multipart, no new dependency (the standard library's `csv`), and no CSV library shipped to
+  the client: the browser reads the file with `file.text()` and posts it. XLSX is deferred; Excel exports "CSV UTF-8". The route declares the body in its OpenAPI
+  (`openapi_extra`), so the generated client types it as a `string`.
+- **Three acts, each its own request** (`marketplace/bulk.py`, `bulk_routes.py`): **check** (a dry run that writes nothing), **apply** (re-validates, never trusting a prior
+  check, then creates each valid row as a **draft**) and **publish** (`set_published`'s own rules per slug, so a vacancy with no standard, or a gig with no place, is refused
+  exactly as it is one at a time). A bad row never blocks a good one; the response carries a downloadable CSV of the original rows plus an `error` column, so the loop is
+  fix and upload again.
+- **Bulk goes through `create_job` and `create_course`, never beside them** (ADR-026: one writer). Those commit, so an upload is **per row**, not all-or-nothing, and a crash
+  leaves a partial upload that re-uploading skips safely. Both writers validate before they write, so a refusal leaves nothing pending to roll back.
+- **Idempotent, because fix-and-re-upload makes it essential.** An optional `external_ref` is unique per organisation (a partial unique index, `external_ref IS NOT NULL`). Without
+  one, a row matching an existing listing of the same organisation on normalised title (vacancies: and district and employment type) is **skipped and names the slug it matched**.
+  A repeat inside one file points at its first row. Never silently duplicated, never silently updated; update-by-reference is a later story.
+- **Standards by code, or by job role, and a role is never guessed.** `Skill.nos_code` is unique across the corpus, so a code is safe in a spreadsheet; a name is not (1,778 names
+  are shared by 4,838 standards). `standards` is `CODE[:importance[:M]]` for a vacancy and `CODE[:level]` for a course, `;`-separated. A `job_role` resolves by **exact title or
+  active alias only, never fuzzy** (the careers rule: a guess is a claim about somebody else); a near miss is shown as a hint and never applied. It expands to the **compulsory**
+  standards of the representative pack at importance 3, and **mandatory defaults to no** (`role_standards_mandatory=yes` opts in), because making every compulsory unit
+  mandatory caps every candidate missing one at 45 (ADR-036) and a role's units are rarely all a real employer's must-haves. Explicitly listed standards win over the expansion.
+  More than 50 resulting standards is an error (the largest real role has 65, the median is 6); a disability-track-only role is a warning (ADR-050). **The review lists every
+  expanded standard by code and name**, so nobody applies a mapping they have not seen.
+- **Caps.** 200 rows a file (413 past it, the file refused whole); a 2 MiB body for the two upload paths **and only those** (`body_limit_for`, every other route keeps 256 KB);
+  and a rolling 24-hour creation cap per organisation, **100 unverified and 500 verified**, counted from `created_at` over every creation path so a hand-made listing counts, and
+  applied identically by check and apply. Drafts are invisible, so the cap bounds clutter and abuse of the write path, not what a visitor can see. A phone number or email in a
+  description is a **warning**, not a block (a description is public once published).
+- **The route order is part of the design.** `/jobs/bulk/publish` would be captured by `/jobs/{slug}/publish` with `bulk` as the slug, so the bulk router is included **before**
+  `publishing_router`; a test asserts it.
+- **Two analytics events** (`jobs_bulk_uploaded`, `courses_bulk_uploaded`), counts only: rows, created, skipped, rejected. Recorded after the business commit, as `record()`
+  requires.
+- **The screen is a route of its own** (`/employer/[org]/jobs/upload`, `.../courses/upload`): `/employer/[org]` has 12 KB of first-load headroom against the budget and a CSV screen
+  must not spend it. Download the template (served by the API, so there is one list of columns), choose a file, review (an `aria-live` summary, a per-row table, the standards each
+  row resolved to), acknowledge the rows that will be skipped, create drafts, then publish with a confirmation that says the consequence in words. The server's own sentence is
+  shown on any failure; a 401 is "signed out", never "your file is wrong".
+
+**Options considered:** 1. A form-per-row grid in the browser
+2. **A CSV through a check, apply and publish sequence on the existing writers** (chosen)
+3. XLSX first
+4. All-or-nothing apply in one transaction
+5. Apply through the worker
+
+**Trade-offs:**
+
+- Option 1: ✅ No file format to explain ❌ The same thousand interactions, now in one page; no way to hand over a partner's existing inventory.
+- Option 2: ✅ No dependency, one writer, a re-uploadable loop ❌ A person must save as CSV; a crash can leave a partial upload.
+- Option 3: ✅ What a non-technical person has open ❌ A dependency that must justify itself (ADR-053) for a format every spreadsheet can already export.
+- Option 4: ✅ No partial state ❌ One bad row blocks 199 good ones, and a 200-row transaction holds locks for the whole upload; `create_job` commits by design.
+- Option 5: ✅ No request timeout to think about ❌ A 200-row apply takes about 2.5 s in a request, which is the bound; ADR-006 is about work that does not belong in a handler, and this
+  does. Revisit above 200 rows.
+
+**Consequences:**
+
+- **Measured on the 50,000-candidate scale database:** a 200-row check is 0.06 s and a 200-row apply 2.4 s for vacancies and 2.6 s for courses.
+- The standards step is the hardest for a person to get right. The role column removes it for the common case; the codes remain for those who know them, and a vacancy with no
+  standard is a warning at check time and a refusal at publish time, not a silent success.
+- **The role expansion decides what many vacancies require.** It is exact-or-alias, shows its working and defaults to non-mandatory; whether that default is right is the thing to
+  watch with the first real partner.
+- There is still **no verification gate on publishing**, for a hand-made vacancy or a bulk one. This widens nothing, and the unverified cap is what limits it.
+- A partner or ATS pushing by API key (a `ServiceAccount`-to-tenant binding and a write scope) and an upload history are later stories, as is update-by-`external_ref`.
