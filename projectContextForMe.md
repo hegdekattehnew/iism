@@ -4,11 +4,7 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-06 · **Sprints 1–51 built, including the small Sprint 50.5.** Sprints 41–50 are merged into `main` (PRs #17–#27, `6cab468`); **Sprint 50.5
-is on `sprint-50-5` (pushed, PR not yet written), cut from that.** Sprint 50.5 is *show the work done on the homepage* (ADR-061): the band now leads with who is here and what has been done
-(job seekers, employers, training providers, applications, hires, districts with an open vacancy), each defined where it is computed, the narrower figure named underneath
-when it differs, a true zero shown as `0`, and a footnote when the figures come from a demonstration database. **Sprint 51 (bulk upload of vacancies and courses, ADR-063, migration 0048) is committed on
-`sprint-51` (`136d81e`, **not pushed**); browser journeys end to end moved to Sprint 52 ("Queued after Sprint 51" in §11).** K stays 500. Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-06 · **Sprints 1–51 built, including the small Sprint 50.5, all merged into `main`** (Sprints 41–50 as PRs #17–#27; Sprints 50.5 and 51 together as PR #29, merge commit `a18e79a`). `sprint-50-5` and `sprint-51` are deleted locally and on `origin`. Sprint 50.5 is *show the work done on the homepage* (ADR-061); Sprint 51 is *bulk upload of vacancies and courses* (ADR-063, migration 0048), followed by a homepage grid fix (three tiles across, the location-data tile removed). **The next sprint is Sprint 52, browser journeys end to end ("Queued after Sprint 51" in §11); cut a branch first.** K stays 500. Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -24,7 +20,7 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-51` (Sprint 51 committed as `136d81e`, **not pushed**; a homepage-grid change from 2026-10-06 sits on top, **uncommitted**), cut from `sprint-50-5` (Sprint 50.5, pushed, PR not yet written), cut from `main` at `6cab468`, which has Sprints 41–50 (PRs #17–#27). Every merged branch is deleted, locally and on `origin`. **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
+| **Branch** | `main` at `a18e79a`, which has everything through Sprint 51 (PR #29 merged 2026-10-06). **There is no feature branch; cut one before starting Sprint 52.** Every merged branch is deleted, locally and on `origin`. **Eight dependabot branches are open on the remote** (two `uv/python-*` groups, two npm `web-*` groups, `@types/node` 26, and three GitHub Actions bumps). Of the older notes below, **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
 | **Last sprint** | 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | **Sprint 52: journeys that work end to end** (Playwright in CI, bulk upload as a sixth journey; plan and open decisions in §11 "Queued after Sprint 50.5"), awaiting the owner's go. `BL-1.3` stays not started. |
 | **Tests** | 1,311 backend (`make check`, 2026-10-05), 417 web (2026-10-06) (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
@@ -969,8 +965,7 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Working on `sprint-51`**, committed as `136d81e` and **not pushed**, on top of `sprint-50-5` (pushed as `origin/sprint-50-5`, `1681de7`; neither has a PR yet), which is cut from `main` at `6cab468` (the PR #27 merge, which carries Sprints 41–50).
-A push of `sprint-51` carries 50.5's commit too unless 50.5 merges first. **Commit and push only when the owner asks.** Sprint 51's change list is in §11 ("Sprint 51: bulk upload"). Sprint 50.5's
+**Merged 2026-10-06.** PR #29 (`sprint-51` → `main`, merge commit `a18e79a`) carried Sprint 50.5 (`1681de7`) and Sprint 51 (`136d81e`, `a2243ae`); `sprint-50-5` and `sprint-51` were deleted on `origin` and locally. `gh` is not installed, so PR state is read from `git fetch` and ancestry. **There is no feature branch right now.** Sprint 51's change list is in §11 ("Sprint 51: bulk upload"). Sprint 50.5's
 changes: `marketplace/stats.py` (one statement, ten new figures and `demo`), `marketplace/models.py` (`skilled_profile()`), `marketplace/schemas.py`, `matching/employer.py`
 (`candidates_total` reuses it), `web/src/components/StatsBand.tsx` (two rows; a test, there was none), `web/src/lib/format.ts` (the shared digit grouping), `LiveCount`, `ApplyPanel`,
 `lib/profile.ts` and `lib/counts.test.tsx` (invalidation), en/hi/ms `stats.*`, the generated `api-schema.d.ts`, `tests/test_homepage_figures.py`, ADR-061, `CLAUDE.md`, the backlog document.
@@ -2285,7 +2280,7 @@ Owner decisions: **keep K = 500**, and **"scale the rest"** as the theme.
   vacancies will feel it. 10,000 enrolled is still 17.6 s as a request.
 - **Left for later:** the alias batch itself; BL-13.6; BL-5.3; BL-12.11; BL-1.3. **Restart `make worker`** for the larger embedding batch and sweep size.
 
-### Sprint 50.5 — show the work done on the homepage (done 2026-10-05, committed `1681de7`, pushed on `sprint-50-5`)
+### Sprint 50.5 — show the work done on the homepage (done 2026-10-05, committed `1681de7`, merged in PR #29)
 
 Owner decisions: show **job seekers, employers and training providers, applications and hires, and reach**; **always show the true count**, however small.
 
@@ -2310,7 +2305,7 @@ Owner decisions: show **job seekers, employers and training providers, applicati
   the figure move, because that would leave a permanent `withdrawn` row in the dev data; the invalidation is covered by tests instead.
 - **Not done:** caching (the owner-settled rule stands), per-district people figures, a "verified organisations" figure, merging `/marketplace/counts` into `/stats`, translating `ms`.
 
-### Sprint 51: bulk upload of vacancies and courses (done 2026-10-05, ADR-063, migration 0048, **uncommitted**)
+### Sprint 51: bulk upload of vacancies and courses (done 2026-10-05, ADR-063, migration 0048; merged in PR #29, 2026-10-06)
 
 - **What exists:** `api/modules/marketplace/bulk.py` (the engine, ~1,100 lines), `bulk_routes.py` (template, check, apply, publish for both kinds under `/org/{slug}/jobs|courses/bulk/*`),
   `web/src/components/employer/BulkUpload.tsx` with a route each (`/employer/[org]/jobs/upload`, `/employer/[org]/courses/upload`) reached by an "Upload a spreadsheet" button beside
@@ -2329,7 +2324,7 @@ Owner decisions: show **job seekers, employers and training providers, applicati
 - **Not built (stories 14.8-14.12):** update by `external_ref`, XLSX, partner/ATS push (needs a `ServiceAccount`-to-tenant binding), an upload history, async above 200 rows. Malay
   strings for the new screen are English, like the rest of that locale.
 
-### Sprint 51 follow-up: the homepage grid (2026-10-06, uncommitted)
+### Sprint 51 follow-up: the homepage grid (2026-10-06, committed `a2243ae`, merged in PR #29)
 
 The owner reported the "Who is here" numbers misaligned and asked for three across. Both sections of `StatsBand` hold six tiles, and `lg:grid-cols-4` made each a row of four and a
 row of two. Now **three columns from `sm` up, two on a phone** (6-digit Indian-grouped figures such as 2,38,370 do not fit three across at 360px), and the **"States and districts in
@@ -2361,7 +2356,7 @@ asserts the tile is absent and each `<dl>` has six children, `sm:grid-cols-3` an
 - **Open decisions:** confirm the theme; Playwright vs Cypress (recommend Playwright); every PR vs `main` only (recommend every PR, **never a nightly**: a build red
   every morning teaches people to ignore red builds); CSP stays report-only (recommend yes).
 
-**Housekeeping the owner must do or confirm:** write Sprint 50.5's and 51's PRs (neither has a title or description); the seven open dependabot
+**Housekeeping the owner must do or confirm:** the open dependabot
 branches (merge the Python lock group; close the two older npm PRs and `@types/node` 24 to 26; merge the three Actions bumps one at a time, judged by CI).
 **Standing owner decisions:** K stays 500; monetisation (`BL-1.3`) and real external integrations stay deferred; never sign in as `+919880663641`; commit and push
 only when asked.
