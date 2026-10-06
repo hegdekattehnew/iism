@@ -869,6 +869,8 @@ split would have to turn into interfaces first; do not add to it casually.
 > created as drafts, then published as a separate, confirmed act; a row naming a `job_role` expands to that role's compulsory standards, shown for review, never guessed.
 > Re-uploading a corrected file creates only what is new. Caps are 100 rows a day unverified and 500 verified. A 200-row apply takes about 2.5 s. Migration 0048
 > (`external_ref` and two events). Mutation-checked: 11 engine rules and 6 screen guards each fail a test when broken.
+>
+> **Homepage grid (2026-10-06):** both `StatsBand` sections are six tiles, three across from tablet width up (two on a phone); the master-list "states and districts" tile was removed. A grid whose tile count is not a multiple of its column count reads as misaligned, and `StatsBand.test.tsx` asserts the count and the classes.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

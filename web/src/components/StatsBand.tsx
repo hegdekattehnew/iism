@@ -21,6 +21,9 @@ type Cell = {
  * API being reachable — and if it is unreachable the band renders skeletons
  * rather than zeros. A zero here would be a lie about the corpus.
  *
+ * **Two rows of six, three across (Sprint 51).** Six tiles on a four-column grid left a row of four and a row of two, so the numbers did not line up; the master-list
+ * "states and districts" tile went because "districts with an open vacancy" says what is actually here.
+ *
  * **Two rows (Sprint 50.5).** "People and work" leads, because the first question a
  * buyer asks is who is here and what has happened, and "what the platform holds" follows.
  * Where a broad and a narrow figure differ, the narrow one is named underneath -- the
@@ -88,11 +91,10 @@ export function StatsBand() {
     { key: "entryRoutes", value: d ? fmt(d.entry_routes) : null },
     { key: "awardingBodies", value: d ? fmt(d.awarding_bodies) : null },
     { key: "sectors", value: d ? fmt(d.sectors) : null },
-    { key: "coverage", value: d ? `${fmt(d.states)} · ${fmt(d.districts)}` : null },
   ];
 
   const grid = (cells: Cell[]) => (
-    <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+    <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
       {cells.map(({ key, value, under }) => (
         <div key={key}>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted">{t(key)}</dt>

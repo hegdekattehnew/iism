@@ -47,7 +47,8 @@ const BASE = {
 
 function answer(overrides: Partial<typeof BASE> = {}) {
   GET.mockImplementation(async (path: string) => {
-    if (path === "/marketplace/stats") return { data: { ...BASE, ...overrides } };
+    if (path === "/marketplace/stats")
+      return { data: { ...BASE, ...overrides } };
     return { data: undefined };
   });
 }
@@ -68,18 +69,26 @@ describe("StatsBand: who is here and what has been done", () => {
     answer();
     renderUi(<StatsBand />);
 
-    expect(await screen.findByText("Who is here, and what has been done")).toBeTruthy();
+    expect(
+      await screen.findByText("Who is here, and what has been done"),
+    ).toBeTruthy();
     await screen.findByText("22");
     const people = screen.getByText("Who is here, and what has been done");
-    const holds = screen.getByText("Built on the national framework, not a guess");
-    expect(people.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const holds = screen.getByText(
+      "Built on the national framework, not a guess",
+    );
+    expect(
+      people.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     expect(within(figure("Job seekers")).getByText("22")).toBeTruthy();
     expect(within(figure("Employers")).getByText("102")).toBeTruthy();
     expect(within(figure("Training providers")).getByText("60")).toBeTruthy();
     expect(within(figure("Applications made")).getByText("18")).toBeTruthy();
     expect(within(figure("Hires")).getByText("1")).toBeTruthy();
-    expect(within(figure("Districts with an open vacancy")).getByText("21")).toBeTruthy();
+    expect(
+      within(figure("Districts with an open vacancy")).getByText("21"),
+    ).toBeTruthy();
   });
 
   it("names the narrower figure underneath only when it differs", async () => {
@@ -88,9 +97,15 @@ describe("StatsBand: who is here and what has been done", () => {
     await screen.findByText("22");
 
     // 42 profiles but 22 with a declared standard; 97 of 102 employers hiring; every provider has one.
-    expect(within(figure("Job seekers")).getByText("42 signed up")).toBeTruthy();
+    expect(
+      within(figure("Job seekers")).getByText("42 signed up"),
+    ).toBeTruthy();
     expect(within(figure("Employers")).getByText("97 hiring now")).toBeTruthy();
-    expect(within(figure("Training providers")).queryByText(/with a published course/)).toBeNull();
+    expect(
+      within(figure("Training providers")).queryByText(
+        /with a published course/,
+      ),
+    ).toBeNull();
   });
 
   it("shows no second line when the two figures are equal", async () => {
@@ -106,7 +121,9 @@ describe("StatsBand: who is here and what has been done", () => {
     answer({ job_seekers: 0, profiles: 0, hires: 0, applications: 0 });
     renderUi(<StatsBand />);
 
-    await waitFor(() => expect(within(figure("Hires")).getByText("0")).toBeTruthy());
+    await waitFor(() =>
+      expect(within(figure("Hires")).getByText("0")).toBeTruthy(),
+    );
     expect(within(figure("Job seekers")).getByText("0")).toBeTruthy();
     expect(within(figure("Applications made")).getByText("0")).toBeTruthy();
   });
@@ -121,7 +138,9 @@ describe("StatsBand: who is here and what has been done", () => {
     answer({ demo: true });
     const { unmount } = renderUi(<StatsBand />);
     expect(
-      await screen.findByText(/These figures come from a demonstration database/),
+      await screen.findByText(
+        /These figures come from a demonstration database/,
+      ),
     ).toBeTruthy();
     unmount();
 
@@ -132,7 +151,10 @@ describe("StatsBand: who is here and what has been done", () => {
   });
 
   it("renders skeletons, never zeros, while loading or when the API is unreachable", async () => {
-    GET.mockImplementation(async () => ({ data: undefined, error: { detail: "down" } }));
+    GET.mockImplementation(async () => ({
+      data: undefined,
+      error: { detail: "down" },
+    }));
     renderUi(<StatsBand />);
 
     await waitFor(() => expect(GET).toHaveBeenCalled());
@@ -141,11 +163,28 @@ describe("StatsBand: who is here and what has been done", () => {
     expect(screen.queryByText("22")).toBeNull();
   });
 
-  it("labels the geography master list as location data, not as reach", async () => {
+  it("does not offer the geography master list as a figure", async () => {
     answer();
     renderUi(<StatsBand />);
     await screen.findByText("22");
-    expect(screen.getByText("States and districts in our location data")).toBeTruthy();
-    expect(within(figure("States and districts in our location data")).getByText("36 · 766")).toBeTruthy();
+    expect(
+      screen.queryByText("States and districts in our location data"),
+    ).toBeNull();
+    expect(screen.queryByText("36 · 766")).toBeNull();
+  });
+
+  it("lays each section out as six tiles, three across, so the rows line up", async () => {
+    answer();
+    const { container } = renderUi(<StatsBand />);
+    await screen.findByText("22");
+    const grids = container.querySelectorAll("dl");
+    expect(grids).toHaveLength(2);
+    for (const grid of grids) {
+      expect(grid.children).toHaveLength(6);
+      // Three from tablet width up. A fourth column (`lg:grid-cols-4`) made six tiles a
+      // row of four and a row of two, which is the misalignment this test exists for.
+      expect(grid.className).toContain("sm:grid-cols-3");
+      expect(grid.className).not.toMatch(/grid-cols-4/);
+    }
   });
 });
