@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(62 ADRs). Read it before making any structural decision — the summary below
+(63 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -279,6 +279,7 @@ api/                     FastAPI modular monolith
                          (Sprint 49, ADR-058) A worker cron purges delivered email and read notices after
                          `NOTIFICATION_RETENTION_DAYS` (90), an unopened notice after twice that, and **never a
                          `pending` row**.
+                         (Sprint 52) `enqueue_many` writes many notices as batched INSERTs; erasure uses it, not one object per applicant.
     alerts/              Telling a candidate about a vacancy they did not go
                          looking for, and closing one whose date has passed.
                          Both run in the **worker**, never in a request. Uses
@@ -369,6 +370,7 @@ web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/components/ui/     The component library — Radix primitives over this project's tokens
   src/lib/api-schema.d.ts  GENERATED from OpenAPI; never edit by hand
   public/sw.js           Service worker. Its DENY list is a security boundary, not a cache tweak
+  e2e/                   Playwright journeys against a production build (Sprint 52, ADR-062); `npm run e2e`
 infra/                   docker-compose (Terraform later — ADR-028)
 migrations/              Alembic migrations
 tests/                   pytest + testcontainers
@@ -461,6 +463,14 @@ split would have to turn into interfaces first; do not add to it casually.
   the slug it matched. **A `job_role` is exact title or alias only, never fuzzy; it expands to the compulsory standards, importance 3, mandatory defaulting to no.** The 24-hour
   cap (100 unverified, 500 verified) counts every creation path and is applied identically by check and apply. A mutation-check run needs `PYTHONDONTWRITEBYTECODE=1`: a
   stale `.pyc` left by a mutated `api/main.py` made five tests 404 and made earlier "killed" results meaningless.
+- **A page is checked in a real browser, on the production build, and a check that cannot fail does not count** (ADR-062). `cd web && npm run e2e` (or `make e2e`) drives six journeys in
+  Chromium; every page goes through `checkPage` (no console error, no failed request, **no CSP violation** -- the policy is report-only so nothing else would notice -- and axe **with contrast ON** in
+  light and dark). The component tests cannot do any of that (jsdom has no layout), and the first run found five real defects none of them could see. **Findings change the product; they are never
+  allow-listed.** `scripts/seed_e2e.py` refuses any database not ending `_e2e` (the importer rewrites the corpus); the build goes to `.next-e2e`, ports are 8100/3100. **After editing web code, rebuild
+  (`npm run build:e2e`) and kill any `next start -p 3100`:** Playwright reuses a running server locally and will test stale code. A test asserts the fact, not the click: `toHaveCount(0)` on a button is true
+  the instant it is pressed (it let a withdrawal be checked before it had happened), so poll the server. Not covered: padding and spacing, visual regression, other browsers.
+- **A signed-out visitor makes no request that can only answer 401.** `useMemberships` answered "401" locally when no token is stored; before that every page for every anonymous visitor asked `/auth/me`
+  and logged a console error (found by Sprint 52's browser run).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -755,6 +765,10 @@ split would have to turn into interfaces first; do not add to it casually.
   `ProviderWorkspace.tsx` described its signed-out branch in the past tense — "there was no
   signed-out branch at all, so a provider whose token had expired was told they had no access" —
   and `isSignedOut` was never imported in that file. The claim outlived the gap by four sprints.
+- **A file input is cleared after the file is read** (`e.target.value = ""`). A browser fires no `change` when the same file is chosen twice, and choosing the file you just fixed in place is the
+  whole fix-and-upload-again loop (Sprint 51's `BulkUpload` did nothing on the second selection until Sprint 52's browser run).
+- **A `<dl>` holds only `dt`/`dd` (and `div` groups of them).** A `<p>` under a figure made every homepage figure list invalid HTML, and only a populated database showed it. Text must not use `opacity-*`
+  to look secondary: it dims below WCAG AA on a tinted surface (`--muted` is `#586980` for that reason).
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,
@@ -871,6 +885,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > (`external_ref` and two events). Mutation-checked: 11 engine rules and 6 screen guards each fail a test when broken.
 >
 > **Homepage grid (2026-10-06):** both `StatsBand` sections are six tiles, three across from tablet width up (two on a phone); the master-list "states and districts" tile was removed. A grid whose tile count is not a multiple of its column count reads as misaligned, and `StatsBand.test.tsx` asserts the count and the classes.
+>
+> **Sprint 52 is done** (ADR-062, migration 0049): *journeys in a real browser*. Six Playwright journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload) run against a production build in a new `e2e` CI
+> job, and every page is checked for console errors, failed requests, CSP violations and contrast in light and dark. It found and fixed five real defects no existing test could see (low-contrast muted text and skill codes,
+> an `/auth/me` 401 on every signed-out page, an invalid `<dl>`, and Sprint 51's upload screen ignoring a re-chosen file). Each check was proved able to fail; ten consecutive runs were clean. Alongside: a partial index for
+> the expiry sweep and batched erasure notices (migration 0049). **Open: two high npm advisories in the production tree (`sharp`, `source-map-js`), pre-existing, one `npm audit fix` away, not applied.**
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

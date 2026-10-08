@@ -101,6 +101,30 @@ benchmark: ## Latency and recall of matching on the scale harness: make benchmar
 drop-scale: ## Drop the scale-harness database
 	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS $(SCALE_DB)"
 
+# ------------------------------------------------------------ browser tests (Sprint 52)
+# A separate database on the dev Postgres (and Redis db 1), never the dev one:
+# `scripts/seed_e2e.py` refuses any name that does not end in `_e2e`. The API and the web
+# server the journeys drive are started by Playwright itself (`web/playwright.config.ts`),
+# on :8100 and :3100 so they never collide with `make api` and `make web`.
+E2E_DB ?= iism_e2e
+E2E_URL := postgresql+asyncpg://iism:iism@localhost:5433/$(E2E_DB)
+E2E_REDIS := redis://localhost:6380/1
+
+.PHONY: seed-e2e
+seed-e2e: ## Create the browser-test database (iism_e2e) from the NSQF fixture
+	@docker exec $(PG) psql -U iism -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$(E2E_DB)'" | grep -q 1 \
+	  || docker exec $(PG) psql -q -U iism -d postgres -c "CREATE DATABASE $(E2E_DB)"
+	DATABASE_URL=$(E2E_URL) REDIS_URL=$(E2E_REDIS) $(ALEMBIC) upgrade head
+	DATABASE_URL=$(E2E_URL) REDIS_URL=$(E2E_REDIS) $(NO_TIMEOUT) $(PY) scripts/seed_e2e.py
+
+.PHONY: e2e
+e2e: seed-e2e ## Run the browser journeys against a production build (needs Chromium: see ADR-062)
+	cd web && PATH="$(NODE_BIN):$$PATH" npm run build:e2e && PATH="$(NODE_BIN):$$PATH" npm run e2e
+
+.PHONY: drop-e2e
+drop-e2e: ## Drop the browser-test database
+	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS $(E2E_DB)"
+
 .PHONY: check-role-aliases
 check-role-aliases: ## Verify every role_aliases.py target names a real, current qualification
 	$(NO_TIMEOUT) $(PY) scripts/check_role_aliases.py

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 const BUDGET = Number(process.env.FIRST_LOAD_JS_BUDGET ?? 700_000);
 const stats = JSON.parse(
-  readFileSync(".next/diagnostics/route-bundle-stats.json", "utf8"),
+  readFileSync(`${process.env.NEXT_DIST_DIR ?? ".next"}/diagnostics/route-bundle-stats.json`, "utf8"),
 );
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} KB`;

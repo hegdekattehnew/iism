@@ -256,7 +256,15 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
             accept=".csv,text/csv"
             className="block w-full text-sm"
             disabled={check.isPending || apply.isPending}
-            onChange={(e) => void choose(e.target.files?.[0])}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // Forget the selection once it is read. A browser fires no `change` when the
+              // very same file is chosen twice, and choosing the file you just fixed in place is
+              // exactly the fix-and-upload-again loop this screen exists for (found by the
+              // browser journey in Sprint 52; jsdom never models it).
+              e.target.value = "";
+              void choose(file);
+            }}
           />
           {tooBig && <Alert role="alert">{t("tooBig")}</Alert>}
           {check.isPending && (

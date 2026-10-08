@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "gen:api": "curl -s ${API_URL:-http://localhost:8000}/openapi.json -o openapi.json && openapi-typescript openapi.json -o src/lib/api-schema.d.ts"
+    "gen:api": "curl -s ${API_URL:-http://localhost:8000}/openapi.json -o openapi.json && openapi-typescript openapi.json -o src/lib/api-schema.d.ts",
+    "build:e2e": "NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE_URL=http://localhost:8100 next build",
+    "start:e2e": "NEXT_DIST_DIR=.next-e2e next start -p 3100",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -26,6 +29,7 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

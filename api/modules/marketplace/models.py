@@ -166,6 +166,14 @@ class Job(_EmbeddingColumns, Base):
             unique=True,
             postgresql_where=text("external_ref IS NOT NULL"),
         ),
+        # What the hourly `close_expired_jobs` sweep reads: vacancies with a closing date that are
+        # still open. Partial, so it holds only that handful and never the closed catalogue or the
+        # (vast majority of) vacancies with no closing date at all (Sprint 52).
+        Index(
+            "ix_jobs_closing",
+            "closes_at",
+            postgresql_where=text("closes_at IS NOT NULL AND closed_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

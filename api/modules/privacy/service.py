@@ -238,7 +238,7 @@ async def _tell_applicants_the_organisation_is_gone(db: AsyncSession, tenant: Te
     near-identical sibling: what the applicant needs to know is the same in
     both cases, which is that the vacancy is not coming back.
     """
-    from api.modules.notifications import enqueue
+    from api.modules.notifications import enqueue_many
 
     rows = await db.execute(
         select(Job.title, CandidateProfile.user_id)
@@ -249,15 +249,21 @@ async def _tell_applicants_the_organisation_is_gone(db: AsyncSession, tenant: Te
             Application.status.in_(("applied", "shortlisted")),
         )
     )
-    for title, user_id in rows.all():
-        await enqueue(
-            db,
-            recipient_kind="user",
-            recipient_id=user_id,
-            channel="in_app",
-            template="vacancy_closed",
-            payload={"vacancy": title, "path": "/applications"},
-        )
+    # Batched multi-row INSERTs, not one ORM object per applicant: an organisation with thousands
+    # of people waiting on it used to build thousands of objects inside the deleting request.
+    await enqueue_many(
+        db,
+        [
+            {
+                "recipient_kind": "user",
+                "recipient_id": user_id,
+                "channel": "in_app",
+                "template": "vacancy_closed",
+                "payload": {"vacancy": title, "path": "/applications"},
+            }
+            for title, user_id in rows.all()
+        ],
+    )
 
 
 async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:

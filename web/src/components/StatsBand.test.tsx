@@ -187,4 +187,19 @@ describe("StatsBand: who is here and what has been done", () => {
       expect(grid.className).not.toMatch(/grid-cols-4/);
     }
   });
+
+  it("keeps a definition list made only of terms and definitions, sub-lines included", async () => {
+    // `profiles > job_seekers` and the others put a sub-line under three tiles. As a `<p>` it made
+    // every `<dl>` invalid HTML (axe: definition-list), and only a populated database showed it.
+    answer();
+    const { container } = renderUi(<StatsBand />);
+    await screen.findByText("22");
+    expect(screen.getByText("42 signed up")).toBeTruthy();
+    for (const grid of container.querySelectorAll("dl")) {
+      for (const group of grid.children) {
+        for (const child of group.children) expect(["DT", "DD"]).toContain(child.tagName);
+      }
+    }
+  });
 });
+

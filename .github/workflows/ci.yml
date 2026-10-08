@@ -70,3 +70,88 @@ jobs:
       # The target device is a low-end Android on mobile data. A ceiling, not a
       # target: it stops the first-load JS growing unnoticed.
       - run: npm run budget
+
+  # Real-browser journeys (Sprint 52, ADR-062). Nothing above renders a page: the component
+  # tests mock three seams and run axe with colour-contrast off (jsdom has no layout), so this is
+  # the only place a layout, a contrast ratio, a CSP violation or a console error can fail a build.
+  # Every pull request, never a nightly: a build that is red every morning teaches people to
+  # ignore red builds.
+  e2e:
+    name: E2E — real-browser journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # The same images and host ports as infra/docker-compose.yml, so the tests' defaults
+      # (localhost:5433, localhost:6380) are what CI provides.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: iism
+          POSTGRES_PASSWORD: iism
+          POSTGRES_DB: postgres
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U iism" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6380:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      E2E_DB_URL: postgresql+asyncpg://iism:iism@localhost:5433/iism_e2e
+      E2E_REDIS: redis://localhost:6380/1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the API
+        run: uv sync --locked --extra dev --python 3.12
+
+      # No NSQF corpus here (it lives in MongoDB, not in the repository): the journeys run on
+      # tests/fixtures/nsqf_sample.json through the real importer. seed_e2e.py refuses any database
+      # whose name does not end in `_e2e`.
+      - name: Create and seed the browser-test database
+        run: |
+          PGPASSWORD=iism psql -h localhost -p 5433 -U iism -d postgres -c "CREATE DATABASE iism_e2e"
+          DATABASE_URL="$E2E_DB_URL" REDIS_URL="$E2E_REDIS" .venv/bin/alembic upgrade head
+          DATABASE_URL="$E2E_DB_URL" REDIS_URL="$E2E_REDIS" DB_STATEMENT_TIMEOUT_MS=0 .venv/bin/python scripts/seed_e2e.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install and build the web app (a production build, as users get)
+        working-directory: web
+        run: |
+          npm ci
+          npm run build:e2e
+
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the journeys
+        working-directory: web
+        run: npm run e2e
+
+      # Only on failure: the trace is what turns "red" into "this click, on this page".
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7

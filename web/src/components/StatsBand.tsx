@@ -104,9 +104,12 @@ export function StatsBand() {
           {under && (
             // Pre-formatted, not handed over as a number: next-intl would format it with the
             // page locale (`en`), and this page's rule is `en-IN` (`lib/format.ts`).
-            <p className="mt-0.5 text-xs text-muted tabular-nums">
+            // A `<dd>`, not a `<p>`: a `<dl>` may hold only `dt`/`dd` groups, and axe fails the
+            // whole list otherwise. It appears only when a secondary figure exists, so an
+            // empty database never showed it (Sprint 52's browser run did).
+            <dd className="mt-0.5 text-xs text-muted tabular-nums">
               {t(under.key, { count: under.count })}
-            </p>
+            </dd>
           )}
         </div>
       ))}

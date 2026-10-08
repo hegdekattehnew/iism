@@ -4,7 +4,10 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-06 · **Sprints 1–51 built, including the small Sprint 50.5, all merged into `main`** (Sprints 41–50 as PRs #17–#27; Sprints 50.5 and 51 together as PR #29, merge commit `a18e79a`). `sprint-50-5` and `sprint-51` are deleted locally and on `origin`. Sprint 50.5 is *show the work done on the homepage* (ADR-061); Sprint 51 is *bulk upload of vacancies and courses* (ADR-063, migration 0048), followed by a homepage grid fix (three tiles across, the location-data tile removed). **The next sprint is Sprint 52, browser journeys end to end ("Queued after Sprint 51" in §11); cut a branch first.** K stays 500. Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-08 · **Sprints 1–52 built.** Sprints 1–51 (with the small 50.5) are merged into `main` (Sprints 41–50 as PRs #17–#27; 50.5 and 51 together as PR #29, merge
+commit `a18e79a`); **Sprint 52 (journeys in a real browser, ADR-062, migration 0049) is on `sprint-52`, cut from `main` at `11cab19`, uncommitted.** Sprint 51 was *bulk upload of vacancies and courses*
+(ADR-063, migration 0048); Sprint 52 runs six journeys in Chromium against a production build, checks every page for console errors, failed requests, CSP violations and contrast, and found and fixed
+five real defects. **No next sprint is chosen** (§11, "Queued after Sprint 52"). K stays 500. Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -20,11 +23,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `main` at `a18e79a`, which has everything through Sprint 51 (PR #29 merged 2026-10-06). **There is no feature branch; cut one before starting Sprint 52.** Every merged branch is deleted, locally and on `origin`. **Eight dependabot branches are open on the remote** (two `uv/python-*` groups, two npm `web-*` groups, `@types/node` 26, and three GitHub Actions bumps). Of the older notes below, **Seven dependabot branches are open on the remote**: the two older npm ones are superseded by Sprint 46 (close them); `@types/node` 24→26 should be closed (Sprint 48's ignore rule stops it reopening); the **Python lock group (fastapi 0.141→0.142, pymongo 4.18.1→4.18.2, ruff 0.16.8→0.16.9) passes every gate** — merged-with-main it gave ruff and `mypy` clean and 1,095 backend tests — so it is safe to merge; the three GitHub Actions ones (checkout 4→7, setup-node 4→7, setup-uv 5→7) are merged one at a time, each judged by its own CI run. |
-| **Last sprint** | 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | **Sprint 52: journeys that work end to end** (Playwright in CI, bulk upload as a sixth journey; plan and open decisions in §11 "Queued after Sprint 50.5"), awaiting the owner's go. `BL-1.3` stays not started. |
-| **Tests** | 1,311 backend (`make check`, 2026-10-05), 417 web (2026-10-06) (`cd web && npm test`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
-| **Migrations** | head `0048` (Sprint 51: `external_ref` on jobs and courses, two analytics events; the dev database was migrated to 0048 on 2026-10-06); 62 ADRs (numbered to 063; 062 is held for Sprint 52's Playwright dependency) |
+| **Branch** | `sprint-52` (Sprint 52, **uncommitted**, 2026-10-08), cut from `main` at `11cab19`, which has everything through Sprint 51 (PR #29 merged 2026-10-06). Every merged branch is deleted, locally and on `origin`. **Eight dependabot branches are open on the remote** (two `uv/python-*` groups, two npm `web-*` groups, `@types/node` 26, and three GitHub Actions bumps). |
+| **Last sprint** | 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | None chosen. Candidates are in §11 "Queued after Sprint 52". `BL-1.3` stays not started. |
+| **Tests** | 1,315 backend (`make check`, 2026-10-08), 421 web (`cd web && npm test`), **6 browser journeys** (`make e2e`, ~10 s warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Migrations** | head `0049` (Sprint 52: a partial index on `jobs.closes_at`; **the dev database `iism` is at 0048, so `make migrate` is owed**); 63 ADRs (001-063) |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -965,7 +968,7 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
 
 ## 10. Git state
 
-**Merged 2026-10-06.** PR #29 (`sprint-51` → `main`, merge commit `a18e79a`) carried Sprint 50.5 (`1681de7`) and Sprint 51 (`136d81e`, `a2243ae`); `sprint-50-5` and `sprint-51` were deleted on `origin` and locally. `gh` is not installed, so PR state is read from `git fetch` and ancestry. **There is no feature branch right now.** Sprint 51's change list is in §11 ("Sprint 51: bulk upload"). Sprint 50.5's
+**Merged 2026-10-06.** PR #29 (`sprint-51` → `main`, merge commit `a18e79a`) carried Sprint 50.5 (`1681de7`) and Sprint 51 (`136d81e`, `a2243ae`); `sprint-50-5` and `sprint-51` were deleted on `origin` and locally. `gh` is not installed, so PR state is read from `git fetch` and ancestry. **Since then: `sprint-52` (2026-10-08), uncommitted.** Sprint 51's change list is in §11 ("Sprint 51: bulk upload"). Sprint 50.5's
 changes: `marketplace/stats.py` (one statement, ten new figures and `demo`), `marketplace/models.py` (`skilled_profile()`), `marketplace/schemas.py`, `matching/employer.py`
 (`candidates_total` reuses it), `web/src/components/StatsBand.tsx` (two rows; a test, there was none), `web/src/lib/format.ts` (the shared digit grouping), `LiveCount`, `ApplyPanel`,
 `lib/profile.ts` and `lib/counts.test.tsx` (invalidation), en/hi/ms `stats.*`, the generated `api-schema.d.ts`, `tests/test_homepage_figures.py`, ADR-061, `CLAUDE.md`, the backlog document.
@@ -2334,29 +2337,41 @@ asserts the tile is absent and each `<dl>` has six children, `sm:grid-cols-3` an
 **Environment, 2026-10-06:** the API and web dev server had both stopped and the worker was a stale Oct 4 process; all three were restarted from a session (`make api`, `make worker`,
 `make web`, logs in `/tmp/iism-logs/`) and `make migrate` applied 0047 and 0048. `/health/deep` reported Postgres, Redis and the worker up. The cause of the stop was not found.
 
-### Queued after Sprint 51: do not lose (written 2026-10-05 at the owner's request; renumbered when bulk upload took Sprint 51)
+### Sprint 52: journeys in a real browser (done 2026-10-08, ADR-062, migration 0049, **uncommitted**)
 
-**Sprint 52: journeys that work end to end** (planned; awaiting the owner's decisions below). **Bulk upload (Sprint 51) becomes a sixth journey** -- a provider or employer uploads
-`scripts/fixtures/sample_*.csv` (or a variant on the CI fixture's nine codes), reviews, creates drafts and publishes -- the best test of whether it works end to end.
-- **Why:** nothing runs a real browser (no Playwright or Cypress in `web/`). Component tests mock three seams, so a wrong actor branch, an unpadded
-  `CardBody` or a routing defect compiles and ships (Sprint 18's ten defects; the homepage panels unpadded for four sprints). `a11y.test.tsx` runs axe with
-  **colour-contrast off** (jsdom has no layout), and nothing asserts the report-only CSP is clean on real pages.
-- **A. Playwright (Chromium) in a new `e2e` CI job** against a real stack (API, worker, `next build && start`, Postgres/Redis). CI has no 21,303-standard corpus,
-  so `make seed-e2e` imports `tests/fixtures/nsqf_sample.json` (nine invented codes) through the existing JSON-file `NsqfSource` and seeds a tiny marketplace for
-  those codes (`seed_marketplace.py` fails loudly without the real ones). Five journeys: candidate (phone sign-up, role-search picker, matches with score and gap,
-  apply, withdraw); employer (register, publish, de-identified pool, shortlist); provider (publish course, learner interest); operator (grant verification, badge
-  visible); Hindi at 360x640 (hero button above the fold, no missing keys). On every page: no console errors, no failed requests, **no CSP violations**, axe **with
-  contrast on**. CSP stays report-only (enforcing trades against static rendering and nonces).
-- **B. Scale leftovers (S):** bulk-insert the erasure notices (one ORM object per applicant, `privacy/service.py:229`), migration 0049 for a partial `closes_at` index (0048 is bulk upload's).
-  Deliberately **no** pagination of the provider and organisation lists.
-- **C. Probe ESLint 10 (XS)** in a worktree; adopt if lint and tests pass, else update ADR-053. **TypeScript 7 stays blocked**: `openapi-typescript` 7.13.0 still
-  peers `typescript ^5.x` (checked 2026-10-05).
-- **Cut line:** C, then B, then the operator journey. **Risks:** flakiness (role locators, auto-wait, one CI retry, delete rather than keep a flaky test); CI cost
-  (Chromium about 300 MB cached; if over 5 minutes, journeys 1 and 5 on every PR and the rest on `main`); a new dev dependency needs its own ADR.
-- **Open decisions:** confirm the theme; Playwright vs Cypress (recommend Playwright); every PR vs `main` only (recommend every PR, **never a nightly**: a build red
-  every morning teaches people to ignore red builds); CSP stays report-only (recommend yes).
+- **What exists.** `web/e2e/` (six specs, `support/{test,identities}.ts`, `global-setup.ts`), `web/playwright.config.ts`, `scripts/seed_e2e.py`, `make seed-e2e` / `make e2e` / `make drop-e2e`, and a third CI
+  job `e2e` (`.github/workflows/ci.yml`). The stack under test is the **production build** (`npm run build:e2e` into `.next-e2e`, so it never overwrites the `.next` a running `next dev` serves) with the
+  real API on **:8100 / :3100** (never 8000/3000) against its own database **`iism_e2e`** and Redis db 1. `@playwright/test` is pinned exactly; axe was already a dependency and is injected from `node_modules`.
+- **Rules that must not be broken.** `scripts/seed_e2e.py` **refuses any database not ending `_e2e`**: the importer rewrites the standards it owns, and on `iism` that would replace the real corpus with seven
+  invented rows (checked: it refuses). Every page goes through `checkPage` (no console error, no failed request, no 4xx/5xx from our origins, **no `securitypolicyviolation`** because report-only never blocks,
+  axe **with contrast ON in light and dark**, transitions frozen first because axe samples a colour mid-fade). **Findings change the product; they are never allow-listed.** `globalSetup` deletes leftover vacancies
+  and courses each run, because `/matches` shows a top twenty and identical earlier vacancies crowd a new one off it (that was the "flaky" candidate test).
+- **Journeys:** candidate (phone sign-up with consent first, "ward boy" -> General Duty Assistant via the alias table, nothing pre-ticked, matches with a named gap, apply, employer sees the contact, withdraw takes
+  it back and the row stays), employer, provider (learner chooses to be contacted), operator (`grant_staff.py` is the only way in; refusal byte-identical to an unrouted path; a reason is required), Hindi at 360x640,
+  bulk upload (drafts invisible, confirmed publish, re-upload creates nothing). **Deviation from the plan:** the bulk CSV is written per test with unique titles, not a committed fixture.
+- **Five real defects it found, each fixed:** `--muted` 4.33:1 on the hero's tinted surface (now `#586980`); **every signed-out page load asked `/auth/me` with no token** and took a 401 plus a console error
+  (`useMemberships` now answers 401 locally when no token is stored; unit test); skill-code labels dimmed by `opacity-70` to 3.97:1 / 4.17:1 (`GapPanel`); the homepage figures' sub-lines were `<p>` inside a `<dl>`,
+  invalid HTML axe fails once a secondary figure exists (`StatsBand`, now `<dd>`; unit test); and **Sprint 51's upload screen did nothing when the same file was chosen twice** (the file input is cleared after reading).
+- **Each check was proved able to fail** by breaking the product on purpose (a `console.error`, an image the CSP disallows, a 2:1 text colour): console, failed-request, CSP and contrast each fired, then reverted.
+  **Ten consecutive full runs (two repeats each) were clean** after fixing two test-side flakes: asserting before the server had acted, and the accumulating database. **Not covered:** padding and spacing (a `Card` with no
+  `CardBody` passes every one of these checks), visual regression, other browsers, real devices.
+- **B, done:** `notifications.enqueue_many` (batched multi-row INSERTs; the erasure path uses it instead of one ORM object per applicant) and **migration 0049**, `ix_jobs_closing` partial index
+  (`closes_at IS NOT NULL AND closed_at IS NULL`) for the hourly `close_expired_jobs` sweep, declared on the model so `alembic check` is clean (round-tripped up/down/up; `EXPLAIN` uses it). `tests/test_notification_bulk.py` (4).
+- **C, settled by evidence, not by an install:** `eslint-plugin-react`'s latest (7.37.5, already installed) still peers ESLint `^9.7`, and `openapi-typescript` 7.13.0 still peers TypeScript `^5.x`; both holds stand
+  (dated note in ADR-053 and `dependabot.yml`).
+- **Open, and not fixed because the owner declined the prompt:** `npm audit --omit=dev --audit-level=high` reports **two high advisories in the production tree, `sharp` <0.35.5 and `source-map-js` <1.2.2**. They predate
+  this sprint (the same two with this sprint's package files stashed) and will turn the existing `web` CI job red on any pull request. `npm audit fix --dry-run` shows four patch bumps in `package-lock.json` only.
+- **Local gotchas.** After editing web code, **rebuild (`npm run build:e2e`) and kill any `next start -p 3100`**: Playwright reuses a running server locally and will test stale code. The Playwright browser cache is
+  575 MB in `~/Library/Caches/ms-playwright`; the machine's disk was at 93%.
 
-**Housekeeping the owner must do or confirm:** the open dependabot
+### Queued after Sprint 52: do not lose
+
+- **The two npm advisories above** (one command, four patch bumps) if the owner agrees. Merging this sprint's pull request before that leaves its `web` job red for a pre-existing reason.
+- **Push it and read the first real `e2e` CI run, including its duration.** The job is written and parses as YAML, but GitHub has not run it yet. If it exceeds ~8 minutes, run journeys 1 and 5 on every pull request and the rest on `main` pushes.
+- **A padding/spacing check** is the gap most likely to bite again (see above); a screenshot comparison was considered and rejected as a larger, noisier dependency.
+- **Bulk upload later stories** (14.8 update by `external_ref`, 14.9 XLSX, 14.10 partner/ATS push, 14.11 history, 14.12 async above 200 rows), and the rest of "Also outstanding" below.
+
+**Housekeeping the owner must do or confirm:** `make migrate` on the dev database (0049); the open dependabot
 branches (merge the Python lock group; close the two older npm PRs and `@types/node` 24 to 26; merge the three Actions bumps one at a time, judged by CI).
 **Standing owner decisions:** K stays 500; monetisation (`BL-1.3`) and real external integrations stay deferred; never sign in as `+919880663641`; commit and push
 only when asked.
