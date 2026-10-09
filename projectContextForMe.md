@@ -2401,14 +2401,22 @@ Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-up
 ### Queued after Sprint 53: do not lose
 
 - **Read PR #30's checks and report the `e2e` job's duration and result** (not visible to me). The suite is now ~54 s locally with 88 tests; if the CI job exceeds ~8 minutes, run journeys 1 and 5 on every PR and the rest on `main`.
-- **Dependabot:** close the stale duplicates above; decide on the `web` group knowing it leaves 4 KB of budget headroom on `/profile`; merge the Actions bumps one at a time, judged by the `e2e` job.
+- **Dependabot: decided 2026-10-09 (the owner took every recommendation); carried out on GitHub, not by me.** In this order, after Sprint 53's PR merges (it changes `web/package-lock.json`, and dependabot rebases onto it):
+  1. **Close the stale duplicates:** `python-5113e460e3` (superseded by `python-6ad1d2fc0a`), `web-d4d48f29cf` and `web-0caa1ab034` (superseded by `web-baf1887580`), and `setup-node-6` (keep `-7`: v6 and v7
+     both exist on `actions/setup-node`, v7 is the newer major and the earlier branch; reopen `-6` only if `-7` fails CI). Also close `@types/node-26.6.3` (held by ADR-053: it follows CI's Node 24).
+     Close with a `@dependabot close` comment on the pull request, or `git push origin --delete dependabot/<ecosystem>/<name>`.
+  2. **Merge the `python` group** (`python-6ad1d2fc0a`; tested: ruff, mypy and the full suite).
+  3. **Merge the `web` group** (`web-baf1887580`; tested: `tsc`, lint, unit tests, build, every browser test). It takes `/profile` to **680 KB of 684 KB**: the owner accepted the 4 KB of headroom, and the budget check will
+     fail loudly on the next change that spends it. Raising the ceiling would be a separate decision with its own ADR line.
+  4. **Merge the Actions bumps one at a time, each judged by CI** (they cannot be tested locally): `upload-artifact-6`, then `cache-6` (both used only by the `e2e` job), then `checkout-7`, `setup-uv-7`, `setup-node-7`.
+     If one goes red, revert it and leave the rest; do not batch them.
 - **`make migrate` on the dev database `iism`** (0049 is owed; Sprint 53 added no migration).
 - **Bulk upload later stories:** 14.9 XLSX (a dependency to justify under ADR-053), 14.10 partner/ATS push (needs a `ServiceAccount`-to-tenant binding and a write scope), 14.11 upload history, 14.12 async
   through the worker (a 200-row apply is now 3 to 6 s in a request; ADR-063's "revisit above 200" stands).
 - **Not covered by the browser checks:** visual regression, other browsers, real devices, and padding that is present but wrong. Screenshot comparison stays rejected as a larger, noisier dependency.
 - The rest of "Also outstanding" below, and the owner-held items under "Known gaps".
 
-**Housekeeping the owner must do or confirm:** `make migrate` on the dev database (0049); revoke any earlier GitHub token that appeared in session output; the dependabot decisions above.
+**Housekeeping the owner must do or confirm:** `make migrate` on the dev database (0049); carry out the dependabot steps above (all earlier GitHub tokens were deleted by the owner on 2026-10-09).
 **Standing owner decisions:** K stays 500; monetisation (`BL-1.3`) and real external integrations stay deferred; never sign in as `+919880663641`; commit and push
 only when asked.
 
