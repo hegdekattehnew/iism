@@ -2828,6 +2828,21 @@ export interface components {
             skipped: number;
             /** Created */
             created: number;
+            /**
+             * Updates
+             * @default 0
+             */
+            updates: number;
+            /**
+             * Updating Live
+             * @default 0
+             */
+            updating_live: number;
+            /**
+             * Updated
+             * @default 0
+             */
+            updated: number;
             /** Daily Limit */
             daily_limit: number;
             /** Remaining Today */
@@ -2843,7 +2858,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "ok" | "warning" | "error" | "skip";
+            status: "ok" | "warning" | "error" | "skip" | "update";
             /** Title */
             title?: string | null;
             /** External Ref */
@@ -2859,6 +2874,16 @@ export interface components {
              * @default false
              */
             created: boolean;
+            /**
+             * Live
+             * @default false
+             */
+            live: boolean;
+            /**
+             * Updated
+             * @default false
+             */
+            updated: boolean;
         };
         /**
          * BulkStandardOut
@@ -7599,7 +7624,10 @@ export interface operations {
     };
     check_jobs_org__org_slug__jobs_bulk_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `update` changes the listings whose external_ref the file names; `skip` never. */
+                existing?: "skip" | "update";
+            };
             header?: never;
             path: {
                 org_slug: string;
@@ -7634,7 +7662,10 @@ export interface operations {
     };
     apply_jobs_org__org_slug__jobs_bulk_apply_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `update` changes the listings whose external_ref the file names; `skip` never. */
+                existing?: "skip" | "update";
+            };
             header?: never;
             path: {
                 org_slug: string;
@@ -7735,7 +7766,10 @@ export interface operations {
     };
     check_courses_org__org_slug__courses_bulk_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `update` changes the listings whose external_ref the file names; `skip` never. */
+                existing?: "skip" | "update";
+            };
             header?: never;
             path: {
                 org_slug: string;
@@ -7770,7 +7804,10 @@ export interface operations {
     };
     apply_courses_org__org_slug__courses_bulk_apply_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `update` changes the listings whose external_ref the file names; `skip` never. */
+                existing?: "skip" | "update";
+            };
             header?: never;
             path: {
                 org_slug: string;

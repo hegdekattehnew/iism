@@ -52,6 +52,9 @@ const report = (over: Record<string, unknown> = {}) => ({
   errors: 0,
   skipped: 0,
   created: 0,
+  updates: 0,
+  updating_live: 0,
+  updated: 0,
   daily_limit: 100,
   remaining_today: 100,
   errors_csv: null,
@@ -139,7 +142,11 @@ describe("BulkUpload", () => {
     expect(create.disabled).toBe(true);
     expect(screen.getByText("title: too short")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /rows with a problem will be skipped/,
+      }),
+    );
     expect(create.disabled).toBe(false);
   });
 
@@ -281,6 +288,116 @@ describe("BulkUpload", () => {
     );
     await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
     expect(GET.mock.calls[0][0]).toBe("/org/{org_slug}/jobs/bulk/template");
+  });
+
+  it("asks to update only when told to, and says so to the server in the query", async () => {
+    POST.mockResolvedValue(ok(report()));
+    screenFor();
+    upload();
+    await screen.findByText("Phlebotomist");
+    expect(POST.mock.calls[0][1].params.query).toEqual({ existing: "skip" });
+  });
+
+  it("sends existing=update once the box is ticked, and re-checks a file already chosen", async () => {
+    POST.mockResolvedValue(ok(report()));
+    screenFor();
+    upload();
+    await screen.findByText("Phlebotomist");
+    expect(posted("check")).toHaveLength(1);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Also update listings I uploaded before/,
+      }),
+    );
+
+    // The old review is gone and the same file is checked again with the new choice: a stale
+    // review must never sit beside a button that now does something else.
+    await waitFor(() => expect(posted("check")).toHaveLength(2));
+    expect(posted("check")[1][1].params.query).toEqual({ existing: "update" });
+    expect(posted("check")[1][1].body).toBe("title\nPhlebotomist\n");
+  });
+
+  it("will not update live listings until that is acknowledged, and says how many", async () => {
+    POST.mockResolvedValue(
+      ok(
+        report({
+          rows: [
+            row({
+              status: "update",
+              slug: "ward-chennai",
+              live: true,
+              messages: ["will update ward-chennai (live): title"],
+            }),
+          ],
+          ok: 0,
+          updates: 1,
+          updating_live: 1,
+        }),
+      ),
+    );
+    screenFor();
+    upload();
+
+    const go = (await screen.findByRole("button", {
+      name: "Update 1",
+    })) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+    expect(screen.getByText(/1 of these is live/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /of these is live/ }));
+    expect(go.disabled).toBe(false);
+  });
+
+  it("names both halves when a file creates and updates", async () => {
+    POST.mockResolvedValue(
+      ok(
+        report({
+          rows: [
+            row(),
+            row({ row: 3, status: "update", slug: "x", live: false }),
+          ],
+          ok: 1,
+          updates: 1,
+          updating_live: 0,
+        }),
+      ),
+    );
+    screenFor();
+    upload();
+    expect(
+      await screen.findByRole("button", {
+        name: "Create 1 drafts and update 1",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("reports how many listings were updated after the apply", async () => {
+    POST.mockImplementation(async (path: string) => {
+      if (path.endsWith("/check"))
+        return ok(
+          report({
+            ok: 0,
+            updates: 1,
+            rows: [row({ status: "update", slug: "x", live: false })],
+          }),
+        );
+      return ok(
+        report({
+          applied: true,
+          ok: 0,
+          updates: 1,
+          updated: 1,
+          rows: [row({ status: "update", slug: "x", updated: true })],
+        }),
+      );
+    });
+    screenFor();
+    upload();
+    fireEvent.click(await screen.findByRole("button", { name: "Update 1" }));
+    expect(await screen.findByText("1 listing updated.")).toBeTruthy();
+    // Nothing was created, so there is nothing to publish and no publish step to offer.
+    expect(screen.queryByRole("button", { name: /Publish these/ })).toBeNull();
   });
 
   it("is accessible with a review on screen, problems included", async () => {

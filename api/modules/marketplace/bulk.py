@@ -18,9 +18,17 @@ rows plus an `error` column, so the loop is: upload, fix the twelve, upload the 
 
 **That loop makes idempotency essential.** An optional `external_ref` is the organisation's own id
 for the row and is unique per organisation (migration 0048); a row whose reference exists is
-*skipped*, never duplicated and never silently updated. Without one, a row matching an existing
-listing of the same organisation on normalised title (+ district + employment type for a vacancy)
-is skipped and names which one it matched.
+*skipped*, never duplicated. Without one, a row matching an existing listing of the same
+organisation on normalised title (+ district + employment type for a vacancy) is skipped and names
+which one it matched.
+
+**Updating is opt-in and by reference only** (Sprint 53). With `existing="update"` a row whose
+`external_ref` exists *changes that listing* through `update_job` / `update_course` -- the one
+writer, so a live listing is guarded by the same rule as one edited by hand (it may not be left with
+no standard, ADR-064). A title match is a guess and stays a skip. The file is the truth only for
+the **columns it carries**: a column the header does not have leaves that field alone, and a blank
+cell in a column it does have clears it. A row that would change nothing is a skip ("unchanged"),
+so uploading the same file twice is still a no-op.
 
 **A standard is named by NOS code**, which is globally unique across all 21,303 (`Skill.nos_code`),
 never by name: 1,778 names are shared by 4,838 standards. A row may instead name a **job role**,
@@ -41,6 +49,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Literal
 
 import structlog
@@ -49,6 +58,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.modules.geography import resolve_location
@@ -66,7 +76,9 @@ from api.modules.skills import Skill, search_roles, standards_for_role
 log = structlog.get_logger("iism.marketplace")
 
 Kind = Literal["jobs", "courses"]
-Status = Literal["ok", "warning", "error", "skip"]
+Status = Literal["ok", "warning", "error", "skip", "update"]
+# What a file may do about a row whose `external_ref` already exists.
+Existing = Literal["skip", "update"]
 
 # JobIn / CourseIn both cap a listing at 50 standards.
 MAX_STANDARDS = 50
@@ -207,9 +219,12 @@ class RowReport:
     external_ref: str | None = None
     messages: list[str] = field(default_factory=list)
     standards: list[StandardRef] = field(default_factory=list)
-    # The slug created (apply) or the one this row matched (a skip).
+    # The slug created (apply), the one this row matched (a skip), or the one it changes (update).
     slug: str | None = None
     created: bool = False
+    # An update only: the listing is published, so the change is visible to everyone at once.
+    live: bool = False
+    updated: bool = False
 
 
 @dataclass
@@ -228,6 +243,15 @@ class BulkReport:
     @property
     def created(self) -> int:
         return sum(1 for r in self.rows if r.created)
+
+    @property
+    def updated(self) -> int:
+        return sum(1 for r in self.rows if r.updated)
+
+    @property
+    def updating_live(self) -> int:
+        """Rows that change (or changed) a published listing, so a person is asked first."""
+        return sum(1 for r in self.rows if r.live and r.status == "update")
 
 
 # --------------------------------------------------------------------------------------- parsing
@@ -603,6 +627,11 @@ class _Plan:
     skip_of: str | None = None
     skip_slug: str | None = None
     key: tuple[str, ...] | None = None
+    # The row's own values, as typed (blank cells absent): what an update merges onto a listing.
+    fields: dict[str, Any] = field(default_factory=dict)
+    update_slug: str | None = None
+    update_live: bool = False
+    changes: list[str] = field(default_factory=list)
 
 
 async def _standards_for_row(
@@ -718,6 +747,7 @@ async def _plan_job(
         fields["closes_at"] = closes
     role_mandatory = _yes_no(cells, "role_standards_mandatory", problems)
 
+    plan.fields = fields
     try:
         JobIn.model_validate(fields)
     except ValidationError as error:
@@ -798,6 +828,7 @@ async def _plan_course(
     if level is not None:
         fields["nsqf_level"] = level
 
+    plan.fields = fields
     try:
         CourseIn.model_validate(fields)
     except ValidationError as error:
@@ -829,6 +860,158 @@ async def _plan_course(
             problems.extend(_validation_messages(error))
     plan.key = (_norm(cells.get("title")),)
     return plan
+
+
+# ------------------------------------------------------------------------------------- updating
+
+# The columns a row may change on an existing listing, and the listing field each one sets. A column
+# the file does not carry is never in `plan.raw.cells`, so it never appears here: the file is the
+# truth only for what it contains.
+_UPDATE_COLUMNS: dict[Kind, dict[str, str]] = {
+    "jobs": {
+        "title": "title",
+        "description": "description",
+        "state": "location_state",
+        "district": "location_district",
+        "employment_type": "employment_type",
+        "positions": "positions",
+        "experience_min_years": "experience_min_years",
+        "experience_max_years": "experience_max_years",
+        "salary_min_inr": "salary_min_inr",
+        "salary_max_inr": "salary_max_inr",
+        "nsqf_level_min": "nsqf_level_min",
+        "closes_at": "closes_at",
+    },
+    "courses": {
+        "title": "title",
+        "description": "description",
+        "mode": "mode",
+        "language": "language",
+        "duration_hours": "duration_hours",
+        "fee_inr": "fee_inr",
+        "nsqf_level": "nsqf_level",
+    },
+}
+
+
+def _same(a: Any, b: Any) -> bool:
+    """Whether two values are the same fact, whatever type the database and the file gave them."""
+    if a is None or b is None:
+        return a is None and b is None
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a == b
+    if isinstance(a, int | float | Decimal) and isinstance(b, int | float | Decimal):
+        return float(a) == float(b)
+    if isinstance(a, datetime) and isinstance(b, datetime):
+        return a == b
+    return str(a).strip() == str(b).strip()
+
+
+def _skill_signature(kind: Kind, links: Sequence[Any]) -> set[tuple[Any, ...]]:
+    if kind == "jobs":
+        return {(link.skill.slug, link.importance, bool(link.is_mandatory)) for link in links}
+    return {
+        (link.skill.slug, None if link.level_taught is None else float(link.level_taught))
+        for link in links
+    }
+
+
+async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: list[_Plan]) -> None:
+    """For each row that names an existing listing, build the payload that *changes only what the
+    file carries*, and say what that is. A row that would change nothing becomes a skip."""
+    wanted = {p.update_slug: p for p in plans if p.update_slug and not p.problems}
+    if not wanted:
+        return
+    # `Any`, as `listings.load_with_skills` types it: the two listings share what is read here but
+    # not a base class, and a union of them makes every attribute below a type error.
+    model: Any = Job if kind == "jobs" else Course
+    loaded = await db.scalars(
+        select(model)
+        .where(model.tenant_id == tenant_id, model.slug.in_(list(wanted)))
+        .options(selectinload(model.skills))
+        .execution_options(populate_existing=True)
+    )
+    columns = _UPDATE_COLUMNS[kind]
+    for item in loaded.all():
+        plan = wanted[item.slug]
+        cells = plan.raw.cells
+        merged: dict[str, Any] = {field_: getattr(item, field_) for field_ in columns.values()}
+        for column, field_ in columns.items():
+            if column in cells:
+                # A blank cell is absent from `fields`, so the field takes its default: cleared.
+                if field_ in plan.fields:
+                    merged[field_] = plan.fields[field_]
+                else:
+                    merged.pop(field_, None)
+        carries_standards = "standards" in cells or "job_role" in cells
+        if carries_standards:
+            skills: list[Any] = (
+                [
+                    JobSkillIn(skill_slug=s.slug, importance=s.importance, is_mandatory=s.mandatory)
+                    for s in plan.standards
+                ]
+                if kind == "jobs"
+                else [
+                    CourseSkillIn(skill_slug=s.slug, level_taught=s.level) for s in plan.standards
+                ]
+            )
+        else:
+            skills = (
+                [
+                    JobSkillIn(
+                        skill_slug=lk.skill.slug,
+                        importance=lk.importance,
+                        is_mandatory=bool(lk.is_mandatory),
+                    )
+                    for lk in item.skills
+                ]
+                if kind == "jobs"
+                else [
+                    CourseSkillIn(
+                        skill_slug=lk.skill.slug,
+                        level_taught=None if lk.level_taught is None else float(lk.level_taught),
+                    )
+                    for lk in item.skills
+                ]
+            )
+        try:
+            payload: JobIn | CourseIn = (
+                JobIn.model_validate({**merged, "skills": skills})
+                if kind == "jobs"
+                else CourseIn.model_validate({**merged, "skills": skills})
+            )
+        except ValidationError as error:
+            plan.problems.extend(_validation_messages(error))
+            continue
+
+        changes = [
+            column
+            for column, field_ in columns.items()
+            if column in cells and not _same(getattr(item, field_), getattr(payload, field_))
+        ]
+        if carries_standards:
+            new_signature = (
+                {(s.slug, s.importance, s.mandatory) for s in plan.standards}
+                if kind == "jobs"
+                else {(s.slug, None if s.level is None else float(s.level)) for s in plan.standards}
+            )
+            if new_signature != _skill_signature(kind, item.skills):
+                changes.append("standards")
+
+        if item.status == "published" and not payload.skills:
+            noun = "vacancy" if kind == "jobs" else "course"
+            plan.problems.append(
+                f"standards: this would leave a published {noun} with no standard; "
+                "unpublish it first or keep at least one"
+            )
+            continue
+        if not changes:
+            plan.skip_of, plan.skip_slug = f"unchanged ({item.slug})", item.slug
+            plan.update_slug = None
+            continue
+        plan.payload = payload
+        plan.changes = changes
+        plan.update_live = item.status == "published"
 
 
 # ------------------------------------------------------------------------ idempotency and limits
@@ -887,7 +1070,13 @@ def daily_limit(tenant: Any) -> int:
 # ------------------------------------------------------------------------------------------ run
 
 
-async def _plans(db: AsyncSession, kind: Kind, tenant_id: Any, rows: list[RawRow]) -> list[_Plan]:
+async def _plans(
+    db: AsyncSession,
+    kind: Kind,
+    tenant_id: Any,
+    rows: list[RawRow],
+    existing: Existing,
+) -> list[_Plan]:
     codes_needed: set[str] = set()
     for row in rows:
         for token in _parse_tokens(kind, row.cells.get("standards", ""), []):
@@ -923,7 +1112,9 @@ async def _plans(db: AsyncSession, kind: Kind, tenant_id: Any, rows: list[RawRow
         if plan.problems:
             continue
         if plan.ref:
-            if plan.ref in by_ref:
+            if plan.ref in by_ref and existing == "update" and plan.ref not in seen_refs:
+                plan.update_slug = by_ref[plan.ref]
+            elif plan.ref in by_ref:
                 plan.skip_of, plan.skip_slug = (
                     f"external_ref {plan.ref} already exists",
                     by_ref[plan.ref],
@@ -942,6 +1133,7 @@ async def _plans(db: AsyncSession, kind: Kind, tenant_id: Any, rows: list[RawRow
             elif plan.key in seen_keys:
                 plan.skip_of = f"the same title appears in row {seen_keys[plan.key]}"
             seen_keys.setdefault(plan.key, plan.raw.number)
+    await _merge_updates(db, kind, tenant_id, plans)
     return plans
 
 
@@ -960,6 +1152,18 @@ def _report_row(plan: _Plan) -> RowReport:
         return RowReport(
             plan.raw.number, "skip", plan.title, plan.ref, [message], plan.standards, plan.skip_slug
         )
+    if plan.update_slug:
+        live = " (live: visible to everyone as soon as it is applied)" if plan.update_live else ""
+        return RowReport(
+            plan.raw.number,
+            "update",
+            plan.title,
+            plan.ref,
+            [f"will update {plan.update_slug}{live}: {', '.join(plan.changes)}", *plan.warnings],
+            plan.standards,
+            plan.update_slug,
+            live=plan.update_live,
+        )
     status: Status = "warning" if plan.warnings else "ok"
     return RowReport(
         plan.raw.number, status, plan.title, plan.ref, list(plan.warnings), plan.standards
@@ -974,10 +1178,14 @@ async def run(
     *,
     apply: bool,
     actor_id: Any = None,
+    existing: Existing,
 ) -> BulkReport:
-    """Check a file, or check it again and create what is valid as drafts."""
+    """Check a file, or check it again and create what is valid as drafts.
+
+    `existing="update"` also changes the listings whose `external_ref` the file names (ADR-064).
+    """
     rows, notes, header = parse_file(text, kind)
-    plans = await _plans(db, kind, tenant.id, rows)
+    plans = await _plans(db, kind, tenant.id, rows, existing)
     reports = [_report_row(p) for p in plans]
 
     limit = daily_limit(tenant)
@@ -1000,6 +1208,22 @@ async def run(
 
     if apply:
         for plan, report in zip(plans, reports, strict=True):
+            if report.status == "update" and plan.payload is not None and plan.update_slug:
+                try:
+                    if kind == "jobs":
+                        assert isinstance(plan.payload, JobIn)
+                        await publishing.update_job(db, tenant.id, plan.update_slug, plan.payload)
+                    else:
+                        assert isinstance(plan.payload, CourseIn)
+                        await course_publishing.update_course(
+                            db, tenant.id, plan.update_slug, plan.payload
+                        )
+                except HTTPException as error:
+                    report.status = "error"
+                    report.messages.insert(0, str(error.detail))
+                else:
+                    report.updated = True
+                continue
             if report.status not in ("ok", "warning") or plan.payload is None:
                 continue
             created: Job | Course
@@ -1057,6 +1281,7 @@ async def _record(
         payload={
             "rows": len(report.rows),
             "created": report.created,
+            "updated": report.updated,
             "skipped": report.count("skip"),
             "rejected": report.count("error"),
         },
@@ -1066,6 +1291,7 @@ async def _record(
         kind=kind,
         rows=len(report.rows),
         created=report.created,
+        updated=report.updated,
         skipped=report.count("skip"),
         rejected=report.count("error"),
     )

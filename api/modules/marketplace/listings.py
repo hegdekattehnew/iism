@@ -12,13 +12,15 @@ modules, and validation duplicated is validation that eventually differs:
 
 * which standards exist, and the refusal of ones that do not;
 * the refusal of retired `legacy` rows;
-* re-reading a listing with its relationships populated.
+* re-reading a listing with its relationships populated;
+* the rule that a **published** listing keeps at least one standard (Sprint 53, ADR-064).
 
 The retired-standard rule had **no test in either copy**, which is exactly how a
 duplicated rule rots: nothing fails when one side drifts.
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -70,6 +72,27 @@ async def resolve_standards(
             f"Retired standards cannot be {verb}: {', '.join(retired)}",
         )
     return {slug: found[slug][0] for slug in found}
+
+
+def refuse_emptying_a_published(
+    listing_status: str, standards: Sequence[object], *, what: str, keep: str
+) -> None:
+    """A live listing may be edited, but not down to nothing.
+
+    "No standard, no publishing" was checked at one moment only -- the instant of publishing -- so
+    an employer could publish a vacancy and then save it with every standard removed: it stayed
+    published, stayed on `/jobs`, and could never be matched or recommended to anyone. The rule is
+    an invariant (*published implies at least one standard*), so it is enforced at every write that
+    can break it, not just the one that establishes it. A draft may still be saved with none: it is
+    unfinished, not live.
+
+    `what` and `keep` only shape the sentence ("vacancy" / "required standard").
+    """
+    if listing_status == "published" and not standards:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"A published {what} must keep at least one {keep}. Add one, or unpublish it first.",
+        )
 
 
 async def unique_slug(db: AsyncSession, column: Any, *parts: str | None) -> str:

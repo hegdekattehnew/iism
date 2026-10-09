@@ -42,6 +42,7 @@ export function ProgrammeDashboard() {
       ) : (
         <>
           <Select
+            aria-label={t("title")}
             className="mt-4 max-w-xs"
             value={selected ?? ""}
             onChange={(e) => setSelected(e.target.value || null)}

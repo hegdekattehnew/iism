@@ -136,7 +136,7 @@ export function Notices() {
             <li key={notice.id} className="text-sm">
               <span>{describe(notice)}</span>{" "}
               {path && (
-                <Link href={path} className="text-brand underline-offset-2 hover:underline">
+                <Link href={path} className="text-brand underline underline-offset-2 hover:text-brand-strong">
                   {t("open")}
                 </Link>
               )}{" "}

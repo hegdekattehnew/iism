@@ -41,7 +41,7 @@ export default async function Page({
         {ts("haveAccount")}{" "}
         <Link
           href="/signin"
-          className="font-medium text-brand underline-offset-4 hover:underline"
+          className="font-medium text-brand underline underline-offset-4 hover:text-brand-strong"
         >
           {ts("signInInstead")}
         </Link>

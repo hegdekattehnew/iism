@@ -46,6 +46,14 @@ describe("DistrictSkillGap", () => {
     expect(await screen.findByText("No district has an open vacancy yet.")).toBeTruthy();
   });
 
+  it("names its picker: a placeholder option is not an accessible name", async () => {
+    // axe `select-name`, found on /admin by Sprint 53's route sweep: the only text was the
+    // "Choose a district" option, which a screen reader does not announce as the control's label.
+    serve([]);
+    renderUi(<DistrictSkillGap />);
+    expect(await screen.findByRole("combobox", { name: "District skill gap" })).toBeTruthy();
+  });
+
   it("never prints a count the server withheld, and marks the shortfall beside it a minimum", async () => {
     serve([
       {

@@ -29,7 +29,7 @@ export function AccountPanel() {
   ) : (
     <p className="mt-8 text-sm text-muted">
       {t("signedOut")}{" "}
-      <Link href="/signin" className="text-brand underline-offset-4 hover:underline">
+      <Link href="/signin" className="text-brand underline underline-offset-4 hover:text-brand-strong">
         {t("signIn")}
       </Link>
     </p>
@@ -110,7 +110,7 @@ function SignedIn() {
             : t("consentMissing")}
         </p>
         <p className="mt-2 text-sm">
-          <Link href="/privacy" className="text-brand underline-offset-4 hover:underline">
+          <Link href="/privacy" className="text-brand underline underline-offset-4 hover:text-brand-strong">
             {t("readNotice")}
           </Link>
         </p>

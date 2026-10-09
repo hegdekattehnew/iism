@@ -1631,7 +1631,8 @@
       "ok": "Ready",
       "warning": "Warning",
       "error": "Problem",
-      "skip": "Skipped"
+      "skip": "Skipped",
+      "update": "Update"
     },
     "standardsCount": "{count, plural, one {# standard} other {# standards}}",
     "fromRole": "from the job role",
@@ -1650,6 +1651,14 @@
       "publishNote": "Publishing makes a course visible to everyone. A course that teaches no standard cannot be published.",
       "publishConfirm": "Publish {count} courses? They become visible to everyone straight away.",
       "viewList": "Go to your courses"
-    }
+    },
+    "existingLabel": "Also update listings I uploaded before",
+    "existingHelp": "Rows are matched by external_ref only. A column your file does not have is left alone, and a blank cell in a column it does have clears that field. Nothing is published or unpublished by an update.",
+    "summaryWithUpdates": "{ok} ready, {warnings} with a warning, {errors} with a problem, {skipped} skipped, {updates} to update.",
+    "applyBoth": "Create {created} drafts and update {updates}",
+    "applyUpdatesOnly": "Update {count}",
+    "liveAcknowledge": "{count, plural, one {# of these is live} other {# of these are live}}. The change is visible to everyone as soon as I apply it.",
+    "updatesNote": "An update changes the listing in place. Its address, and whether it is published, stay as they are.",
+    "updatedDone": "{count, plural, one {# listing updated.} other {# listings updated.}}"
   }
 }

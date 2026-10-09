@@ -37,6 +37,7 @@ from api.core.slugs import add_with_unique_slug
 from api.modules.geography import resolve_location
 from api.modules.marketplace.listings import (
     load_with_skills,
+    refuse_emptying_a_published,
     resolve_standards,
     unique_slug,
 )
@@ -202,6 +203,11 @@ async def update_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str, payload:
     job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+
+    # Before any field changes: a live vacancy may not be edited down to no standards (ADR-064).
+    refuse_emptying_a_published(
+        job.status, payload.skills, what="vacancy", keep="required standard"
+    )
 
     for field in _PLAIN_FIELDS:
         setattr(job, field, getattr(payload, field))
