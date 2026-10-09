@@ -27,6 +27,8 @@ updates:
       web:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    # `@playwright/test` is pinned exactly (ADR-062): a bump changes the Chromium the journeys
+    # run in, so it is judged by the `e2e` CI job like any other change, never merged blind.
     ignore:
       # Held until upstream catches up; revisit when either condition changes.
       # `openapi-typescript` (the generated client, `make gen-api`) declares a
@@ -34,7 +36,8 @@ updates:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # `eslint-config-next`'s React plugin throws under ESLint 10, so `npm run
-      # lint` crashes rather than reporting.
+      # lint` crashes rather than reporting. Re-checked 2026-10-07: eslint-plugin-react's
+      # latest (7.37.5) still peers ESLint ^9.7, and openapi-typescript still peers TypeScript ^5.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
       # `@types/node` follows the Node version CI runs (24), not the newest release: types

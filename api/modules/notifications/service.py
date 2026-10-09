@@ -11,11 +11,12 @@ Two rules, both learned elsewhere in this project:
 """
 
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider
@@ -52,6 +53,23 @@ async def enqueue(
     )
     db.add(notification)
     return notification
+
+
+async def enqueue_many(db: AsyncSession, notices: Sequence[Mapping[str, Any]]) -> int:
+    """Record what is owed to many people, without building one ORM object each.
+
+    Each notice carries the same keys `enqueue` takes (`locale` optional). Does not commit.
+    Erasing an organisation with thousands of waiting applicants used to build one ORM object per
+    applicant (Sprint 50's audit); this writes the same rows as batched multi-row INSERTs (the
+    driver's own limit on bind parameters is respected by SQLAlchemy's batching).
+    """
+    if not notices:
+        return 0
+    await db.execute(
+        insert(Notification),
+        [{"locale": "en", **notice} for notice in notices],
+    )
+    return len(notices)
 
 
 async def _address_for(db: AsyncSession, notification: Notification) -> str | None:

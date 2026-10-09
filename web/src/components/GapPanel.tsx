@@ -37,9 +37,10 @@ export function SkillChip({
         <span className="font-semibold uppercase tracking-wide">{t("mandatory")}</span>
       )}
       <span className="min-w-0 break-words">{skill.name}</span>
-      {skill.nos_code && (
-        <span className="font-mono text-[10px] opacity-70">{skill.nos_code}</span>
-      )}
+      {/* No `opacity-70` on the code: it dimmed it below WCAG AA on every tone (3.97:1 in light
+          mode, 4.17:1 in dark), and only a real browser's contrast check could see that
+          (Sprint 52). The tone's own text colour already passes. */}
+      {skill.nos_code && <span className="font-mono text-[10px]">{skill.nos_code}</span>}
     </span>
   );
 }

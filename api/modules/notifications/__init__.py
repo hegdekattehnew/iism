@@ -11,6 +11,6 @@ application *is* -- it is handed a template name and a payload.
 
 from api.modules.notifications.models import Notification
 from api.modules.notifications.routes import router
-from api.modules.notifications.service import drain, enqueue
+from api.modules.notifications.service import drain, enqueue, enqueue_many
 
-__all__ = ["Notification", "drain", "enqueue", "router"]
+__all__ = ["Notification", "drain", "enqueue", "enqueue_many", "router"]

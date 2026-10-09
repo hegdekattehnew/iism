@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
+import { getAccessToken, getRefreshToken } from "./auth";
 import { employerDashboardKey, invalidatePublicCounts, providerDashboardKey } from "./counts";
 import { ApiError, readDetail } from "./http";
 
@@ -39,6 +40,12 @@ export function useMemberships() {
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
+      // Nobody signed in, so there is nothing to ask. This ran on **every page for every
+      // signed-out visitor** -- a request that could only answer 401, and a red line in the
+      // browser console each time -- until Sprint 52's real-browser run saw it. The answer is
+      // still "401", thrown the way the request's own failure is, so `isSignedOut` and the
+      // sign-in prompts downstream behave exactly as they did.
+      if (!getAccessToken() && !getRefreshToken()) throw new Error("401");
       // The status is read *before* the check, not inside it: `/auth/me`
       // declares no error response, so on the failure branch openapi-fetch
       // narrows the whole result to `never` and `response` is unreachable.

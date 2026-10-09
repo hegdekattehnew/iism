@@ -58,6 +58,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The browser tests build into their own directory so a production build never overwrites the
+  // `.next` a running `next dev` is serving from (Sprint 52). Unset, it is Next's default.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

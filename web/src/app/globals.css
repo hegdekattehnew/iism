@@ -15,7 +15,11 @@
   --surface: #ffffff;
   --surface-muted: #f8fafc;
   --foreground: #0f172a;
-  --muted: #64748b;
+  /* Secondary text. Was #64748b, which is 4.76:1 on white but **4.33:1 on the hero's tinted
+     surface** -- under the 4.5:1 WCAG AA asks for, and invisible to every test until Sprint 52's
+     browser run measured it (jsdom has no layout, so `a11y.test.tsx` cannot check contrast).
+     This passes on white, on `--accent-soft` and down to #e2e8f0. */
+  --muted: #586980;
   --border: #e2e8f0;
   /* A form control's edge. `--border` is 1.23:1 on white, which is fine for a
      card and fails WCAG 1.4.11 (3:1) for an input you have to find to type in. */

@@ -2573,6 +2573,11 @@ it waited with it. The newest PR, merged with current `main` and run through eve
 - **Newer npm prints `allow-scripts` warnings** for two packages with install scripts (`fsevents`, `unrs-resolver`).
   Nothing fails, and the build and tests pass without approving them.
 
+- **Re-checked 2026-10-07 (Sprint 52); both holds stand.** `eslint-config-next` is at 16.4.0 and still depends on `eslint-plugin-react` `^7.37.0`, whose latest release is 7.37.5
+  (the version already installed) with a peer range that stops at ESLint `^9.7`; ESLint itself is at 10.12.0. `openapi-typescript` is still 7.13.0 with a TypeScript `^5.x` peer. Read from the
+  registry rather than by installing ESLint 10 in a worktree, because the blocker is an upstream peer range that has not moved, so an install would only re-prove the crash. Re-check when
+  `eslint-plugin-react` publishes a release whose peers include ESLint 10, or `openapi-typescript` one that admits TypeScript 7.
+
 
 ## ADR-054: Role Aliases Are Edited by an Operator, the Table Is the Source of Truth, and the Seed Never Overwrites an Operator
 
@@ -3052,6 +3057,65 @@ profile row, including the empty ones lazy creation makes), and the homepage's o
 - `/marketplace/counts` still duplicates three of `/stats`'s figures and is read only by `LiveCount`; merging them was not worth the churn.
 - Malay `stats` strings are still English (the locale is not in the switcher).
 
+
+## ADR-062: Journeys Run in a Real Browser, Against the Production Build, and a Check That Cannot Fail Does Not Count
+
+**Status:** Accepted (October 2026). Sprint 52. One new dev dependency (`@playwright/test`, pinned exactly); migration 0049 is separate.
+
+**Context:** Nothing in this repository ran a real browser. The component tests mock three seams (`@/lib/auth`, `@/lib/org`, `@/i18n/navigation`), `a11y.test.tsx` runs axe with
+`color-contrast` **off** because jsdom has no layout, and the Content-Security-Policy ships report-only, so a violation blocks nothing and is invisible. So a wrong actor branch, a
+flush card, a routing defect or a failing contrast ratio compiled and shipped: Sprint 18's ten defects, the homepage panels sitting unpadded for four sprints, and a homepage grid
+the owner found misaligned by eye. Sprint 51 then shipped its largest new screen with a hand-run as its only live proof.
+
+**Decision:**
+
+- **Playwright, Chromium only, on the production build.** `next build && next start`, not `next dev`: the CSP is looser in development, the service worker registers only in a
+  production build, and `sw.js`'s DENY list is a security boundary nothing else exercises. The API is the real one on its own database, `iism_e2e`, with `ENVIRONMENT=test` (the sign-in code is
+  returned and the form prints it). Ports are 8100 and 3100, so the tests never collide with `make api` and `make web`, and the build goes to `.next-e2e` so it never overwrites the
+  `.next` a running `next dev` is serving from.
+- **Six journeys, each one spec file:** candidate (sign-up, role search, matches with a named gap, apply, withdraw), employer (post, publish, de-identified pool, shortlist), provider
+  (publish a course, a learner chooses to be contacted), operator (granted by `scripts/grant_staff.py`, verifies with a reason), Hindi at 360x640 (search above the fold, nothing clipped),
+  and bulk upload (check, drafts, confirmed publish, re-upload creates nothing).
+- **Every page a journey visits goes through one `checkPage`:** no `console.error`, no uncaught page error, no failed request, no 4xx/5xx from our own origins, **no
+  `securitypolicyviolation` event** (an init script listens, because a report-only policy never blocks), and **axe with `color-contrast` ON in both colour schemes**. Transitions are frozen
+  before measuring, because axe samples a colour mid-fade and reports a contrast failure that exists for 150 ms and in nobody's eyes.
+- **Data: each test makes its own people through the product.** CI has no 21,303-standard corpus, so `scripts/seed_e2e.py` imports `tests/fixtures/nsqf_sample.json` through the real
+  `JsonFileNsqfSource` (seven standards, three roles, Karnataka and Assam). It **refuses any database whose name does not end in `_e2e`**: the importer rewrites the standards it owns, and on
+  the development database that would replace the real corpus with seven invented rows. A `globalSetup` deletes leftover vacancies and courses each run, because `/matches` shows a top
+  twenty and identical vacancies from earlier runs, all tied on score, crowd a fresh one off the page.
+- **axe is already a dependency**, so it is injected from `node_modules`; `@axe-core/playwright` is not added. `@playwright/test` is the only new package, it is dev-only, and it
+  never reaches a phone.
+- **A third CI job, `e2e`, on every pull request. Never nightly:** a build that is red every morning for a reason nobody can fix teaches people to ignore red builds. One retry; a test
+  that needs more is rewritten around a web-first assertion or deleted. The report and traces are kept only on failure.
+- **Findings are fixed, not allow-listed.** The first run of the contrast check found real defects (below), and the rule is that a finding changes the product.
+
+**Options considered:** 1. More component tests
+2. **Playwright against a production build** (chosen)
+3. Cypress
+4. Playwright against `next dev`
+5. A nightly run
+
+**Trade-offs:**
+
+- Option 1: ✅ Fast, no browser ❌ jsdom has no layout, no contrast, no CSP, no service worker: the four things that kept shipping wrong.
+- Option 2: ✅ Measures what a user gets ❌ A browser to download (about 575 MB cached) and roughly 17 seconds for six journeys locally.
+- Option 3: ✅ Familiar ❌ Larger, slower to start, and its multi-origin handling is the harder fit for a web app on one origin calling an API on another.
+- Option 4: ✅ No build step ❌ Tests a CSP and a service-worker story that production does not have.
+- Option 5: ✅ Costs nothing per pull request ❌ A red build nobody is looking at, and the change that broke it is a day old.
+
+**Consequences:**
+
+- **It found five real defects in its first sessions**, none visible to any existing test: muted text at 4.33:1 on the hero (below WCAG AA 4.5:1); every signed-out page load asked `/auth/me`
+  with no token, took a 401 and logged a console error; skill-code labels dimmed by `opacity-70` to 3.97:1 (light) and 4.17:1 (dark); the homepage figures' sub-lines were `<p>` inside a
+  `<dl>`, invalid HTML that axe fails once a secondary figure exists; and Sprint 51's own upload screen did nothing when the same file was chosen twice, which is exactly the
+  fix-and-upload-again loop it exists for. Each has a fix and, where jsdom can see it, a unit test.
+- **Each check was proved able to fail** by breaking the product on purpose (a `console.error`, an image the CSP disallows, a 2:1 text colour): the console, failed-request, CSP and
+  contrast checks each fired. A check that cannot fail is worse than none.
+- **Not covered:** padding and spacing (a `Card` with no `CardBody` is the same to every one of these checks), visual regression, other browsers, and real devices. The first is the
+  most likely to bite again; a screenshot comparison was considered and rejected as a larger, noisier dependency.
+- Ten consecutive full runs (two repeats each) were clean after the two flakes found along the way were fixed: a test asserting before the server had acted, and a database that
+  accumulated vacancies across runs.
+- A local run needs Chromium (`npx playwright install chromium`) and Docker's Postgres and Redis; `make e2e` does the rest.
 
 ## ADR-063: A Spreadsheet Is Many Writes Through the One Writer, Checked Before It Is Applied, Applied as Drafts, and Published as a Separate Act
 
