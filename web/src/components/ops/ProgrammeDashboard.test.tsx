@@ -30,6 +30,18 @@ describe("ProgrammeDashboard", () => {
     expect(await screen.findByText("No programme has enrolled anyone yet.")).toBeTruthy();
   });
 
+  it("names its picker: a placeholder option is not an accessible name", async () => {
+    // axe `select-name`, found on /admin by Sprint 53's route sweep.
+    GET.mockImplementation(async (path: string) => {
+      if (path === "/ops/programmes") {
+        return { data: { programmes: ["PMKVY-TEST"] }, error: undefined, response: { status: 200 } };
+      }
+      return { data: undefined, error: undefined, response: { status: 200 } };
+    });
+    renderUi(<ProgrammeDashboard />);
+    expect(await screen.findByRole("combobox", { name: "Programme outcomes" })).toBeTruthy();
+  });
+
   it("renders the chosen programme's outcomes once one is picked", async () => {
     GET.mockImplementation(async (path: string, opts?: { params?: { path?: { name?: string } } }) => {
       if (path === "/ops/programmes") {

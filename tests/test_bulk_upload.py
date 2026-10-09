@@ -734,7 +734,13 @@ class TestApplyingVacancies:
             )
         )
         assert event is not None
-        assert event.payload == {"rows": 2, "created": 1, "skipped": 0, "rejected": 1}
+        assert event.payload == {
+            "rows": 2,
+            "created": 1,
+            "updated": 0,
+            "skipped": 0,
+            "rejected": 1,
+        }
         assert "Secret" not in str(event.payload)
 
     async def test_a_check_records_nothing(
@@ -1175,3 +1181,396 @@ class TestTheSampleFiles:
         parsed, notes, header = bulk.parse_file(text, kind)  # type: ignore[arg-type]
         assert tuple(header) == bulk.COLUMNS[kind]
         assert (len(parsed), notes) == (rows, [])
+
+
+# ============================================================ updating by reference (Sprint 53)
+
+UPDATE = "?existing=update"
+UPDATE_HEADER = "external_ref,title,description,state,district,employment_type,standards"
+
+
+async def _job_row(client: AsyncClient, headers: dict, org: str, slug: str) -> dict:
+    return (await client.get(f"/org/{org}/jobs/{slug}", headers=headers)).json()
+
+
+async def _seed(client: AsyncClient, headers: dict, org: str, *, publish: bool = False) -> str:
+    """One vacancy made by an upload (reference R1), optionally published; returns its slug."""
+    body = (
+        await _post(
+            client,
+            f"/org/{org}/jobs/bulk/apply",
+            _csv("R1,Phlebotomist,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,"),
+            headers,
+        )
+    ).json()
+    slug = body["rows"][0]["slug"]
+    if publish:
+        assert (
+            await client.post(f"/org/{org}/jobs/{slug}/publish", headers=headers)
+        ).status_code == 200
+    return slug
+
+
+class TestUpdatingByReference:
+    async def test_without_asking_a_matching_reference_is_still_only_a_skip(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Skip Hospital")
+        slug = await _seed(client, headers, org)
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply",
+                _csv("R1,Renamed,,Tamil Nadu,Chennai,full_time,HC/N0001,"),
+                headers,
+            )
+        ).json()
+        assert [r["status"] for r in body["rows"]] == ["skip"]
+        assert (await _job_row(client, headers, org, slug))["title"] == "Phlebotomist"
+
+    async def test_a_check_says_what_would_change_and_writes_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Preview Hospital")
+        slug = await _seed(client, headers, org)
+        before = await _job_row(client, headers, org, slug)
+
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/check{UPDATE}",
+                _csv(
+                    "R1,Senior phlebotomist,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,"
+                ),
+                headers,
+            )
+        ).json()
+
+        (row,) = body["rows"]
+        assert row["status"] == "update"
+        assert row["slug"] == slug and row["live"] is False
+        assert "title" in row["messages"][0] and "salary" not in row["messages"][0]
+        assert (body["updates"], body["updated"], body["created"]) == (1, 0, 0)
+        assert await _job_row(client, headers, org, slug) == before
+
+    async def test_an_apply_changes_the_listing_and_keeps_its_slug_and_status(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Change Hospital")
+        slug = await _seed(client, headers, org, publish=True)
+
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                _csv("R1,Senior phlebotomist,New text,Tamil Nadu,Chennai,part_time,HC/N0002:5:M,"),
+                headers,
+            )
+        ).json()
+
+        assert (body["updated"], body["created"], body["updating_live"]) == (1, 0, 1)
+        after = await _job_row(client, headers, org, slug)
+        assert after["slug"] == slug, "a published URL is never rewritten"
+        assert after["status"] == "published", "an upload never publishes or unpublishes"
+        assert (after["title"], after["description"], after["employment_type"]) == (
+            "Senior phlebotomist",
+            "New text",
+            "part_time",
+        )
+        assert [s["skill"]["slug"] for s in after["skills"]] == [
+            "maintain-a-sterile-field-hc-n0002"
+        ]
+
+    async def test_an_update_through_a_file_equals_the_same_edit_by_hand(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        """The oracle: bulk goes *through* `update_job`, so it is the one-at-a-time result."""
+        headers, org = await _org(client, "Oracle Update Hospital")
+        by_file = await _seed(client, headers, org)
+        by_hand = (
+            await client.post(
+                f"/org/{org}/jobs",
+                headers=headers,
+                json={
+                    "title": "Phlebotomist",
+                    "description": "Draws blood",
+                    "location_state": "Tamil Nadu",
+                    "location_district": "Chennai",
+                    "skills": [{"skill_slug": "collect-blood-samples-hc-n0001"}],
+                },
+            )
+        ).json()["slug"]
+        await _post(
+            client,
+            f"/org/{org}/jobs/bulk/apply{UPDATE}",
+            _csv("R1,Changed,Other,Tamil Nadu,Chennai,part_time,HC/N0002:4:M,"),
+            headers,
+        )
+        edited = await client.put(
+            f"/org/{org}/jobs/{by_hand}",
+            headers=headers,
+            json={
+                "title": "Changed",
+                "description": "Other",
+                "location_state": "Tamil Nadu",
+                "location_district": "Chennai",
+                "employment_type": "part_time",
+                "skills": [
+                    {
+                        "skill_slug": "maintain-a-sterile-field-hc-n0002",
+                        "importance": 4,
+                        "is_mandatory": True,
+                    }
+                ],
+            },
+        )
+        assert edited.status_code == 200
+        a = await _job_row(client, headers, org, by_file)
+        b = await _job_row(client, headers, org, by_hand)
+        for field in (
+            "title",
+            "description",
+            "employment_type",
+            "location_state",
+            "location_district",
+        ):
+            assert a[field] == b[field], field
+        assert [(s["skill"]["slug"], s["importance"], s["is_mandatory"]) for s in a["skills"]] == [
+            (s["skill"]["slug"], s["importance"], s["is_mandatory"]) for s in b["skills"]
+        ]
+
+    async def test_a_column_the_file_does_not_have_is_left_alone(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        (
+            headers,
+            org,
+        ) = await _org(client, "Partial Hospital")
+        slug = await _seed(client, headers, org)
+        before = await _job_row(client, headers, org, slug)
+        await _post(
+            client,
+            f"/org/{org}/jobs/bulk/apply{UPDATE}",
+            "external_ref,title\nR1,Only the title changes\n",
+            headers,
+        )
+        after = await _job_row(client, headers, org, slug)
+        assert after["title"] == "Only the title changes"
+        for field in ("description", "location_state", "location_district", "employment_type"):
+            assert after[field] == before[field], field
+        assert after["skills"] == before["skills"], "no standards column, so the standards stay"
+
+    async def test_a_blank_cell_in_a_column_the_file_has_clears_that_field(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Blank Hospital")
+        slug = await _seed(client, headers, org)
+        assert (await _job_row(client, headers, org, slug))["description"] == "Draws blood"
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                "external_ref,title,description\nR1,Phlebotomist,\n",
+                headers,
+            )
+        ).json()
+        assert body["updated"] == 1
+        assert (await _job_row(client, headers, org, slug))["description"] in (None, "")
+
+    async def test_a_row_that_would_change_nothing_is_a_skip_and_writes_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Same Hospital")
+        slug = await _seed(client, headers, org)
+        before = await _job_row(client, headers, org, slug)
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                _csv("R1,Phlebotomist,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,"),
+                headers,
+            )
+        ).json()
+        (row,) = body["rows"]
+        assert row["status"] == "skip" and "unchanged" in row["messages"][0]
+        assert (body["updated"], body["updates"]) == (0, 0)
+        assert await _job_row(client, headers, org, slug) == before
+
+    async def test_a_title_match_is_a_guess_and_never_updates(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Guess Hospital")
+        slug = await _seed(client, headers, org)
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                _csv(",Phlebotomist,Changed text,Tamil Nadu,Chennai,full_time,HC/N0001,"),
+                headers,
+            )
+        ).json()
+        assert [r["status"] for r in body["rows"]] == ["skip"]
+        assert (await _job_row(client, headers, org, slug))["description"] == "Draws blood"
+
+    async def test_another_organisations_reference_is_never_touched(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        h1, o1 = await _org(client, "Mine Hospital")
+        h2, o2 = await _org(client, "Yours Hospital")
+        mine = await _seed(client, h1, o1)
+        body = (
+            await _post(
+                client,
+                f"/org/{o2}/jobs/bulk/apply{UPDATE}",
+                _csv("R1,Theirs,,Tamil Nadu,Chennai,full_time,HC/N0001,"),
+                h2,
+            )
+        ).json()
+        assert [r["status"] for r in body["rows"]] == ["ok"], "the same reference is theirs to use"
+        assert body["created"] == 1 and body["updated"] == 0
+        assert (await _job_row(client, h1, o1, mine))["title"] == "Phlebotomist"
+
+    async def test_a_live_listing_cannot_be_left_with_no_standard(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Empty Hospital")
+        slug = await _seed(client, headers, org, publish=True)
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/check{UPDATE}",
+                "external_ref,title,standards\nR1,Phlebotomist,\n",
+                headers,
+            )
+        ).json()
+        (row,) = body["rows"]
+        assert (
+            row["status"] == "error" and "published vacancy with no standard" in row["messages"][0]
+        )
+        applied = await _post(
+            client,
+            f"/org/{org}/jobs/bulk/apply{UPDATE}",
+            "external_ref,title,standards\nR1,Phlebotomist,\n",
+            headers,
+        )
+        assert applied.json()["updated"] == 0
+        assert len((await _job_row(client, headers, org, slug))["skills"]) == 1
+
+    async def test_updating_costs_nothing_against_the_daily_creation_cap(
+        self, client: AsyncClient, corpus: None, monkeypatch
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.setattr(get_settings(), "bulk_rows_per_day_unverified", 1)
+        headers, org = await _org(client, "Cap Hospital")
+        slug = await _seed(client, headers, org)  # uses the whole allowance
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                _csv(
+                    "R1,Changed title,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,",
+                    "R2,A brand new one,,Tamil Nadu,Chennai,full_time,HC/N0001,",
+                ),
+                headers,
+            )
+        ).json()
+        assert [r["status"] for r in body["rows"]] == ["update", "error"]
+        assert "daily limit" in body["rows"][1]["messages"][0]
+        assert (await _job_row(client, headers, org, slug))["title"] == "Changed title"
+
+    async def test_a_reference_repeated_in_the_file_updates_once(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Twice Hospital")
+        slug = await _seed(client, headers, org)
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply{UPDATE}",
+                _csv(
+                    "R1,First change,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,",
+                    "R1,Second change,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,",
+                ),
+                headers,
+            )
+        ).json()
+        assert [r["status"] for r in body["rows"]] == ["update", "skip"]
+        assert (await _job_row(client, headers, org, slug))["title"] == "First change"
+
+    async def test_the_event_counts_the_updates(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Event Hospital")
+        await _seed(client, headers, org)
+        await _post(
+            client,
+            f"/org/{org}/jobs/bulk/apply{UPDATE}",
+            _csv("R1,Changed,Draws blood,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,"),
+            headers,
+        )
+        tenant_id = await db.scalar(select(Tenant.id).where(Tenant.slug == org))
+        events = (
+            await db.scalars(
+                select(AnalyticsEvent).where(
+                    AnalyticsEvent.subject_id == tenant_id,
+                    AnalyticsEvent.name == "jobs_bulk_uploaded",
+                )
+            )
+        ).all()
+        # Two uploads: the seed (one created) and the update (one updated, none created).
+        assert sorted((e.payload["created"], e.payload["updated"]) for e in events) == [
+            (0, 1),
+            (1, 0),
+        ]
+
+    async def test_an_unknown_choice_is_refused(self, client: AsyncClient, corpus: None) -> None:
+        headers, org = await _org(client, "Choice Hospital")
+        response = await _post(
+            client,
+            f"/org/{org}/jobs/bulk/check?existing=overwrite",
+            _csv("R1,A,,,,,HC/N0001,"),
+            headers,
+        )
+        assert response.status_code == 422
+
+
+class TestUpdatingCourses:
+    async def test_a_course_is_updated_by_reference_through_its_own_writer(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Update Academy", "course_provider")
+        first = (
+            await _post(
+                client,
+                f"/org/{org}/courses/bulk/apply",
+                _csv("C1,Blood collection,,offline,both,100,5000,4,HC/N0001", header=COURSE_HEADER),
+                headers,
+            )
+        ).json()
+        slug = first["rows"][0]["slug"]
+
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/courses/bulk/apply{UPDATE}",
+                _csv(
+                    "C1,Blood collection,,online,hi,120,4500,4,HC/N0001",
+                    header=COURSE_HEADER,
+                ),
+                headers,
+            )
+        ).json()
+
+        assert (body["updated"], body["created"]) == (1, 0)
+        course = (await client.get(f"/org/{org}/courses/{slug}", headers=headers)).json()
+        assert (
+            course["mode"],
+            course["language"],
+            course["duration_hours"],
+            course["fee_inr"],
+        ) == (
+            "online",
+            "hi",
+            120,
+            4500,
+        )
+        assert course["slug"] == slug

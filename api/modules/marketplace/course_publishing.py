@@ -34,6 +34,7 @@ from sqlalchemy.orm import selectinload
 from api.core.slugs import add_with_unique_slug
 from api.modules.marketplace.listings import (
     load_with_skills,
+    refuse_emptying_a_published,
     resolve_standards,
     unique_slug,
 )
@@ -155,6 +156,11 @@ async def update_course(
     )
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+
+    # Before any field changes: a live course may not be edited down to teaching nothing (ADR-064).
+    refuse_emptying_a_published(
+        course.status, payload.skills, what="course", keep="standard it teaches"
+    )
 
     for field in _PLAIN_FIELDS:
         setattr(course, field, getattr(payload, field))

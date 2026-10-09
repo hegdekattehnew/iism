@@ -136,3 +136,49 @@ export async function publishedJob(
   if (!published.ok()) throw new Error(`publish job: ${published.status()} ${await published.text()}`);
   return slug;
 }
+
+/** A published course teaching the given standards, created through the API as set-up. */
+export async function publishedCourse(
+  request: APIRequestContext,
+  org: { slug: string; tokens: Tokens },
+  title: string,
+  skillSlugs: string[],
+): Promise<string> {
+  const created = await request.post(api(`/org/${org.slug}/courses`), {
+    headers: bearer(org.tokens),
+    data: {
+      title,
+      mode: "offline",
+      language: "both",
+      duration_hours: 120,
+      fee_inr: 5000,
+      skills: skillSlugs.map((skill_slug) => ({ skill_slug, level_taught: 4 })),
+    },
+  });
+  if (!created.ok()) throw new Error(`create course: ${created.status()} ${await created.text()}`);
+  const { slug } = await created.json();
+  const published = await request.post(api(`/org/${org.slug}/courses/${slug}/publish`), {
+    headers: bearer(org.tokens),
+  });
+  if (!published.ok()) throw new Error(`publish course: ${published.status()} ${await published.text()}`);
+  return slug;
+}
+
+/** Save a vacancy for later, as a seeker. */
+export async function saveJob(request: APIRequestContext, tokens: Tokens, jobSlug: string): Promise<void> {
+  const res = await request.post(api("/me/saved-jobs"), { headers: bearer(tokens), data: { job_slug: jobSlug } });
+  if (!res.ok()) throw new Error(`save job ${jobSlug}: ${res.status()} ${await res.text()}`);
+}
+
+/** Register interest in a course, as a learner (shares their contact with that provider). */
+export async function registerInterest(
+  request: APIRequestContext,
+  tokens: Tokens,
+  courseSlug: string,
+): Promise<void> {
+  const res = await request.post(api("/me/course-interests"), {
+    headers: bearer(tokens),
+    data: { course_slug: courseSlug },
+  });
+  if (!res.ok()) throw new Error(`register interest ${courseSlug}: ${res.status()} ${await res.text()}`);
+}

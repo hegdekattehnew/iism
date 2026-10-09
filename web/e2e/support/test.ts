@@ -56,8 +56,12 @@ export async function watch(page: Page, apiOrigin: string): Promise<void> {
 type Options = {
   /** Responses that are the journey's own doing (a deliberate 409, a 401 before sign-in). */
   allowResponses?: RegExp[];
+  /** Console lines that are the journey's own doing: the browser reports a deliberate 404 as an error. */
+  allowConsole?: RegExp[];
   /** Skip the dark-mode contrast pass: for a page that is checked light-only on purpose. */
   light?: boolean;
+  /** Skip the flush-border check on a page where a bordered box genuinely holds bare text. */
+  flush?: boolean;
 };
 
 /**
@@ -74,11 +78,16 @@ export async function checkPage(page: Page, label: string, options: Options = {}
   const allowed = options.allowResponses ?? [];
   const responses = seen.badResponses.filter((r) => !allowed.some((a) => a.test(r)));
 
-  expect.soft(seen.consoleErrors, `${label}: console errors`).toEqual([]);
+  const consoleErrors = seen.consoleErrors.filter((m) => !(options.allowConsole ?? []).some((a) => a.test(m)));
+  expect.soft(consoleErrors, `${label}: console errors`).toEqual([]);
   expect.soft(seen.pageErrors, `${label}: uncaught page errors`).toEqual([]);
   expect.soft(seen.failedRequests, `${label}: failed requests`).toEqual([]);
   expect.soft(responses, `${label}: error responses`).toEqual([]);
   expect.soft(csp, `${label}: CSP violations (report-only, so nothing was blocked)`).toEqual([]);
+
+  if (options.flush !== false) {
+    expect.soft(await flushBorders(page), `${label}: text flush against a border`).toEqual([]);
+  }
 
   // Colours fade (`transition-colors`), and axe samples the computed value: measured the instant
   // the scheme flips it reads the *old* scheme's colour against the new background -- a contrast
@@ -92,6 +101,72 @@ export async function checkPage(page: Page, label: string, options: Options = {}
     expect.soft(violations, `${label}: accessibility (${scheme})`).toEqual([]);
   }
   await page.emulateMedia({ colorScheme: null });
+}
+
+/**
+ * Text that touches the border of the box it sits in.
+ *
+ * The gap Sprint 52 named: a `<Card>` with no `<CardBody>` renders its text flush against the border,
+ * compiles, passes `tsc` and every check above, and shipped on the homepage for four sprints.
+ * It is measurable: take every element with a visible border on **all four sides** (a card, not a
+ * divider), and ask how far its text starts from the inner edge of the left border. Padding makes
+ * that tens of pixels; a missing `CardBody` makes it zero.
+ *
+ * Skipped, because each carries its own spacing or is not a box of prose: form controls, buttons,
+ * links, table parts, images and SVG. The threshold is 6px, which is the smallest padding the design
+ * uses on a bordered chip (`px-1.5`).
+ */
+async function flushBorders(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const SKIP = new Set([
+      "HTML", "BODY", "INPUT", "SELECT", "TEXTAREA", "BUTTON", "A", "IMG", "SVG", "PATH", "TABLE",
+      "THEAD", "TBODY", "TR", "TD", "TH", "SUMMARY", "LABEL", "OPTION", "IFRAME", "CANVAS",
+    ]);
+    const MIN = 6;
+    const px = (v: string) => Number.parseFloat(v) || 0;
+    const visible = (width: string, style: string, colour: string) =>
+      px(width) >= 1 && style !== "none" && style !== "hidden" && !/rgba\(.*,\s*0\)$/.test(colour) && colour !== "transparent";
+    const found: string[] = [];
+
+    for (const el of document.querySelectorAll("*")) {
+      if (SKIP.has(el.tagName.toUpperCase())) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.display === "contents") continue;
+      const sides = ["Top", "Right", "Bottom", "Left"] as const;
+      const boxed = sides.every((side) =>
+        visible(cs.getPropertyValue(`border-${side.toLowerCase()}-width`), cs.getPropertyValue(`border-${side.toLowerCase()}-style`), cs.getPropertyValue(`border-${side.toLowerCase()}-color`)),
+      );
+      if (!boxed) continue;
+
+      const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const inner = box.left + px(cs.borderLeftWidth);
+
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let nearest = Number.POSITIVE_INFINITY;
+      let sample = "";
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = (node.textContent ?? "").trim();
+        if (!text) continue;
+        const parent = node.parentElement;
+        if (!parent || SKIP.has(parent.tagName.toUpperCase())) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const r = range.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) continue;
+        const gap = r.left - inner;
+        if (gap < nearest) {
+          nearest = gap;
+          sample = text.slice(0, 40);
+        }
+      }
+      if (nearest < MIN) {
+        const cls = (el.getAttribute("class") ?? "").split(/\s+/).slice(0, 6).join(".");
+        found.push(`${el.tagName.toLowerCase()}.${cls} -- text "${sample}" starts ${nearest.toFixed(1)}px from the border`);
+      }
+    }
+    return found.slice(0, 8);
+  });
 }
 
 async function axe(page: Page): Promise<string[]> {

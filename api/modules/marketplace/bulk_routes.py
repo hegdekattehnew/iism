@@ -12,7 +12,7 @@ included after. `tests/test_bulk_upload.py` asserts the order.
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
@@ -29,6 +29,13 @@ CanPublishCourse = Depends(require(Permission.COURSE_PUBLISH, "course"))
 
 # The file is the request body, read raw -- so FastAPI cannot see it. Declaring it here is what
 # puts `text/csv` in the OpenAPI document and a `string` body in the generated client.
+# What to do with a row whose `external_ref` exists: skip it (the default) or update that listing.
+_Existing = Query(
+    "skip",
+    pattern="^(skip|update)$",
+    description="`update` changes the listings whose external_ref the file names; `skip` never.",
+)
+
 _CSV_BODY: dict[str, object] = {
     "requestBody": {
         "required": True,
@@ -61,6 +68,8 @@ def _out(report: bulk.BulkReport) -> schemas.BulkReportOut:
                 ],
                 slug=r.slug,
                 created=r.created,
+                live=r.live,
+                updated=r.updated,
             )
             for r in report.rows
         ],
@@ -70,6 +79,9 @@ def _out(report: bulk.BulkReport) -> schemas.BulkReportOut:
         errors=report.count("error"),
         skipped=report.count("skip"),
         created=report.created,
+        updates=report.count("update"),
+        updating_live=report.updating_live,
+        updated=report.updated,
         daily_limit=report.daily_limit,
         remaining_today=report.remaining_today,
         errors_csv=report.errors_csv,
@@ -83,11 +95,18 @@ async def _file(
     kind: Literal["jobs", "courses"],
     *,
     apply: bool,
+    existing: Literal["skip", "update"] = "skip",
 ) -> schemas.BulkReportOut:
     try:
         text = bulk.decode(await request.body())
         report = await bulk.run(
-            db, kind, context.tenant, text, apply=apply, actor_id=context.user.id
+            db,
+            kind,
+            context.tenant,
+            text,
+            apply=apply,
+            actor_id=context.user.id,
+            existing=existing,
         )
     except bulk.BulkFileError as error:
         raise HTTPException(error.status_code, error.message) from error
@@ -131,21 +150,23 @@ async def jobs_template(context: TenantContext = CanCreateJob) -> Response:
 @router.post("/jobs/bulk/check", response_model=schemas.BulkReportOut, openapi_extra=_CSV_BODY)
 async def check_jobs(
     request: Request,
+    existing: Literal["skip", "update"] = _Existing,
     context: TenantContext = CanCreateJob,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     """Validate every row and say what an apply would do. Writes nothing."""
-    return await _file(request, db, context, "jobs", apply=False)
+    return await _file(request, db, context, "jobs", apply=False, existing=existing)
 
 
 @router.post("/jobs/bulk/apply", response_model=schemas.BulkReportOut, openapi_extra=_CSV_BODY)
 async def apply_jobs(
     request: Request,
+    existing: Literal["skip", "update"] = _Existing,
     context: TenantContext = CanCreateJob,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     """Check the file again, then create each valid row as a **draft**. Never publishes."""
-    return await _file(request, db, context, "jobs", apply=True)
+    return await _file(request, db, context, "jobs", apply=True, existing=existing)
 
 
 @router.post("/jobs/bulk/publish", response_model=schemas.BulkPublishOut)
@@ -169,19 +190,21 @@ async def courses_template(context: TenantContext = CanCreateCourse) -> Response
 @router.post("/courses/bulk/check", response_model=schemas.BulkReportOut, openapi_extra=_CSV_BODY)
 async def check_courses(
     request: Request,
+    existing: Literal["skip", "update"] = _Existing,
     context: TenantContext = CanCreateCourse,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
-    return await _file(request, db, context, "courses", apply=False)
+    return await _file(request, db, context, "courses", apply=False, existing=existing)
 
 
 @router.post("/courses/bulk/apply", response_model=schemas.BulkReportOut, openapi_extra=_CSV_BODY)
 async def apply_courses(
     request: Request,
+    existing: Literal["skip", "update"] = _Existing,
     context: TenantContext = CanCreateCourse,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
-    return await _file(request, db, context, "courses", apply=True)
+    return await _file(request, db, context, "courses", apply=True, existing=existing)
 
 
 @router.post("/courses/bulk/publish", response_model=schemas.BulkPublishOut)

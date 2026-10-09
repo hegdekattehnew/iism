@@ -523,14 +523,17 @@ class BulkStandardOut(BaseModel):
 
 class BulkRowOut(BaseModel):
     row: int
-    status: Literal["ok", "warning", "error", "skip"]
+    status: Literal["ok", "warning", "error", "skip", "update"]
     title: str | None = None
     external_ref: str | None = None
     messages: list[str] = Field(default_factory=list)
     standards: list[BulkStandardOut] = Field(default_factory=list)
-    # The slug created (after an apply), or the one a skipped row matched.
+    # The slug created (after an apply), the one a skipped row matched, or the one it updates.
     slug: str | None = None
     created: bool = False
+    # An update of a published listing: the change is public the moment it is applied.
+    live: bool = False
+    updated: bool = False
 
 
 class BulkReportOut(BaseModel):
@@ -543,6 +546,11 @@ class BulkReportOut(BaseModel):
     errors: int
     skipped: int
     created: int
+    # Rows that change an existing listing (a check: will; after an apply: did), how many of those
+    # are published, and how many were applied. Only ever non-zero when `existing=update` was asked.
+    updates: int = 0
+    updating_live: int = 0
+    updated: int = 0
     # Rows this organisation may still create in the rolling 24 hours, and the limit itself.
     daily_limit: int
     remaining_today: int

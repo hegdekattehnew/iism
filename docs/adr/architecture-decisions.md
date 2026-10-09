@@ -3186,3 +3186,66 @@ and vacancies and courses **in one sprint on one engine**.
   watch with the first real partner.
 - There is still **no verification gate on publishing**, for a hand-made vacancy or a bulk one. This widens nothing, and the unverified cap is what limits it.
 - A partner or ATS pushing by API key (a `ServiceAccount`-to-tenant binding and a write scope) and an upload history are later stories, as is update-by-`external_ref`.
+
+
+## ADR-064: A Published Listing Keeps Its Standards, an Upload Updates Only by Reference and Only the Columns It Carries, and the Browser Sees Every Page
+
+**Status:** Accepted (October 2026). Sprint 53. No migration. Extends ADR-062 and ADR-063.
+
+**Context:** Three loose ends from Sprints 51 and 52. (1) **A rule that was only a check.** "No standard, no publishing" (Sprint 12) was enforced at the instant of publishing, so
+`update_job` and `update_course` would still replace a *published* listing's standards with none: it stayed published, stayed on `/jobs`, and could never be matched or recommended. Found while planning,
+not reported. (2) **A re-upload could only skip.** ADR-063 made a matching `external_ref` a skip and never an update, which is the safe default and the wrong end state: a staffing agency fixes a salary
+in its spreadsheet and has to edit the live vacancy by hand, thirty times. (3) **Sprint 52's six journeys saw about a third of the 42 routes**, and found five defects in them.
+
+**Decision:**
+
+- **Published implies at least one standard, enforced at every write that can break it.** `listings.refuse_emptying_a_published` is called first thing in `update_job` and `update_course`
+  (before any field changes): a published listing saved with no standards is a 422 naming the rule and the way out ("add one, or unpublish it first"). A **draft** may still be saved with none
+  (unfinished, not live), and unpublishing first remains the way to empty a listing. One shared helper in the shared-policy module, not two copies (ADR-026).
+- **An upload may update, only when asked, only by reference.** `bulk/check` and `bulk/apply` take `existing=skip|update` (default `skip`, and a **required argument** inside the engine so there is no
+  default to rely on). Only a row whose **`external_ref`** exists may update; a title match is a guess and stays a skip. The update goes through `update_job` / `update_course`, the one writer, so the
+  invariant above guards a bulk update exactly as it guards a hand edit, and the check mirrors it so the preview says what the apply will do.
+- **The file is the truth only for the columns it carries.** A column the header lacks is never in the row, so that field is left alone; a blank cell in a column the file *does* have clears it
+  (the field takes its default, as it would on creation). The update is built by merging the file onto the existing listing, never by treating absent columns as blank, which would have wiped salaries
+  and standards from any file that simply had fewer columns.
+- **A row that would change nothing is a skip ("unchanged")**, so uploading the same file twice is still a no-op, and a changed row says which columns it changes.
+- **Status, slug and the daily cap are untouched.** An update never publishes or unpublishes and never rewrites a published URL; it creates nothing, so it does not consume the daily creation cap
+  (it still counts against the 200-row file limit).
+- **A live listing changes the moment an update is applied, so the screen asks first.** When the update set includes published rows, the apply button stays disabled until the person acknowledges
+  how many are live, in addition to the existing acknowledgement of rows that will be skipped. Toggling the choice re-checks the file already loaded, so an old review never sits beside a button that
+  now does something else.
+- **Every page is visited, not only the journeys** (`web/e2e/sweep.spec.ts`): ~45 routes in both languages, signed out and as a seeker, employer, provider and operator, with real rows on every list,
+  each through the same `checkPage`. A new `checkPage` rule asks of every box with a border on all four sides whether its text starts at least 6px inside it, the gap ADR-062 named (a `Card` with no
+  `CardBody` passed every other check).
+
+**Options considered:** 1. Guard the invariant only at publish time (as before)
+2. **Guard it at every write that can break it** (chosen)
+3. Overwrite the whole listing from the file on update
+4. **Merge the file onto the listing, column by column** (chosen)
+5. Update on a title match
+6. A separate "update" upload type with its own screen
+
+**Trade-offs:**
+
+- Option 1: ✅ No new refusal ❌ A live listing can silently become unmatchable; the rule was a check, not an invariant.
+- Option 3: ✅ Simple to explain ❌ A file with fewer columns wipes everything it did not mention; the first partner to upload "just the salaries" would destroy their listings.
+- Option 5: ✅ Works without references ❌ A title is not an identity: two "Ward attendant" vacancies in two districts, or a renamed one, would be edited or duplicated by a guess.
+- Option 6: ✅ A cleaner mental model ❌ A second screen, a second template and a second review for what is the same file with a different intent.
+
+**Consequences:**
+
+- **The sweep found two defect classes in about 90 page visits**, both fixed at their cause: inline links told apart from their sentence by colour alone (1.54:1 against the text; WCAG 1.4.1 wants an
+  underline or 3:1), on all three sign-up pages, sign-in and employer sign-in, in both languages; and two `<select>`s on `/admin` with no accessible name (a placeholder option is not a name). Each has
+  a test that fails without the fix (the selects in the unit suite, the links in the sweep). The flush-border check found nothing on the real app and was **proved able to fail**: removing
+  `CardBody`'s padding failed all six journeys, naming each box and its text.
+- **Eleven rules of the update path were mutation-checked** (a title match updating, absent columns overwritten, blank cells not clearing, unchanged rows applied, updates consuming the cap, another
+  organisation's references visible, the live guard not mirrored, the route default flipping, and the UI's live acknowledgement, query parameter and re-check on toggle), and one survivor, the
+  engine's own default, was removed by making the argument required.
+- **Measured on the 50,000-candidate scale database:** a 200-row update check takes 0.13 s, applying 200 updates 5.9 s, and re-uploading an unchanged file 0.06 s and writes nothing. Creation measured
+  6.5 s the same session against 2.4 s in Sprint 51, because the machine was busy with the browser runs; treat both as upper bounds. ADR-063's "revisit above 200 rows" stands.
+- **`update_job`'s other quiet behaviour is unchanged and now visible:** it replaces a listing's standards wholesale, so an update that carries a `standards` column replaces them; one that does not leaves
+  them. The review lists the changed column names ("standards" among them) so nobody applies that unseen.
+- **Dependency triage, recorded because it was done and not merged:** the newest `python` group (fastapi 0.142.2, pymongo 4.18.2, ruff 0.16.10, mypy 2.4.0) passes ruff, mypy and the full suite; the newest
+  `web` group (`@radix-ui/react-dialog` 1.2.0, `axe-core` 4.14.0, `jsdom` 30.1.2, `react-progress` 1.1.17) passes `tsc`, lint, the unit suite, the build and every browser test, **but takes `/profile` to
+  680 KB of the 684 KB budget**. The older duplicate groups and `@types/node` 26 (held by ADR-053) are the ones to close.
+- **Not covered by the browser checks:** visual regression, other browsers, real devices, and padding that is present but wrong (the flush check catches none, not too little).

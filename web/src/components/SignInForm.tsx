@@ -157,7 +157,7 @@ export function SignInForm() {
                 of it must not assume the person is a job seeker. */}
             <Link
               href="/signup"
-              className="text-brand underline-offset-4 hover:underline"
+              className="text-brand underline underline-offset-4 hover:text-brand-strong"
             >
               {t("signUpInstead")}
             </Link>

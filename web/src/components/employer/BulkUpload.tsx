@@ -37,6 +37,7 @@ const TONE = {
   warning: "warn",
   error: "bad",
   skip: "neutral",
+  update: "brand",
 } as const;
 
 /** Save text as a UTF-8 CSV Excel will open with Devanagari intact (hence the BOM). */
@@ -61,8 +62,9 @@ async function send(
   org: string,
   step: "check" | "apply",
   text: string,
+  existing: "skip" | "update",
 ) {
-  const params = { path: { org_slug: org } };
+  const params = { path: { org_slug: org }, query: { existing } };
   const { data, error, response } =
     kind === "jobs"
       ? await api.POST(`/org/{org_slug}/jobs/bulk/${step}`, {
@@ -116,7 +118,11 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
   const [applied, setApplied] = useState<Report | null>(null);
   const [published, setPublished] = useState<Published | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [liveAccepted, setLiveAccepted] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Opt-in, and never remembered: changing live listings is something to choose each time.
+  const [update, setUpdate] = useState(false);
+  const existing = update ? "update" : "skip";
 
   const refresh = () => {
     if (kind === "jobs") {
@@ -149,12 +155,13 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
   });
 
   const check = useMutation({
-    mutationFn: (body: string) => send(kind, org, "check", body),
+    mutationFn: (v: { body: string; existing: "skip" | "update" }) =>
+      send(kind, org, "check", v.body, v.existing),
     onSuccess: setReport,
   });
 
   const apply = useMutation({
-    mutationFn: (body: string) => send(kind, org, "apply", body),
+    mutationFn: (body: string) => send(kind, org, "apply", body, existing),
     onSuccess: (result) => {
       setApplied(result);
       refresh();
@@ -183,6 +190,7 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
     setApplied(null);
     setPublished(null);
     setAccepted(false);
+    setLiveAccepted(false);
     setConfirming(false);
     check.reset();
     apply.reset();
@@ -199,11 +207,26 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
     const body = await file.text();
     setText(body);
     setFileName(file.name);
-    check.mutate(body);
+    check.mutate({ body, existing });
+  };
+
+  // Changing the choice changes what the file would do, so the review is asked for again: an
+  // old review must never sit beside a button that now does something else.
+  const choose_existing = (on: boolean) => {
+    setUpdate(on);
+    if (text === null) return;
+    setReport(null);
+    setApplied(null);
+    setAccepted(false);
+    setLiveAccepted(false);
+    apply.reset();
+    check.mutate({ body: text, existing: on ? "update" : "skip" });
   };
 
   const shown = applied ?? report;
   const ready = report ? report.ok + report.warnings : 0;
+  const updates = report?.updates ?? 0;
+  const live = report?.updating_live ?? 0;
   const drafts = (applied?.rows ?? [])
     .filter((r) => r.created && r.slug)
     .map((r) => r.slug as string);
@@ -247,6 +270,21 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
       <Card>
         <CardBody className="space-y-3">
           <h2 className="text-base font-semibold">{t("step2")}</h2>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={update}
+              disabled={check.isPending || apply.isPending}
+              onChange={(e) => choose_existing(e.target.checked)}
+            />
+            <span>
+              {t("existingLabel")}
+              <span className="mt-0.5 block text-xs text-muted">
+                {t("existingHelp")}
+              </span>
+            </span>
+          </label>
           <label className="block text-sm" htmlFor="bulk-file">
             {t("chooseFile")}
           </label>
@@ -283,11 +321,12 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
             </h2>
             <p className="text-sm text-muted">{fileName}</p>
             <p className="text-sm" role="status" aria-live="polite">
-              {t("summary", {
+              {t(shown.updates > 0 ? "summaryWithUpdates" : "summary", {
                 ok: shown.ok,
                 warnings: shown.warnings,
                 errors: shown.errors,
                 skipped: shown.skipped,
+                updates: shown.updates,
               })}
             </p>
             {!applied && (
@@ -323,6 +362,17 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
                     <span>{t("acknowledge", { count: report.errors })}</span>
                   </label>
                 )}
+                {live > 0 && (
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={liveAccepted}
+                      onChange={(e) => setLiveAccepted(e.target.checked)}
+                    />
+                    <span>{t("liveAcknowledge", { count: live })}</span>
+                  </label>
+                )}
                 {report.errors_csv && (
                   <Button
                     variant="secondary"
@@ -337,26 +387,45 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
                   <Button
                     disabled={
                       text === null ||
-                      ready === 0 ||
+                      ready + updates === 0 ||
                       (report.errors > 0 && !accepted) ||
+                      (live > 0 && !liveAccepted) ||
                       apply.isPending
                     }
                     onClick={() => text !== null && apply.mutate(text)}
                   >
                     {apply.isPending
                       ? t("applying")
-                      : t("apply", { count: ready })}
+                      : updates === 0
+                        ? t("apply", { count: ready })
+                        : ready === 0
+                          ? t("applyUpdatesOnly", { count: updates })
+                          : t("applyBoth", { created: ready, updates })}
                   </Button>
-                  <p className="mt-2 text-xs text-muted">{t("draftsNote")}</p>
+                  {ready > 0 && (
+                    <p className="mt-2 text-xs text-muted">{t("draftsNote")}</p>
+                  )}
+                  {updates > 0 && (
+                    <p className="mt-2 text-xs text-muted">
+                      {t("updatesNote")}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
             {applied && (
               <div className="space-y-3">
-                <p className="text-sm font-medium">
-                  {t("created", { count: applied.created })}
-                </p>
+                {applied.created > 0 || applied.updated === 0 ? (
+                  <p className="text-sm font-medium">
+                    {t("created", { count: applied.created })}
+                  </p>
+                ) : null}
+                {applied.updated > 0 && (
+                  <p className="text-sm font-medium">
+                    {t("updatedDone", { count: applied.updated })}
+                  </p>
+                )}
                 {applied.errors_csv && (
                   <Button
                     variant="secondary"

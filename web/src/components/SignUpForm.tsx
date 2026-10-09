@@ -416,7 +416,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
         {t("haveAccount")}{" "}
         <Link
           href="/signin"
-          className="text-brand underline-offset-4 hover:underline"
+          className="text-brand underline underline-offset-4 hover:text-brand-strong"
         >
           {t("signInInstead")}
         </Link>

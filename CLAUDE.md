@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(63 ADRs). Read it before making any structural decision — the summary below
+(64 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -471,6 +471,14 @@ split would have to turn into interfaces first; do not add to it casually.
   the instant it is pressed (it let a withdrawal be checked before it had happened), so poll the server. Not covered: padding and spacing, visual regression, other browsers.
 - **A signed-out visitor makes no request that can only answer 401.** `useMemberships` answered "401" locally when no token is stored; before that every page for every anonymous visitor asked `/auth/me`
   and logged a console error (found by Sprint 52's browser run).
+- **A rule that holds is enforced at every write that can break it, not only the one that establishes it** (ADR-064). "No standard, no publishing" was checked when a listing was published, so a live
+  vacancy could be saved with every standard removed and stay published and unmatchable. `listings.refuse_emptying_a_published` runs first in `update_job` and `update_course` (before any field
+  changes); a draft may still be saved with none. When you add an invariant, list every writer of the thing it protects.
+- **A bulk upload updates only when asked, only by `external_ref`, and only the columns the file carries** (ADR-064). `existing=skip|update` (default skip; **required** inside `bulk.run`, because a default
+  there survived a mutation check). An absent column leaves the field alone; a blank cell in a present column clears it; a row that changes nothing is a skip. It goes through `update_job` /
+  `update_course`, never beside them, so the invariant above guards it, and a live listing is acknowledged by the person before the button enables.
+- **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
+  it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
   service layer.
 - Every new external dependency (payment, assessment, verification, government API) gets an
@@ -769,6 +777,9 @@ split would have to turn into interfaces first; do not add to it casually.
   whole fix-and-upload-again loop (Sprint 51's `BulkUpload` did nothing on the second selection until Sprint 52's browser run).
 - **A `<dl>` holds only `dt`/`dd` (and `div` groups of them).** A `<p>` under a figure made every homepage figure list invalid HTML, and only a populated database showed it. Text must not use `opacity-*`
   to look secondary: it dims below WCAG AA on a tinted surface (`--muted` is `#586980` for that reason).
+- **A link inside a sentence is underlined, not only on hover.** Colour alone told it apart from the text at 1.54:1 (WCAG 1.4.1 wants an underline or 3:1); standalone action links are exempt. A
+  `<select>` with only a placeholder option has no accessible name: give it `aria-label` or a `<label>`.
+- **Do not run `prettier --write` on an existing file.** This repo is not at Prettier's default width and it reformats unrelated lines; run it only on files you created.
 - **Every branch on who is signed in gets a component test.** `tsc`, `eslint` and `next build`
   cannot see a conditional that picks the wrong actor — it compiles perfectly — and all ten Sprint
   18 defects were exactly that. Mock the three seams through `src/test/harness.tsx`, set `world`,
@@ -890,6 +901,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > job, and every page is checked for console errors, failed requests, CSP violations and contrast in light and dark. It found and fixed five real defects no existing test could see (low-contrast muted text and skill codes,
 > an `/auth/me` 401 on every signed-out page, an invalid `<dl>`, and Sprint 51's upload screen ignoring a re-chosen file). Each check was proved able to fail; ten consecutive runs were clean. Alongside: a partial index for
 > the expiry sweep and batched erasure notices (migration 0049). **Open: two high npm advisories in the production tree (`sharp`, `source-map-js`), pre-existing, one `npm audit fix` away, not applied.**
+>
+> **Sprint 53 is done** (ADR-064, no migration): *every page, an invariant, and the update half of bulk upload*. A browser sweep of ~45 routes in both languages (88 browser tests in all, ~54 s) found two more defect
+> classes, fixed at their cause (inline links told apart by colour alone; two unnamed `<select>`s), and a new flush-against-border check was proved by breaking `CardBody`. It also found, by reading rather than
+> running, that `update_job` / `update_course` let a **published** listing be saved with no standards (live and unmatchable); that is now refused at the write. Bulk upload can **update by `external_ref`**
+> (opt-in, only the columns the file carries, live listings acknowledged first). `npm audit fix` cleared the two production advisories; dependabot's newest groups were tested safe but not merged.
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one
