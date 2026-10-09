@@ -132,7 +132,7 @@ jobs:
           npm run build:e2e
 
       - name: Cache the browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
