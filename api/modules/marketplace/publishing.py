@@ -105,8 +105,17 @@ async def _resolve_skills(
     return [(sid, imp, mand) for sid, (imp, mand) in merged.items()]
 
 
-async def _write_skills(db: AsyncSession, job: Job, rows: list[JobSkillIn]) -> None:
-    resolved = await _resolve_skills(db, rows)
+async def _write_skills(
+    db: AsyncSession,
+    job: Job,
+    rows: list[JobSkillIn],
+    *,
+    resolved: list[tuple[uuid.UUID, int, bool]] | None = None,
+) -> None:
+    """Replace the vacancy's standards. `resolved` lets an updater validate them *before* it
+    changes anything and hand the result in, so a refusal never leaves a half-edited row behind."""
+    if resolved is None:
+        resolved = await _resolve_skills(db, rows)
     await db.execute(delete(JobSkill).where(JobSkill.job_id == job.id))
     for skill_id, importance, is_mandatory in resolved:
         db.add(
@@ -209,15 +218,21 @@ async def update_job(db: AsyncSession, tenant_id: uuid.UUID, slug: str, payload:
         job.status, payload.skills, what="vacancy", keep="required standard"
     )
 
-    for field in _PLAIN_FIELDS:
-        setattr(job, field, getattr(payload, field))
+    # **Everything that can refuse runs before anything is changed** (Sprint 55). The row is a
+    # persistent object in a session that autoflush does not protect, so a refusal after the first
+    # `setattr` leaves it dirty, and whatever commits next -- the following row of a bulk upload,
+    # an analytics `record()` -- saves the edit that was just rejected.
     location = await resolve_location(db, payload.location_state, payload.location_district)
     _require_gig_has_a_place(payload, location.district_id)
+    resolved = await _resolve_skills(db, payload.skills)
+
+    for field in _PLAIN_FIELDS:
+        setattr(job, field, getattr(payload, field))
     job.state_id, job.district_id = location.state_id, location.district_id
     # The slug is not regenerated. It is a published URL as soon as the job goes
     # live, and rewriting it on a title tweak breaks every link to it.
     await db.flush()
-    await _write_skills(db, job, payload.skills)
+    await _write_skills(db, job, payload.skills, resolved=resolved)
     await db.commit()
     return await _load(db, job.id)
 

@@ -2449,6 +2449,23 @@ Owner decisions: the recommended sprint was SEO and share previews plus layout s
   (1,778 names shared by 4,838 standards) are measured; a `NEXT_PUBLIC_SITE_URL` setting that omits canonicals rather than emitting `localhost`; a share button (Web Share, else `wa.me`). Needs a live site for
   Google's Rich Results Test. **Deployment is the real gate to traffic**, and monetisation waits for traffic (ADR-047).
 
+### Sprint 55: the review's four fixes (2026-10-12, no migration, **uncommitted** on `fix-bulk-review`, cut from `main` at `24f36de`)
+
+Findings 1 to 4 of the `/code-review` of Sprints 51-54 (the other six are listed below and untouched). 20 new backend tests, 1,357 in all; every new test fails against the old code (19 of the 20; the 20th
+is a guard).
+- **A number that is not a number** (`bulk._int`, `_float`): `nan`, `inf`, `-inf` and `1e999` raised ValueError/OverflowError and turned the whole upload into a 500. pandas writes a missing number as `nan`.
+  Now a row error naming the column; the rest of the file applies.
+- **A refused update was still saved** (`publishing.update_job`, `course_publishing.update_course`, `bulk.run`): the updaters set fields on the persistent row, then resolved the place/standards, so a refusal
+  left it dirty and the next commit in the loop (or `record()`) saved it. Root fix: resolve and validate first, then change. Safety net: a refused row is rolled back in the apply loop.
+- **A lost race was a 500** (`bulk.run`): `db.rollback()` after an `IntegrityError` expired the `Tenant`, and the next `tenant.id` was a MissingGreenlet. `run` reads the id once. Tested with committed
+  rows (`tests/test_bulk_apply_rollback.py`), because the suite's `db` fixture would roll back its own set-up.
+- **Check and apply disagreed about gigs** (`_plan_job`, `_plans`, `_merge_updates`): a gig with a state and no district passed the check and failed at apply; and an update row whose file carries no place
+  columns was refused even when the listing it changes has a district. The "no place at all" problem is now decided once the row's kind is known (a new gig needs it from the file, an update is checked on the
+  merged payload with the same `resolve_location` question `update_job` asks).
+- **Not fixed, from the same review:** an update that carries `state` but not `district` keeps the old district (a contradictory pair, so the district resolves to nothing); bulk update is gated by
+  `JOB_CREATE`/`COURSE_CREATE` instead of `JOB_UPDATE`/`COURSE_UPDATE` (latent: only admin and owner hold either today); `isdigit()` lets a superscript digit reach `int()` (500); `key={m}` duplicates in
+  `BulkUpload`'s review rows; `visit()` in the sweep waits on `.animate-pulse` rather than `[data-loading]`; the phone group duplicates the desktop route lists.
+
 ### CI facts (read with `gh` on 2026-10-12; the repo is private, so nothing here is visible without a token)
 
 - **Three jobs, ~3.5 minutes wall clock** (they run in parallel): Web (lint, types, build) 59 s to 1m40s, API (audit, lint, types, tests) 3m22s to 3m29s, **E2E (real-browser journeys) 2m52s to 3m43s**.
