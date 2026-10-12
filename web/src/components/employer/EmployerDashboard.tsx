@@ -24,7 +24,9 @@ export function EmployerDashboard({ orgSlug }: { orgSlug: string }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (dashboard.isPending) {
-    return <Skeleton className="h-16 w-full" />;
+    // As tall as the card that replaces it: at h-16 the vacancy list below dropped a few hundred
+    // pixels when it landed (Sprint 54, found by CI, whose runner is slower than a laptop).
+    return <Skeleton className="h-96 w-full rounded-xl" />;
   }
 
   // Silent on error: a real failure here (401, 403) is already shown by the

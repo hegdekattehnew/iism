@@ -3270,7 +3270,7 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Nothing renders `null` while it loads.** `SeekerOnly`, `ProfileEditor` and `DeleteOrganisation` returned nothing until their data arrived; they now return a `Skeleton`. A line of text that arrives
   late and is a different length (the consent line on `/account`) is reserved the same way, and a count is never shown as "No jobs" for the moment before the list arrives. A placeholder is as tall as
   what replaces it (`CandidateDashboard` was 64 px standing in for a ~400 px card, which dropped the whole match list below it; the homepage `StatsBand` holds the room for the line some of its tiles grow
-  once the figures arrive, which the existing Hindi phone journey caught at 0.111).
+  once the figures arrive, which the existing Hindi phone journey caught at 0.111; the employer and provider dashboards had the same 64 px placeholder, which **CI** caught at 0.158 on a slower runner when three local runs had passed).
 - **The browser harness fails a page that jumps.** `checkPage` now reads the worst layout-shift *session window* (the way Chrome scores it, ignoring shifts within 500 ms of the person's own input) and
   fails above **0.1**, naming the elements that moved. To make that deterministic rather than a property of how fast the developer's laptop is, the harness holds every API **read** back 250 ms (writes are
   not delayed) and waits for the network to go idle before it looks. The sweep also runs the public pages and the signed-in pages **on a 360x640 phone**: on a 1280x720 desktop most pages are taller than
