@@ -7,13 +7,18 @@ const isDev = process.env.NODE_ENV !== "production";
 const apiOrigin = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 /**
- * Content Security Policy -- shipped **report-only** (Sprint 20).
+ * Content Security Policy -- **enforced in a production build** (Sprint 54, ADR-065); report-only
+ * under `next dev`.
  *
  * Tokens live in localStorage, where any script on the page can read them, so
  * keeping foreign script out matters more here than on a cookie-session site.
- * But a wrong policy silently breaks pages, so it reports first: violations
- * appear in the browser console and nothing is blocked. Switch the header name
- * to `Content-Security-Policy` once a production build runs clean.
+ * Sprint 20 shipped it report-only because a wrong policy silently breaks pages.
+ * Sprint 52's browser run made that checkable -- every page, in both languages,
+ * on a production build, with a listener on `securitypolicyviolation` -- and
+ * Sprints 52 and 53 found none, so it is enforced. The same run is the guard: a
+ * page that needs something the policy forbids now fails the suite instead of
+ * quietly working. Development stays report-only, because hot reload and React's
+ * dev overlay reach for things (eval, websockets) a production page never does.
  *
  * `'unsafe-inline'` for scripts is the honest current state: Next's inline
  * bootstrap carries no nonce on statically rendered pages, and nonces require
@@ -37,7 +42,7 @@ const csp = [
 ].join("; ");
 
 const securityHeaders = [
-  { key: "Content-Security-Policy-Report-Only", value: csp },
+  { key: isDev ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy", value: csp },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

@@ -13,6 +13,8 @@ type Cell = {
   value: string | null;
   /** A narrower figure named underneath, only when it differs from the one above. */
   under?: { key: string; count: string } | null;
+  /** This tile may grow a line underneath once the figures arrive: keep the room for it from the start. */
+  reserve?: boolean;
 };
 
 /** What the platform holds, and what has been done on it, counted live.
@@ -58,6 +60,7 @@ export function StatsBand() {
   const people: Cell[] = [
     {
       key: "jobSeekers",
+      reserve: true,
       value: d ? fmt(d.job_seekers) : null,
       under: wider(d?.profiles, d?.job_seekers)
         ? { key: "signedUp", count: fmt(d!.profiles) }
@@ -65,6 +68,7 @@ export function StatsBand() {
     },
     {
       key: "employers",
+      reserve: true,
       value: d ? fmt(d.employers) : null,
       under:
         d && d.employers_hiring < d.employers
@@ -73,6 +77,7 @@ export function StatsBand() {
     },
     {
       key: "providers",
+      reserve: true,
       value: d ? fmt(d.providers) : null,
       under:
         d && d.providers_with_course < d.providers
@@ -95,20 +100,23 @@ export function StatsBand() {
 
   const grid = (cells: Cell[]) => (
     <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
-      {cells.map(({ key, value, under }) => (
+      {cells.map(({ key, value, under, reserve }) => (
         <div key={key}>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted">{t(key)}</dt>
           <dd className="mt-1 text-2xl font-bold tabular-nums sm:text-3xl">
             {value ?? <Skeleton className="h-8 w-24" />}
           </dd>
-          {under && (
+          {(under || reserve) && (
             // Pre-formatted, not handed over as a number: next-intl would format it with the
             // page locale (`en`), and this page's rule is `en-IN` (`lib/format.ts`).
             // A `<dd>`, not a `<p>`: a `<dl>` may hold only `dt`/`dd` groups, and axe fails the
             // whole list otherwise. It appears only when a secondary figure exists, so an
             // empty database never showed it (Sprint 52's browser run did).
-            <dd className="mt-0.5 text-xs text-muted tabular-nums">
-              {t(under.key, { count: under.count })}
+            // `min-h-4` is the room the line takes, held while the figures load and when a tile has no
+            // narrower figure: without it every tile below the first row dropped 16px when they
+            // arrived (Sprint 54: the homepage scored 0.11 of layout shift on a phone, in Hindi).
+            <dd className="mt-0.5 min-h-4 text-xs text-muted tabular-nums">
+              {under ? t(under.key, { count: under.count }) : null}
             </dd>
           )}
         </div>

@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(64 ADRs). Read it before making any structural decision — the summary below
+(65 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -464,7 +464,7 @@ split would have to turn into interfaces first; do not add to it casually.
   cap (100 unverified, 500 verified) counts every creation path and is applied identically by check and apply. A mutation-check run needs `PYTHONDONTWRITEBYTECODE=1`: a
   stale `.pyc` left by a mutated `api/main.py` made five tests 404 and made earlier "killed" results meaningless.
 - **A page is checked in a real browser, on the production build, and a check that cannot fail does not count** (ADR-062). `cd web && npm run e2e` (or `make e2e`) drives six journeys in
-  Chromium; every page goes through `checkPage` (no console error, no failed request, **no CSP violation** -- the policy is report-only so nothing else would notice -- and axe **with contrast ON** in
+  Chromium; every page goes through `checkPage` (no console error, no failed request, **no CSP violation** -- since Sprint 54 an enforced policy, so a violation is also a blocked resource -- and axe **with contrast ON** in
   light and dark). The component tests cannot do any of that (jsdom has no layout), and the first run found five real defects none of them could see. **Findings change the product; they are never
   allow-listed.** `scripts/seed_e2e.py` refuses any database not ending `_e2e` (the importer rewrites the corpus); the build goes to `.next-e2e`, ports are 8100/3100. **After editing web code, rebuild
   (`npm run build:e2e`) and kill any `next start -p 3100`:** Playwright reuses a running server locally and will test stale code. A test asserts the fact, not the click: `toHaveCount(0)` on a button is true
@@ -477,6 +477,14 @@ split would have to turn into interfaces first; do not add to it casually.
 - **A bulk upload updates only when asked, only by `external_ref`, and only the columns the file carries** (ADR-064). `existing=skip|update` (default skip; **required** inside `bulk.run`, because a default
   there survived a mutation check). An absent column leaves the field alone; a blank cell in a present column clears it; a row that changes nothing is a skip. It goes through `update_job` /
   `update_course`, never beside them, so the invariant above guards it, and a live listing is acknowledged by the person before the button enables.
+- **A page must not jump while it loads, and a placeholder is the thing that stops it** (ADR-065). `checkPage` fails a page whose worst layout-shift window is above 0.1 and names what moved; the harness
+  delays API reads 250 ms and waits for the network to go idle first, or the check looks before the list has arrived and passes a page that jumps. The sweep runs the public and signed-in pages **on a
+  360x640 phone** as well: on a desktop window the footer is never in view while a list loads, so nothing can jump there. Every loading state is a `Skeleton` (or carries `data-loading`), and
+  `globals.css` hides the footer (`visibility`, so it keeps its box) while any `[data-loading]` is on the page. **Never return `null` while a query is pending**, and never show a count of 0 for a list
+  that has not arrived. `ListSkeleton` is the placeholder for a list of cards.
+- **Kill a test server by port, not by name.** The process is `next-server`, so `pkill -f "next start"` matches nothing; a stale one on :3100 is reused by Playwright and serves the old build, and after a
+  rebuild it answers 500 for every changed chunk. `lsof -nP -iTCP:3100 -sTCP:LISTEN -t | xargs kill`. A running `next dev` can also break `next build`'s type-check (a stub `.next/dev/types/routes.d.ts`
+  collides with `.next-e2e/types`); stop it, or move `.next/dev/types` aside, first.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -907,6 +915,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > running, that `update_job` / `update_course` let a **published** listing be saved with no standards (live and unmatchable); that is now refused at the write. Bulk upload can **update by `external_ref`**
 > (opt-in, only the columns the file carries, live listings acknowledged first). `npm audit fix` cleared the two production advisories; dependabot's newest groups were tested safe but not merged.
 
+> **Sprint 54 is done** (ADR-065, no migration): *pages that do not jump, and a policy that blocks*. Measured on a throttled 360x640 phone profile, speed was fine (about 0.7 s to first paint) but `/jobs` scored a layout shift of
+> 0.205 and the signed-in screens up to 0.645 (0.1 is good). The cause was one element, the footer, sitting mid-screen beside a half-loaded list and being pushed away when it landed. One CSS rule now hides the footer
+> (`visibility`) while any placeholder is on the page, three screens that returned nothing while loading return a `Skeleton`, and `checkPage` fails a page above 0.1 -- on a phone viewport too, with API reads delayed, which is
+> the only way it can see this (a first version passed the very pages that were jumping). The CSP is now **enforced** in a production build. All 119 browser tests pass; each new check was proved able to fail.
+> **Deferred by the owner:** SEO, deployment and monetisation.
+
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one
 control on offer deleted their whole account. The reproduction was worse than the report:
@@ -1315,10 +1329,9 @@ closed before the first deployment in Sprint 21.
   one. CORS no longer grants credentials — auth is a bearer header and no route uses a cookie.
 - **A 15-second statement timeout applies to every connection.** The seed, evaluate and
   import-nsqf targets run with `DB_STATEMENT_TIMEOUT_MS=0`; a new long-running script needs the same.
-- **The web CSP ships report-only**, and still allows `'unsafe-inline'` scripts: Next's inline
-  bootstrap carries no nonce on statically rendered pages, and nonces force dynamic rendering.
-  Enforcing it is a deliberate trade against static rendering, not a header rename. Verified clean
-  in the browser console; switch the header name once a production build is clean too.
+- **The web CSP is enforced in a production build and report-only under `next dev`** (Sprint 20, enforced in Sprint 54, ADR-065), and still allows `'unsafe-inline'` scripts: Next's inline
+  bootstrap carries no nonce on statically rendered pages, and nonces force dynamic rendering. Removing it is a deliberate trade against static rendering, not a header rename. The browser sweep is
+  the guard (a page that needs something the policy forbids fails it), plus a test that the header is the enforcing one and that a foreign `<script src>` is blocked.
 - **A detail page calls `notFound()` only on a 404.** Every failure used to land there, so an API
   outage told visitors the listing did not exist. `error.tsx` says "unavailable"; `global-error`
   reads `messages/fatal.json` rather than both full catalogues.

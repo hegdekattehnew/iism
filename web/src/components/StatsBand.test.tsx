@@ -201,5 +201,20 @@ describe("StatsBand: who is here and what has been done", () => {
       }
     }
   });
+
+  // Sprint 54: the figures arrive late and three of them may grow a line underneath, so the band
+  // used to grow when they landed and everything below it dropped (0.11 of layout shift on a
+  // phone, in Hindi). The room is held from the start and whether or not the line turns up.
+  it("holds the room for a narrower figure's line, before the figures arrive and when there is none", async () => {
+    GET.mockReturnValue(new Promise(() => undefined));
+    const loading = renderUi(<StatsBand />);
+    expect(loading.container.querySelectorAll("dd.min-h-4")).toHaveLength(3);
+    loading.unmount();
+
+    answer({ profiles: 22, employers_hiring: 102, providers_with_course: 60 }); // nothing narrower to say
+    const loaded = renderUi(<StatsBand />);
+    await waitFor(() => expect(screen.getByText("22")).toBeTruthy());
+    expect(loaded.container.querySelectorAll("dd.min-h-4")).toHaveLength(3);
+  });
 });
 

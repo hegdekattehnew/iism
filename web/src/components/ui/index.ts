@@ -29,5 +29,5 @@ export { Card, CardBody, CardTitle } from "@/components/ui/card";
 // route. Import it from `@/components/ui/dialog` where one is actually shown.
 export { Section, SectionHeading, Logo } from "@/components/ui/layout";
 export { Progress } from "@/components/ui/progress";
-export { Skeleton } from "@/components/ui/skeleton";
+export { ListSkeleton, Skeleton } from "@/components/ui/skeleton";
 export { StatTile } from "@/components/ui/stat-tile";

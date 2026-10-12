@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
-import { ButtonLink, Card, CardBody } from "@/components/ui";
+import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { useIsSignedIn } from "@/lib/auth";
 import { useMemberships } from "@/lib/org";
 
@@ -42,7 +42,7 @@ export function SeekerOnly({ children }: { children: ReactNode }) {
       </Card>
     );
   }
-  if (isPending || !data) return null;
+  if (isPending || !data) return <Skeleton className="h-64 w-full rounded-xl" />;
   if (isJobSeeker) return <>{children}</>;
 
   const only = organisations.length === 1 ? organisations[0] : null;
