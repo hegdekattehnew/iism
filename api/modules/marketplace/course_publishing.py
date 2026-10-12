@@ -81,8 +81,17 @@ async def _resolve_skills(
     return list(taught.items())
 
 
-async def _write_skills(db: AsyncSession, course: Course, rows: list[CourseSkillIn]) -> None:
-    resolved = await _resolve_skills(db, rows)
+async def _write_skills(
+    db: AsyncSession,
+    course: Course,
+    rows: list[CourseSkillIn],
+    *,
+    resolved: list[tuple[uuid.UUID, float | None]] | None = None,
+) -> None:
+    """Replace what the course teaches. `resolved` lets an updater validate the standards before it
+    changes anything (see `publishing._write_skills`)."""
+    if resolved is None:
+        resolved = await _resolve_skills(db, rows)
     await db.execute(delete(CourseSkill).where(CourseSkill.course_id == course.id))
     for skill_id, level in resolved:
         db.add(CourseSkill(course_id=course.id, skill_id=skill_id, level_taught=level))
@@ -162,12 +171,16 @@ async def update_course(
         course.status, payload.skills, what="course", keep="standard it teaches"
     )
 
+    # Anything that can refuse runs before anything is changed (Sprint 55): see
+    # `publishing.update_job`.
+    resolved = await _resolve_skills(db, payload.skills)
+
     for field in _PLAIN_FIELDS:
         setattr(course, field, getattr(payload, field))
     # The slug is not regenerated: it is a published URL as soon as the course
     # goes live, and rewriting it on a title tweak breaks every link to it.
     await db.flush()
-    await _write_skills(db, course, payload.skills)
+    await _write_skills(db, course, payload.skills, resolved=resolved)
     await db.commit()
     return await _load(db, course.id)
 

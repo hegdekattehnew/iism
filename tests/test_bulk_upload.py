@@ -1574,3 +1574,172 @@ class TestUpdatingCourses:
             4500,
         )
         assert course["slug"] == slug
+
+
+COLLECT_BLOOD = "collect-blood-samples-hc-n0001"
+
+# ================================================================== the Sprint 55 review fixes
+
+
+class TestANumberThatIsNotANumber:
+    """`float()` accepts "nan", "inf" and "1e999", and `int()` of each raises. pandas writes a
+    missing number as `nan`, so one such cell used to turn the whole upload into a 500."""
+
+    @pytest.mark.parametrize("cell", ["nan", "NaN", "inf", "-inf", "1e999"])
+    def test_the_whole_number_reader_refuses_it_as_a_row_problem(self, cell: str) -> None:
+        problems: list[str] = []
+        assert bulk._int({"positions": cell}, "positions", problems) is None
+        assert problems == [f"positions: '{cell}' is not a number"]
+
+    @pytest.mark.parametrize("cell", ["nan", "inf", "1e999"])
+    def test_the_decimal_reader_refuses_it_too(self, cell: str) -> None:
+        problems: list[str] = []
+        assert bulk._float({"nsqf_level_min": cell}, "nsqf_level_min", problems) is None
+        assert problems == [f"nsqf_level_min: '{cell}' is not a number"]
+
+    @pytest.mark.parametrize("cell", ["nan", "inf", "1e999"])
+    async def test_a_vacancy_with_one_is_that_rows_error_and_the_rest_of_the_file_applies(
+        self, client: AsyncClient, corpus: None, cell: str
+    ) -> None:
+        headers, org = await _org(client, "Nan Hospital")
+        header = "external_ref,title,positions,salary_min_inr,standards"
+        text = _csv(
+            "N1,Ward attendant,2,15000,HC/N0001",
+            f"N2,Cook,{cell},15000,HC/N0001",
+            f"N3,Driver,1,{cell},HC/N0001",
+            header=header,
+        )
+        for step in ("check", "apply"):
+            response = await _post(client, f"/org/{org}/jobs/bulk/{step}", text, headers)
+            assert response.status_code == 200, f"{step}: {response.text}"
+            rows = response.json()["rows"]
+            assert [r["status"] for r in rows] == ["ok", "error", "error"]
+            assert (
+                "positions" in rows[1]["messages"][0] and "not a number" in rows[1]["messages"][0]
+            )
+            assert "salary_min_inr" in rows[2]["messages"][0]
+
+    @pytest.mark.parametrize("cell", ["nan", "inf"])
+    async def test_a_course_with_one_is_that_rows_error_too(
+        self, client: AsyncClient, corpus: None, cell: str
+    ) -> None:
+        headers, org = await _org(client, "Nan Academy", "course_provider")
+        header = "title,duration_hours,fee_inr,standards"
+        text = _csv(
+            "Blood collection,120,4500,HC/N0001",
+            f"Home care,{cell},4500,HC/N0001",
+            header=header,
+        )
+        response = await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)
+        assert response.status_code == 200, response.text
+        rows = response.json()["rows"]
+        assert [r["status"] for r in rows] == ["ok", "error"]
+        assert "duration_hours" in rows[1]["messages"][0]
+
+
+class TestAGigNeedsADistrictNotOnlyAState:
+    async def test_the_check_refuses_a_gig_with_a_state_and_no_district_as_the_apply_would(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "State Only Hospital")
+        header = "title,employment_type,state,district,closes_at,standards"
+        text = _csv("Shift,gig,Tamil Nadu,,2999-01-01,HC/N0001", header=header)
+
+        checked = (await _post(client, f"/org/{org}/jobs/bulk/check", text, headers)).json()
+        applied = (await _post(client, f"/org/{org}/jobs/bulk/apply", text, headers)).json()
+
+        # The two agree: it is an error before anything is written, not a surprise at apply time.
+        assert [r["status"] for r in checked["rows"]] == ["error"]
+        assert [r["status"] for r in applied["rows"]] == ["error"]
+        assert "needs a district" in checked["rows"][0]["messages"][0]
+        assert applied["created"] == 0
+        assert await _count(db, Job, org) == 0
+
+    async def test_an_update_that_turns_a_vacancy_into_a_gig_with_no_place_is_refused_by_the_check(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Turn Gig Hospital")
+        made = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply",
+                "external_ref,title,standards\nR9,Cook,HC/N0001\n",  # no state, no district
+                headers,
+            )
+        ).json()
+        slug = made["rows"][0]["slug"]
+        before = await _job_row(client, headers, org, slug)
+        text = "external_ref,title,employment_type,closes_at\nR9,Cook,gig,2999-01-01\n"
+
+        checked = (await _post(client, f"/org/{org}/jobs/bulk/check{UPDATE}", text, headers)).json()
+        applied = (await _post(client, f"/org/{org}/jobs/bulk/apply{UPDATE}", text, headers)).json()
+
+        for body in (checked, applied):
+            (row,) = body["rows"]
+            assert row["status"] == "error" and "needs a place" in row["messages"][0]
+        assert applied["updated"] == 0
+        assert await _job_row(client, headers, org, slug) == before
+
+    async def test_an_update_that_gives_a_gig_a_district_that_resolves_is_allowed(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Good Gig Hospital")
+        slug = await _seed(client, headers, org)  # Tamil Nadu / Chennai, resolvable
+        text = "external_ref,title,employment_type,closes_at\nR1,Phlebotomist,gig,2999-01-01\n"
+        body = (await _post(client, f"/org/{org}/jobs/bulk/apply{UPDATE}", text, headers)).json()
+        assert [r["status"] for r in body["rows"]] == ["update"], body["rows"][0]["messages"]
+        assert body["updated"] == 1
+        assert (await _job_row(client, headers, org, slug))["employment_type"] == "gig"
+
+
+class TestAWriterThatRefusesChangesNothing:
+    """The root cause of the half-saved edit: both updaters set fields on a persistent row and only
+    then asked the questions that can refuse. The refusal now comes first."""
+
+    async def test_update_job_refusing_a_gig_with_no_place_leaves_the_row_untouched(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        from fastapi import HTTPException
+
+        headers, org = await _org(client, "Writer Hospital")
+        tenant_id = await db.scalar(select(Tenant.id).where(Tenant.slug == org))
+        job = await publishing.create_job(
+            db, tenant_id, JobIn(title="Cook", skills=[JobSkillIn(skill_slug=COLLECT_BLOOD)])
+        )
+        with pytest.raises(HTTPException) as refused:
+            await publishing.update_job(
+                db,
+                tenant_id,
+                job.slug,
+                JobIn(
+                    title="Changed",
+                    employment_type="gig",
+                    closes_at=datetime.now(UTC) + timedelta(days=3),
+                    skills=[JobSkillIn(skill_slug=COLLECT_BLOOD)],
+                ),
+            )
+        assert refused.value.status_code == 422
+        assert job.title == "Cook" and job.employment_type == "full_time"
+        assert not db.dirty, "a refused update must not leave the row waiting to be committed"
+
+    async def test_update_course_refusing_an_unknown_standard_leaves_the_row_untouched(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        from fastapi import HTTPException
+
+        headers, org = await _org(client, "Writer Academy", "course_provider")
+        tenant_id = await db.scalar(select(Tenant.id).where(Tenant.slug == org))
+        course = await course_publishing.create_course(
+            db,
+            tenant_id,
+            CourseIn(title="Blood collection", skills=[CourseSkillIn(skill_slug=COLLECT_BLOOD)]),
+        )
+        with pytest.raises(HTTPException):
+            await course_publishing.update_course(
+                db,
+                tenant_id,
+                course.slug,
+                CourseIn(title="Changed", skills=[CourseSkillIn(skill_slug="no-such-standard")]),
+            )
+        assert course.title == "Blood collection"
+        assert not db.dirty

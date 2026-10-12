@@ -485,6 +485,11 @@ split would have to turn into interfaces first; do not add to it casually.
 - **Kill a test server by port, not by name.** The process is `next-server`, so `pkill -f "next start"` matches nothing; a stale one on :3100 is reused by Playwright and serves the old build, and after a
   rebuild it answers 500 for every changed chunk. `lsof -nP -iTCP:3100 -sTCP:LISTEN -t | xargs kill`. A running `next dev` can also break `next build`'s type-check (a stub `.next/dev/types/routes.d.ts`
   collides with `.next-e2e/types`); stop it, or move `.next/dev/types` aside, first.
+- **A writer that can refuse refuses before it changes anything, and a loop over rows that rolls back must not read the session afterwards** (Sprint 55, from the review of Sprints 51-54). `update_job` /
+  `update_course` set fields on a persistent row and only then asked the questions that can refuse; in a bulk apply the next commit saved the edit the person had just been told was rejected. They resolve
+  the place and the standards first now, and `bulk.run` rolls back a refused row. **`db.rollback()` expires every instance in the session** (`expire_on_commit=False` does not cover it), and reading
+  `tenant.id` afterwards is a synchronous load inside the event loop (MissingGreenlet), so `run` reads the id once. The suite's `db` fixture would roll back its own set-up, so these paths are tested
+  with committed rows (`tests/test_bulk_apply_rollback.py`, `tests/concurrency.py`). `float()` accepts `nan`, `inf` and `1e999` and `int()` of each raises: any number read from a file checks `math.isfinite` first.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's

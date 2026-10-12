@@ -45,6 +45,7 @@ bounds clutter and abuse of the write path; a separate publish step is what make
 
 import csv
 import io
+import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -390,6 +391,11 @@ def _int(cells: dict[str, str], column: str, problems: list[str]) -> int | None:
     except ValueError:
         problems.append(f"{column}: '{cells[column]}' is not a number")
         return None
+    # `float()` accepts "nan", "inf" and "1e999", and `int()` of any of them raises: one such cell
+    # (pandas writes a missing number as "nan") used to fail the whole upload with a 500.
+    if not math.isfinite(value):
+        problems.append(f"{column}: '{cells[column]}' is not a number")
+        return None
     if value != int(value):
         problems.append(f"{column}: '{cells[column]}' must be a whole number")
         return None
@@ -401,10 +407,14 @@ def _float(cells: dict[str, str], column: str, problems: list[str]) -> float | N
     if not raw:
         return None
     try:
-        return float(raw)
+        value = float(raw)
     except ValueError:
         problems.append(f"{column}: '{raw}' is not a number")
         return None
+    if not math.isfinite(value):
+        problems.append(f"{column}: '{raw}' is not a number")
+        return None
+    return value
 
 
 def _closes_at(cells: dict[str, str], problems: list[str]) -> datetime | None:
@@ -632,6 +642,10 @@ class _Plan:
     update_slug: str | None = None
     update_live: bool = False
     changes: list[str] = field(default_factory=list)
+    # A gig whose own cells name no place at all. Whether that is a problem depends on what the row
+    # turns out to be, so it is decided in `_plans`: a *new* gig needs the place from the file, an
+    # *update* may take it from the listing it changes (and is checked on the merged payload).
+    gig_without_place: bool = False
 
 
 async def _standards_for_row(
@@ -766,8 +780,12 @@ async def _plan_job(
                 "place as typed and could not be matched by location"
             )
             (problems if fields["employment_type"] == "gig" else plan.warnings).append(message)
+        elif not district and fields["employment_type"] == "gig":
+            # A state alone is not a place a worker can travel to: `create_job` refuses it, so the
+            # check has to say so too (it must describe exactly what the apply will do).
+            problems.append("district: a gig needs a district, not only a state")
     elif fields["employment_type"] == "gig":
-        problems.append("district: a gig needs a place a worker can travel to")
+        plan.gig_without_place = True
 
     if not plan.standards and not problems:
         plan.warnings.append(
@@ -984,6 +1002,14 @@ async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: li
             plan.problems.extend(_validation_messages(error))
             continue
 
+        if isinstance(payload, JobIn) and payload.employment_type == "gig":
+            # `update_job` refuses a gig with no resolvable district. The merged payload is the
+            # one it will be given, so ask the same question here instead of at apply time.
+            location = await resolve_location(db, payload.location_state, payload.location_district)
+            if location.district_id is None:
+                plan.problems.append("district: a gig needs a place a worker can travel to")
+                continue
+
         changes = [
             column
             for column, field_ in columns.items()
@@ -1133,6 +1159,14 @@ async def _plans(
             elif plan.key in seen_keys:
                 plan.skip_of = f"the same title appears in row {seen_keys[plan.key]}"
             seen_keys.setdefault(plan.key, plan.raw.number)
+    for plan in plans:
+        if (
+            plan.gig_without_place
+            and not plan.problems
+            and not plan.update_slug
+            and not plan.skip_of
+        ):
+            plan.problems.append("district: a gig needs a place a worker can travel to")
     await _merge_updates(db, kind, tenant_id, plans)
     return plans
 
@@ -1184,12 +1218,17 @@ async def run(
 
     `existing="update"` also changes the listings whose `external_ref` the file names (ADR-064).
     """
+    # Read off the ORM object once. Applying may roll the session back (a refused row, a duplicate
+    # inserted at the same moment), which **expires every persistent instance**, and reading
+    # `tenant.id` from an expired instance is a synchronous load inside the event loop: a
+    # MissingGreenlet, so a race on one row would have become a 500 for the whole file.
+    tenant_id = tenant.id
     rows, notes, header = parse_file(text, kind)
-    plans = await _plans(db, kind, tenant.id, rows, existing)
+    plans = await _plans(db, kind, tenant_id, rows, existing)
     reports = [_report_row(p) for p in plans]
 
     limit = daily_limit(tenant)
-    remaining = max(0, limit - await _created_in_last_day(db, kind, tenant.id))
+    remaining = max(0, limit - await _created_in_last_day(db, kind, tenant_id))
     # The cap is applied in file order to the rows that would create something, identically in
     # check and apply: the preview must say what the apply will do.
     allowance = remaining
@@ -1212,13 +1251,17 @@ async def run(
                 try:
                     if kind == "jobs":
                         assert isinstance(plan.payload, JobIn)
-                        await publishing.update_job(db, tenant.id, plan.update_slug, plan.payload)
+                        await publishing.update_job(db, tenant_id, plan.update_slug, plan.payload)
                     else:
                         assert isinstance(plan.payload, CourseIn)
                         await course_publishing.update_course(
-                            db, tenant.id, plan.update_slug, plan.payload
+                            db, tenant_id, plan.update_slug, plan.payload
                         )
                 except HTTPException as error:
+                    # Whatever the refused writer had already changed must not survive: the next
+                    # commit in this loop (or `record()`) would save it. Earlier rows are committed
+                    # row by row, so this discards only the one that was refused.
+                    await db.rollback()
                     report.status = "error"
                     report.messages.insert(0, str(error.detail))
                 else:
@@ -1231,15 +1274,17 @@ async def run(
                 if kind == "jobs":
                     assert isinstance(plan.payload, JobIn)
                     created = await publishing.create_job(
-                        db, tenant.id, plan.payload, external_ref=plan.ref
+                        db, tenant_id, plan.payload, external_ref=plan.ref
                     )
                 else:
                     assert isinstance(plan.payload, CourseIn)
                     created = await course_publishing.create_course(
-                        db, tenant.id, plan.payload, external_ref=plan.ref
+                        db, tenant_id, plan.payload, external_ref=plan.ref
                     )
             except HTTPException as error:
-                # Both writers validate before they write, so a refusal leaves nothing pending.
+                # The writers validate before they write, so a refusal should leave nothing pending;
+                # the rollback makes that true whatever a writer does later.
+                await db.rollback()
                 report.status = "error"
                 report.messages.insert(0, str(error.detail))
             except IntegrityError:
@@ -1261,7 +1306,7 @@ async def run(
         errors_csv=errors_csv(header, rows, failed),
     )
     if apply:
-        await _record(db, kind, tenant.id, actor_id, report_out)
+        await _record(db, kind, tenant_id, actor_id, report_out)
     return report_out
 
 
