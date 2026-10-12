@@ -4,11 +4,11 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-09 · **Sprints 1–53 built.** Sprints 1–52 (with the small 50.5) are merged into `main` (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30,
-merge commit `63ba8a0`); **Sprint 53 (every page seen by a browser, a published listing keeps its standards, bulk upload can update by reference; ADR-064, no migration) is on `sprint-53`, cut from
-`main` at `63ba8a0`, uncommitted.** Sprint 52 added six browser journeys and found five defects; Sprint 53 widened them to every page (81 sweep tests), found two more classes, closed a
-correctness hole (a live vacancy could be edited down to no standards) and finished bulk upload's loop. **No next sprint is chosen** (§11, "Queued after Sprint 53"). K stays 500. Monetisation and
-real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-12 · **Sprints 1–53 built, all merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30, merge commit `63ba8a0`; **53 as PR #35, merge
+commit `6993241`**). Sprint 53 (every page seen by a browser, a published listing keeps its standards, bulk upload can update by reference; ADR-064, no migration) widened Sprint 52's six browser journeys
+to every page (81 sweep tests), found two more defect classes, closed a correctness hole (a live vacancy could be edited down to no standards) and finished bulk upload's loop. Seven dependabot PRs
+were then merged one at a time and PR #36 brought the e2e job's actions to v7; **`main` is `d8cf469` and CI on it is green** (see §11, "CI facts"). **No next sprint is chosen** (§11, "Queued after
+Sprint 53"). K stays 500. Monetisation and real external integrations stay deferred by the owner.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -24,10 +24,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-53` (Sprint 53, **uncommitted**, 2026-10-09), cut from `main` at `63ba8a0`, which has everything through Sprint 52 (PR #30 merged). Every merged branch is deleted, locally and on `origin`. **Twelve dependabot branches are open on the remote**, several of them duplicates (see §11, Sprint 53, for which to close and which were tested safe). |
+| **Branch** | `main` at `d8cf469` (2026-10-12), which has everything through Sprint 53 plus every dependabot bump; **no feature branch and no open PR**. Every merged branch is deleted, locally and on `origin`. Cut a new branch before starting anything. |
+| **CI** | Green on `main` (run `38206302111`, 2026-10-12): Web 1m24s, API 3m29s, **E2E 3m01s**. Read it yourself with `~/bin/gh run list --repo hegdekattehnew/iism --branch main` (§6 explains `gh`; §11 "CI facts" has the rest). |
 | **Last sprint** | 53 — **every page, an invariant, and the update half of bulk upload**: a browser sweep of ~45 routes in two languages (88 browser tests in all, ~54 s), a flush-against-border check, two defect classes fixed (colour-only inline links, unnamed selects), `npm audit fix` (production audit clean), "a published listing keeps at least one standard" enforced at every write, and `existing=update` on bulk upload (by `external_ref`, only the columns the file carries, live listings acknowledged) (ADR-064, no migration). Before it: 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | None chosen. Candidates are in §11 "Queued after Sprint 53". `BL-1.3` stays not started. |
-| **Tests** | 1,337 backend (`make check`, 2026-10-09), 428 web (`cd web && npm test`), **88 browser tests** (`make e2e`: 81 route-sweep + 7 journeys, ~54 s warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run |
+| **Tests** | 1,337 backend (`make check`, re-run on `main` 2026-10-12), 428 web (`cd web && npm test`), **88 browser tests** (`make e2e`: 81 route-sweep + 7 journeys, ~45 s warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/profile` 680 of 684 KB |
 | **Migrations** | head `0049` (Sprint 52: a partial index on `jobs.closes_at`; **the dev database `iism` is at 0048, so `make migrate` is owed**); 63 ADRs (001-063) |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -694,9 +695,24 @@ This is an **Apple Silicon (arm64) Mac, macOS 26.6.2**, and the setup has traps:
   explicit path: `~/.nvm/versions/node/v24.18.0/bin`.
 - **System `python3` is 3.7.1.** The project uses **uv-managed Python 3.12.14** in `.venv`.
   Always invoke `.venv/bin/python`, never bare `python3`.
-- **Homebrew at `/usr/local` is the Intel build running under Rosetta.** Everything it installs is
-  x86_64. Deliberately left alone — Python comes from uv (native arm64) instead. Do not install
-  project dependencies through brew.
+- **Homebrew at `/usr/local` is the Intel build, and Rosetta is not installed, so it does not run at
+  all** (checked 2026-10-12: `brew install` fails with "Bad CPU type in executable" and a misleading
+  "'git' must be installed"; `/opt/homebrew` does not exist). Python comes from uv (native arm64)
+  instead. Do not install project dependencies through brew. Fixing it properly means a native
+  Homebrew in `/opt/homebrew` and moving packages over; nothing needs it yet.
+- **`/usr/local/bin/git` is also x86_64 and also fails** when something execs it by that path (the
+  `gh` CLI does; `/usr/bin/git` works). So `gh pr create` needs `PATH="/usr/bin:$PATH"` in front of it,
+  and every `gh` call should pass `--repo hegdekattehnew/iism` (its repo lookup runs git).
+- **`gh` is a native arm64 binary at `~/bin/gh` (2.102.0, installed 2026-10-12 straight from
+  `cli/cli` releases because brew is broken), logged in as `hegdekattehnew`** with scopes `repo`,
+  `workflow`, `gist`, `read:org`: broader than the fine-grained, repo-only token that was
+  recommended (Contents, Pull requests, Actions, Workflows read-write); tighten with `gh auth logout`
+  and `gh auth login --with-token` if wanted. `~/.zshrc` now has `export PATH="$HOME/bin:$PATH"` (the
+  first attempt did not add it: its `grep` matched a commented-out template line). A
+  `compinit: no such file ... _brew_cask` warning in every new shell is a dangling symlink from the old
+  Homebrew and is harmless.
+- **`uv sync --locked` alone uninstalls the dev tools** (ruff, mypy, pytest). Always
+  `uv sync --locked --extra dev`.
 - **Docker host ports are non-default:** Postgres **5433**, Redis **6380**, chosen so any
   pre-existing local install is untouched. Docker Desktop is native aarch64, 8 GB / 8 CPU —
   raise the memory before embedding workers arrive.
@@ -968,6 +984,11 @@ running old code (found 2026-09-15: a worker from 2026-09-10 plus two orphaned c
   staying out of logs. Resume-derived embeddings inherit the same sensitivity.
 
 ## 10. Git state
+
+**Merged 2026-10-09 to 2026-10-12.** PR #30 (Sprint 52, `63ba8a0`) and PR #35 (Sprint 53, `6993241`), then the dependabot PRs one at a time (#28 python group, #34 web group, #32 `upload-artifact` 6,
+#33 `cache` 6, #3 `checkout` 7, #2 `setup-uv` 7, #4 `setup-node` 7), then PR #36 (the e2e job's own `checkout`/`setup-uv`/`setup-node` to v7, merge commit `d8cf469`). The stale dependabot duplicates
+(`python-5113e460e3`, `web-d4d48f29cf`, `web-0caa1ab034`, `setup-node-6`, `@types/node-26.6.3`) and every merged branch were deleted on `origin`; local and remote both hold only `main`. Branch
+deletes on `origin` are done by the owner or with `git push origin --delete <name>` (one was blocked by the permission system on 2026-10-09 and went through on 2026-10-12).
 
 **Merged 2026-10-06.** PR #29 (`sprint-51` → `main`, merge commit `a18e79a`) carried Sprint 50.5 (`1681de7`) and Sprint 51 (`136d81e`, `a2243ae`); `sprint-50-5` and `sprint-51` were deleted on `origin` and locally. `gh` is not installed, so PR state is read from `git fetch` and ancestry. **Sprint 52 merged as PR #30 (`63ba8a0`, 2026-10-09) and `sprint-52` was deleted. Since then: `sprint-53` (2026-10-09), uncommitted.** Sprint 51's change list is in §11 ("Sprint 51: bulk upload"). Sprint 50.5's
 changes: `marketplace/stats.py` (one statement, ten new figures and `demo`), `marketplace/models.py` (`skilled_profile()`), `marketplace/schemas.py`, `matching/employer.py`
@@ -2338,7 +2359,7 @@ asserts the tile is absent and each `<dl>` has six children, `sm:grid-cols-3` an
 **Environment, 2026-10-06:** the API and web dev server had both stopped and the worker was a stale Oct 4 process; all three were restarted from a session (`make api`, `make worker`,
 `make web`, logs in `/tmp/iism-logs/`) and `make migrate` applied 0047 and 0048. `/health/deep` reported Postgres, Redis and the worker up. The cause of the stop was not found.
 
-### Sprint 52: journeys in a real browser (done 2026-10-08, ADR-062, migration 0049, **uncommitted**)
+### Sprint 52: journeys in a real browser (done 2026-10-08, ADR-062, migration 0049; merged in PR #30, `63ba8a0`)
 
 - **What exists.** `web/e2e/` (six specs, `support/{test,identities}.ts`, `global-setup.ts`), `web/playwright.config.ts`, `scripts/seed_e2e.py`, `make seed-e2e` / `make e2e` / `make drop-e2e`, and a third CI
   job `e2e` (`.github/workflows/ci.yml`). The stack under test is the **production build** (`npm run build:e2e` into `.next-e2e`, so it never overwrites the `.next` a running `next dev` serves) with the
@@ -2365,7 +2386,7 @@ asserts the tile is absent and each `<dl>` has six children, `sm:grid-cols-3` an
 - **Local gotchas.** After editing web code, **rebuild (`npm run build:e2e`) and kill any `next start -p 3100`**: Playwright reuses a running server locally and will test stale code. The Playwright browser cache is
   575 MB in `~/Library/Caches/ms-playwright`; the machine's disk was at 93%.
 
-### Sprint 53: every page, an invariant, and the update half of bulk upload (done 2026-10-09, ADR-064, no migration, **uncommitted**)
+### Sprint 53: every page, an invariant, and the update half of bulk upload (done 2026-10-09, ADR-064, no migration; merged in PR #35, `6993241`)
 
 Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-upload update is the cut line (it was not cut).
 
@@ -2374,8 +2395,8 @@ Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-up
   **Dependabot triage (tested, not merged; the owner merges and closes):** the newest `python` group (fastapi 0.142.2, pymongo 4.18.2, ruff 0.16.10, mypy 2.4.0) passes ruff, mypy and all 1,315 tests of that
   day; the newest `web` group (`react-dialog` 1.2.0, `react-progress` 1.1.17, `axe-core` 4.14.0, `jsdom` 30.1.2) passes `tsc`, lint, unit tests, the build and every browser test **but takes `/profile`
   from 678 to 680 KB of the 684 KB budget, leaving 4 KB**. Stale duplicates to close: `python-5113e460e3`, `web-0caa1ab034`, `web-d4d48f29cf`, one of `setup-node-6` / `setup-node-7`; `@types/node` 26
-  stays closed (ADR-053). The Actions bumps (`checkout` 7, `setup-uv` 7, `setup-node`, `cache` 6, `upload-artifact` 6) can only be judged by CI, one at a time. **The CI result of PR #30 (including the
-  first `e2e` job duration) is unknown to me: the repo is private and there is no token, so the owner reads it.**
+  stays closed (ADR-053). The Actions bumps (`checkout` 7, `setup-uv` 7, `setup-node`, `cache` 6, `upload-artifact` 6) can only be judged by CI, one at a time. *(Written 2026-10-09 when there was no
+  `gh` token; every one of these was then merged and judged by CI, and the `e2e` duration is known: see "CI facts" below.)*
 - **Stage 1, done: `web/e2e/sweep.spec.ts`** visits ~45 routes in `/en` and `/hi` (signed out; a seeker with something on every list; an employer; a provider; an operator; detail pages for a real vacancy,
   course and standard; a real 404; `/status` asserted absent in a production build) through the same `checkPage`: **81 tests, ~30 s with 3 workers**. It found **two defect classes**, fixed at their cause:
   inline links in running text told apart by colour alone (1.54:1; now underlined: `SignUpForm`, `SignInForm`, `signup/page`, `AccountPanel`, `Notices`) and two `/admin` `<select>`s with no accessible
@@ -2398,25 +2419,34 @@ Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-up
   `read -s "T?Token: "` then `git credential-osxkeychain store` (zsh: the prompt goes inside the quotes, `read -p` is bash); a push that touches `.github/workflows/` needs the token's **`workflow`** scope;
   a fine-grained token needs Contents and Workflows read-write on `iism`.
 
+### CI facts (read with `gh` on 2026-10-12; the repo is private, so nothing here is visible without a token)
+
+- **Three jobs, ~3.5 minutes wall clock** (they run in parallel): Web (lint, types, build) 59 s to 1m40s, API (audit, lint, types, tests) 3m22s to 3m29s, **E2E (real-browser journeys) 2m52s to 3m43s**.
+  The "split the journeys if the e2e job passes ~8 minutes" plan is **not needed**; revisit it only if the job approaches that.
+- **Dependabot is finished.** Every wanted bump was merged one at a time on 2026-10-09 and each run judged by CI (python group #28, web group #34, `upload-artifact` 6 #32, `cache` 6 #33, `checkout` 7 #3,
+  `setup-uv` 7 #2, `setup-node` 7 #4); stale duplicates were closed and their branches deleted. The first merges produced several `cancelled` runs: that is the workflow's concurrency setting superseding
+  an older run with a newer push, **not a failure**. Dependabot's bumps predate the e2e job, so it was left on `checkout@v4`, `setup-uv@v5`, `setup-node@v4` (Node 20 deprecation warnings) until PR #36
+  moved them to v7. **Every workflow file is now on `checkout@v7`, `setup-uv@v7`, `setup-node@v7`, `cache@v6`, `upload-artifact@v6`.** A new job added to `ci.yml` must use those, or dependabot never sees it.
+- **The one red run on `main`** (the PR #35 merge, 2026-10-09 07:28 UTC) was the API job's **"Audit dependencies" step**: `pymongo 4.18.1` had three CVEs fixed in 4.18.2. Not our code: **the audit is
+  time-dependent, so an advisory published after the lock was written reddens the next push with no change on our side.** The python group (#28) took `pymongo` to 4.18.2. There is no nightly job by
+  decision, so the policy is: when the audit goes red, bump the named package first, before anything else, and read the "Found N known vulnerabilities" table in `gh run view <id> --log-failed`.
+- **`ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19** (a run annotation says so). The first CI run after that date is the one to read carefully: Playwright's system dependencies and the pinned
+  Postgres/Redis service images are what could differ.
+- **Local gate on `main`, 2026-10-12** (after the merges, before PR #36 which touches only `ci.yml`): `make check` 1,337 passed with ruff and mypy clean (ruff 0.16.10); `npm ci` and the production audit 0
+  vulnerabilities; `tsc`, `eslint` clean; 428 unit tests; build and budget fine (`/profile` 680 of 684 KB, the accepted 4 KB of headroom); `make e2e` 88 passed in 45 s.
+- **How to look**: `~/bin/gh run list --repo hegdekattehnew/iism --branch main`, `gh run view <id>`, `gh run view <id> --log-failed`, `gh run watch <id> --exit-status`, `gh pr checks <n> --repo ...`.
+  CI runs on pull requests and `main` only, so a branch needs a PR before it has a run. See §6 for the `gh` and git quirks on this Mac.
+
 ### Queued after Sprint 53: do not lose
 
-- **Read PR #30's checks and report the `e2e` job's duration and result** (not visible to me). The suite is now ~54 s locally with 88 tests; if the CI job exceeds ~8 minutes, run journeys 1 and 5 on every PR and the rest on `main`.
-- **Dependabot: decided 2026-10-09 (the owner took every recommendation); carried out on GitHub, not by me.** In this order, after Sprint 53's PR merges (it changes `web/package-lock.json`, and dependabot rebases onto it):
-  1. **Close the stale duplicates:** `python-5113e460e3` (superseded by `python-6ad1d2fc0a`), `web-d4d48f29cf` and `web-0caa1ab034` (superseded by `web-baf1887580`), and `setup-node-6` (keep `-7`: v6 and v7
-     both exist on `actions/setup-node`, v7 is the newer major and the earlier branch; reopen `-6` only if `-7` fails CI). Also close `@types/node-26.6.3` (held by ADR-053: it follows CI's Node 24).
-     Close with a `@dependabot close` comment on the pull request, or `git push origin --delete dependabot/<ecosystem>/<name>`.
-  2. **Merge the `python` group** (`python-6ad1d2fc0a`; tested: ruff, mypy and the full suite).
-  3. **Merge the `web` group** (`web-baf1887580`; tested: `tsc`, lint, unit tests, build, every browser test). It takes `/profile` to **680 KB of 684 KB**: the owner accepted the 4 KB of headroom, and the budget check will
-     fail loudly on the next change that spends it. Raising the ceiling would be a separate decision with its own ADR line.
-  4. **Merge the Actions bumps one at a time, each judged by CI** (they cannot be tested locally): `upload-artifact-6`, then `cache-6` (both used only by the `e2e` job), then `checkout-7`, `setup-uv-7`, `setup-node-7`.
-     If one goes red, revert it and leave the rest; do not batch them.
+- **Watch the first CI run after 2026-10-19** (Ubuntu 26, above) and the next audit result.
 - **`make migrate` on the dev database `iism`** (0049 is owed; Sprint 53 added no migration).
 - **Bulk upload later stories:** 14.9 XLSX (a dependency to justify under ADR-053), 14.10 partner/ATS push (needs a `ServiceAccount`-to-tenant binding and a write scope), 14.11 upload history, 14.12 async
   through the worker (a 200-row apply is now 3 to 6 s in a request; ADR-063's "revisit above 200" stands).
 - **Not covered by the browser checks:** visual regression, other browsers, real devices, and padding that is present but wrong. Screenshot comparison stays rejected as a larger, noisier dependency.
 - The rest of "Also outstanding" below, and the owner-held items under "Known gaps".
 
-**Housekeeping the owner must do or confirm:** `make migrate` on the dev database (0049); carry out the dependabot steps above (all earlier GitHub tokens were deleted by the owner on 2026-10-09).
+**Housekeeping the owner must do or confirm:** `make migrate` on the dev database (0049). All earlier GitHub tokens were deleted by the owner on 2026-10-09; the one in use now is `gh`'s own login (§6).
 **Standing owner decisions:** K stays 500; monetisation (`BL-1.3`) and real external integrations stay deferred; never sign in as `+919880663641`; commit and push
 only when asked.
 
