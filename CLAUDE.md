@@ -490,6 +490,8 @@ split would have to turn into interfaces first; do not add to it casually.
   the place and the standards first now, and `bulk.run` rolls back a refused row. **`db.rollback()` expires every instance in the session** (`expire_on_commit=False` does not cover it), and reading
   `tenant.id` afterwards is a synchronous load inside the event loop (MissingGreenlet), so `run` reads the id once. The suite's `db` fixture would roll back its own set-up, so these paths are tested
   with committed rows (`tests/test_bulk_apply_rollback.py`, `tests/concurrency.py`). `float()` accepts `nan`, `inf` and `1e999` and `int()` of each raises: any number read from a file checks `math.isfinite` first.
+- **`make gen-api` reads whatever is running on :8000, and a dev API that has not reloaded serves an old schema.** One regenerated client deleted Sprint 53's fields. Generate from a fresh app
+  (`app.openapi()` dumped to a file, then `openapi-typescript`) and expect a zero-line diff when no endpoint changed; restart `make api` and `make worker` after pulling.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's

@@ -10,9 +10,11 @@ so `/jobs/bulk/publish` would be captured by it with `bulk` as the slug if this 
 included after. `tests/test_bulk_upload.py` asserts the order.
 """
 
-from typing import Literal
+from collections.abc import Callable, Coroutine
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
@@ -20,6 +22,7 @@ from api.core.database import get_db_session
 from api.modules.marketplace import bulk, schemas
 
 router = APIRouter(prefix="/org/{org_slug}", tags=["bulk"])
+log = structlog.get_logger("iism.authz")
 
 CanCreateJob = Depends(require(Permission.JOB_CREATE, "job"))
 CanPublishJob = Depends(require(Permission.JOB_PUBLISH, "job"))
@@ -35,6 +38,40 @@ _Existing = Query(
     pattern="^(skip|update)$",
     description="`update` changes the listings whose external_ref the file names; `skip` never.",
 )
+
+
+def _create_or_update(
+    create: Callable[..., Coroutine[Any, Any, TenantContext]], update: Permission
+) -> Callable[..., Coroutine[Any, Any, TenantContext]]:
+    """A file may only *create*, which needs the create permission, or also *update* what it names,
+    which is an edit to live listings and needs the update permission as well (ADR-039: ask for the
+    permission the act needs, not the one that happens to be nearby).
+
+    Today only `admin` and `owner` hold either, so nothing changes; the day a role holds create
+    without update, an upload naming an `external_ref` would otherwise be a way round the edit gate.
+    A dependency, not a check in the handler: a guard each handler must remember is one that
+    eventually is not there.
+    """
+
+    async def dependency(
+        existing: Literal["skip", "update"] = _Existing,
+        context: TenantContext = Depends(create),
+    ) -> TenantContext:
+        if existing == "update" and not context.allows(update):
+            log.warning("authz.permission_denied", permission=update.value, role=context.role)
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"Your role ({context.role}) does not permit {update.value}",
+            )
+        return context
+
+    return dependency
+
+
+_create_job = require(Permission.JOB_CREATE, "job")
+_create_course = require(Permission.COURSE_CREATE, "course")
+CanUploadJobs = Depends(_create_or_update(_create_job, Permission.JOB_UPDATE))
+CanUploadCourses = Depends(_create_or_update(_create_course, Permission.COURSE_UPDATE))
 
 _CSV_BODY: dict[str, object] = {
     "requestBody": {
@@ -151,7 +188,7 @@ async def jobs_template(context: TenantContext = CanCreateJob) -> Response:
 async def check_jobs(
     request: Request,
     existing: Literal["skip", "update"] = _Existing,
-    context: TenantContext = CanCreateJob,
+    context: TenantContext = CanUploadJobs,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     """Validate every row and say what an apply would do. Writes nothing."""
@@ -162,7 +199,7 @@ async def check_jobs(
 async def apply_jobs(
     request: Request,
     existing: Literal["skip", "update"] = _Existing,
-    context: TenantContext = CanCreateJob,
+    context: TenantContext = CanUploadJobs,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     """Check the file again, then create each valid row as a **draft**. Never publishes."""
@@ -191,7 +228,7 @@ async def courses_template(context: TenantContext = CanCreateCourse) -> Response
 async def check_courses(
     request: Request,
     existing: Literal["skip", "update"] = _Existing,
-    context: TenantContext = CanCreateCourse,
+    context: TenantContext = CanUploadCourses,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     return await _file(request, db, context, "courses", apply=False, existing=existing)
@@ -201,7 +238,7 @@ async def check_courses(
 async def apply_courses(
     request: Request,
     existing: Literal["skip", "update"] = _Existing,
-    context: TenantContext = CanCreateCourse,
+    context: TenantContext = CanUploadCourses,
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.BulkReportOut:
     return await _file(request, db, context, "courses", apply=True, existing=existing)

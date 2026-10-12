@@ -78,11 +78,16 @@ test.beforeAll(async () => {
   await request.dispose();
 });
 
-/** Land on the page and wait until its data has arrived: a skeleton is a page not yet worth checking. */
+/**
+ * Land on the page and wait until its data has arrived: a placeholder is a page not yet worth
+ * checking. `[data-loading]` is the product's own statement that something is still loading (the
+ * footer hides on it, ADR-065); waiting on a class name would let a placeholder that is not shaped
+ * like today's `Skeleton` pass for a finished page.
+ */
 async function visit(page: Page, url: string): Promise<void> {
   await page.goto(url);
   await page.waitForLoadState("load");
-  await expect(page.locator(".animate-pulse")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator("[data-loading]")).toHaveCount(0, { timeout: 15_000 });
 }
 
 const PUBLIC = [
@@ -108,27 +113,43 @@ const PUBLIC = [
   "/invite/not-a-real-token",
 ];
 
+/** The pages a seeker reaches, one list for the desktop pass and the phone pass. */
+const SEEKER_ROUTES = ["/profile", "/matches", "/applications", "/saved", "/interests", "/account", "/career-paths"];
+
+/** A public page, checked. Shared by the desktop and phone groups so a route or an allowance added to
+ * one is in the other. */
+async function checkPublic(page: Page, locale: string, route: string, label: string): Promise<void> {
+  await visit(page, `/${locale}${route === "/" ? "" : route}`);
+  // An unknown invitation is a refusal the page is meant to show, so its 4xx is its own doing.
+  const refused = route.startsWith("/invite/");
+  await checkPage(page, `${label}${route}`, {
+    allowResponses: refused ? [/\/invitations\//] : [],
+    allowConsole: refused ? [/status of 404/] : [],
+  });
+}
+
+/** The three detail pages made through the API: a vacancy, a course and a standard. */
+async function checkDetailPages(page: Page, locale: string, label: string): Promise<void> {
+  for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/${COLLECT_BLOOD_SLUG}`]) {
+    await visit(page, `/${locale}${route}`);
+    await checkPage(page, `${label}${route}`);
+  }
+}
+
+const COLLECT_BLOOD_SLUG = "collect-blood-samples-hc-n0001";
+
 test.describe("signed out", () => {
   for (const locale of LOCALES) {
     for (const route of PUBLIC) {
       test(`${locale}${route}`, async ({ page }) => {
-        await visit(page, `/${locale}${route === "/" ? "" : route}`);
-        // An unknown invitation is a refusal the page is meant to show, so its 4xx is its own doing.
-        const refused = route.startsWith("/invite/");
-        await checkPage(page, `${locale}${route}`, {
-          allowResponses: refused ? [/\/invitations\//] : [],
-          allowConsole: refused ? [/status of 404/] : [],
-        });
+        await checkPublic(page, locale, route, locale);
       });
     }
   }
 
   for (const locale of LOCALES) {
     test(`${locale}: a vacancy, a course and a standard`, async ({ page }) => {
-      for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/collect-blood-samples-hc-n0001`]) {
-        await visit(page, `/${locale}${route}`);
-        await checkPage(page, `${locale}${route}`);
-      }
+      await checkDetailPages(page, locale, locale);
     });
 
     test(`${locale}: a page that does not exist is a real 404`, async ({ page }) => {
@@ -164,7 +185,7 @@ test.describe("signed out", () => {
 
 test.describe("signed in as a job seeker, with something on every list", () => {
   for (const locale of LOCALES) {
-    for (const route of ["/profile", "/matches", "/applications", "/saved", "/interests", "/account", "/career-paths"]) {
+    for (const route of SEEKER_ROUTES) {
       test(`${locale}${route}`, async ({ page }) => {
         await signInAs(page, world.seeker);
         await visit(page, `/${locale}${route}`);
@@ -239,23 +260,15 @@ test.describe("on a phone", () => {
 
   for (const route of PUBLIC) {
     test(`signed out en${route}`, async ({ page }) => {
-      await visit(page, `/en${route === "/" ? "" : route}`);
-      const refused = route.startsWith("/invite/");
-      await checkPage(page, `phone en${route}`, {
-        allowResponses: refused ? [/\/invitations\//] : [],
-        allowConsole: refused ? [/status of 404/] : [],
-      });
+      await checkPublic(page, "en", route, "phone en");
     });
   }
 
   test("signed out: a vacancy, a course and a standard", async ({ page }) => {
-    for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/collect-blood-samples-hc-n0001`]) {
-      await visit(page, `/en${route}`);
-      await checkPage(page, `phone en${route}`);
-    }
+    await checkDetailPages(page, "en", "phone en");
   });
 
-  for (const route of ["/profile", "/matches", "/applications", "/saved", "/interests", "/account", "/career-paths"]) {
+  for (const route of SEEKER_ROUTES) {
     test(`job seeker en${route}`, async ({ page }) => {
       await signInAs(page, world.seeker);
       await visit(page, `/en${route}`);
