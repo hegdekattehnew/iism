@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
@@ -250,7 +250,8 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
         )}
       </div>
 
-      <p className="mt-4 text-sm text-muted" aria-live="polite">
+      {results.isPending && <Skeleton className="mt-4 h-5 w-32" />}
+      <p className="mt-4 text-sm text-muted" aria-live="polite" hidden={results.isPending}>
         {results.isFetching && searching
           ? t("searching")
           : searching
@@ -281,6 +282,8 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
       {!results.isError && rows.length === 0 && !results.isPending && (
         <p className="mt-8 text-sm text-muted">{t("noResults")}</p>
       )}
+
+      {results.isPending && <ListSkeleton className="md:grid-cols-2 lg:grid-cols-2" />}
 
       <ul className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
         {rows.map((r) => (

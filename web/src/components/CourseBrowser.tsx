@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
@@ -133,9 +133,13 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
         )}
       </div>
 
-      <p className="mt-4 text-sm text-muted" aria-live="polite">
-        {t("resultsCount", { count: rows.length })}
-      </p>
+      {results.isPending ? (
+        <Skeleton className="mt-4 h-5 w-32" />
+      ) : (
+        <p className="mt-4 text-sm text-muted" aria-live="polite">
+          {t("resultsCount", { count: rows.length })}
+        </p>
+      )}
 
       {results.isError && (
         <p className="mt-6 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
@@ -145,6 +149,8 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
       {!results.isError && !results.isPending && rows.length === 0 && (
         <p className="mt-8 text-sm text-muted">{t("noResults")}</p>
       )}
+
+      {results.isPending && <ListSkeleton />}
 
       <ul className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {rows.map((c) => (

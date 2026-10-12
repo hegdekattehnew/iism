@@ -3249,3 +3249,64 @@ in its spreadsheet and has to edit the live vacancy by hand, thirty times. (3) *
   `web` group (`@radix-ui/react-dialog` 1.2.0, `axe-core` 4.14.0, `jsdom` 30.1.2, `react-progress` 1.1.17) passes `tsc`, lint, the unit suite, the build and every browser test, **but takes `/profile` to
   680 KB of the 684 KB budget**. The older duplicate groups and `@types/node` 26 (held by ADR-053) are the ones to close.
 - **Not covered by the browser checks:** visual regression, other browsers, real devices, and padding that is present but wrong (the flush check catches none, not too little).
+
+
+## ADR-065: The Footer Waits for the Page, a Page Must Not Jump While It Loads, and the Content Security Policy Is Enforced
+
+**Status:** Accepted (October 2026). Sprint 54. No migration, no new dependency. Extends ADR-062; supersedes the "ships report-only" decision of Sprint 20.
+
+**Context:** Two things the browser harness (ADR-062) made measurable and nothing had measured. (1) **Pages jump while they load.** Measured on a 360x640 phone profile (Slow 4G, 4x slower CPU) against a
+production build, speed was fine (first and largest paint about 0.7 s on a vacancy, the jobs list and sign-in, 340 to 350 KB over the wire), but `/jobs` scored a layout shift of **0.205** and `/skills`
+**0.167**, where Core Web Vitals call 0.1 good and 0.25 poor. The one element that moved was the footer: while a list is a placeholder the page is short, so the footer sits mid-screen, and when the list
+lands it is pushed off the bottom. The signed-in screens were worse (up to **0.645**), because several returned `null` while loading, which leaves a blank page with a footer on it. (2) **The CSP blocked
+nothing.** It shipped report-only in Sprint 20 "until a production build runs clean", and Sprints 52 and 53 then ran every page in both languages with a `securitypolicyviolation` listener and found none, so
+the condition for enforcing it had been met for two sprints with no one assigned to notice.
+
+**Decision:**
+
+- **The footer is hidden, not removed, while anything on the page is still a placeholder.** `body:has([data-loading]) footer { visibility: hidden }` in `globals.css`. Every `Skeleton` carries
+  `data-loading`; a placeholder that is not a `Skeleton` must carry the attribute itself. `visibility`, not `display`, so the footer keeps its box and appearing moves nothing, and a hidden element is
+  not counted as having shifted. This is one rule for every page, present and future, rather than a height tuned per list. Where `:has()` is unsupported the footer is simply visible, as before.
+- **Nothing renders `null` while it loads.** `SeekerOnly`, `ProfileEditor` and `DeleteOrganisation` returned nothing until their data arrived; they now return a `Skeleton`. A line of text that arrives
+  late and is a different length (the consent line on `/account`) is reserved the same way, and a count is never shown as "No jobs" for the moment before the list arrives. A placeholder is as tall as
+  what replaces it (`CandidateDashboard` was 64 px standing in for a ~400 px card, which dropped the whole match list below it; the homepage `StatsBand` holds the room for the line some of its tiles grow
+  once the figures arrive, which the existing Hindi phone journey caught at 0.111).
+- **The browser harness fails a page that jumps.** `checkPage` now reads the worst layout-shift *session window* (the way Chrome scores it, ignoring shifts within 500 ms of the person's own input) and
+  fails above **0.1**, naming the elements that moved. To make that deterministic rather than a property of how fast the developer's laptop is, the harness holds every API **read** back 250 ms (writes are
+  not delayed) and waits for the network to go idle before it looks. The sweep also runs the public pages and the signed-in pages **on a 360x640 phone**: on a 1280x720 desktop most pages are taller than
+  the screen, the footer is never in view while a list loads, and nothing can jump, so the desktop pass could never have found this.
+- **The Content Security Policy is enforced in a production build** (`Content-Security-Policy`), and stays report-only under `next dev`, where hot reload and React's overlay reach for eval and
+  websockets that a production page never does. The policy itself is unchanged (including `'unsafe-inline'` for scripts, which is still the honest state: ADR-062 and Sprint 20 explain why). The guard is the
+  sweep: a page that needs something the policy forbids now fails the suite. Two assertions, because a header can be present and a policy still wrong: the response carries the enforcing header and no
+  report-only twin, and an injected `<script src="https://...">` is **blocked** (`script-src-elem ... (enforce)`).
+
+**Options considered:**
+
+1. Give each list a skeleton tuned to its expected height
+2. **One rule that hides the footer until the page has settled** (chosen), plus real placeholders where a screen was blank
+3. `min-height: 100vh` on `<main>` so the footer is always below the fold
+4. Server-render every list so there is no loading state
+5. Leave the CSP report-only until `'unsafe-inline'` can be removed
+6. **Enforce it now with the policy as it stands** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ Each page is exact ❌ A height guessed per list is wrong the moment the content changes, and the next list shipped without one jumps again.
+- Option 3: ✅ Trivial ❌ A short page (sign-in, a 404) would have a footer a full screen below its content.
+- Option 4: ✅ No loading state, and faster ❌ Not possible for the signed-in screens, and a large change to how every list is fetched; it remains an option for the public lists.
+- Option 5: ✅ Strictest end state ❌ Leaves a measured-clean policy doing nothing for an unbounded time; `frame-ancestors`, `object-src`, `base-uri`, `form-action` and the foreign-script restriction on
+  `script-src-elem` all work today.
+
+**Consequences:**
+
+- **Before and after, on the same harness:** the first run of the check failed 18 of 88 pages (the signed-in workspaces, matches, account, admin, and the employer team and candidates pages). It
+  passed `/jobs`, `/courses` and `/skills` that run, **which was wrong**: the check looked before the list had arrived. Once it waited for the network to go idle (and reads were delayed, and the phone
+  viewport added) those six, in both languages, failed too, matching the hand measurement. After the rule and the placeholders, **all 119 browser tests pass**. Both ends were **proved able to fail**: removing the rule failed 21 tests (50 shift reports), restoring the report-only header failed the CSP test, and removing `data-loading` or changing the
+  rule's `visibility` fails the unit tests.
+- **The first two measurement runs tested stale code**: a production server left running on port 3100 from an earlier measurement was reused by Playwright (`reuseExistingServer`), and a rebuild under it
+  served 500s for every changed chunk. CLAUDE.md already says to kill `next start -p 3100` after a rebuild; the process name is `next-server`, so `pkill -f "next start"` matches nothing. Kill by
+  **port** (`lsof -nP -iTCP:3100 -sTCP:LISTEN -t`).
+- **A running `next dev` can break `next build`'s type-check**: `tsconfig.json` includes both `.next/dev/types` and `.next-e2e/types`, and a dev server that has not yet compiled any page leaves a stub
+  `routes.d.ts` that conflicts with the real one (`Route` collapses to `never`). Stop the dev server, or move `.next/dev/types` aside, before a browser build.
+- **Not done, and why:** search-engine optimisation (per-page metadata, structured `JobPosting` data, a sitemap and `robots.txt`), a share control, deployment and monetisation were scoped out by the
+  owner for later. The measured finding that motivates the first of them stands: every vacancy, course and standard page carries the same title and description.

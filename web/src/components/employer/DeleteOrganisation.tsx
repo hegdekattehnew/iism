@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
-import { Alert, Button, Card, CardBody } from "@/components/ui";
+import { Alert, Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { isSignedOut } from "@/lib/http";
@@ -67,7 +67,7 @@ export function DeleteOrganisation({ orgSlug }: { orgSlug: string }) {
     onError: () => setFailed(true),
   });
 
-  if (preview.isPending) return null;
+  if (preview.isPending) return <Skeleton className="mt-10 h-24 w-full rounded-xl" />;
   // **401 and 403 are not the same refusal, and conflating them is what sent
   // an owner looking for a control that was not on the page.** A 403 means
   // this is not yours -- an admin is a member but not an owner -- and the

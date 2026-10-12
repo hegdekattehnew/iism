@@ -4,11 +4,11 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-12 · **Sprints 1–53 built, all merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30, merge commit `63ba8a0`; **53 as PR #35, merge
-commit `6993241`**). Sprint 53 (every page seen by a browser, a published listing keeps its standards, bulk upload can update by reference; ADR-064, no migration) widened Sprint 52's six browser journeys
-to every page (81 sweep tests), found two more defect classes, closed a correctness hole (a live vacancy could be edited down to no standards) and finished bulk upload's loop. Seven dependabot PRs
-were then merged one at a time and PR #36 brought the e2e job's actions to v7; **`main` is `d8cf469` and CI on it is green** (see §11, "CI facts"). **No next sprint is chosen** (§11, "Queued after
-Sprint 53"). K stays 500. Monetisation and real external integrations stay deferred by the owner.
+**Last updated:** 2026-10-12 · **Sprints 1–53 built and merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30, `63ba8a0`; 53 as PR #35, `6993241`), then seven
+dependabot PRs one at a time, PR #36 (the e2e job's actions to v7) and PR #37 (docs); **`main` is `846738e` and CI on it is green** (§11, "CI facts"). **Sprint 54 (pages that do not jump, and an enforced CSP;
+ADR-065, no migration) is on `sprint-54`, uncommitted.** It measured layout shift on a phone profile and found the footer jumping on every list (0.2 to 0.6; 0.1 is good): one CSS rule plus real placeholders
+fixed it, the browser harness now fails a page that jumps (on a phone viewport too), and the CSP is enforced in a production build. **No next sprint is chosen** (§11, "Queued after Sprint 53"). SEO,
+deployment and monetisation were deferred by the owner on 2026-10-12. K stays 500; real external integrations stay deferred.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -24,12 +24,12 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `main` at `d8cf469` (2026-10-12), which has everything through Sprint 53 plus every dependabot bump; **no feature branch and no open PR**. Every merged branch is deleted, locally and on `origin`. Cut a new branch before starting anything. |
+| **Branch** | `sprint-54` (Sprint 54, **uncommitted**, 2026-10-12), cut from `main` at `846738e`, which has everything through Sprint 53, every dependabot bump and the docs. No open PR. Every merged branch is deleted, locally and on `origin`. |
 | **CI** | Green on `main` (run `38206302111`, 2026-10-12): Web 1m24s, API 3m29s, **E2E 3m01s**. Read it yourself with `~/bin/gh run list --repo hegdekattehnew/iism --branch main` (§6 explains `gh`; §11 "CI facts" has the rest). |
-| **Last sprint** | 53 — **every page, an invariant, and the update half of bulk upload**: a browser sweep of ~45 routes in two languages (88 browser tests in all, ~54 s), a flush-against-border check, two defect classes fixed (colour-only inline links, unnamed selects), `npm audit fix` (production audit clean), "a published listing keeps at least one standard" enforced at every write, and `existing=update` on bulk upload (by `external_ref`, only the columns the file carries, live listings acknowledged) (ADR-064, no migration). Before it: 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Last sprint** | 54 — **pages that do not jump, and a policy that blocks** (ADR-065): `checkPage` fails a page whose layout-shift window is above 0.1 (API reads delayed 250 ms, network idle awaited, and a 360x640 phone pass over the public and signed-in pages); the footer is hidden (`visibility`) while any `[data-loading]` placeholder is on the page, three screens that rendered nothing while loading now render a `Skeleton`, the job, course and skill lists have a `ListSkeleton`; the web CSP is enforced in a production build. 119 browser tests, 435 unit tests. Before it: 53 — **every page, an invariant, and the update half of bulk upload**: a browser sweep of ~45 routes in two languages (88 browser tests in all, ~54 s), a flush-against-border check, two defect classes fixed (colour-only inline links, unnamed selects), `npm audit fix` (production audit clean), "a published listing keeps at least one standard" enforced at every write, and `existing=update` on bulk upload (by `external_ref`, only the columns the file carries, live listings acknowledged) (ADR-064, no migration). Before it: 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
 | **Next sprint** | None chosen. Candidates are in §11 "Queued after Sprint 53". `BL-1.3` stays not started. |
-| **Tests** | 1,337 backend (`make check`, re-run on `main` 2026-10-12), 428 web (`cd web && npm test`), **88 browser tests** (`make e2e`: 81 route-sweep + 7 journeys, ~45 s warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/profile` 680 of 684 KB |
-| **Migrations** | head `0049` (Sprint 52: a partial index on `jobs.closes_at`; **the dev database `iism` is at 0048, so `make migrate` is owed**); 63 ADRs (001-063) |
+| **Tests** | 1,337 backend (`make check`, re-run on `main` 2026-10-12), 435 web (`cd web && npm test`), **119 browser tests** (`make e2e`: 112 sweep, desktop and phone, + 7 journeys, ~1.9 min warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/profile` 680 of 684 KB |
+| **Migrations** | head `0049` (Sprint 52: a partial index on `jobs.closes_at`; **the dev database `iism` is at 0048, so `make migrate` is owed**); 65 ADRs (001-065) |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -205,7 +205,7 @@ deployment moved to Sprint 22.
 need no outside account, closed before the first deployment. Consent recorded server-side at
 signup (DPDP Act 2023), self-serve export and deletion at `/account`, privacy notice / terms /
 grievance pages in both languages **marked draft pending legal review**, analytics purged after
-12 months. Security headers on API and web (web CSP report-only), rate limiting on every class of
+12 months. Security headers on API and web (web CSP enforced in production builds since Sprint 54), rate limiting on every class of
 request, body-size cap, `/docs` local-only, DB pool and statement timeout. Encrypted backups outside
 the tree, **MongoDB covered for the first time**, restore drill run and passed. `uv.lock` committed
 and CI installing from it, dependency audits and Dependabot, a first-load JS budget, axe checks,
@@ -2419,6 +2419,36 @@ Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-up
   `read -s "T?Token: "` then `git credential-osxkeychain store` (zsh: the prompt goes inside the quotes, `read -p` is bash); a push that touches `.github/workflows/` needs the token's **`workflow`** scope;
   a fine-grained token needs Contents and Workflows read-write on `iism`.
 
+### Sprint 54: pages that do not jump, and a policy that blocks (done 2026-10-12, ADR-065, no migration, **uncommitted**)
+
+Owner decisions: the recommended sprint was SEO and share previews plus layout stability; **the owner took only the stability and CSP halves** ("let SEO, deployment and monetisation be taken up later").
+
+- **What was measured first** (a throwaway Playwright script outside the repo; production build, 360x640, Slow 4G, 4x slower CPU, median of three): first and largest paint 650 to 750 ms on the homepage, jobs, a
+  vacancy, skills and sign-in; 340 to 350 KB over the wire (484 KB in Hindi: the Devanagari face). **Speed is fine**, and the 680 of 684 KB "budget" is an *uncompressed* ceiling, so its 4 KB of headroom
+  is not a real constraint. **Layout shift was the defect:** `/jobs` 0.205, `/skills` 0.167, both from the footer alone; the signed-in screens up to 0.645.
+- **The fix is one rule, not per-list heights.** `globals.css`: `body:has([data-loading]) footer { visibility: hidden }`; every `Skeleton` carries `data-loading`. `visibility`, not `display`, so the footer
+  keeps its box. Three components returned `null` while loading (`SeekerOnly`, `ProfileEditor`, `DeleteOrganisation`) and now return a `Skeleton`; `AccountPanel` reserves the consent line that arrives late;
+  `CandidateDashboard`'s placeholder was 64 px for a ~400 px card (now `h-96`); `StatsBand` holds the room for the sub-line under its first three tiles (the existing Hindi 360x640 journey
+  failed the new check at 0.111 until it did: the figures arrive late and a tile may grow a line); `JobBrowser`, `CourseBrowser` and `SkillBrowser` show a `ListSkeleton` and no "No jobs" count while pending.
+- **The check.** `web/e2e/support/test.ts`: a `layout-shift` observer scoring the worst session window (shifts within 500 ms of input excluded), a 0.1 ceiling, the moved elements named in the failure;
+  GET requests to the API are held 250 ms (so the loading phase is always visible, whatever the machine), and `checkPage` waits for the network to go idle first. **The first version passed the very
+  pages that jump** (it looked before the list arrived): that is the lesson, recorded in ADR-065. `web/e2e/sweep.spec.ts` gained an "on a phone" group (the public routes, the three detail pages, the seeker's
+  seven pages, an employer's and a provider's workspace) because on a 1280x720 window the footer is never in view while a list loads.
+- **CSP enforced** (`web/next.config.ts`): `Content-Security-Policy` in a production build, report-only under `next dev`. Two sweep assertions: the response carries the enforcing header and no report-only
+  twin, and an injected `<script src="https://...">` is blocked (`script-src-elem ... (enforce)`). `'unsafe-inline'` for scripts remains (ADR-062, Sprint 20).
+- **Proved able to fail:** removing the footer rule failed 21 browser tests (50 shift reports); restoring the report-only header failed the CSP test; deleting `data-loading` from `Skeleton` failed 4 unit tests
+  and changing the rule to `display: none` failed the guard test. Unit tests: `ui/skeleton.test.tsx` (the attribute, `ListSkeleton`, and the stylesheet rule pinned from both ends) and
+  `ListBrowsers.test.tsx`. All 119 browser tests (three consecutive clean runs, ~2 min each) and 435 unit tests pass.
+- **Gotchas learned (also in CLAUDE.md):** a `next start` left on :3100 is **reused by Playwright and serves the old build**, and the process is called `next-server`, so `pkill -f "next start"` matches
+  nothing: kill by port. The first two measurement runs this sprint tested stale code for that reason. A running `next dev` can also break `next build`'s type-check (a stub `.next/dev/types/routes.d.ts`
+  collides with `.next-e2e/types`): the owner's dev server was up on :3000 mid-sprint and `.next/dev/types` was moved aside (to the scratchpad) for the build; it regenerates on the next compile.
+- **Deferred by the owner (2026-10-12): SEO, deployment, monetisation.** The SEO findings, kept for when it is picked up: no `robots.txt`, no sitemap, no `JobPosting` structured data, and **no per-page metadata
+  at all** (one `generateMetadata` in the locale layout, so every vacancy, course and standard has the same title and description, and a link shared on WhatsApp previews as the site tagline). Plan sketched: unique
+  title/description/canonical/`hreflang` for jobs, courses, roles and organisations; `JobPosting` JSON-LD on open vacancies only (the fields exist, including salary and `closes_at`), a closed one `noindex`; a sitemap
+  of open vacancies and published courses split under 50,000 URLs; `noindex` and a `robots.txt` disallow for private routes; the 21,303 standards pages **not** in the sitemap until duplicate names
+  (1,778 names shared by 4,838 standards) are measured; a `NEXT_PUBLIC_SITE_URL` setting that omits canonicals rather than emitting `localhost`; a share button (Web Share, else `wa.me`). Needs a live site for
+  Google's Rich Results Test. **Deployment is the real gate to traffic**, and monetisation waits for traffic (ADR-047).
+
 ### CI facts (read with `gh` on 2026-10-12; the repo is private, so nothing here is visible without a token)
 
 - **Three jobs, ~3.5 minutes wall clock** (they run in parallel): Web (lint, types, build) 59 s to 1m40s, API (audit, lint, types, tests) 3m22s to 3m29s, **E2E (real-browser journeys) 2m52s to 3m43s**.
@@ -2650,7 +2680,7 @@ Fixed since the last audit: the four missing filter indexes, and the browsers th
 
 **Closed in Sprint 20 (2026-09-11):** rate limiting on every class of request
 (auth, write, read — per account when signed in, per IP otherwise, fails open);
-security headers on the API and the web app (the web CSP is **report-only** and
+security headers on the API and the web app (the web CSP is **enforced in a production build** (report-only in `next dev`) and
 still allows inline scripts — see `CLAUDE.md`); DPDP consent, export and erasure;
 a 256 KB request body cap; `/docs` and `/openapi.json` local-only; CORS without
 credentials.

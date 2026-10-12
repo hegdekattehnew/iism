@@ -177,3 +177,17 @@ html[lang="hi"] body {
   font-family: var(--font-inter), var(--font-devanagari), system-ui, sans-serif;
   line-height: 1.7;
 }
+
+/* The footer waits for the page.
+ *
+ * A footer is the last thing on a page, so while a list is still a placeholder it sits mid-screen,
+ * and when the list lands it is pushed off the bottom: on a phone that is the whole screen jumping
+ * (Sprint 54 measured 0.205 on /jobs and up to 0.64 in the signed-in workspaces, where 0.1 is
+ * "good"). `visibility` rather than `display`, so the footer keeps its place in the layout and
+ * nothing else moves when it appears; and a hidden element is not counted as having shifted.
+ *
+ * Anything on a page that is still loading carries `data-loading` (every `Skeleton` does). Where
+ * `:has()` is not supported the footer simply stays visible, which is how it behaved before. */
+body:has([data-loading]) footer {
+  visibility: hidden;
+}

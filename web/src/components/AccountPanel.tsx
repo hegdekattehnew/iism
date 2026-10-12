@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Alert, Button } from "@/components/ui";
+import { Alert, Button, Skeleton } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, useIsSignedIn } from "@/lib/auth";
@@ -42,7 +42,7 @@ function SignedIn() {
   const format = useFormatter();
   const router = useRouter();
   const qc = useQueryClient();
-  const { data: me } = useMemberships();
+  const { data: me, isPending: mePending } = useMemberships();
   const [confirming, setConfirming] = useState(false);
 
   const preview = useQuery({
@@ -99,16 +99,21 @@ function SignedIn() {
         <h2 id="consent-heading" className="text-base font-semibold">
           {t("consentTitle")}
         </h2>
-        <p className="mt-1 text-sm text-muted">
-          {me?.consent_version && me.consented_at
-            ? t("consentGiven", {
-                version: me.consent_version,
-                date: format.dateTime(new Date(me.consented_at), {
-                  dateStyle: "medium",
-                }),
-              })
-            : t("consentMissing")}
-        </p>
+        {/* A line of text arrives late and is a different length: reserve it. */}
+        {mePending ? (
+          <Skeleton className="mt-1 h-5 w-3/4" />
+        ) : (
+          <p className="mt-1 text-sm text-muted">
+            {me?.consent_version && me.consented_at
+              ? t("consentGiven", {
+                  version: me.consent_version,
+                  date: format.dateTime(new Date(me.consented_at), {
+                    dateStyle: "medium",
+                  }),
+                })
+              : t("consentMissing")}
+          </p>
+        )}
         <p className="mt-2 text-sm">
           <Link href="/privacy" className="text-brand underline underline-offset-4 hover:text-brand-strong">
             {t("readNotice")}

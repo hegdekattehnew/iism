@@ -28,7 +28,9 @@ export function CandidateDashboard() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (dashboard.isPending) {
-    return <Skeleton className="h-16 w-full" />;
+    // As tall as the card that replaces it (about 400px with a few matches): at h-16 everything
+    // below it, the match list, dropped a few hundred pixels when it landed (Sprint 54, 0.13).
+    return <Skeleton className="h-96 w-full rounded-xl" />;
   }
 
   // Silent on error: `MatchBrowser` below already renders its own failure

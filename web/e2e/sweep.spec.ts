@@ -138,6 +138,24 @@ test.describe("signed out", () => {
     });
   }
 
+  test("the Content Security Policy is enforced, and it blocks a foreign script", async ({ page }) => {
+    // Sprint 54 (ADR-065): the header used to be report-only, which blocks nothing. Both halves
+    // are asserted, because a header can be present and a policy still wrong.
+    const response = await page.goto("/en");
+    const headers = response?.headers() ?? {};
+    expect(headers["content-security-policy"], "the enforcing header").toContain("script-src 'self'");
+    expect(headers["content-security-policy-report-only"], "no report-only twin left behind").toBeUndefined();
+
+    await page.evaluate(() => {
+      const script = document.createElement("script");
+      script.src = "https://scripts.example.invalid/steal.js";
+      document.head.appendChild(script);
+    });
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __csp: string[] }).__csp.join("|")))
+      .toMatch(/script-src-elem blocked https:\/\/scripts\.example\.invalid\/steal\.js \(enforce\)/);
+  });
+
   test("the development-only pages are not in a production build", async ({ page }) => {
     const status = await page.goto("/en/status");
     expect(status?.status(), "/status is for development only").toBe(404);
@@ -204,4 +222,60 @@ test.describe("signed in as an operator", () => {
       }
     });
   }
+});
+
+/**
+ * The same pages on the device the product is for.
+ *
+ * Every test above runs in a 1280x720 desktop window, where most pages are taller than the screen
+ * and the footer is never in view while a list loads, so nothing can jump. On a 360x640 phone the
+ * footer is on screen the whole time the page is loading, and Sprint 54 measured 0.2 to 0.6
+ * of layout shift there. Phone layouts are also different DOM (the menu, stacked cards), so axe
+ * and the flush-border check see things the desktop pass never does. One language: the layout does
+ * not depend on it, and the Hindi journey already covers Devanagari at this size.
+ */
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
+
+  for (const route of PUBLIC) {
+    test(`signed out en${route}`, async ({ page }) => {
+      await visit(page, `/en${route === "/" ? "" : route}`);
+      const refused = route.startsWith("/invite/");
+      await checkPage(page, `phone en${route}`, {
+        allowResponses: refused ? [/\/invitations\//] : [],
+        allowConsole: refused ? [/status of 404/] : [],
+      });
+    });
+  }
+
+  test("signed out: a vacancy, a course and a standard", async ({ page }) => {
+    for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/collect-blood-samples-hc-n0001`]) {
+      await visit(page, `/en${route}`);
+      await checkPage(page, `phone en${route}`);
+    }
+  });
+
+  for (const route of ["/profile", "/matches", "/applications", "/saved", "/interests", "/account", "/career-paths"]) {
+    test(`job seeker en${route}`, async ({ page }) => {
+      await signInAs(page, world.seeker);
+      await visit(page, `/en${route}`);
+      await checkPage(page, `phone seeker en${route}`);
+    });
+  }
+
+  test("an employer's workspace, team and applicants", async ({ page }) => {
+    await signInAs(page, world.employer.tokens);
+    for (const route of ["", "/team", `/jobs/${world.jobSlug}/applications`, `/candidates/${world.jobSlug}`]) {
+      await visit(page, `/en/employer/${world.employer.slug}${route}`);
+      await checkPage(page, `phone employer en${route || "/"}`);
+    }
+  });
+
+  test("a provider's workspace and interests", async ({ page }) => {
+    await signInAs(page, world.provider.tokens);
+    for (const route of ["", "/interests"]) {
+      await visit(page, `/en/employer/${world.provider.slug}${route}`);
+      await checkPage(page, `phone provider en${route || "/"}`);
+    }
+  });
 });

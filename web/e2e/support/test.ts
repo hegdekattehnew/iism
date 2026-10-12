@@ -7,8 +7,7 @@ const AXE = require.resolve("axe-core/axe.min.js");
  * What `checkPage` collects while a journey runs.
  *
  * Everything here is a fact a real browser knows and jsdom does not: that a request failed, that
- * the report-only CSP *would have* blocked something (it blocks nothing, so nobody notices
- * otherwise), that a page logged an error, and what the colours actually compute to.
+ * the CSP blocked something, that a page logged an error, and what the colours actually compute to.
  */
 type Seen = {
   consoleErrors: string[];
@@ -24,8 +23,9 @@ export async function watch(page: Page, apiOrigin: string): Promise<void> {
   const seen: Seen = { consoleErrors: [], pageErrors: [], failedRequests: [], badResponses: [] };
   watched.set(page, seen);
 
-  // `securitypolicyviolation` fires for report-only policies too, which is the point: the header
-  // ships report-only, so a violation blocks nothing and is otherwise invisible.
+  // `securitypolicyviolation` fires for report-only policies and enforced ones alike. In a
+  // production build the policy is enforced (Sprint 54), so a violation is also a blocked resource
+  // and usually a console error; the listener names *which* directive it was.
   await page.addInitScript(() => {
     (window as unknown as { __csp: string[] }).__csp = [];
     document.addEventListener("securitypolicyviolation", (e) => {
@@ -33,6 +33,43 @@ export async function watch(page: Page, apiOrigin: string): Promise<void> {
         `${e.violatedDirective} blocked ${e.blockedURI || "inline"} (${e.disposition})`,
       );
     });
+
+    // Layout shift, the way Chrome scores it for Core Web Vitals: the worst *session window* (shifts
+    // less than 1 s apart, a window at most 5 s long), ignoring shifts within 500 ms of a keypress or
+    // click, which the person caused. Each shift keeps the element that moved, so a failure names it.
+    const w = window as unknown as { __cls: { score: number; moved: string[] } };
+    w.__cls = { score: 0, moved: [] };
+    let windowScore = 0;
+    let windowStart = 0;
+    let last = 0;
+    const describe = (n: Node | null) => {
+      const el = n as Element | null;
+      if (!el || !el.tagName) return "?";
+      const cls = (el.getAttribute("class") ?? "").split(/\s+/).slice(0, 3).join(".");
+      return `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${cls ? "." + cls : ""}`;
+    };
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries() as unknown as Array<{ hadRecentInput: boolean; value: number; startTime: number; sources: Array<{ node: Node | null }> }>) {
+        if (e.hadRecentInput) continue;
+        if (windowScore === 0 || e.startTime - last > 1000 || e.startTime - windowStart > 5000) {
+          windowScore = 0;
+          windowStart = e.startTime;
+        }
+        windowScore += e.value;
+        last = e.startTime;
+        if (windowScore > w.__cls.score) w.__cls.score = windowScore;
+        for (const s of e.sources) w.__cls.moved.push(`${describe(s.node)} (${e.value.toFixed(3)})`);
+      }
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+
+  // The loading phase is where layout shifts happen, and on a developer's laptop it lasts a few
+  // milliseconds, so a page can look stable here and jump on a phone. Holding every read back a
+  // fixed 250 ms makes the loading state something the check always sees, whatever the machine.
+  // Writes are not delayed: a journey's own actions should not get slower.
+  await page.route(`${apiOrigin}/**`, async (route) => {
+    if (route.request().method() === "GET") await new Promise((done) => setTimeout(done, 250));
+    await route.continue();
   });
 
   page.on("console", (m) => {
@@ -64,6 +101,9 @@ type Options = {
   flush?: boolean;
 };
 
+/** Core Web Vitals call a layout-shift score up to 0.1 "good"; above 0.25 it is "poor". */
+const MAX_LAYOUT_SHIFT = 0.1;
+
 /**
  * Assert the page in front of the browser is healthy: nothing logged, nothing failed, nothing the
  * CSP would have blocked, and no accessibility violation **including colour contrast** in both
@@ -83,7 +123,19 @@ export async function checkPage(page: Page, label: string, options: Options = {}
   expect.soft(seen.pageErrors, `${label}: uncaught page errors`).toEqual([]);
   expect.soft(seen.failedRequests, `${label}: failed requests`).toEqual([]);
   expect.soft(responses, `${label}: error responses`).toEqual([]);
-  expect.soft(csp, `${label}: CSP violations (report-only, so nothing was blocked)`).toEqual([]);
+  expect.soft(csp, `${label}: CSP violations`).toEqual([]);
+
+  // A page that has not finished loading has not finished shifting: without this a list whose
+  // data is still on its way passes, and jumps a moment after the test has looked. Polling pages
+  // never go idle, so the wait is bounded and its timeout is not a failure.
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
+  await page.waitForTimeout(150);
+
+  const shift = await page.evaluate(() => (window as unknown as { __cls?: { score: number; moved: string[] } }).__cls ?? { score: 0, moved: [] });
+  expect.soft(
+    shift.score <= MAX_LAYOUT_SHIFT ? [] : [`layout shift ${shift.score.toFixed(3)} > ${MAX_LAYOUT_SHIFT}; moved: ${[...new Set(shift.moved)].slice(0, 4).join(", ")}`],
+    `${label}: the page jumped while loading`,
+  ).toEqual([]);
 
   if (options.flush !== false) {
     expect.soft(await flushBorders(page), `${label}: text flush against a border`).toEqual([]);

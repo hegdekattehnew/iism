@@ -13,7 +13,7 @@ import {
 import { SkillsSection } from "@/components/profile/SkillsSection";
 import { TagSection } from "@/components/profile/TagSection";
 import { SessionExpired } from "@/components/SessionExpired";
-import { Alert, ButtonLink } from "@/components/ui";
+import { Alert, ButtonLink, Skeleton } from "@/components/ui";
 import { useIsSignedIn } from "@/lib/auth";
 import { detailOf, isSignedOut } from "@/lib/http";
 import { useProfile } from "@/lib/profile";
@@ -36,7 +36,7 @@ export function ProfileEditor() {
     );
   }
 
-  if (profile.isPending) return null;
+  if (profile.isPending) return <Skeleton className="h-96 w-full rounded-xl" />;
   if (isSignedOut(profile.error)) return <SessionExpired />;
   // Never fall through to an empty editor: saving it would overwrite the
   // profile we failed to read.
