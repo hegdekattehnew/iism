@@ -2449,10 +2449,9 @@ Owner decisions: the recommended sprint was SEO and share previews plus layout s
   (1,778 names shared by 4,838 standards) are measured; a `NEXT_PUBLIC_SITE_URL` setting that omits canonicals rather than emitting `localhost`; a share button (Web Share, else `wa.me`). Needs a live site for
   Google's Rich Results Test. **Deployment is the real gate to traffic**, and monetisation waits for traffic (ADR-047).
 
-### Sprint 55: the review's four fixes (2026-10-12, no migration, **uncommitted** on `fix-bulk-review`, cut from `main` at `24f36de`)
+### Sprint 55: the code review's fixes (2026-10-12, no migration; four merged in PR #39, the other six **uncommitted** on `fix-review-rest`)
 
-Findings 1 to 4 of the `/code-review` of Sprints 51-54 (the other six are listed below and untouched). 20 new backend tests, 1,357 in all; every new test fails against the old code (19 of the 20; the 20th
-is a guard).
+Findings 1 to 4 of the `/code-review` of Sprints 51-54 (PR #39): 20 new backend tests; every new test fails against the old code (19 of the 20; the 20th is a guard).
 - **A number that is not a number** (`bulk._int`, `_float`): `nan`, `inf`, `-inf` and `1e999` raised ValueError/OverflowError and turned the whole upload into a 500. pandas writes a missing number as `nan`.
   Now a row error naming the column; the rest of the file applies.
 - **A refused update was still saved** (`publishing.update_job`, `course_publishing.update_course`, `bulk.run`): the updaters set fields on the persistent row, then resolved the place/standards, so a refusal
@@ -2462,9 +2461,18 @@ is a guard).
 - **Check and apply disagreed about gigs** (`_plan_job`, `_plans`, `_merge_updates`): a gig with a state and no district passed the check and failed at apply; and an update row whose file carries no place
   columns was refused even when the listing it changes has a district. The "no place at all" problem is now decided once the row's kind is known (a new gig needs it from the file, an update is checked on the
   merged payload with the same `resolve_location` question `update_job` asks).
-- **Not fixed, from the same review:** an update that carries `state` but not `district` keeps the old district (a contradictory pair, so the district resolves to nothing); bulk update is gated by
-  `JOB_CREATE`/`COURSE_CREATE` instead of `JOB_UPDATE`/`COURSE_UPDATE` (latent: only admin and owner hold either today); `isdigit()` lets a superscript digit reach `int()` (500); `key={m}` duplicates in
-  `BulkUpload`'s review rows; `visit()` in the sweep waits on `.animate-pulse` rather than `[data-loading]`; the phone group duplicates the desktop route lists.
+- **The other six findings of the same review, fixed the same day** (1,365 backend tests, 436 web; each new backend test fails on the old code except two guards):
+  1. *Stale district* (`_merge_updates`): a file that carries `state` but not `district` cleared nothing, leaving a new state over the old district (a contradiction that resolves to no district). The district now
+     goes with the state it belonged to (compared normalised, so a respelling keeps it) and the review lists "district" among the changes. A gig losing its district that way is refused by the check.
+  2. *Bulk update gated by the create permission* (`bulk_routes._create_or_update`): `existing=update` also needs `JOB_UPDATE` / `COURSE_UPDATE`, as a dependency (a guard in the handler is one that is eventually
+     forgotten). Tested by removing the update permission from `owner`; today only admin and owner hold either, so behaviour is unchanged.
+  3. *Superscript digit* (`_parse_tokens`): `isdigit()` is true for a superscript two and `int()` cannot read it (a 500); ASCII digits only.
+  4. *Duplicate React keys* (`BulkUpload`): the server says each sentence once (`_once`) and the key includes the index.
+  5. *`visit()` waited on `.animate-pulse`*: it waits on `[data-loading]`, the product's own contract.
+  6. *The phone group copied the desktop lists*: `checkPublic`, `checkDetailPages` and `SEEKER_ROUTES` are shared.
+  Also: the gig "no place" rule is one field (`gig_place_problem`), decided in `_plans` for *new* rows only.
+- **Gotcha: `make gen-api` reads whatever is on :8000, and the dev API had not reloaded since Oct 6** (it served a schema without `existing` and the regenerated client **deleted 42 lines of Sprint 53's
+  types**; reverted). Restart `make api` and `make worker` after pulling; or generate from a fresh app (`app.openapi()` to a file, then `openapi-typescript`) and diff before committing.
 
 ### CI facts (read with `gh` on 2026-10-12; the repo is private, so nothing here is visible without a token)
 

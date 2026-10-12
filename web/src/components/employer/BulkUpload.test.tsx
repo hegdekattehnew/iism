@@ -427,4 +427,36 @@ describe("BulkUpload", () => {
     });
     expect(results.violations.map((v) => v.id)).toEqual([]);
   });
+
+  // Sprint 55 (review). Two identical sentences in one row used to be two children with one key.
+  it("renders a row that says the same thing twice without a duplicate-key warning", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    POST.mockResolvedValue(
+      ok(
+        report({
+          errors: 1,
+          ok: 0,
+          rows: [
+            row({
+              status: "error",
+              standards: [],
+              messages: [
+                "standards: no standard has the code NOPE/N1",
+                "standards: no standard has the code NOPE/N1",
+              ],
+            }),
+          ],
+        }),
+      ),
+    );
+    screenFor();
+    upload();
+
+    expect(
+      (await screen.findAllByText("standards: no standard has the code NOPE/N1")).length,
+    ).toBe(2);
+    const duplicateKey = warn.mock.calls.filter((c) => /same key/i.test(String(c[0])));
+    warn.mockRestore();
+    expect(duplicateKey).toEqual([]);
+  });
 });

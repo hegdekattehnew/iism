@@ -522,7 +522,8 @@ def _parse_tokens(kind: Kind, cell: str, problems: list[str]) -> list[_Token]:
                 problems.append(f"standards: '{raw}' has too many parts (CODE:importance:M)")
                 continue
             if len(parts) >= 2 and parts[1]:
-                if not parts[1].isdigit() or not 1 <= int(parts[1]) <= 5:
+                # ASCII only: `isdigit()` is true for a superscript two, which `int()` cannot parse.
+                if not (parts[1].isascii() and parts[1].isdigit()) or not 1 <= int(parts[1]) <= 5:
                     problems.append(
                         f"standards: importance for {code} must be 1 to 5, not '{parts[1]}'"
                     )
@@ -642,10 +643,11 @@ class _Plan:
     update_slug: str | None = None
     update_live: bool = False
     changes: list[str] = field(default_factory=list)
-    # A gig whose own cells name no place at all. Whether that is a problem depends on what the row
-    # turns out to be, so it is decided in `_plans`: a *new* gig needs the place from the file, an
-    # *update* may take it from the listing it changes (and is checked on the merged payload).
-    gig_without_place: bool = False
+    # What is wrong with a gig's place *as the file gives it*: no place at all, or a state and no
+    # district. Whether that is a problem depends on what the row turns out to be, so it is decided
+    # in `_plans`: a *new* gig needs a district from the file, an *update* may take the district
+    # from the listing it changes (and is checked on the merged payload).
+    gig_place_problem: str | None = None
 
 
 async def _standards_for_row(
@@ -783,9 +785,9 @@ async def _plan_job(
         elif not district and fields["employment_type"] == "gig":
             # A state alone is not a place a worker can travel to: `create_job` refuses it, so the
             # check has to say so too (it must describe exactly what the apply will do).
-            problems.append("district: a gig needs a district, not only a state")
+            plan.gig_place_problem = "district: a gig needs a district, not only a state"
     elif fields["employment_type"] == "gig":
-        plan.gig_without_place = True
+        plan.gig_place_problem = "district: a gig needs a place a worker can travel to"
 
     if not plan.standards and not problems:
         plan.warnings.append(
@@ -961,6 +963,21 @@ async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: li
                     merged[field_] = plan.fields[field_]
                 else:
                     merged.pop(field_, None)
+        # A place is one fact, a state and a district, and the file may carry only half of it. A new
+        # state with the old district under it is a contradiction (`resolve_location` keeps the
+        # state and drops the district), so the district the listing had is cleared with the state
+        # it belonged to, and the review says so.
+        district_cleared = False
+        if (
+            kind == "jobs"
+            and "state" in cells
+            and "district" not in cells
+            and _norm(item.location_state) != _norm(merged.get("location_state"))
+            and item.location_district
+        ):
+            merged.pop("location_district", None)
+            district_cleared = True
+
         carries_standards = "standards" in cells or "job_role" in cells
         if carries_standards:
             skills: list[Any] = (
@@ -1015,6 +1032,8 @@ async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: li
             for column, field_ in columns.items()
             if column in cells and not _same(getattr(item, field_), getattr(payload, field_))
         ]
+        if district_cleared:
+            changes.append("district")
         if carries_standards:
             new_signature = (
                 {(s.slug, s.importance, s.mandatory) for s in plan.standards}
@@ -1161,14 +1180,19 @@ async def _plans(
             seen_keys.setdefault(plan.key, plan.raw.number)
     for plan in plans:
         if (
-            plan.gig_without_place
+            plan.gig_place_problem
             and not plan.problems
             and not plan.update_slug
             and not plan.skip_of
         ):
-            plan.problems.append("district: a gig needs a place a worker can travel to")
+            plan.problems.append(plan.gig_place_problem)
     await _merge_updates(db, kind, tenant_id, plans)
     return plans
+
+
+def _once(messages: Sequence[str]) -> list[str]:
+    """The same sentence once, in order: a cell naming one unknown code twice says so once."""
+    return list(dict.fromkeys(messages))
 
 
 def _report_row(plan: _Plan) -> RowReport:
@@ -1178,7 +1202,7 @@ def _report_row(plan: _Plan) -> RowReport:
             "error",
             plan.title,
             plan.ref,
-            [*plan.problems, *plan.warnings],
+            _once([*plan.problems, *plan.warnings]),
             plan.standards,
         )
     if plan.skip_of:
@@ -1193,14 +1217,16 @@ def _report_row(plan: _Plan) -> RowReport:
             "update",
             plan.title,
             plan.ref,
-            [f"will update {plan.update_slug}{live}: {', '.join(plan.changes)}", *plan.warnings],
+            _once(
+                [f"will update {plan.update_slug}{live}: {', '.join(plan.changes)}", *plan.warnings]
+            ),
             plan.standards,
             plan.update_slug,
             live=plan.update_live,
         )
     status: Status = "warning" if plan.warnings else "ok"
     return RowReport(
-        plan.raw.number, status, plan.title, plan.ref, list(plan.warnings), plan.standards
+        plan.raw.number, status, plan.title, plan.ref, _once(plan.warnings), plan.standards
     )
 
 

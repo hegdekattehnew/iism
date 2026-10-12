@@ -1743,3 +1743,120 @@ class TestAWriterThatRefusesChangesNothing:
             )
         assert course.title == "Blood collection"
         assert not db.dirty
+
+
+class TestTheRestOfTheReview:
+    """The six lower-severity findings of the Sprint 51-54 review (Sprint 55)."""
+
+    # ---- a superscript digit is not a digit `int()` can read
+    def test_a_superscript_digit_in_an_importance_is_a_problem_not_a_crash(self) -> None:
+        problems: list[str] = []
+        assert bulk._parse_tokens("jobs", "HC/N0001:\u00b2", problems) == []
+        assert problems and "importance" in problems[0]
+
+    async def test_and_through_the_route_it_is_that_rows_error(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Superscript Hospital")
+        text = _csv("Cook,HC/N0001:\u00b2", "Cleaner,HC/N0001:4", header="title,standards")
+        response = await _post(client, f"/org/{org}/jobs/bulk/check", text, headers)
+        assert response.status_code == 200, response.text
+        assert [r["status"] for r in response.json()["rows"]] == ["error", "ok"]
+
+    # ---- one sentence once
+    async def test_a_message_repeated_within_a_row_is_said_once(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Twice Hospital")
+        text = _csv("Cook,NOPE/N1; NOPE/N1", header="title,standards")
+        (row,) = (await _post(client, f"/org/{org}/jobs/bulk/check", text, headers)).json()["rows"]
+        assert row["status"] == "error"
+        assert row["messages"].count("standards: no standard has the code NOPE/N1") == 1
+
+    # ---- a place is one fact
+    async def test_a_new_state_takes_the_old_district_with_it_and_the_review_says_so(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Move Hospital")
+        slug = await _seed(client, headers, org)  # Tamil Nadu / Chennai
+        text = "external_ref,title,state\nR1,Phlebotomist,Maharashtra\n"
+
+        checked = (await _post(client, f"/org/{org}/jobs/bulk/check{UPDATE}", text, headers)).json()
+        (row,) = checked["rows"]
+        assert row["status"] == "update"
+        assert "state" in row["messages"][0] and "district" in row["messages"][0]
+        assert (await _job_row(client, headers, org, slug))["location_district"] == "Chennai"
+
+        await _post(client, f"/org/{org}/jobs/bulk/apply{UPDATE}", text, headers)
+        job = await _job_row(client, headers, org, slug)
+        assert (job["location_state"], job["location_district"]) == ("Maharashtra", None)
+
+    async def test_the_same_state_keeps_its_district_and_a_different_spelling_of_it_too(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Stay Hospital")
+        slug = await _seed(client, headers, org)
+        same = "external_ref,title,state\nR1,Phlebotomist,Tamil Nadu\n"
+        (row,) = (await _post(client, f"/org/{org}/jobs/bulk/check{UPDATE}", same, headers)).json()[
+            "rows"
+        ]
+        assert row["status"] == "skip" and "unchanged" in row["messages"][0]
+
+        respelled = "external_ref,title,state\nR1,Phlebotomist,  tamil   nadu \n"
+        await _post(client, f"/org/{org}/jobs/bulk/apply{UPDATE}", respelled, headers)
+        assert (await _job_row(client, headers, org, slug))["location_district"] == "Chennai"
+
+    async def test_a_state_change_that_leaves_a_gig_with_no_district_is_refused_by_the_check(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Gig Move Hospital")
+        header = "external_ref,title,employment_type,state,district,closes_at,standards"
+        made = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/apply",
+                _csv("G1,Shift,gig,Tamil Nadu,Chennai,2999-01-01,HC/N0001", header=header),
+                headers,
+            )
+        ).json()
+        slug = made["rows"][0]["slug"]
+        before = await _job_row(client, headers, org, slug)
+        text = "external_ref,title,state\nG1,Shift,Maharashtra\n"
+
+        for step in ("check", "apply"):
+            (row,) = (
+                await _post(client, f"/org/{org}/jobs/bulk/{step}{UPDATE}", text, headers)
+            ).json()["rows"]
+            assert row["status"] == "error" and "needs a place" in row["messages"][0]
+        assert await _job_row(client, headers, org, slug) == before
+
+    # ---- changing a live listing needs the permission to change it
+    @pytest.mark.parametrize(
+        ("kind", "tenant_type", "dropped"),
+        [("jobs", "employer", "JOB_UPDATE"), ("courses", "course_provider", "COURSE_UPDATE")],
+    )
+    async def test_updating_needs_the_update_permission_and_creating_does_not(
+        self,
+        client: AsyncClient,
+        corpus: None,
+        monkeypatch: pytest.MonkeyPatch,
+        kind: str,
+        tenant_type: str,
+        dropped: str,
+    ) -> None:
+        from api.core import authorization
+        from api.core.authorization import Permission
+
+        headers, org = await _org(client, f"Gate {kind}", tenant_type)
+        owner = authorization.ROLE_PERMISSIONS["owner"]
+        monkeypatch.setitem(
+            authorization.ROLE_PERMISSIONS, "owner", owner - {getattr(Permission, dropped)}
+        )
+        text = "external_ref,title\nR1,Something to change\n"
+
+        for step in ("check", "apply"):
+            plain = await _post(client, f"/org/{org}/{kind}/bulk/{step}", text, headers)
+            assert plain.status_code == 200, f"{step} without update: {plain.text}"
+            asked = await _post(client, f"/org/{org}/{kind}/bulk/{step}{UPDATE}", text, headers)
+            assert asked.status_code == 403, f"{step} with update: {asked.text}"
+            assert getattr(Permission, dropped).value in asked.json()["detail"]

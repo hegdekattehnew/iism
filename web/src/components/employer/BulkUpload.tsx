@@ -549,8 +549,11 @@ function ReviewTable({ rows }: { rows: Row[] }) {
                 <Badge tone={TONE[r.status]}>{t(`status.${r.status}`)}</Badge>
               </td>
               <td className="py-2">
-                {(r.messages ?? []).map((m) => (
-                  <p key={m}>{m}</p>
+                {/* The index is in the key: two rows of one file can say the same thing, and a
+                    message repeated within a row must not collide either (the server says
+                    each once, but this does not depend on it). */}
+                {(r.messages ?? []).map((m, i) => (
+                  <p key={`${i}:${m}`}>{m}</p>
                 ))}
                 {(r.standards ?? []).length > 0 && (
                   <details className="mt-1">
