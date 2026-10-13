@@ -31,6 +31,9 @@ from api.modules.applications import router as applications_router
 from api.modules.assessment import router as assessment_router
 from api.modules.careers import router as careers_router
 from api.modules.geography import router as geography_router
+from api.modules.grievances import me_router as grievances_me_router
+from api.modules.grievances import ops_router as grievances_ops_router
+from api.modules.grievances import router as grievances_router
 from api.modules.identity import (
     account_router,
     invitation_router,
@@ -161,6 +164,9 @@ app.include_router(course_publishing_router)
 app.include_router(matching_router)
 app.include_router(analytics_router)
 app.include_router(assessment_router)
+app.include_router(grievances_router)
+app.include_router(grievances_me_router)
+app.include_router(grievances_ops_router)
 app.include_router(applications_router)
 app.include_router(applications_public_router)
 app.include_router(applications_employer_router)

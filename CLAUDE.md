@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(66 ADRs). Read it before making any structural decision — the summary below
+(67 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -338,6 +338,17 @@ api/                     FastAPI modular monolith
     analytics/           analytics_events (ADR-025). record() COMMITS. course_dismissed
                          (Sprint 33) is course_opened's negative half -- precision@5's
                          missing class, same shape, its own handler for the same reason.
+    grievances/          (Sprint 57, BL-14.3, ADR-067) What `/contact` and `/grievance` write to, and the
+                         operator queue behind them (`/ops/grievances`, `OPS_GRIEVANCE_*`, support and admin
+                         tiers). A **leaf**: depends on identity and notifications, nothing depends on it.
+                         One table; three kinds (`contact`, `grievance`, `data_request`) and four statuses.
+                         **We never write to an address a stranger typed** -- the operator replies out of band;
+                         only a signed-in sender is told (inline email to their verified address, an in-app
+                         `grievance_update` notice with the reference and status, **never the operator's
+                         note**). `data_request` is signed-in only. `service.submit` carries the limits
+                         (honeypot, `core.security.enforce_budget` per address and per sender); overdue is
+                         read from `grievance_acknowledge_hours` / `grievance_resolve_days`; closed rows are
+                         purged after a year, **open ones never**.
 
     Not built. ADR-005/013/018's intelligence/ (LLM extraction, embeddings) has
     an ADR and no code. ADR-008's career_paths/ exists as `careers/` above (Sprint
@@ -498,6 +509,12 @@ split would have to turn into interfaces first; do not add to it casually.
 - **A credential is changed by proving the new one, and changing it ends the other sessions** (ADR-066). `replace_credential` / `unlink_credential` revoke every refresh token and **return a fresh pair that the interface
   must store**, or the person is signed out by their own action. Removing takes a row lock on the user before asking "is another verified way in left?". A notice that must reach an address that is being taken away
   cannot go through the outbox (it resolves the recipient at send time): it is sent inline, best effort, email only.
+- **A public endpoint that writes a row carries its own limits, and never relays** (ADR-067). `enforce_budget(name, identifier, limit=, window_seconds=)` is the OTP counter generalised: one key per `(name,
+  identifier)`, a 429 with `Retry-After`, `limit <= 0` switches it off (`tests/conftest.py` does, because every test shares one address; a budget test switches it back on and **cleans its keys**). A per-address budget and a
+  per-sender budget are two checks, and a test must prove each alone (the first version could not tell them apart: two mutants survived). `core.middleware.client_ip` is the one rule for "which address" (rightmost
+  `X-Forwarded-For` entry, only behind our proxy). A form that takes an address from a stranger must not mail it; a hidden field answered with a fake success and nothing stored is the cheap bot filter.
+- **A queue's default view is everything, with what is owed first, never one status** (ADR-067). The grievance queue defaulted to "waiting" and an acknowledged message, still owed a resolution, vanished from the default view
+  the moment the first button was pressed; only the browser journey (which pressed it) saw that. A deadline that has two stages needs a view that holds both.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -938,6 +955,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 57 is done** (ADR-067, migration 0050): *a way to complain*. `/contact` and `/grievance` are real forms and the grievance page's promise (acknowledged within 24 hours, resolved within 15 days) has a queue behind it:
+> a new `grievances/` module, an operator queue on `/admin` that marks what is **overdue against the page's own numbers**, a budget and a honeypot on the public endpoint, no relay to an address a stranger typed, a
+> signed-in sender who sees where their message stands (and is told through an in-app notice that never carries the operator's note), a year's retention for closed rows (open ones never), and the DPDP export and erasure
+> updated. 34 backend / 482 web / 122 browser tests; three clean `make e2e` runs. The browser journey caught one real defect (the queue's default hid acknowledged messages). **Open, owner-side: appoint the grievance
+> officer and fill `GRIEVANCE_OFFICER` in `web/src/lib/legal.ts`; provide the mailbox the operator replies from.**
 >
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had

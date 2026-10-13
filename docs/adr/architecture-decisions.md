@@ -3352,3 +3352,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Access tokens of other sessions live until they expire (15 minutes)**; only refresh is revoked. Stated, not hidden: ending an access token early would need a revocation list on every request.
 - **Measured by tests that fail without the rule:** no revocation (two session tests), add overwriting again, no "another way in" check (two tests), the notice going to the wrong address, the missing row lock (the committed-row race test fails with an `IntegrityError`), a component test for each interface branch including "forgets the new tokens", and the organisation resend asking to register again.
 - **Not done:** an analytics event for credential changes (a hand-written CHECK migration; the lockout rate is not yet worth one), a notice by SMS, and proof of the old identifier.
+
+## ADR-067: A Grievance Is a Row With a Deadline, We Never Write to an Address a Stranger Typed, and a Public Form Carries Its Own Limits
+
+**Status:** Accepted (October 2026). Sprint 57 (BL-14.3). Migration 0050. Extends ADR-023, ADR-042 and ADR-044.
+
+**Context:** `/grievance` told people "we acknowledge a grievance within 24 hours and aim to resolve it within 15 days" and to write to a grievance officer. There was no form, no table, no queue and no officer (`GRIEVANCE_OFFICER` still reads "to be appointed"); `/contact` was a placeholder. A promise with nothing behind it is worse than none, and the DPDP Act 2023 expects a working grievance route before real users. The forms are the engineering half; **appointing the officer is the owner's** and no code can do it.
+
+**Decision:**
+
+- **A new leaf module, `api/modules/grievances/`** (one table, `grievances`). `kind` is `contact`, `grievance` or `data_request`; `status` is `open`, `acknowledged`, `resolved` or `dismissed`; a reference (`GRV-` and six unambiguous characters, unique, drawn again inside a savepoint on a collision) is what the sender keeps. CHECKs hold the rules the service holds: a body of 10 to 4,000 characters, somebody to reach (`user_id` or `reply_to`), a data request belongs to an account, and a closed row has a `resolved_at`.
+- **Who may send what.** A stranger may send a `contact` message or a `grievance`, and must leave an email address or a mobile number to be answered at. A **`data_request` (see, correct, erase, nominate) needs an account**, because the account is the proof of who is asking; a stranger asking to see or erase somebody's data is exactly the attack this stops. It is a 401 that says to sign in, not a 422.
+- **No relay.** An anonymous form that emails whatever address it is handed is a way to harass a stranger. The address a stranger typed is shown to the operator and **never written to by us**; the operator replies out of band from the grievance officer's own mailbox. A signed-in sender is acknowledged at the verified email their account already holds (inline, best effort, as ADR-066), sees where the message stands on the grievance page, and gets an **in-app** notice on each change (`grievance_update`, a template added by hand to the notification CHECK; the payload is the reference and the status and **never the operator's note**, which is evidence and may name other people). A signed-in sender's own `reply_to` is not stored: they are answered through the account.
+- **A public endpoint that writes a row carries its own limits.** `core.security.enforce_budget` (the OTP counters, generalised) gives 5 messages an hour **per client address** and **per account or reply address**, so one person is stopped without throttling their neighbours behind carrier-grade NAT, and one person changing address does not escape their own budget. `client_ip` (extracted from the request limiter) is the one rule for the address: `X-Forwarded-For` only when we trust a proxy, rightmost entry only. A hidden `website` field is a honeypot: a bot is answered with a success and a reference that exists nowhere, and nothing is stored. The global write limiter still applies; a CAPTCHA is out of scope (it needs a vendor).
+- **The promise is measured.** The operator queue shows **overdue** against the page's own numbers, which are two settings (`grievance_acknowledge_hours`, `grievance_resolve_days`) read at the moment of the query, so the page and the code cannot drift. A contact message promises nothing and is never overdue; a closed one is no longer late.
+- **Operators.** Two permissions, `OPS_GRIEVANCE_READ` and `OPS_GRIEVANCE_HANDLE`, in the **support and admin** tiers: a grievance is a single-subject decision with no public blast radius, like a certification check. `GET /ops/grievances` is ordered by what is owed (not yet acknowledged first, then acknowledged, then closed, the longest-waiting first), with true counts from SQL. A sender's **account is masked** (`mask_phone`, `mask_email`); the message and the reply address are not, because an operator cannot answer a person without them. A decision takes the row lock (`FOR UPDATE`), is final once closed, and closing an open message acknowledges it. Resolving or dismissing needs a note of at least 10 characters, like a verification decision. **The queue's default view is everything, not "waiting"**: found by the browser journey, an acknowledged message is still owed a resolution, and a default of "waiting" dropped it from sight the moment the first button was pressed.
+- **Retention, export and erasure.** A closed grievance is deleted `grievance_retention_days` (365) after it was closed, by a daily worker cron; **an open one is never deleted, however old**. Erasing an account deletes its grievances explicitly; the DPDP export lists them (`grievances_raised`), **without the operator's note**. The log line carries the reference and the kind and never the body, a phone or an address.
+
+**Options considered:**
+
+1. Email the grievance to the officer's inbox (no table)
+2. **A row, a queue and a deadline** (chosen)
+3. Acknowledge every sender by email at the address they typed
+4. **Acknowledge only the signed-in sender, at the address their account already holds** (chosen)
+5. A CAPTCHA on the form
+6. **A budget, a honeypot and a length cap** (chosen)
+7. A separate table or tier for grievances
+8. **Two permissions in the existing tiers** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ No new surface ❌ No deadline anyone can measure, no history, nothing to export or erase, and the page's promise stays unfalsifiable.
+- Option 3: ✅ A stranger gets a receipt ❌ An open relay that writes to anyone: the form becomes a harassment tool. The reference on screen is the receipt.
+- Option 5: ✅ Stops more bots ❌ A vendor, a script on the page and a CSP change, for a form behind a budget that already makes a flood harmless.
+
+**Consequences:**
+
+- **A signed-out sender cannot be answered through the product.** By design: the operator replies from a mailbox the owner must provide, and the sender is told on screen that nothing is sent automatically.
+- **The officer is still to be appointed**, and a lawyer has not read the page. The queue makes the deadlines visible; people meet them.
+- **The budget is per address and per sender, advisory by design** (a cap that deters abuse may stay advisory, ADR-051): Redis is the counter, and an outage fails open.
+- **Measured by tests that fail without the rule:** a stranger's data request, a stranger with nowhere to reply, the honeypot storing, each of the two budgets (separately: the first version of the test could not tell them apart), the retention age, a contact message counted overdue, an acknowledged one counted late to acknowledge, the operator's note reaching the sender's notice, and the queue default hiding an acknowledged message. One mutant is equivalent and documented: the purge of an open row (the CHECK keeps `resolved_at` null there).
+- **Not done:** the dashboard's open and overdue counts, an SMS notice (waits on DLT), threading a reply into the product, a per-sender view of an operator's reply, and a reply template. Appointing the officer and a reply mailbox are the owner's.

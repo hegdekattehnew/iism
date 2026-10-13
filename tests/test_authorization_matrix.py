@@ -68,6 +68,11 @@ PUBLIC_ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/skills/{slug}/requirements"): "the taxonomy",
     # --- how a person becomes signed in: these cannot require being signed in
     ("POST", "/auth/otp/request"): "sign-in by phone",
+    (
+        "POST",
+        "/grievances",
+    ): "a stranger may write to us (contact, grievance); a data request needs an account, and the "
+    "service says so; a budget, a honeypot and a length cap guard it",
     ("POST", "/auth/otp/verify"): "sign-in by phone",
     ("POST", "/auth/email/otp/request"): "sign-in by email",
     ("POST", "/auth/email/otp/verify"): "sign-in by email",

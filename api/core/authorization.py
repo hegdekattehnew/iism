@@ -91,6 +91,11 @@ class Permission(StrEnum):
     # Sprint 47, BL-12.15. Editing role aliases changes every candidate's role search, the same
     # public blast radius that kept `OPS_ORG_VERIFY` off the support tier.
     OPS_ALIAS_EDIT = "ops:alias:edit"
+    # Sprint 57, BL-14.3. Reading what people wrote to us, and acting on it. Both tiers: a grievance
+    # is a single-subject decision with no public blast radius, like a certification check, and the
+    # person who answers the mailbox should not need the one tier that can verify organisations.
+    OPS_GRIEVANCE_READ = "ops:grievance:read"
+    OPS_GRIEVANCE_HANDLE = "ops:grievance:handle"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -147,6 +152,8 @@ OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.OPS_PROGRAMME_READ,
         Permission.OPS_CANDIDATE_VERIFY,
         Permission.OPS_ALIAS_EDIT,
+        Permission.OPS_GRIEVANCE_READ,
+        Permission.OPS_GRIEVANCE_HANDLE,
     }
 )
 
@@ -164,6 +171,8 @@ TIER_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.OPS_ORG_READ,
             Permission.OPS_PROGRAMME_READ,
             Permission.OPS_CANDIDATE_VERIFY,
+            Permission.OPS_GRIEVANCE_READ,
+            Permission.OPS_GRIEVANCE_HANDLE,
         }
     ),
     "admin": OPERATOR_PERMISSIONS,

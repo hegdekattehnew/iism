@@ -330,7 +330,6 @@ def _limiter_identity(scope: Scope, *, verified_key: str | None = None) -> str:
     """
     from api.core.security import decode_token  # local: security imports the DB layer
 
-    settings = get_settings()
     for name, value in scope["headers"]:
         if name == b"authorization":
             token = value.decode("latin-1").removeprefix("Bearer ").strip()
@@ -342,16 +341,26 @@ def _limiter_identity(scope: Scope, *, verified_key: str | None = None) -> str:
     if verified_key:
         return "k:" + verified_key
 
+    return "ip:" + client_ip(scope)
+
+
+def client_ip(scope: Scope) -> str:
+    """The caller's address, by the one rule the limiter and every other per-address budget share.
+
+    Behind a load balancer every request arrives from the balancer, so the address is read from
+    `X-Forwarded-For` -- but only when `rate_limit_trust_forwarded` says there is a proxy of ours in
+    front, and only its **rightmost** entry, the one our proxy appended: everything to its left is
+    whatever the client chose to send.
+    """
+    settings = get_settings()
     client = scope.get("client")
     ip = client[0] if client else "unknown"
     if settings.rate_limit_trust_forwarded:
         for name, value in scope["headers"]:
             if name == b"x-forwarded-for":
-                # The rightmost entry is the one our proxy appended; everything
-                # to its left is whatever the client chose to send.
                 ip = value.decode("latin-1").split(",")[-1].strip()
                 break
-    return "ip:" + ip
+    return ip
 
 
 class RateLimitMiddleware:

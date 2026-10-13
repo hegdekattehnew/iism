@@ -1553,6 +1553,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grievances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send
+         * @description Send us a message: a question, a complaint, or a request about your data.
+         *
+         *     A request about your data needs you signed in. Anything else may be sent by a stranger, who
+         *     must give an address to write back to; we never write to it ourselves.
+         */
+        post: operations["send_grievances_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/grievances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Messages */
+        get: operations["my_messages_me_grievances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/grievances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue */
+        get: operations["queue_ops_grievances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/grievances/{grievance_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge */
+        post: operations["acknowledge_ops_grievances__grievance_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/grievances/{grievance_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve */
+        post: operations["resolve_ops_grievances__grievance_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/grievances/{grievance_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["dismiss_ops_grievances__grievance_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/dashboard": {
         parameters: {
             query?: never;
@@ -3794,6 +3902,125 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /**
+         * GrievanceAccountOut
+         * @description Who the signed-in sender is, masked: enough to find the account, not to dial or write.
+         */
+        GrievanceAccountOut: {
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+        };
+        /** GrievanceDecisionIn */
+        GrievanceDecisionIn: {
+            /** Note */
+            note: string;
+        };
+        /** GrievanceIn */
+        GrievanceIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contact" | "grievance" | "data_request";
+            /** Body */
+            body: string;
+            /** Reply To */
+            reply_to?: string | null;
+            /** Website */
+            website?: string | null;
+        };
+        /**
+         * GrievanceOut
+         * @description A person's own message, and where it stands.
+         */
+        GrievanceOut: {
+            /** Reference */
+            reference: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contact" | "grievance" | "data_request";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved" | "dismissed";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+        };
+        /** GrievanceQueueItem */
+        GrievanceQueueItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reference */
+            reference: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contact" | "grievance" | "data_request";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved" | "dismissed";
+            /** Body */
+            body: string;
+            /** Reply To */
+            reply_to?: string | null;
+            account?: components["schemas"]["GrievanceAccountOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Resolution Note */
+            resolution_note?: string | null;
+            /** Overdue Acknowledge */
+            overdue_acknowledge: boolean;
+            /** Overdue Resolve */
+            overdue_resolve: boolean;
+        };
+        /** GrievanceQueueOut */
+        GrievanceQueueOut: {
+            /** Items */
+            items: components["schemas"]["GrievanceQueueItem"][];
+            /** Open */
+            open: number;
+            /** Overdue */
+            overdue: number;
+        };
+        /** GrievanceSubmittedOut */
+        GrievanceSubmittedOut: {
+            /** Reference */
+            reference: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contact" | "grievance" | "data_request";
+            /** Acknowledge Within Hours */
+            acknowledge_within_hours: number;
+            /** Resolve Within Days */
+            resolve_within_days: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -8726,6 +8953,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssessmentWebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_grievances_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrievanceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceSubmittedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_messages_me_grievances_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceOut"][];
+                };
+            };
+        };
+    };
+    queue_ops_grievances_get: {
+        parameters: {
+            query?: {
+                status?: ("open" | "acknowledged" | "resolved" | "dismissed") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_ops_grievances__grievance_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grievance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_ops_grievances__grievance_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grievance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrievanceDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_ops_grievances__grievance_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grievance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrievanceDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrievanceOut"];
                 };
             };
             /** @description Validation Error */

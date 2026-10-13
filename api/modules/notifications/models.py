@@ -72,6 +72,10 @@ TEMPLATES = (
     # owner: becoming the person who can delete it should not be silent. A
     # phone-only account is `skipped`, as for every email here.
     "ownership_received",
+    # Sprint 57, BL-14.3. A message somebody sent us was acknowledged, resolved or dismissed. In-app
+    # only, to a signed-in sender: an anonymous sender has no recipient to resolve, and we never
+    # write to an address a stranger typed into a form.
+    "grievance_update",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

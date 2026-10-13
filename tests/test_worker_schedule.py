@@ -37,6 +37,8 @@ EXPECTED_CRONS = {
     "cron:close_expired_jobs": "a closing date never closes anything",
     "cron:purge_expired_analytics": "events are kept past their retention period",
     "cron:purge_expired_notifications": "delivered email and read notices are kept for ever",
+    "cron:purge_expired_grievances": "closed grievances, and the addresses written to "
+    "them, are kept for ever",
     "cron:refresh_embeddings": "a published job or a saved skill set never gets "
     "a semantic-similarity term, and BL-5.2's whole ranking refinement is inert",
     "cron:refresh_role_embeddings": "a qualification pack imported or reissued never "

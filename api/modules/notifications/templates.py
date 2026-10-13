@@ -77,6 +77,10 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "See the team:\n{link}\n\n"
             "If you were not expecting this, please contact the previous owner.\n",
         ),
+        "grievance_update": (
+            "An update on your message {reference}",
+            "Your message {reference} is now: {status}.\n\nSee where it stands:\n{link}\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -137,6 +141,10 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "सकते हैं।\n\n"
             "टीम देखें:\n{link}\n\n"
             "यदि आपको इसकी अपेक्षा नहीं थी, तो कृपया पिछले स्वामी से संपर्क करें।\n",
+        ),
+        "grievance_update": (
+            "आपके संदेश {reference} की जानकारी",
+            "आपका संदेश {reference} अब: {status}।\n\nदेखें कि यह कहाँ पहुँचा:\n{link}\n",
         ),
     },
 }

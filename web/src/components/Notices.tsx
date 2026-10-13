@@ -97,6 +97,13 @@ export function Notices() {
           standard: String(notice.payload.standard ?? ""),
           course: String(notice.payload.course ?? ""),
         });
+      case "grievance_update":
+        // Where a message the person sent us stands. Never the operator's note: it is the
+        // operator's evidence and may name other people.
+        return t("grievanceUpdate", {
+          reference: String(notice.payload.reference ?? ""),
+          status: t(`grievanceStatus.${String(notice.payload.status ?? "acknowledged")}`),
+        });
       default:
         return t("generic");
     }
@@ -131,7 +138,9 @@ export function Notices() {
           const path =
             notice.template === "application_status_changed"
               ? null
-              : linkOf(notice.payload.path);
+              : notice.template === "grievance_update"
+                ? "/grievance"
+                : linkOf(notice.payload.path);
           return (
             <li key={notice.id} className="text-sm">
               <span>{describe(notice)}</span>{" "}

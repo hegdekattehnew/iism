@@ -1076,7 +1076,7 @@
             "Correction: edit your profile at any time.",
             "Erasure and withdrawing consent: delete your account from your Account page. It is as easy as signing up, and it removes your profile and any organisation only you belong to.",
             "Grievance: raise a complaint with our grievance officer; if it is not resolved, you may approach the Data Protection Board of India.",
-            "Nomination: you may nominate someone to exercise these rights for you in the event of death or incapacity — write to the grievance officer."
+            "Nomination: you may nominate someone to exercise these rights for you in the event of death or incapacity — use the form on the grievance page."
           ]
         },
         {
@@ -1154,12 +1154,12 @@
     },
     "grievance": {
       "title": "Grievance redressal",
-      "intro": "If you have a complaint about how IISM handles your personal data, or about content on the marketplace, write to our grievance officer.",
+      "intro": "If you have a complaint about how IISM handles your personal data, or about content on the marketplace, tell our grievance officer using the form on this page.",
       "sections": [
         {
           "title": "How to raise a grievance",
           "body": [
-            "Write to the grievance officer from the mobile number or email your account uses, so we can confirm it is you.",
+            "Use the form below. If you are signed in we answer through your account; if you are not, give an email address or mobile number we can reply to, so we can reach you.",
             "Say what happened, when, and what you would like done. Do not send sign-in codes — we will never ask for them."
           ]
         },
@@ -1284,7 +1284,13 @@
       "completed": "Completed",
       "no_show": "Did not attend"
     },
-    "sponsorOffer": "{organisation} would sponsor you to close a gap for {vacancy}: take {course}, which teaches “{standard}”."
+    "sponsorOffer": "{organisation} would sponsor you to close a gap for {vacancy}: take {course}, which teaches “{standard}”.",
+    "grievanceUpdate": "Your message {reference} is now: {status}.",
+    "grievanceStatus": {
+      "acknowledged": "being looked at",
+      "resolved": "resolved",
+      "dismissed": "closed"
+    }
   },
   "searchPage": {
     "title": "Results for “{q}”",
@@ -1677,5 +1683,94 @@
     "liveAcknowledge": "{count, plural, one {# of these is live} other {# of these are live}}. The change is visible to everyone as soon as I apply it.",
     "updatesNote": "An update changes the listing in place. Its address, and whether it is published, stay as they are.",
     "updatedDone": "{count, plural, one {# listing updated.} other {# listings updated.}}"
+  },
+  "contactPage": {
+    "title": "Contact us",
+    "intro": "Ask a question or send us a note. If it is a complaint about how your data is handled, or about something on the marketplace, use the grievance page instead: it comes with deadlines we are held to.",
+    "grievanceLink": "Raise a grievance"
+  },
+  "messageForm": {
+    "grievanceHeading": "Tell us what happened",
+    "mineHeading": "What you have sent",
+    "kindLegend": "What is this about?",
+    "kind": {
+      "contact": "A question or a note",
+      "grievance": "A complaint",
+      "data_request": "A request about my data"
+    },
+    "kindHint": {
+      "contact": "",
+      "grievance": "About how your data is handled, or about something on the marketplace.",
+      "data_request": "To see, correct or erase your data, or to nominate someone to act for you. You need to be signed in."
+    },
+    "dataRequestSignIn": "A request about your own data has to come from your account, so we know it is you asking. Sign in, then come back to this page.",
+    "signIn": "Sign in",
+    "bodyLabel": "Your message",
+    "bodyHint": "Say what happened, when, and what you would like done. At least {min} characters, at most {max}. Do not include sign-in codes.",
+    "counter": "{used} of {max}",
+    "replyToLabel": "Where can we reply?",
+    "replyToHint": "An email address or a mobile number. We use it only to answer this message.",
+    "honeypotLabel": "Website",
+    "send": "Send",
+    "sending": "Sending…",
+    "sentTitle": "We have your message",
+    "reference": "Your reference:",
+    "sentContact": "We read every message. A question does not carry a deadline, but we will answer it.",
+    "sentPromise": "We acknowledge it within {hours} hours and aim to resolve it within {days} days.",
+    "sentSignedIn": "You will see where it stands on this page and in your updates.",
+    "sentSignedOut": "Keep the reference. We reply to the address you gave, by a person, and never send anything automatically to it.",
+    "another": "Send another",
+    "errorWait": "You have sent several messages recently. Try again in {seconds} seconds.",
+    "errorSignIn": "Sign in first. A request about your data has to come from your account.",
+    "errorGeneric": "Could not send your message. Check it and try again.",
+    "status": {
+      "open": "Received",
+      "acknowledged": "Being looked at",
+      "resolved": "Resolved",
+      "dismissed": "Closed"
+    },
+    "sentOn": "Sent {date}",
+    "closedOn": "closed {date}"
+  },
+  "grievanceQueue": {
+    "title": "Messages and grievances",
+    "subtitle": "What people have sent us, the ones owed an answer first. We reply from the officer's own mailbox; nothing here emails anybody.",
+    "filter": "Show",
+    "filters": {
+      "open": "Waiting",
+      "acknowledged": "Acknowledged",
+      "resolved": "Resolved",
+      "dismissed": "Dismissed",
+      "all": "Everything, owed an answer first"
+    },
+    "counts": "{open} waiting · {overdue} late",
+    "failed": "Could not load the messages.",
+    "empty": "Nothing here. Nobody is waiting on an answer.",
+    "status": {
+      "open": "Waiting",
+      "acknowledged": "Acknowledged",
+      "resolved": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "kind": {
+      "contact": "Message",
+      "grievance": "Grievance",
+      "data_request": "Data request"
+    },
+    "overdueAcknowledge": "Not acknowledged in time",
+    "overdueResolve": "Past the resolve date",
+    "received": "Received {date}",
+    "acknowledgedOn": "acknowledged {date}",
+    "closedOn": "closed {date}",
+    "replyTo": "Reply to",
+    "account": "Account",
+    "noContact": "no contact on file",
+    "note": "Note",
+    "noteLabel": "Note (needed to resolve or dismiss)",
+    "notePlaceholder": "What was done, or why it was closed",
+    "acknowledge": "Acknowledge",
+    "resolve": "Resolve",
+    "dismiss": "Dismiss",
+    "decideFailed": "Could not save that decision. Try again."
   }
 }

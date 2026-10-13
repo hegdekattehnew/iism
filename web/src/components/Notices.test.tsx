@@ -197,4 +197,21 @@ describe("Notices", () => {
       expect(screen.queryByRole("link", { name: "Open" })).toBeNull();
     });
   });
+
+  it("words a grievance update by where the message stands, and links to the page it lives on", async () => {
+    GET.mockResolvedValue({
+      data: [
+        notice({
+          template: "grievance_update",
+          payload: { reference: "GRV-ABC234", status: "resolved" },
+        }),
+      ],
+      error: undefined,
+    });
+    renderUi(<Notices />);
+    expect(
+      await screen.findByText("Your message GRV-ABC234 is now: resolved."),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/grievance");
+  });
 });

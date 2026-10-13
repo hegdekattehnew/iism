@@ -293,6 +293,34 @@ async def enforce_otp_rate_limit(channel: Channel, identifier: str) -> None:
         )
 
 
+async def enforce_budget(
+    name: str, identifier: str, *, limit: int, window_seconds: int, noun: str = "requests"
+) -> None:
+    """At most `limit` of `name` per `identifier` per window, or a 429 that says when to come back.
+
+    The same counter `enforce_otp_rate_limit` is built on, for anything public that writes a row.
+    The identifier is hashed before it reaches Redis: it may be a phone number or an address, and a
+    key is something an operator reads in a console. `limit` 0 turns it off (the suite does).
+    """
+    if limit <= 0:
+        return
+    redis = get_redis()
+    digest = hashlib.sha256(identifier.lower().encode()).hexdigest()[:24]
+    key = f"budget:{name}:{digest}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, window_seconds)
+    if count > limit:
+        remaining = await redis.ttl(key)
+        wait = remaining if remaining and remaining > 0 else window_seconds
+        log.warning("budget.exhausted", name=name, count=count)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many {noun}. Try again in {max(1, wait // 60)} minutes.",
+            headers={"Retry-After": str(wait)},
+        )
+
+
 # ------------------------------------------------------------ FastAPI wiring
 
 
