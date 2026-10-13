@@ -225,3 +225,19 @@ describe("ApplicationList", () => {
     expect(screen.getByText("You finished this assignment.")).toBeTruthy();
   });
 });
+
+describe("a vacancy an operator removed (Sprint 59)", () => {
+  it("says so and does not link to a page that no longer exists", async () => {
+    const row = application("applied", "gone");
+    GET.mockResolvedValue({
+      data: [{ ...row, job: { ...row.job, removed: true } }, application("applied", "fine")],
+      error: undefined,
+    });
+    renderUi(<ApplicationList />);
+    expect(await screen.findByText("Removed by our team")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Weekend shift gone" })).toBeNull();
+    expect(screen.getByText("Weekend shift gone")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Weekend shift fine" })).toBeTruthy();
+  });
+});
+

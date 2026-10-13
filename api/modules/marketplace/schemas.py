@@ -172,6 +172,10 @@ class OrgJobOut(JobDetail):
 
     status: Status
     updated_at: datetime
+    # Set when an operator removed it (Sprint 59): the owner is told when and why, and the publish
+    # control says so instead of failing.
+    taken_down_at: datetime | None = None
+    takedown_reason: str | None = None
 
 
 class CourseOut(BaseModel):
@@ -252,6 +256,8 @@ class OrgCourseOut(CourseDetail):
 
     status: Status
     updated_at: datetime
+    taken_down_at: datetime | None = None
+    takedown_reason: str | None = None
 
 
 class JobPage(BaseModel):

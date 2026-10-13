@@ -249,3 +249,33 @@ describe("EmployerWorkspace — saying why publishing or closing failed", () => 
     expect(await screen.findByText(/Could not do that\./)).toBeTruthy();
   });
 });
+
+describe("EmployerWorkspace -- a vacancy an operator removed (Sprint 59)", () => {
+  const removed = () =>
+    job({
+      status: "draft",
+      is_open: false,
+      close_reason: "taken_down",
+      taken_down_at: "2026-10-01T09:00:00Z",
+      takedown_reason: "It asked applicants to pay a fee before an interview.",
+    });
+
+  it("says it was removed, when, and why, and calls it neither a draft nor closed", async () => {
+    world_([removed()]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    expect(await screen.findByText("Removed")).toBeTruthy();
+    expect(screen.getByText(/Removed by our team on/)).toBeTruthy();
+    expect(screen.getByText("It asked applicants to pay a fee before an interview.")).toBeTruthy();
+    expect(screen.queryByText("Draft")).toBeNull();
+  });
+
+  it("offers no publish or reopen, but still lets the owner edit it", async () => {
+    world_([removed()]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    await screen.findByText("Removed");
+    expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reopen" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  });
+});
+

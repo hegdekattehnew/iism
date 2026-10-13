@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { ApplyPanel } from "@/components/ApplyPanel";
+import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -157,6 +158,10 @@ export default async function JobDetailPage({
           ))}
         </ul>
       </section>
+
+      <div className="mt-10">
+        <ReportListing kind="job" slug={data.slug} />
+      </div>
 
       <p className="mt-10 border-t border-border-token pt-5 font-mono text-xs text-muted">
         {data.slug}

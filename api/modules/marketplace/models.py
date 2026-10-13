@@ -57,6 +57,9 @@ CLOSE_REASONS = (
     "withdrawn",
     # `closes_at` came and went. Written by the worker, never by a request.
     "expired",
+    # An operator took the listing down (Sprint 59, BL-14.4, ADR-069). Written by
+    # `take_down`, never by an owner: it is the one reason an employer cannot claim.
+    "taken_down",
 )
 
 # How a claimed skill was evidenced. This is the column that later lets verified
@@ -141,6 +144,9 @@ class Job(_EmbeddingColumns, Base):
         # stated reason -- and every screen that explains *why* a vacancy is
         # closed would have a blank to render.
         CheckConstraint("(closed_at IS NULL) = (close_reason IS NULL)", name="ck_jobs_closed"),
+        CheckConstraint(
+            "(taken_down_at IS NULL) = (takedown_reason IS NULL)", name="ck_jobs_taken_down"
+        ),
         CheckConstraint("positions >= 1", name="ck_jobs_positions"),
         # The alert sweep's own query: unalerted, published, open, oldest first.
         Index("ix_jobs_alerted_at", "alerted_at"),
@@ -229,6 +235,12 @@ class Job(_EmbeddingColumns, Base):
     # with one and not the other is a bug, which `ck_jobs_closed` refuses.
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     close_reason: Mapped[str | None] = mapped_column(default=None)
+    # An operator removed this listing (Sprint 59, ADR-069): when, and the reason the
+    # organisation was shown. Set together or not at all (`ck_jobs_taken_down`). **Not a
+    # status**: `status` goes back to `draft`, which every public query already excludes, so
+    # the roughly thirty-four places that compare it needed no change.
+    taken_down_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    takedown_reason: Mapped[str | None] = mapped_column(Text, default=None)
 
     # When the alert sweep last considered this vacancy. Null means "never",
     # which is what makes the sweep idempotent: it claims jobs by setting this,
@@ -366,6 +378,9 @@ class Course(Base):
             name="ck_courses_nsqf_level",
         ),
         CheckConstraint("seats IS NULL OR seats >= 1", name="ck_courses_seats"),
+        CheckConstraint(
+            "(taken_down_at IS NULL) = (takedown_reason IS NULL)", name="ck_courses_taken_down"
+        ),
         Index("ix_courses_tenant_id", "tenant_id"),
         Index("ix_courses_status", "status"),
         Index("ix_courses_status_mode", "status", "mode"),
@@ -415,6 +430,10 @@ class Course(Base):
     )
     starts_on: Mapped[date | None] = mapped_column(default=None)
     seats: Mapped[int | None] = mapped_column(default=None)
+
+    # Removed by an operator (Sprint 59, ADR-069); see `Job.taken_down_at`.
+    taken_down_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    takedown_reason: Mapped[str | None] = mapped_column(Text, default=None)
 
     status: Mapped[str] = mapped_column(default="published")
     # The provider's own reference, written only by a bulk upload (see `Job.external_ref`).

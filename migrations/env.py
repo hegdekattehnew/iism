@@ -20,6 +20,7 @@ from api.modules.grievances import models as _grievances_models  # noqa: F401
 from api.modules.identity import models as _identity_models  # noqa: F401
 from api.modules.interests import models as _interest_models  # noqa: F401
 from api.modules.marketplace import models as _marketplace_models  # noqa: F401
+from api.modules.moderation import models as _moderation_models  # noqa: F401
 from api.modules.notifications import models as _notification_models  # noqa: F401
 from api.modules.operations import models as _operations_models  # noqa: F401
 from api.modules.skills import concepts as _skills_concepts  # noqa: F401

@@ -2,6 +2,7 @@ import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { InterestPanel } from "@/components/InterestPanel";
+import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -139,6 +140,10 @@ export default async function CourseDetailPage({
           ))}
         </ul>
       </section>
+
+      <div className="mt-10">
+        <ReportListing kind="course" slug={data.slug} />
+      </div>
 
       <p className="mt-10 border-t border-border-token pt-5 font-mono text-xs text-muted">
         {data.slug}

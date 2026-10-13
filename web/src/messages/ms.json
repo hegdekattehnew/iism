@@ -752,7 +752,11 @@
       "nearly": "Nearly ready",
       "newApplications": "New applications"
     },
-    "uploadJobs": "Upload a spreadsheet"
+    "uploadJobs": "Upload a spreadsheet",
+    "removed": "Removed",
+    "removedOn": "Removed by our team on {date}",
+    "removedExplain": "It cannot be published until we restore it. You can still edit it. If you think this is a mistake, contact us.",
+    "closed_taken_down": "Removed"
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -1246,7 +1250,8 @@
       "no_show": "The employer recorded that you did not attend this assignment."
     },
     "vacancyClosed": "This vacancy is closed and is no longer taking applications.",
-    "errorWithdrawDecided": "A decision has been made on this application, so it cannot be withdrawn here. Contact the employer."
+    "errorWithdrawDecided": "A decision has been made on this application, so it cannot be withdrawn here. Contact the employer.",
+    "removed": "Removed by our team"
   },
   "employerInbox": {
     "title": "Applicants",
@@ -1813,5 +1818,62 @@
     "closesGap": "Closes {closed} of {total} of your gap",
     "budgetLabel": "What would you pay for a course? (₹)",
     "budgetClear": "Clear"
+  },
+  "reportListing": {
+    "openJob": "Report this vacancy",
+    "openCourse": "Report this course",
+    "signedOut": "Sign in to report a listing, so a report can be looked into.",
+    "signIn": "Sign in",
+    "intro": "Tell us what is wrong. An operator reads every report. We do not tell the organisation who reported.",
+    "reasonLabel": "What is wrong?",
+    "reason": {
+      "asks_for_money": "Asks for money",
+      "fake_or_misleading": "Fake or misleading",
+      "discriminatory": "Discriminatory",
+      "unsafe_or_illegal": "Unsafe or illegal",
+      "spam_or_duplicate": "Spam or a duplicate",
+      "other": "Something else"
+    },
+    "detailLabel": "Anything else we should know?",
+    "detailHint": "Optional. Do not include sign-in codes.",
+    "send": "Send report",
+    "sending": "Sending…",
+    "received": "Thank you. We have your report and an operator will review it.",
+    "tooMany": "You have sent several reports today. Try again tomorrow.",
+    "failed": "Could not send your report. Try again."
+  },
+  "reportQueue": {
+    "title": "Reported listings",
+    "subtitle": "What people have said about a vacancy or course. You decide about the listing; reporters are shown masked.",
+    "view": "Listings",
+    "viewOpen": "Reported",
+    "viewTakenDown": "Removed",
+    "counts": "{open} reported · {removed} removed",
+    "failed": "Could not load the reports.",
+    "emptyOpen": "Nothing reported. Nobody is waiting on a decision.",
+    "emptyRemoved": "Nothing has been removed.",
+    "kind": {
+      "job": "Vacancy",
+      "course": "Course"
+    },
+    "removed": "Removed",
+    "reportsCount": "{count, plural, one {# report} other {# reports}}",
+    "reason": {
+      "asks_for_money": "Asks for money",
+      "fake_or_misleading": "Fake or misleading",
+      "discriminatory": "Discriminatory",
+      "unsafe_or_illegal": "Unsafe or illegal",
+      "spam_or_duplicate": "Spam or a duplicate",
+      "other": "Something else"
+    },
+    "noContact": "no contact on file",
+    "removedBecause": "Removed because",
+    "noteLabel": "Note (needed to dismiss)",
+    "noteLabelAdmin": "Note, or the reason for a removal",
+    "takedownHint": "A removal reason is emailed to the organisation. Do not name the reporter.",
+    "dismiss": "Dismiss reports",
+    "takedown": "Take it down",
+    "restore": "Restore (as a draft)",
+    "decideFailed": "Could not save that decision. Try again."
   }
 }

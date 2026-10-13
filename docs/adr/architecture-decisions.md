@@ -3434,3 +3434,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Seeded courses now carry places** (relative start dates, so the demo never ages; two are made full by a seeded enrolled learner), and the offline-without-place **warning in bulk upload changes five existing expectations from `ok` to `warning`**, which is the intended pressure on providers.
 - **Measured by tests that fail without the rule:** each reach, started (today is not started), full, the budget edges and a null fee, the order including "a mandatory closer is never outranked", no-context equals the old order (a started course is not demoted), the derived seat count (only `enrolled`, never negative, a seat returns on withdrawal), the refuse-first update, and a golden set whose attendability labels are derived from the seed's own tables and checked independently in CI and by `make evaluate` (25 course expectations hold; breaking the attendable tier fails it).
 - **Not done:** a place filter on course browse, travel time or a distance measure (district and state only), a waiting list, and language preference in the ranking.
+
+## ADR-069: A Takedown Is a Draft With a Stamp, Not a Third Status; Reports Are Grouped by Listing and Decided by a Human, Never by a Count
+
+**Status:** Accepted (October 2026). Sprint 59 (BL-14.4). Migration 0052. Extends ADR-042, ADR-044 and ADR-067.
+
+**Context:** Fake vacancies are the main trust risk of a jobs marketplace, and the only moderation lever was the owner unpublishing their own listing. A candidate who met a vacancy asking for a deposit, or a course that did not exist, could not say so, and an operator could not act. The code showed three things that shape the answer. `status == "published"` is compared in about thirty-four places (browse, matching retrieval, counts, alerts), so a new status would have to be added to each and would stay visible wherever one was missed. Only two functions put a listing live (`publishing.set_published` and `course_publishing.set_published`; `bulk.publish_many` goes through them) and one brings a closed vacancy back (`reopen_job`). And closing a vacancy already tells the applicants still waiting.
+
+**Decision:**
+
+- **A takedown is `status="draft"` plus `taken_down_at` and `takedown_reason`** (set together, a CHECK on each table), not a third status. A draft is excluded by every public query for free. A vacancy is also **closed** with the new reason `taken_down` (the one close reason an owner cannot claim, as `expired` is the worker's), so it stops counting as open and its live applicants are told through the notice a closed vacancy already sends.
+- **Every writer of "published" refuses while stamped** (409, with the reason and how to appeal): both `set_published` functions, which covers bulk publishing, and `reopen_job`. Editing stays allowed: the owner fixes what was wrong. **A restore clears the stamp and the takedown's own closure (a vacancy the employer had already filled stays filled) and leaves a draft**: nothing goes live by an operator's hand, the owner publishes again themselves. The write lives in `marketplace/takedown.py`, because whether a listing may go live is an invariant of the listing; `moderation/` only decides that one should come down.
+- **A report is its own row** (`listing_reports`): once per person per listing (a unique constraint arbitrates), a reason from a fixed list plus up to 1,000 characters, `target_id` with **no foreign key** (a report about a deleted listing is still a fact; the retention purge removes the orphans with one `NOT EXISTS`, so no writer of a deleted listing had to learn about reports), and `reporter_id` with `CASCADE` (it is the reporter's own words, so erasing the account erases it, and the DPDP export lists it). A signed-in person only; a published listing only (a draft is a 404, so its existence is not confirmed); **not about their own organisation** (409); a per-person daily budget.
+- **An operator decides about a listing, not a report.** The queue groups reports by listing, most distinct reporters first and then the oldest, with the reporter **masked** and the organisation named. Dismissing closes every open report on the listing; a takedown closes them as actioned **in the same transaction** as the removal, so a refusal leaves them open. **Nothing is taken down by a count, ever**: a rival organisation can file reports, and a human reads them.
+- **Tiers (ADR-044).** Reading and dismissing are `support`'s; **taking down and restoring are `admin`'s alone** (`OPS_LISTING_TAKEDOWN`): removing somebody's business from the public has the blast radius `OPS_ORG_VERIFY` has for a badge. A support operator is not offered the control rather than offered and refused.
+- **Who is told what.** The organisation is **emailed the operator's reason** (the form says so: it is the one free-text field in the back office that leaves the building) through the outbox, addressed to the tenant; the live applicants get the existing closed notice; **nobody is told who reported**, not the organisation, not an event, not the applicant. The reporter is told only that the report arrived.
+- **Events** (`listing_reported`, `listing_reports_dismissed`, `listing_taken_down`, `listing_restored`) subject the listing and carry a reason code or a count, never the reporter or free text, recorded after the commit in the service. Three closed sets were widened by hand in migration 0052 with frozen lists (close reasons, event names, notification templates), since Alembic does not diff CHECK bodies.
+
+**Options considered:**
+
+1. A third `taken_down` status
+2. **Draft plus a stamp** (chosen)
+3. Take a listing down automatically at N reports
+4. **A human decides, whatever the count** (chosen)
+5. One queue row per report
+6. **One row per listing with its reports nested** (chosen)
+7. A foreign key from a report to its listing
+8. **No foreign key and a purge that finds the orphans** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ Explicit ❌ Every one of ~34 `status == "published"` sites would need the new value, and a closed-by-operator listing would stay visible wherever one was missed.
+- Option 3: ✅ Fast ❌ A brigade of N accounts removes a competitor's vacancies, and every count is a number somebody will aim for.
+- Option 7: ✅ Referential integrity ❌ A cascade deletes the evidence when the owner deletes the listing, and `SET NULL` leaves rows that point at nothing; a purge is simpler and a deleted listing is the owner's right.
+
+**Consequences:**
+
+- **A taken-down vacancy 404s publicly**, like any draft. An applicant's bookmark would dead-end, so the application list shows "Removed by our team" and does not link to it.
+- **A mistaken takedown harms a real business.** Admin-only, a mandatory reason, a restore, events and a banner telling the owner what happened; there is no appeals queue, only the contact page.
+- **A reporter is not told the outcome**, and learners who registered interest in a removed course are not told (only a vacancy's applicants are). Both would need a notice design of their own.
+- **Measured by tests that fail without the rule:** each of the three publish writers (job, course and `reopen_job`), the closure with its own reason, a restore that keeps a filled vacancy filled, a draft staying a draft after restore, self-report, a draft being reportable, support able to take down, dismissal needing the wrong tier, the retention age, an open report being purged, the queue order and an unmasked reporter; in the browser, a support operator is not offered the removal, the applicant's list says so, the owner cannot publish and an admin's restore lets them.
+- **Not done:** an appeals queue, a reporter-facing outcome, notifying learners, language in a takedown notice beyond English and Hindi, and acting on a listing from its public page.

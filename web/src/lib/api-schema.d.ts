@@ -1661,6 +1661,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{slug}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Job
+         * @description Tell us a vacancy is fake, misleading or harmful. Once per vacancy, and not your own.
+         */
+        post: operations["report_job_jobs__slug__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{slug}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Course */
+        post: operations["report_course_courses__slug__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue */
+        get: operations["queue_ops_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/reports/{target_type}/{target_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["dismiss_ops_reports__target_type___target_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/listings/{target_type}/{target_id}/takedown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Takedown */
+        post: operations["takedown_ops_listings__target_type___target_id__takedown_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/listings/{target_type}/{target_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_ops_listings__target_type___target_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/dashboard": {
         parameters: {
             query?: never;
@@ -3729,6 +3834,26 @@ export interface components {
             /** Total Marks */
             total_marks?: number | null;
         };
+        /** DecisionOut */
+        DecisionOut: {
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "job" | "course";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Reports Closed
+             * @default 0
+             */
+            reports_closed: number;
+            /** Taken Down */
+            taken_down: boolean;
+        };
         /** DeepHealth */
         DeepHealth: {
             /**
@@ -3758,6 +3883,11 @@ export interface components {
             organisations_deleted: components["schemas"]["OrganisationFate"][];
             /** Blocked By */
             blocked_by: components["schemas"]["OrganisationFate"][];
+        };
+        /** DismissIn */
+        DismissIn: {
+            /** Note */
+            note: string;
         };
         /**
          * DistrictBreakdownOut
@@ -4509,6 +4639,8 @@ export interface components {
             /** Employment Type */
             employment_type: string;
             tenant: components["schemas"]["TenantOut"];
+            /** Removed */
+            readonly removed: boolean;
         };
         /**
          * JobSkillIn
@@ -4645,6 +4777,48 @@ export interface components {
             phone: string;
             /** Code */
             code: string;
+        };
+        /**
+         * ListingReportsOut
+         * @description One listing and everything said about it.
+         *
+         *     An operator decides about a listing, not a report.
+         */
+        ListingReportsOut: {
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "job" | "course";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            organisation?: components["schemas"]["OrganisationRefOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published";
+            /** Open Reports */
+            open_reports: number;
+            /** Reasons */
+            reasons?: {
+                [key: string]: number;
+            };
+            /** Oldest */
+            oldest?: string | null;
+            /** Reports */
+            reports?: components["schemas"]["ReportOut"][];
+            /** Taken Down At */
+            taken_down_at?: string | null;
+            /** Takedown Reason */
+            takedown_reason?: string | null;
         };
         /**
          * MarketplaceCounts
@@ -4910,6 +5084,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Taken Down At */
+            taken_down_at?: string | null;
+            /** Takedown Reason */
+            takedown_reason?: string | null;
             /**
              * Started
              * @description Derived from the date, never stored: a stored flag is wrong the morning after.
@@ -5002,6 +5180,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Taken Down At */
+            taken_down_at?: string | null;
+            /** Takedown Reason */
+            takedown_reason?: string | null;
         };
         /**
          * OrgRegisterRequest
@@ -5141,6 +5323,13 @@ export interface components {
             is_verified: boolean;
             /** Contact Email */
             contact_email?: string | null;
+        };
+        /** OrganisationRefOut */
+        OrganisationRefOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
         };
         /**
          * OrganisationVerificationOut
@@ -5373,6 +5562,62 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /** ReportIn */
+        ReportIn: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "asks_for_money" | "fake_or_misleading" | "discriminatory" | "unsafe_or_illegal" | "spam_or_duplicate" | "other";
+            /** Detail */
+            detail?: string | null;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "asks_for_money" | "fake_or_misleading" | "discriminatory" | "unsafe_or_illegal" | "spam_or_duplicate" | "other";
+            /** Detail */
+            detail?: string | null;
+            reporter?: components["schemas"]["ReporterOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ReportQueueOut */
+        ReportQueueOut: {
+            /** Items */
+            items: components["schemas"]["ListingReportsOut"][];
+            /** Open Listings */
+            open_listings: number;
+            /** Taken Down */
+            taken_down: number;
+        };
+        /**
+         * ReportReceivedOut
+         * @description All the reporter is told: that it arrived. Not what became of it (ADR-069).
+         */
+        ReportReceivedOut: {
+            /**
+             * Received
+             * @default true
+             */
+            received: boolean;
+        };
+        /**
+         * ReporterOut
+         * @description Masked, as in the grievance queue: enough to correlate, not enough to identify or dial.
+         */
+        ReporterOut: {
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
         };
         /**
          * ReputationOut
@@ -5897,6 +6142,11 @@ export interface components {
             same_occupation: boolean;
             /** Shared Nco */
             shared_nco: boolean;
+        };
+        /** TakedownIn */
+        TakedownIn: {
+            /** Reason */
+            reason: string;
         };
         /** TaskEnqueued */
         TaskEnqueued: {
@@ -9226,6 +9476,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GrievanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_job_jobs__slug__report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReceivedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_course_courses__slug__report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReceivedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_ops_reports_get: {
+        parameters: {
+            query?: {
+                view?: "open" | "taken_down";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_ops_reports__target_type___target_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_type: "job" | "course";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    takedown_ops_listings__target_type___target_id__takedown_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_type: "job" | "course";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakedownIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_ops_listings__target_type___target_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_type: "job" | "course";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOut"];
                 };
             };
             /** @description Validation Error */

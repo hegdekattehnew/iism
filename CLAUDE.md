@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(68 ADRs). Read it before making any structural decision — the summary below
+(69 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -343,6 +343,17 @@ api/                     FastAPI modular monolith
                          row -- a coarse pass/fail, never a score or a transcript. A
                          leaf: depends on identity, marketplace and skills; nothing
                          depends on it.
+    moderation/          (Sprint 59, BL-14.4, ADR-069) Reports about a vacancy or course and the operator queue
+                         behind them (`/ops/reports`, `OPS_REPORT_*` for support and admin; **taking down and
+                         restoring are `OPS_LISTING_TAKEDOWN`, admin tier only**). A **leaf**: depends on
+                         identity, marketplace and notifications. One table (`listing_reports`, once per person
+                         per listing, `target_id` with no foreign key). An operator decides about a *listing*,
+                         so the queue groups by it and the reporter is shown masked; **no count ever removes
+                         anything**. The takedown itself is marketplace's (`take_down_listing`,
+                         `restore_listing`): a draft plus `taken_down_at`/`takedown_reason`, not a status, and
+                         every writer of "published" (`set_published` x2, so bulk publish, and `reopen_job`)
+                         calls `refuse_while_taken_down`. A vacancy is also closed with `taken_down`, an owner
+                         can never claim that reason. Nobody is told who reported.
     analytics/           analytics_events (ADR-025). record() COMMITS. course_dismissed
                          (Sprint 33) is course_opened's negative half -- precision@5's
                          missing class, same shape, its own handler for the same reason.
@@ -527,6 +538,13 @@ split would have to turn into interfaces first; do not add to it casually.
   ordered by `attendance.rank_key` and never hidden; "seats left" is `seats - enrolled interests` (`interests.enrolled_counts`) and "started" is `starts_on < today_ist()`, because a stored counter or flag is wrong the
   morning after. A calendar date is formatted in UTC on the web (`timeZone: "UTC"`, parsed with a `Z`): as local midnight it slips a day west of Greenwich. The budget is a per-request query parameter held in
   `localStorage`, never a profile column (ADR-055). **When a new optional column makes a bulk upload warn on every existing row, the existing expectations change on purpose** -- five did.
+- **When a rule is "this may not go live", list every writer of "published" and give each the one guard** (ADR-069). A takedown is `status="draft"` plus a stamp rather than a third status precisely because
+  `status == "published"` is compared in ~34 places; what has to be found instead is the **few writers**, and they were: `publishing.set_published`, `course_publishing.set_published` (so `bulk.publish_many`) and
+  `reopen_job`. A new path that can put a listing live calls `takedown.refuse_while_taken_down` first, and a test per writer fails without it. **A report that points at a row it does not own is not a foreign key**
+  (the owner may delete the listing); the retention purge finds the orphans with `NOT EXISTS`, so no new writer of a deleted listing has to know reports exist. **Free text that leaves the building (an emailed takedown
+  reason) is named as such on the form that takes it**, and the identity of whoever prompted it is in no payload, event or screen the other party sees.
+- **The suite's `db` fixture is one outer transaction, so `db.rollback()` inside a test rolls back the set-up too** (Sprint 59, found writing the "a refused takedown leaves the reports open" test). Assert that nothing
+  was *flushed or committed* instead (autoflush is off, so the database still says what it said), and use committed rows (`tests/concurrency.py`) when a rollback is the thing under test.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -967,6 +985,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 59 is done** (ADR-069, migration 0052): *a marketplace you can trust*. A signed-in person can **report** a vacancy or course (once, not their own organisation's, a reason from a fixed list); an operator sees the
+> reports **grouped by listing** with the reporter masked and may dismiss them (support tier) or **take the listing down** with a reason the organisation is emailed (admin tier only), and restore it as a draft. A takedown is a
+> draft plus a stamp, not a third status; every writer of "published" refuses while it is there; a vacancy closes with its own reason so its waiting applicants are told; nobody is told who reported, and no count ever removes
+> anything. 1,538 backend / 524 web / 124 browser tests; the journey runs reporter, support, admin, applicant and owner.
 >
 > **Sprint 58 is done** (ADR-068, migration 0051): *courses you can attend*. A course has a place, a next intake and seats (seats left derived from enrolled interests, never a counter), and a candidate's suggested
 > courses are ordered by whether they can take them -- a mandatory closer first, then one they can attend, then the nearer -- and **labelled, never hidden**. One shared `SuggestedCourses` list replaces four hand-rolled

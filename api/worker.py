@@ -39,6 +39,7 @@ from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
 from api.modules.grievances import purge_expired_grievances
 from api.modules.matching.tasks import refresh_embeddings
+from api.modules.moderation import purge_expired_reports
 from api.modules.notifications.tasks import drain_notifications, purge_expired_notifications
 from api.modules.skills.tasks import refresh_role_embeddings
 
@@ -88,6 +89,7 @@ class WorkerSettings:
         cron(purge_expired_notifications, hour={21}, minute={45}, run_at_startup=False),
         # And fifteen after that (03:30 in India): a closed grievance past its retention goes.
         cron(purge_expired_grievances, hour={22}, minute={0}, run_at_startup=False),
+        cron(purge_expired_reports, hour={22}, minute={30}, run_at_startup=False),
         # Every minute: an application that arrives at 09:00 should not be
         # announced at 09:59. Cheap when the queue is empty -- one indexed
         # query returning nothing.
