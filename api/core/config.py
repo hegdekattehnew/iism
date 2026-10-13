@@ -85,6 +85,17 @@ class Settings(BaseSettings):
     # before a person could.
     notification_retention_days: int = Field(default=90, ge=7)
 
+    # --- grievances and contact messages (Sprint 57, ADR-067) ---
+    # What the grievance page promises, in one place so the page and the operator's overdue badge
+    # cannot disagree: acknowledged within a day, resolved within fifteen.
+    grievance_acknowledge_hours: int = Field(default=24, ge=1)
+    grievance_resolve_days: int = Field(default=15, ge=1)
+    # A closed grievance is kept this long after it was closed, then deleted; an open one never is.
+    grievance_retention_days: int = Field(default=365, ge=30)
+    # Submissions an address, an account or a reply address may make in an hour. The form is public
+    # and writes a row: it is a spam sink unless somebody says how much.
+    grievance_submissions_per_hour: int = Field(default=5, ge=0)
+
     # --- abuse protection ---
     # Per minute. Signed-in requests are limited per *user*, anonymous ones per
     # IP: Indian mobile carriers put many subscribers behind one address (CGNAT),

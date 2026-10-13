@@ -58,6 +58,9 @@ export default defineConfig({
         // The product waits 30 seconds between two requests for one number; a journey that has to
         // see the countdown and wait it out cannot.
         OTP_RESEND_COOLDOWN_SECONDS: "4",
+        // Five public messages an hour per address; every journey here sends from one address,
+        // and repeated runs would meet the limit. The limit itself is a backend test.
+        GRIEVANCE_SUBMISSIONS_PER_HOUR: "0",
         JWT_SECRET_KEY: "e2e-only-key-" + "x".repeat(40),
         WEB_BASE_URL: WEB,
         API_BASE_URL: API,

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { Link } from "@/i18n/navigation";
 import { GRIEVANCE_OFFICER, PRIVACY_NOTICE_VERSION } from "@/lib/legal";
@@ -18,7 +18,7 @@ type Section = { title: string; body: string[] };
  * Sections live in the message files as arrays (read with `t.raw`) so the
  * Hindi text is a translation of the same structure, not a second document.
  */
-export async function LegalPage({ doc }: { doc: Doc }) {
+export async function LegalPage({ doc, children }: { doc: Doc; children?: ReactNode }) {
   const t = await getTranslations("legal");
   const sections = t.raw(`${doc}.sections`) as Section[];
   const officer = [
@@ -73,6 +73,8 @@ export async function LegalPage({ doc }: { doc: Doc }) {
           ))}
         </section>
       ))}
+
+      {children && <div className="mt-12">{children}</div>}
 
       <p className="mt-12 text-sm">
         <Link

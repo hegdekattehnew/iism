@@ -53,6 +53,7 @@ EXPORTED: dict[str, str] = {
     "job_alerts": "job_alerts",
     "sponsor_intents": "sponsorship_offers",
     "application_reviews": "ratings_received",
+    "grievances": "grievances_raised",
     # No foreign key, so named rather than discovered.
     "notifications": "notices",
 }

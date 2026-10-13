@@ -80,6 +80,21 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/MessageForm.tsx",
+    label: "GrievanceIn",
+    expect: {
+      // Through the shared constants, so the server's floor and the browser's are one number;
+      // the describe block at the foot of this file pins the constants themselves.
+      body: ["minLength={BODY_MIN}", "maxLength={BODY_MAX}"],
+      reply_to: ["maxLength={REPLY_TO_MAX}"],
+    },
+  },
+  {
+    file: "components/ops/GrievanceQueue.tsx",
+    label: "GrievanceDecisionIn",
+    expect: { note: ["minLength={NOTE_MIN}", "maxLength={NOTE_MAX}"] },
+  },
+  {
     file: "components/ReviewControl.tsx",
     label: "ReviewIn",
     expect: { comment: ["maxLength={1000}"] },
@@ -172,3 +187,28 @@ describe("the bulk upload screen mirrors the server's limits", () => {
   });
 });
 
+
+/** The grievance form's numbers are the server's, read from its source. */
+describe("the grievance forms mirror the server's limits", () => {
+  const root = join(SRC, "..", "..");
+  const models = readFileSync(join(root, "api/modules/grievances/models.py"), "utf8");
+  const schemas = readFileSync(join(root, "api/modules/grievances/schemas.py"), "utf8");
+  const lib = read("lib/grievances.ts");
+
+  it("the message length", () => {
+    expect(models).toContain("BODY_MIN, BODY_MAX = 10, 4000");
+    expect(lib).toContain("BODY_MIN = 10");
+    expect(lib).toContain("BODY_MAX = 4000");
+  });
+
+  it("the reply address", () => {
+    expect(schemas).toContain("reply_to: Annotated[str, Field(max_length=254)]");
+    expect(lib).toContain("REPLY_TO_MAX = 254");
+  });
+
+  it("the operator's note", () => {
+    expect(schemas).toContain("note: Annotated[str, Field(min_length=10, max_length=1000)]");
+    expect(lib).toContain("NOTE_MIN = 10");
+    expect(lib).toContain("NOTE_MAX = 1000");
+  });
+});
