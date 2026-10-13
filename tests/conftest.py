@@ -37,6 +37,9 @@ def _environment(_containers: tuple[str, str]) -> Iterator[None]:
     # Every test shares one client address, so the suite's own traffic would trip
     # the limiter within a few files. The limiter's tests switch it back on.
     os.environ["RATE_LIMIT_ENABLED"] = "false"
+    # The cooldown between two code requests for one identifier would turn every test that asks
+    # for a second code into a 429; its own tests switch it back on.
+    os.environ["OTP_RESEND_COOLDOWN_SECONDS"] = "0"
     # A real-length key: PyJWT warns below 32 bytes for HMAC-SHA256, and the
     # warning is worth keeping meaningful rather than muting.
     os.environ["JWT_SECRET_KEY"] = "test-only-key-" + "x" * 40

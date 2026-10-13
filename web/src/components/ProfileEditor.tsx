@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 
 import { AboutSection } from "@/components/profile/AboutSection";
-import { CredentialsSection } from "@/components/profile/CredentialsSection";
 import { CompletenessMeter } from "@/components/profile/CompletenessMeter";
 import { OnboardingWizard } from "@/components/profile/OnboardingWizard";
 import {
@@ -17,6 +17,15 @@ import { Alert, ButtonLink, Skeleton } from "@/components/ui";
 import { useIsSignedIn } from "@/lib/auth";
 import { detailOf, isSignedOut } from "@/lib/http";
 import { useProfile } from "@/lib/profile";
+
+// Last on the page and only ever used there, so it is not part of what the profile has to download
+// before it can be used: this route sits a few kilobytes under the first-load ceiling (Sprint 56 put
+// it a kilobyte from it). The placeholder carries `data-loading`, so the footer waits for it.
+const CredentialsSection = dynamic(
+  () =>
+    import("@/components/profile/CredentialsSection").then((m) => m.CredentialsSection),
+  { loading: () => <Skeleton className="h-40 w-full rounded-xl" /> },
+);
 
 export function ProfileEditor() {
   const t = useTranslations("profilePage");

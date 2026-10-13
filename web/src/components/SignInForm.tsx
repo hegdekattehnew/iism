@@ -9,6 +9,8 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens } from "@/lib/auth";
 import { landingFor, lastContext } from "@/lib/context";
+import { failedWith, type WaitError } from "@/lib/http";
+import { useCountdown } from "@/lib/use-countdown";
 
 type Step = "phone" | "code";
 
@@ -38,6 +40,9 @@ export function SignInForm() {
   // The number verified but has no account. Sign-in never creates one: that
   // needs consent to the privacy notice, which only signup asks for.
   const [unregistered, setUnregistered] = useState(false);
+  // How long until another code may be asked for. The server enforces it; this keeps the
+  // button honest so nobody has to press it to find out.
+  const wait = useCountdown();
 
   const errorFor = (status: number | undefined, fallback: string) =>
     status === 429
@@ -56,15 +61,23 @@ export function SignInForm() {
       } = looksLikeEmail(phone)
         ? await api.POST("/auth/email/otp/request", { body: { email: phone } })
         : await api.POST("/auth/otp/request", { body: { phone } });
-      if (err || !data) throw new Error(String(response.status));
+      if (err || !data) throw failedWith(response);
       return data;
     },
     onSuccess: (data) => {
       setDevCode(data.debug_code ?? null);
+      wait.start(data.resend_after_seconds);
       setStep("code");
     },
-    onError: (e: Error) =>
-      setError(errorFor(Number(e.message), t("errorGeneric"))),
+    onError: (e: WaitError) => {
+      // Asking again too soon is not a failure to explain: count down, and say how long.
+      if (Number(e.message) === 429 && e.retryAfter) {
+        wait.start(e.retryAfter);
+        setError(t("errorWait", { seconds: e.retryAfter }));
+        return;
+      }
+      setError(errorFor(Number(e.message), t("errorGeneric")));
+    },
   });
 
   const verify = useMutation({
@@ -222,10 +235,12 @@ export function SignInForm() {
             <button
               type="button"
               onClick={() => request.mutate()}
-              disabled={request.isPending}
-              className="text-brand hover:underline disabled:opacity-50"
+              disabled={request.isPending || wait.remaining > 0}
+              className="text-brand hover:underline disabled:opacity-50 disabled:no-underline"
             >
-              {t("resend")}
+              {wait.remaining > 0
+                ? t("resendIn", { seconds: wait.remaining })
+                : t("resend")}
             </button>
           </div>
         </form>

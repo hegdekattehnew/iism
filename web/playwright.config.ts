@@ -55,6 +55,9 @@ export default defineConfig({
         REDIS_URL: redis,
         ENVIRONMENT: "test",
         RATE_LIMIT_ENABLED: "false",
+        // The product waits 30 seconds between two requests for one number; a journey that has to
+        // see the countdown and wait it out cannot.
+        OTP_RESEND_COOLDOWN_SECONDS: "4",
         JWT_SECRET_KEY: "e2e-only-key-" + "x".repeat(40),
         WEB_BASE_URL: WEB,
         API_BASE_URL: API,

@@ -37,6 +37,13 @@ export const world = {
   // give, so it is a field of its own rather than a role in `memberships`.
   isStaff: false,
   memberships: [] as TestMembership[],
+  // How this person signs in (Sprint 56): what `/auth/me` says about the two credentials.
+  account: {
+    phone: "+919812349999" as string | null,
+    email: null as string | null,
+    phone_verified_at: "2026-01-01T00:00:00Z" as string | null,
+    email_verified_at: null as string | null,
+  },
   push: vi.fn(),
 };
 
@@ -47,6 +54,12 @@ export function resetWorld(): void {
   world.pending = false;
   world.isStaff = false;
   world.memberships = [];
+  world.account = {
+    phone: "+919812349999",
+    email: null,
+    phone_verified_at: "2026-01-01T00:00:00Z",
+    email_verified_at: null,
+  };
   world.push = vi.fn();
 }
 
@@ -87,8 +100,7 @@ function derived() {
         : {
             memberships,
             full_name: null,
-            phone: "+919812349999",
-            email: null,
+            ...world.account,
             is_staff: world.isStaff,
           },
     isPending: world.pending,

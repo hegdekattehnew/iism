@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { CredentialsSection } from "@/components/profile/CredentialsSection";
 import { Alert, Button, Skeleton } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -92,6 +93,10 @@ function SignedIn() {
 
   return (
     <div className="mt-8 space-y-6">
+      {/* Every signed-in person, not only a candidate: an organisation-only account has no profile
+          page, and its owner signs in by email, so this is where a lost address is dealt with. */}
+      <CredentialsSection />
+
       <section
         aria-labelledby="consent-heading"
         className="rounded-xl border border-border-token bg-surface p-5"

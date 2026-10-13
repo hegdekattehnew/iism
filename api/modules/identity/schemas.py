@@ -62,6 +62,9 @@ class OtpRequest(BaseModel):
 class OtpRequestResponse(BaseModel):
     sent: bool
     expires_in_seconds: int
+    # How long until another code may be asked for: what the forms count down from. 0 when no
+    # code was sent. The server enforces it regardless (a 429 with `Retry-After`).
+    resend_after_seconds: int = 0
     # Development only; absent in any other environment (see Settings.expose_otp).
     debug_code: str | None = None
 
@@ -173,6 +176,16 @@ class TokenPairOut(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+
+
+class CredentialChangedOut(TokenPairOut):
+    """A sign-in credential was replaced or removed.
+
+    Every session ended, this caller's included, so the answer carries a fresh pair: the person who
+    changed their number must not be signed out by doing so.
+    """
+
+    user: "UserOut"
 
 
 class SignInOut(TokenPairOut):
