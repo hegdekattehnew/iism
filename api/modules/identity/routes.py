@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.config import get_settings
 from api.core.database import get_db_session
 from api.core.security import (
     TokenPair,
@@ -29,6 +30,15 @@ def _tokens(pair: TokenPair) -> schemas.TokenPairOut:
     )
 
 
+def _code_sent(ttl: int, debug_code: str | None) -> schemas.OtpRequestResponse:
+    return schemas.OtpRequestResponse(
+        sent=True,
+        expires_in_seconds=ttl,
+        debug_code=debug_code,
+        resend_after_seconds=get_settings().otp_resend_cooldown_seconds,
+    )
+
+
 def _signed_in(
     pair: TokenPair, *, created: bool, organisation_slug: str | None = None
 ) -> schemas.SignInOut:
@@ -49,7 +59,7 @@ async def request_otp(payload: schemas.OtpRequest) -> schemas.OtpRequestResponse
     exists — otherwise the endpoint enumerates registered phone numbers.
     """
     ttl, debug_code = await service.request_otp(payload.phone)
-    return schemas.OtpRequestResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return _code_sent(ttl, debug_code)
 
 
 @router.post("/otp/verify", response_model=schemas.SignInOut)
@@ -73,7 +83,7 @@ async def request_email_otp(payload: schemas.EmailOtpRequest) -> schemas.OtpRequ
     the same answer, whether or not it has an account.
     """
     ttl, debug_code = await service.request_email_otp(payload.email)
-    return schemas.OtpRequestResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return _code_sent(ttl, debug_code)
 
 
 @router.post("/email/otp/verify", response_model=schemas.SignInOut)
@@ -150,7 +160,7 @@ async def link_email_request(
 ) -> schemas.OtpRequestResponse:
     """Start adding an email to the signed-in account. Writes nothing yet."""
     ttl, debug_code = await service.request_link_code("email", payload.email)
-    return schemas.OtpRequestResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return _code_sent(ttl, debug_code)
 
 
 @account_router.post("/credentials/email/verify", response_model=schemas.UserOut)
@@ -168,7 +178,7 @@ async def link_phone_request(
     payload: schemas.LinkPhoneRequest, user: User = Depends(get_current_user)
 ) -> schemas.OtpRequestResponse:
     ttl, debug_code = await service.request_link_code("sms", payload.phone)
-    return schemas.OtpRequestResponse(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return _code_sent(ttl, debug_code)
 
 
 @account_router.post("/credentials/phone/verify", response_model=schemas.UserOut)
@@ -179,6 +189,53 @@ async def link_phone_verify(
 ) -> schemas.UserOut:
     updated = await service.confirm_link(db, user, "sms", payload.phone, payload.code)
     return schemas.UserOut.model_validate(updated)
+
+
+def _changed(user: User, pair: TokenPair) -> schemas.CredentialChangedOut:
+    return schemas.CredentialChangedOut(
+        access_token=pair.access_token,
+        refresh_token=pair.refresh_token,
+        expires_in=pair.expires_in,
+        user=schemas.UserOut.model_validate(user),
+    )
+
+
+@account_router.post("/credentials/email/replace", response_model=schemas.CredentialChangedOut)
+async def replace_email(
+    payload: schemas.LinkEmailVerify,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> schemas.CredentialChangedOut:
+    """Change the email the account signs in with, by proving the new one. Ends every session."""
+    updated, pair = await service.replace_credential(db, user, "email", payload.email, payload.code)
+    return _changed(updated, pair)
+
+
+@account_router.post("/credentials/phone/replace", response_model=schemas.CredentialChangedOut)
+async def replace_phone(
+    payload: schemas.LinkPhoneVerify,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> schemas.CredentialChangedOut:
+    updated, pair = await service.replace_credential(db, user, "sms", payload.phone, payload.code)
+    return _changed(updated, pair)
+
+
+@account_router.delete("/credentials/email", response_model=schemas.CredentialChangedOut)
+async def remove_email(
+    db: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)
+) -> schemas.CredentialChangedOut:
+    """Remove the email, while another verified way in remains. Ends every session."""
+    updated, pair = await service.unlink_credential(db, user, "email")
+    return _changed(updated, pair)
+
+
+@account_router.delete("/credentials/phone", response_model=schemas.CredentialChangedOut)
+async def remove_phone(
+    db: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)
+) -> schemas.CredentialChangedOut:
+    updated, pair = await service.unlink_credential(db, user, "sms")
+    return _changed(updated, pair)
 
 
 @account_router.post("/organisations", response_model=schemas.TenantOut, status_code=201)

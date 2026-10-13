@@ -57,6 +57,7 @@ _USER_REFRESH_SET = "auth:refresh:user:{user_id}"
 _OTP_KEY = "auth:otp:{channel}:{identifier}"
 _OTP_ATTEMPTS_KEY = "auth:otp:attempts:{channel}:{identifier}"
 _OTP_RATE_KEY = "auth:otp:rate:{channel}:{identifier}"
+_OTP_COOLDOWN_KEY = "auth:otp:cooldown:{channel}:{identifier}"
 
 # How a one-time code reaches its owner. The OTP machinery itself is
 # credential-blind (ADR-032: both login paths converge on one token path); only
@@ -252,8 +253,32 @@ async def check_otp(channel: Channel, identifier: str, code: str) -> bool:
 
 
 async def enforce_otp_rate_limit(channel: Channel, identifier: str) -> None:
+    """Every way of asking for a code goes through here: sign-in by phone or email, organisation
+    registration and both linking requests.
+
+    Two limits, for two different abuses. A **cooldown** between two requests for one identifier
+    (`SET NX EX`, so asking is also what starts the wait) answers the double tap and the impatient
+    press, and is what the forms count down from; a **budget** per window answers a flood. The
+    cooldown is checked first and does not spend the budget, so a person waiting out a wait is not
+    penalised for pressing the button. Both are per identifier whether or not an account exists, so
+    neither reveals whether one does.
+    """
     settings = get_settings()
     redis = get_redis()
+
+    cooldown = settings.otp_resend_cooldown_seconds
+    if cooldown > 0:
+        wait_key = _OTP_COOLDOWN_KEY.format(channel=channel, identifier=identifier)
+        if not await redis.set(wait_key, "1", nx=True, ex=cooldown):
+            remaining = await redis.ttl(wait_key)
+            seconds = remaining if remaining and remaining > 0 else cooldown
+            log.info("auth.otp_cooldown", channel=channel, seconds=seconds)
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"A code was just sent. Wait {seconds} seconds before asking for a new one.",
+                headers={"Retry-After": str(seconds)},
+            )
+
     key = _OTP_RATE_KEY.format(channel=channel, identifier=identifier)
     count = await redis.incr(key)
     if count == 1:

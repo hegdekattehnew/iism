@@ -3310,3 +3310,45 @@ the condition for enforcing it had been met for two sprints with no one assigned
   `routes.d.ts` that conflicts with the real one (`Route` collapses to `never`). Stop the dev server, or move `.next/dev/types` aside, before a browser build.
 - **Not done, and why:** search-engine optimisation (per-page metadata, structured `JobPosting` data, a sitemap and `robots.txt`), a share control, deployment and monetisation were scoped out by the
   owner for later. The measured finding that motivates the first of them stands: every vacancy, course and standard page carries the same title and description.
+
+
+## ADR-066: A Code May Be Asked For Again After a Wait, a Credential Is Changed by Proving the New One, and Changing It Ends the Other Sessions
+
+**Status:** Accepted (October 2026). Sprint 56. No migration. Extends ADR-009, ADR-032 and ADR-038.
+
+**Context:** A one-time code is the only way into an account (no password anywhere), so the phone number or email it goes to **is** the account, and a code that does not arrive is a lost user. Reading the code for the sprint's plan found more than the roadmap assumed. (1) **No cooldown.** `enforce_otp_rate_limit` was a budget (5 per identifier per 15 minutes); nothing separated two requests, and the sign-up form had no way to ask again at all (sign-in had a resend button with no countdown). (2) **A silent overwrite.** `POST /me/credentials/{phone,email}/verify` replaced a credential already held in that channel: no notice to the old address, no session ended, so a stolen session could swap the number or address and keep the account. (3) **No removal**, and a link screen that could only add the credential that was missing. (4) **A trap in the obvious resend:** for an organisation, asking again through `/auth/org/register` re-queues a pending organisation of the same name, and the duplicate-name refusal then fails the person at verification.
+
+**Decision:**
+
+- **One cooldown, in the one place every code request passes.** `enforce_otp_rate_limit` does `SET NX EX` first: a second request for the same identifier inside `otp_resend_cooldown_seconds` (default 30) is a 429 with `Retry-After` and a sentence saying how long. It is checked before, and does not spend, the 15-minute budget. It is per identifier whether or not an account exists, as the budget already was, so it is not an enumeration oracle. The response carries `resend_after_seconds` so the forms count down without guessing; the countdown is a deadline, not a tick counter, because a background tab throttles its timers.
+- **An organisation asks again for a sign-in code, never registers again** (`/auth/email/otp/request`, the same key and the same verify).
+- **Add is add-only.** `confirm_link` refuses (409, "replace it instead") when the channel already holds a different value, before the code is spent. The same value is an idempotent re-verify.
+- **Replace proves the new identifier, not the old one.** The usual reason to replace is that the old one is lost. In its place: a live session, a code sent to the new identifier, the other credential being told, and **every other session ending**. `POST /me/credentials/{phone,email}/replace` and `DELETE /me/credentials/{phone,email}` revoke all refresh tokens and return a **fresh pair**, so the person who changed their number is not signed out of the screen they changed it on (the interface must store it: a component test fails if it does not).
+- **Remove only while another verified way in remains.** "Verified" matters: an address typed in and never proved is not a way back. The user row is locked (`SELECT ... FOR UPDATE`) before the check, because the check is followed by a write and removing the phone and the email at the same moment would otherwise pass it twice and leave an account nobody can open; `ck_users_has_identifier` would turn the loser into a 500.
+- **The notice is inline, best effort, and email only.** An outbox row names a recipient and resolves the address at send time (ADR-006, ADR-023), which after a replacement is the *new* address; this notice must reach the one taken away, so the address is captured before the change. A failure is logged and never undoes the change. No SMS: it needs a DLT-registered template and costs money. A phone-only person has nobody to tell, which is why the account and profile pages ask them to add an email.
+- **The screen** (`CredentialsSection`, on the profile and on `/account` so an organisation-only account has it too): add, change (a code to the new one, then confirm), remove (asked twice), a countdown on every resend, and the new tokens stored after a change. It is loaded lazily on the profile, which sits a few kilobytes under the first-load ceiling.
+
+**Options considered:**
+
+1. A longer budget only (no cooldown)
+2. **A cooldown shared by every code request** (chosen)
+3. Send the notice through the notification outbox
+4. **Send it inline to an address captured before the change** (chosen)
+5. Require a code to the old identifier to replace it
+6. **Require a code to the new one, end other sessions, tell the other credential** (chosen)
+7. Return only the user from replace/remove and make the person sign in again
+8. **Return a fresh token pair** (chosen)
+
+**Trade-offs:**
+
+- Option 3: ✅ Retries, locale, no inline latency ❌ Cannot address the credential that was removed, and would need a hand-written template CHECK.
+- Option 5: ✅ Strongest ❌ Defeats the purpose: the person who lost the number cannot answer it.
+- Option 7: ✅ Simplest ❌ A person who changes a number is signed out by doing so, on the page they did it on.
+
+**Consequences:**
+
+- **Recycled phone numbers are a risk this does not close.** A number reassigned by the carrier lets its new holder ask for a code and sign in to the old account, and "prove the new one" cannot see that. The mitigation is the backup email and, later, an operator-assisted identity policy for an account that has lost every credential (a policy question, not code; not built).
+- **Phone codes reach a real phone only once SMS is registered (DLT).** Until then recovery works through email, and the console provider is the only phone path in development.
+- **Access tokens of other sessions live until they expire (15 minutes)**; only refresh is revoked. Stated, not hidden: ending an access token early would need a revocation list on every request.
+- **Measured by tests that fail without the rule:** no revocation (two session tests), add overwriting again, no "another way in" check (two tests), the notice going to the wrong address, the missing row lock (the committed-row race test fails with an `IntegrityError`), a component test for each interface branch including "forgets the new tokens", and the organisation resend asking to register again.
+- **Not done:** an analytics event for credential changes (a hand-written CHECK migration; the lockout rate is not yet worth one), a notice by SMS, and proof of the old identifier.

@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(65 ADRs). Read it before making any structural decision — the summary below
+(66 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -492,6 +492,12 @@ split would have to turn into interfaces first; do not add to it casually.
   with committed rows (`tests/test_bulk_apply_rollback.py`, `tests/concurrency.py`). `float()` accepts `nan`, `inf` and `1e999` and `int()` of each raises: any number read from a file checks `math.isfinite` first.
 - **`make gen-api` reads whatever is running on :8000, and a dev API that has not reloaded serves an old schema.** One regenerated client deleted Sprint 53's fields. Generate from a fresh app
   (`app.openapi()` dumped to a file, then `openapi-typescript`) and expect a zero-line diff when no endpoint changed; restart `make api` and `make worker` after pulling.
+- **Every way of asking for a code goes through `enforce_otp_rate_limit`, which holds both a cooldown and a budget** (ADR-066). The cooldown (`otp_resend_cooldown_seconds`, 30; 0 in the test suite via `tests/conftest.py`) is
+  a `SET NX EX` checked first and not counted against the budget; the answer carries `resend_after_seconds` and a refusal carries `Retry-After`, and the forms count down from them (`useCountdown`: a deadline, not
+  ticks). A new code path calls it; it never rolls its own limit. An organisation asks again through `/auth/email/otp/request`, **never** by registering again.
+- **A credential is changed by proving the new one, and changing it ends the other sessions** (ADR-066). `replace_credential` / `unlink_credential` revoke every refresh token and **return a fresh pair that the interface
+  must store**, or the person is signed out by their own action. Removing takes a row lock on the user before asking "is another verified way in left?". A notice that must reach an address that is being taken away
+  cannot go through the outbox (it resolves the recipient at send time): it is sent inline, best effort, email only.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -927,6 +933,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > (`visibility`) while any placeholder is on the page, three screens that returned nothing while loading return a `Skeleton`, and `checkPage` fails a page above 0.1 -- on a phone viewport too, with API reads delayed, which is
 > the only way it can see this (a first version passed the very pages that were jumping). The CSP is now **enforced** in a production build. All 119 browser tests pass; each new check was proved able to fail.
 > **Deferred by the owner:** SEO, deployment and monetisation.
+
+> **Sprint 56 is done** (ADR-066, no migration): *never locked out*. A code can be asked for again after a wait (one cooldown in the one place every request passes, a countdown on sign-in, sign-up and the credential forms;
+> an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
+> every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
+> (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
 
 **Deleting one organisation** (reported 2026-09-23, fixed the same day). A job seeker who had
 created an employer *and* a training provider wanted rid of only the first, and found that the one

@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     # denial-of-wallet on the SMS bill, not merely a nuisance.
     otp_request_limit: int = 5
     otp_request_window_seconds: int = 900
+    # The wait between two requests for one phone or address. The budget above
+    # stops a flood over fifteen minutes; this stops the double tap and the
+    # impatient fourth press, and it is what the forms count down from. 0 turns
+    # it off (the test suite does, as it does the request limiter).
+    otp_resend_cooldown_seconds: int = 30
     # Development only: return the code in the API response so the flow can be
     # exercised without an SMS provider. Must never be true outside development.
     otp_expose_in_response: bool = True

@@ -9,7 +9,8 @@ import { WELCOME_BACK } from "@/components/ReturningNotice";
 import { Button, ButtonLink } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-import { statusOf } from "@/lib/http";
+import { failedWith, statusOf, type WaitError } from "@/lib/http";
+import { useCountdown } from "@/lib/use-countdown";
 import { setTokens, useIsSignedIn } from "@/lib/auth";
 import { PRIVACY_NOTICE_VERSION } from "@/lib/legal";
 import { SEEKER, landingFor, lastContext } from "@/lib/context";
@@ -158,6 +159,49 @@ function ColdSignUp({ type }: { type: SignUpType }) {
   const [sent, setSent] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Until another code may be asked for. A code that never arrives is a lost user, and this form
+  // had no way to ask again at all.
+  const wait = useCountdown();
+
+  // Asking again too soon is not a failure to explain: count down, and say how long.
+  const onAskError = (e: WaitError) => {
+    if (Number(e.message) === 429 && e.retryAfter) {
+      wait.start(e.retryAfter);
+      setError(ta("errorWait", { seconds: e.retryAfter }));
+      return;
+    }
+    setError(
+      Number(e.message) === 429
+        ? ta("errorRateLimited")
+        : Number(e.message) === 422
+          ? t("errorInvalid")
+          : t("errorGeneric"),
+    );
+  };
+
+  // A second code for the address or number already typed. For an organisation this must **not**
+  // register again: the address now exists, so a second registration would hold a second pending
+  // organisation of the same name and the duplicate-name refusal would fail the person at
+  // verification. It is an ordinary sign-in code, and verifying it is the same step.
+  const resend = useMutation({
+    mutationFn: async () => {
+      setError(null);
+      const {
+        data,
+        error: err,
+        response,
+      } = isSeeker
+        ? await api.POST("/auth/otp/request", { body: { phone: identifier } })
+        : await api.POST("/auth/email/otp/request", { body: { email: identifier } });
+      if (err || !data) throw failedWith(response);
+      return data;
+    },
+    onSuccess: (data) => {
+      setDevCode(data.debug_code ?? null);
+      wait.start(data.resend_after_seconds);
+    },
+    onError: onAskError,
+  });
 
   const request = useMutation({
     mutationFn: async () => {
@@ -176,7 +220,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
               consent_version: PRIVACY_NOTICE_VERSION,
             },
           });
-      if (err || !data) throw new Error(String(response.status));
+      if (err || !data) throw failedWith(response);
       return data;
     },
     onSuccess: (data) => {
@@ -188,16 +232,10 @@ function ColdSignUp({ type }: { type: SignUpType }) {
         return;
       }
       setDevCode(data.debug_code ?? null);
+      wait.start(data.resend_after_seconds);
       setSent(true);
     },
-    onError: (e: Error) =>
-      setError(
-        Number(e.message) === 429
-          ? ta("errorRateLimited")
-          : Number(e.message) === 422
-            ? t("errorInvalid")
-            : t("errorGeneric"),
-      ),
+    onError: onAskError,
   });
 
   const verify = useMutation({
@@ -393,6 +431,14 @@ function ColdSignUp({ type }: { type: SignUpType }) {
           >
             {verify.isPending ? t("verifying") : t("verify")}
           </Button>
+          <button
+            type="button"
+            onClick={() => resend.mutate()}
+            disabled={resend.isPending || wait.remaining > 0}
+            className="mt-3 w-full rounded-sm text-sm text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:no-underline"
+          >
+            {wait.remaining > 0 ? ta("resendIn", { seconds: wait.remaining }) : ta("resend")}
+          </button>
           <button
             type="button"
             onClick={() => {

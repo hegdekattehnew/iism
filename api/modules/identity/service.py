@@ -22,11 +22,13 @@ from datetime import UTC, datetime, timedelta
 import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider, get_notification_provider
 from api.core.cache import get_redis
 from api.core.config import get_settings
+from api.core.redaction import mask_email, mask_phone
 from api.core.security import (
     Channel,
     TokenPair,
@@ -34,6 +36,7 @@ from api.core.security import (
     enforce_otp_rate_limit,
     generate_otp,
     issue_token_pair,
+    revoke_all_for_user,
     store_otp,
 )
 from api.core.slugs import add_with_unique_slug
@@ -505,6 +508,7 @@ class OrgRegistration:
     expires_in_seconds: int
     debug_code: str | None = None
     organisation_slug: str | None = None
+    resend_after_seconds: int = 0
 
 
 async def register_or_add_organisation(
@@ -537,7 +541,12 @@ async def register_or_add_organisation(
         return OrgRegistration(sent=False, expires_in_seconds=0, organisation_slug=tenant.slug)
 
     ttl, debug_code = await register_organisation(db, email, name, tenant_type, consent_version)
-    return OrgRegistration(sent=True, expires_in_seconds=ttl, debug_code=debug_code)
+    return OrgRegistration(
+        sent=True,
+        expires_in_seconds=ttl,
+        debug_code=debug_code,
+        resend_after_seconds=get_settings().otp_resend_cooldown_seconds,
+    )
 
 
 async def register_organisation(
@@ -620,18 +629,21 @@ async def request_link_code(channel: Channel, identifier: str) -> tuple[int, str
     return settings.otp_ttl_seconds, code if settings.expose_otp else None
 
 
-async def confirm_link(
-    db: AsyncSession, user: User, channel: Channel, identifier: str, code: str
-) -> User:
-    """Attach a verified identifier to the signed-in account.
+def _held(user: User, channel: Channel) -> str | None:
+    return user.phone if channel == "sms" else user.email
 
-    Refuses if another account already holds it. Merging two accounts is a real
-    operation with real consequences for profiles and memberships, and it is not
-    something a login form should perform silently.
-    """
-    if not await check_otp(channel, identifier, code):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
 
+def _same(channel: Channel, a: str | None, b: str | None) -> bool:
+    if a is None or b is None:
+        return False
+    return a == b if channel == "sms" else a.lower() == b.lower()
+
+
+def _noun(channel: Channel) -> str:
+    return "phone number" if channel == "sms" else "email address"
+
+
+async def _holder_of(db: AsyncSession, channel: Channel, identifier: str) -> User | None:
     # Case-insensitive for email, as every other email lookup here is. A
     # case-sensitive comparison let `Admin@Clinic.in` walk past a 409 meant to
     # protect `admin@clinic.in`, straight into the unique index.
@@ -640,7 +652,33 @@ async def confirm_link(
         if channel == "sms"
         else func.lower(User.email) == identifier.lower()
     )
-    holder = await db.scalar(select(User).where(match))
+    return await db.scalar(select(User).where(match))
+
+
+async def confirm_link(
+    db: AsyncSession, user: User, channel: Channel, identifier: str, code: str
+) -> User:
+    """**Add** a verified identifier the account does not have yet.
+
+    Refuses if another account already holds it. Merging two accounts is a real
+    operation with real consequences for profiles and memberships, and it is not
+    something a login form should perform silently.
+
+    Refuses, too, when this account already holds a *different* identifier of the
+    same kind. Until Sprint 56 it overwrote it: no notice to the old address, no
+    session ended, so a stolen session could swap the number or address and keep
+    the account. Changing one is `replace_credential`, which does both.
+    """
+    held = _held(user, channel)
+    if held is not None and not _same(channel, held, identifier):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"A different {_noun(channel)} is already on this account. Replace it instead.",
+        )
+    if not await check_otp(channel, identifier, code):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
+
+    holder = await _holder_of(db, channel, identifier)
     if holder is not None and holder.id != user.id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Already linked to another account")
 
@@ -653,3 +691,190 @@ async def confirm_link(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+# ----------------------------------------- replacing and removing a credential
+
+_CREDENTIAL_SUBJECT = {
+    "en": "Your IISM sign-in details were changed",
+    "hi": "आपके IISM साइन-इन विवरण बदले गए",
+}
+_CREDENTIAL_BODY = {
+    "en": (
+        "The {what} you sign in to IISM with was {action}.\n\n{detail}\n\n"
+        "If this was you, nothing more is needed. If it was not, someone else has your account: "
+        "use the grievance page on the IISM website to tell us."
+    ),
+    "hi": (
+        "जिस {what} से आप IISM में साइन इन करते हैं, उसे {action}।\n\n{detail}\n\n"
+        "अगर यह आपने किया है तो कुछ और करने की ज़रूरत नहीं। अगर नहीं, तो आपका खाता किसी और के पास है: "
+        "हमें बताने के लिए IISM वेबसाइट का शिकायत पृष्ठ इस्तेमाल करें।"
+    ),
+}
+_WHAT = {
+    ("sms", "en"): "phone number",
+    ("email", "en"): "email address",
+    ("sms", "hi"): "फ़ोन नंबर",
+    ("email", "hi"): "ईमेल पता",
+}
+
+
+async def _tell_credential_changed(
+    *, address: str | None, locale: str, channel: Channel, replaced: bool, now_holds: str | None
+) -> None:
+    """Tell somebody who is still reachable that a sign-in credential changed.
+
+    **Inline and best effort, and not through the outbox, on purpose.** An outbox row names its
+    recipient and resolves the address at send time, which after a replacement is the *new* one;
+    this notice has to reach the one that was just taken away, so the address is captured before the
+    change and used here. A failure is logged and never fails the change: the person asked for it
+    and it has happened.
+
+    **Email only.** A phone notice is an SMS, which needs a registered template (DLT) and costs
+    money; a phone-only person has nobody to tell, which is why the account page asks them to add
+    an email.
+    """
+    if not address:
+        return
+    lang = locale if locale in _CREDENTIAL_SUBJECT else "en"
+    what = _WHAT[(channel, lang)]
+    if lang == "hi":
+        action = "बदल दिया गया" if replaced else "हटा दिया गया"
+        detail = f"अब: {now_holds}" if now_holds else ""
+    else:
+        action = "replaced" if replaced else "removed"
+        detail = f"It is now {now_holds}." if now_holds else ""
+    body = (
+        _CREDENTIAL_BODY[lang]
+        .format(what=what, action=action, detail=detail)
+        .replace("\n\n\n\n", "\n\n")
+    )
+    try:
+        await get_email_provider().send_email(address, _CREDENTIAL_SUBJECT[lang], body)
+    except Exception:  # noqa: BLE001 - a notice must never undo what the person asked for
+        log.warning("auth.credential_notice_failed", channel=channel)
+
+
+def _masked(channel: Channel, identifier: str | None) -> str | None:
+    if identifier is None:
+        return None
+    return mask_phone(identifier) if channel == "sms" else mask_email(identifier)
+
+
+async def _locked(db: AsyncSession, user: User) -> User:
+    """The user's row, locked and re-read. Changing who may sign in is a check followed by a write
+    (is another way in left?), so two requests must not both pass the check: removing the phone and
+    the email at once would otherwise leave an account nobody can open."""
+    locked = await db.scalar(
+        select(User)
+        .where(User.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    assert locked is not None
+    return locked
+
+
+async def _sign_in_again(user_id: uuid.UUID) -> TokenPair:
+    """End every session, the caller's included, and hand back a new one: a changed credential must
+    not leave an old session standing, and the person who just changed it must not be signed out by
+    their own action."""
+    await revoke_all_for_user(user_id)
+    return await issue_token_pair(user_id)
+
+
+async def replace_credential(
+    db: AsyncSession, user: User, channel: Channel, identifier: str, code: str
+) -> tuple[User, TokenPair]:
+    """Change the phone number or email the account signs in with, by proving the new one.
+
+    The old identifier is **not** asked for: the usual reason to do this is that it is lost. What
+    stands in for it is a live session, the code sent to the new one, the other credential being
+    told, and every other session ending. What it cannot detect is a phone number that was
+    recycled to somebody else (ADR-066).
+    """
+    held = _held(user, channel)
+    if held is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"There is no {_noun(channel)} on this account to replace. Add one instead.",
+        )
+    if _same(channel, held, identifier):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"That is already the {_noun(channel)} on this account."
+        )
+    if not await check_otp(channel, identifier, code):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
+
+    user = await _locked(db, user)
+    previous = _held(user, channel)
+    other_address = user.email if channel == "sms" else None
+    holder = await _holder_of(db, channel, identifier)
+    if holder is not None and holder.id != user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Already linked to another account")
+
+    now = datetime.now(UTC)
+    if channel == "sms":
+        user.phone, user.phone_verified_at = identifier, now
+    else:
+        user.email, user.email_verified_at = identifier, now
+    try:
+        await db.commit()
+    except IntegrityError as error:  # the unique index, lost to another account a moment ago
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Already linked to another account"
+        ) from error
+    await db.refresh(user)
+
+    tokens = await _sign_in_again(user.id)
+    # An email change tells the old address; a phone change tells the account's email.
+    await _tell_credential_changed(
+        address=previous if channel == "email" else other_address,
+        locale=user.preferred_locale,
+        channel=channel,
+        replaced=True,
+        now_holds=_masked(channel, identifier),
+    )
+    return user, tokens
+
+
+async def unlink_credential(
+    db: AsyncSession, user: User, channel: Channel
+) -> tuple[User, TokenPair]:
+    """Take the phone number or email off the account, while another verified way in remains."""
+    user = await _locked(db, user)
+    removed = _held(user, channel)
+    if removed is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"There is no {_noun(channel)} on this account."
+        )
+    other_verified = (
+        user.email_verified_at is not None and user.email is not None
+        if channel == "sms"
+        else user.phone_verified_at is not None and user.phone is not None
+    )
+    if not other_verified:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"That is the only verified way to sign in. Add and verify another before removing "
+            f"the {_noun(channel)}.",
+        )
+
+    remaining_email = user.email if channel == "sms" else None
+    if channel == "sms":
+        user.phone, user.phone_verified_at = None, None
+    else:
+        user.email, user.email_verified_at = None, None
+    await db.commit()
+    await db.refresh(user)
+
+    tokens = await _sign_in_again(user.id)
+    await _tell_credential_changed(
+        address=removed if channel == "email" else remaining_email,
+        locale=user.preferred_locale,
+        channel=channel,
+        replaced=False,
+        now_holds=None,
+    )
+    return user, tokens

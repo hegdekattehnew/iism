@@ -114,3 +114,18 @@ export function readDetail(body: unknown): string | null {
 export function detailOf(error: unknown): string | null {
   return error instanceof ApiError ? error.detail : null;
 }
+
+/** Seconds the server asked the caller to wait before trying again (`Retry-After`), or 0. */
+export function retryAfterSeconds(response: Response): number {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0;
+}
+
+/** A failed request that remembers how long it was told to wait. */
+export type WaitError = Error & { retryAfter?: number };
+
+export function failedWith(response: Response): WaitError {
+  return Object.assign(new Error(String(response.status)), {
+    retryAfter: retryAfterSeconds(response),
+  });
+}

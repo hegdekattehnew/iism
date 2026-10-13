@@ -555,7 +555,11 @@ export interface paths {
          * @description Start adding an email to the signed-in account. Writes nothing yet.
          */
         post: operations["link_email_request_me_credentials_email_post"];
-        delete?: never;
+        /**
+         * Remove Email
+         * @description Remove the email, while another verified way in remains. Ends every session.
+         */
+        delete: operations["remove_email_me_credentials_email_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -589,7 +593,8 @@ export interface paths {
         put?: never;
         /** Link Phone Request */
         post: operations["link_phone_request_me_credentials_phone_post"];
-        delete?: never;
+        /** Remove Phone */
+        delete: operations["remove_phone_me_credentials_phone_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -606,6 +611,43 @@ export interface paths {
         put?: never;
         /** Link Phone Verify */
         post: operations["link_phone_verify_me_credentials_phone_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/email/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Email
+         * @description Change the email the account signs in with, by proving the new one. Ends every session.
+         */
+        post: operations["replace_email_me_credentials_email_replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/credentials/phone/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace Phone */
+        post: operations["replace_phone_me_credentials_phone_replace_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3480,6 +3522,27 @@ export interface components {
             /** Covers Mandatory */
             covers_mandatory: number;
         };
+        /**
+         * CredentialChangedOut
+         * @description A sign-in credential was replaced or removed.
+         *
+         *     Every session ended, this caller's included, so the answer carries a fresh pair: the person who
+         *     changed their number must not be signed out by doing so.
+         */
+        CredentialChangedOut: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            user: components["schemas"]["UserOut"];
+        };
         /** CriterionOut */
         CriterionOut: {
             /** Pc Ref */
@@ -4664,6 +4727,11 @@ export interface components {
             sent: boolean;
             /** Expires In Seconds */
             expires_in_seconds: number;
+            /**
+             * Resend After Seconds
+             * @default 0
+             */
+            resend_after_seconds: number;
             /** Debug Code */
             debug_code?: string | null;
             /** Organisation Slug */
@@ -4792,6 +4860,11 @@ export interface components {
             sent: boolean;
             /** Expires In Seconds */
             expires_in_seconds: number;
+            /**
+             * Resend After Seconds
+             * @default 0
+             */
+            resend_after_seconds: number;
             /** Debug Code */
             debug_code?: string | null;
         };
@@ -6702,6 +6775,26 @@ export interface operations {
             };
         };
     };
+    remove_email_me_credentials_email_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialChangedOut"];
+                };
+            };
+        };
+    };
     link_email_verify_me_credentials_email_verify_post: {
         parameters: {
             query?: never;
@@ -6768,6 +6861,26 @@ export interface operations {
             };
         };
     };
+    remove_phone_me_credentials_phone_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialChangedOut"];
+                };
+            };
+        };
+    };
     link_phone_verify_me_credentials_phone_verify_post: {
         parameters: {
             query?: never;
@@ -6788,6 +6901,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_email_me_credentials_email_replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkEmailVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialChangedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_phone_me_credentials_phone_replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPhoneVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialChangedOut"];
                 };
             };
             /** @description Validation Error */
