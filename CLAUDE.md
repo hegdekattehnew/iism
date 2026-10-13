@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(67 ADRs). Read it before making any structural decision — the summary below
+(68 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -218,6 +218,13 @@ api/                     FastAPI modular monolith
                          number a person sees is still `score_match`'s. `tests/test_retrieval.py` holds it never
                          below the score *and* tight, and `make seed-scale` / `make benchmark` are how to check a
                          change to either side.
+                         (Sprint 58, ADR-068) `attendance.py` is the other half of "recommend a course": can
+                         this person take it. **Pure like `scoring.py`** (no I/O, no clock): reach (online,
+                         district, state, unknown, elsewhere), started, full, within a budget, and
+                         `rank_key`, whose first term is "closes a mandatory standard" so a nearer course that
+                         closes none never outranks one that does. **Not part of the score** (ADR-037).
+                         `courses_closing_gap(attend=...)` is passed only by candidate-facing callers; without
+                         it the order is the old one exactly (the employer-facing sponsorship callers).
                          (Sprint 50, ADR-060) `batch.py` asks one question of many candidates --
                          `profiles_with_serious_match`, what `programme_report` needs -- by scoring only the
                          pairs whose bound can reach the threshold, **the same answer as the `match_jobs` loop
@@ -304,6 +311,7 @@ api/                     FastAPI modular monolith
                          their own choice, else a guess from their profile that is trusted only on
                          an **exact or alias** match of their own words, and flagged as a guess.
                          The page is `/career-paths` -- `/careers` is the company's own hiring page.
+                         (Sprint 58) Its course suggestions carry the person's own context (see `matching/`).
     privacy/             DPDP export, deletion preview and erasure (ADR-023 adjacent).
                          Spans every module; nothing depends on it.
     operations/          The back office (ADR-042): tenant_verification_events, the
@@ -515,6 +523,10 @@ split would have to turn into interfaces first; do not add to it casually.
   `X-Forwarded-For` entry, only behind our proxy). A form that takes an address from a stranger must not mail it; a hidden field answered with a fake success and nothing stored is the cheap bot filter.
 - **A queue's default view is everything, with what is owed first, never one status** (ADR-067). The grievance queue defaulted to "waiting" and an acknowledged message, still owed a resolution, vanished from the default view
   the moment the first button was pressed; only the browser journey (which pressed it) saw that. A deadline that has two stages needs a view that holds both.
+- **A recommendation says whether you can act on it, and a fact about a course that changes is derived, not stored** (ADR-068). Where, when and how many places go on every suggested course (`CourseSuggestionOut`),
+  ordered by `attendance.rank_key` and never hidden; "seats left" is `seats - enrolled interests` (`interests.enrolled_counts`) and "started" is `starts_on < today_ist()`, because a stored counter or flag is wrong the
+  morning after. A calendar date is formatted in UTC on the web (`timeZone: "UTC"`, parsed with a `Z`): as local midnight it slips a day west of Greenwich. The budget is a per-request query parameter held in
+  `localStorage`, never a profile column (ADR-055). **When a new optional column makes a bulk upload warn on every existing row, the existing expectations change on purpose** -- five did.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -955,6 +967,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 58 is done** (ADR-068, migration 0051): *courses you can attend*. A course has a place, a next intake and seats (seats left derived from enrolled interests, never a counter), and a candidate's suggested
+> courses are ordered by whether they can take them -- a mandatory closer first, then one they can attend, then the nearer -- and **labelled, never hidden**. One shared `SuggestedCourses` list replaces four hand-rolled
+> ones and shows where, when, the fee and the places; a per-request budget moves what they cannot afford down. The scorer is untouched. 1,499 backend / 499 web / 123 browser tests; `make evaluate` holds 25 course
+> expectations, with attendability labels derived from inputs.
 >
 > **Sprint 57 is done** (ADR-067, migration 0050): *a way to complain*. `/contact` and `/grievance` are real forms and the grievance page's promise (acknowledged within 24 hours, resolved within 15 days) has a queue behind it:
 > a new `grievances/` module, an operator queue on `/admin` that marks what is **overdue against the page's own numbers**, a budget and a honeypot on the public endpoint, no relay to an address a stranger typed, a

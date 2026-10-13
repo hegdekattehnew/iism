@@ -15,7 +15,9 @@ part:
 * duplicates therefore collapse on the **highest level taught**, not on the
   strongest signal — the seed's own rule, since a course covering a standard to
   level 4 in one module and level 3 in another does take the learner to 4;
-* a course has no location at all, so none of the geography resolution jobs need.
+* a course's place is optional (an online course has none), so it resolves with the same
+  best-effort `resolve_location` as a vacancy but is never required, and a state or district that
+  does not resolve is kept as typed beside a null id.
 
 What is identical, and identical on purpose: full replacement of the link rows
 rather than a diff, an explicit `draft` on create, and a refusal to publish with
@@ -32,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.core.slugs import add_with_unique_slug
+from api.modules.geography import resolve_location
 from api.modules.marketplace.listings import (
     load_with_skills,
     refuse_emptying_a_published,
@@ -54,6 +57,10 @@ _PLAIN_FIELDS = (
     "duration_hours",
     "fee_inr",
     "nsqf_level",
+    "location_state",
+    "location_district",
+    "starts_on",
+    "seats",
 )
 
 
@@ -137,6 +144,7 @@ async def create_course(
     external_ref: str | None = None,
 ) -> Course:
     """A draft course. `external_ref` is the provider's own id (bulk upload only)."""
+    location = await resolve_location(db, payload.location_state, payload.location_district)
     course = await add_with_unique_slug(
         db,
         Course.slug,
@@ -148,6 +156,8 @@ async def create_course(
             # so omitting this would put an unfinished syllabus in front of
             # candidates. The seed sets `published` on purpose; a form must not.
             status="draft",
+            state_id=location.state_id,
+            district_id=location.district_id,
             external_ref=external_ref,
             **{f: getattr(payload, f) for f in _PLAIN_FIELDS},
         ),
@@ -174,9 +184,11 @@ async def update_course(
     # Anything that can refuse runs before anything is changed (Sprint 55): see
     # `publishing.update_job`.
     resolved = await _resolve_skills(db, payload.skills)
+    location = await resolve_location(db, payload.location_state, payload.location_district)
 
     for field in _PLAIN_FIELDS:
         setattr(course, field, getattr(payload, field))
+    course.state_id, course.district_id = location.state_id, location.district_id
     # The slug is not regenerated: it is a published URL as soon as the course
     # goes live, and rewriting it on a title tweak breaks every link to it.
     await db.flush()

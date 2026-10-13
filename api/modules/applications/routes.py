@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
@@ -147,13 +147,16 @@ async def withdraw_application(
 @router.get("/applications/{application_id}/gap", response_model=ApplicationGapOut)
 async def application_gap(
     application_id: uuid.UUID,
+    budget_inr: int | None = Query(
+        None, ge=0, le=10_000_000, description="What the person would pay for a course, in rupees."
+    ),
     user: User = Depends(get_current_candidate),
     db: AsyncSession = Depends(get_db_session),
     locale: str = Depends(request_locale),
 ) -> ApplicationGapOut:
     """Why not me: the standards this application was missing, and the courses
     that teach them. Computed now, from the candidate's skills as they stand."""
-    gap = await service.application_gap(db, user, application_id)
+    gap = await service.application_gap(db, user, application_id, budget_inr=budget_inr)
     overrides = await overrides_for(db, "job", [gap.application.job], ("title",), locale)
     job = JobRef.model_validate(gap.application.job).model_copy(
         update=overrides.get(gap.application.job_id, {})

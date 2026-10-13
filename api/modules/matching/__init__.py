@@ -8,6 +8,7 @@ The employer console is the same `score_match` with its arguments the other way
 round, which is why it lives here rather than in a module of its own.
 """
 
+from api.modules.matching.attendance import AttendContext
 from api.modules.matching.batch import profiles_with_serious_match
 from api.modules.matching.employer import (
     JobPool,
@@ -44,6 +45,7 @@ from api.modules.matching.service import (
     RoleAlignment,
     RoleFit,
     ScoredJob,
+    attend_context,
     course_role_alignment,
     courses_closing_gap,
     match_jobs,
@@ -52,6 +54,7 @@ from api.modules.matching.service import (
 
 __all__ = [
     "CandidateCardOut",
+    "AttendContext",
     "CourseSuggestion",
     "CourseSuggestionOut",
     "EntryRouteFit",
@@ -75,6 +78,7 @@ __all__ = [
     "employer_org_router",
     "provider_market_router",
     "provider_org_router",
+    "attend_context",
     "courses_closing_gap",
     "match_jobs",
     "profiles_with_serious_match",

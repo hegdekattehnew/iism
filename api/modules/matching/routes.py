@@ -74,12 +74,21 @@ async def list_matches(
 @router.get("/{slug}", response_model=schemas.MatchDetail)
 async def match_detail(
     slug: str,
+    budget_inr: int | None = Query(
+        None,
+        ge=0,
+        le=10_000_000,
+        description=(
+            "What the person would pay for a course, in rupees. Per request and never stored: a "
+            "profile column would need export and erasure treatment."
+        ),
+    ),
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_candidate),
 ) -> schemas.MatchDetail:
     """One job, scored, with the courses that close its gap."""
     profile = await _profile(db, user)
-    detail = await service.match_detail(db, profile.id, user.id, slug)
+    detail = await service.match_detail(db, profile.id, user.id, slug, budget_inr=budget_inr)
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     scored, courses, entry = detail.scored, detail.courses, detail.entry

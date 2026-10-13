@@ -10,6 +10,7 @@ The same two rules `applications/service.py` carries, for the same reasons:
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -29,6 +30,33 @@ from api.modules.marketplace.models import Course
 from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.interests")
+
+_CHUNK = 5_000
+
+
+async def enrolled_counts(
+    db: AsyncSession, course_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """How many learners each course's provider has marked **enrolled** (Sprint 58, ADR-068).
+
+    The one answer behind "seats left". Provider-reported and never platform-verified (ADR-047), so
+    it is only as true as the provider makes it; the screens say "seats left", never a guarantee.
+    Chunked: an `IN (...)` list is bounded (asyncpg refuses more than 32,767 bind parameters), and a
+    common standard is taught by hundreds of courses. A course nobody enrolled on is absent.
+    """
+    counts: dict[uuid.UUID, int] = {}
+    ids = list(dict.fromkeys(course_ids))
+    for start in range(0, len(ids), _CHUNK):
+        rows = await db.execute(
+            select(CourseInterest.course_id, func.count())
+            .where(
+                CourseInterest.course_id.in_(ids[start : start + _CHUNK]),
+                CourseInterest.status == "enrolled",
+            )
+            .group_by(CourseInterest.course_id)
+        )
+        counts.update({course_id: int(n) for course_id, n in rows.all()})
+    return counts
 
 
 async def _published_course(db: AsyncSession, course_slug: str) -> Course:

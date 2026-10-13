@@ -1,4 +1,4 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { InterestPanel } from "@/components/InterestPanel";
@@ -18,6 +18,7 @@ export default async function CourseDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("coursesPage");
+  const format = await getFormatter();
 
   const { data, error, response } = await api.GET(
     "/courses/{slug}",
@@ -39,6 +40,20 @@ export default async function CourseDetailPage({
     data.fee_inr == null || data.fee_inr === 0
       ? t("feeFree")
       : t("fee", { amount: inr(data.fee_inr) });
+
+  const place =
+    data.mode === "online"
+      ? null
+      : [data.location_district, data.location_state].filter(Boolean).join(", ") ||
+        t("placeNotStated");
+  const intake = data.starts_on
+    ? t(data.started ? "startedOn" : "startsOn", {
+        date: format.dateTime(new Date(`${data.starts_on}T00:00:00Z`), {
+          dateStyle: "long",
+          timeZone: "UTC",
+        }),
+      })
+    : t("startNotStated");
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
@@ -78,6 +93,24 @@ export default async function CourseDetailPage({
           <div>
             <dt className="text-xs text-muted">{t("durationLabel")}</dt>
             <dd className="mt-0.5 text-lg font-semibold">{t("duration", { hours: data.duration_hours })}</dd>
+          </div>
+        )}
+        {place && (
+          <div>
+            <dt className="text-xs text-muted">{t("placeLabel")}</dt>
+            <dd className="mt-0.5 text-lg font-semibold">{place}</dd>
+          </div>
+        )}
+        <div>
+          <dt className="text-xs text-muted">{t("intakeLabel")}</dt>
+          <dd className="mt-0.5 text-lg font-semibold">{intake}</dd>
+        </div>
+        {data.seats_left != null && (
+          <div>
+            <dt className="text-xs text-muted">{t("seatsLabel")}</dt>
+            <dd className="mt-0.5 text-lg font-semibold">
+              {data.seats_left === 0 ? t("full") : t("seatsLeft", { count: data.seats_left })}
+            </dd>
           </div>
         )}
       </dl>

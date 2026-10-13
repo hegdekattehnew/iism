@@ -32,11 +32,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from seed_candidates import (  # noqa: E402
     CANDIDATES,
+    COURSE_INTERESTS,  # noqa: E402
     GOLDEN_COURSE_PAIRS,
     GOLDEN_ORDERINGS,
     GOLDEN_PAIRS,
 )
-from seed_marketplace import CLOSED_VACANCY_SLUG, COURSES, JOBS  # noqa: E402
+from seed_marketplace import CLOSED_VACANCY_SLUG, COURSES, JOBS, course_intake  # noqa: E402
 
 PHONES = {c[0] for c in CANDIDATES}
 JOB_SLUGS = {j[0] for j in JOBS}
@@ -51,7 +52,8 @@ JOB_EXPECTATIONS = {
     "missing_mandatory",
     "not_ranked",
 }
-COURSE_EXPECTATIONS = {"closes_mandatory", "no_suggestions"}
+COURSE_EXPECTATIONS = {"closes_mandatory", "no_suggestions", "attendable_first"}
+ATTEND_PREFIXES = ("attendable:", "not_attendable:", "reach:")
 
 EVALUATOR = (ROOT / "scripts" / "evaluate_matching.py").read_text()
 
@@ -79,10 +81,16 @@ class TestEveryExpectationIsHandled:
 
     def test_no_course_pair_uses_an_expectation_nobody_handles(self) -> None:
         used = {
-            e.split(":", 1)[0] if e.startswith("suggests:") else e
+            e.split(":", 1)[0] + ":" if e.startswith(("suggests:", *ATTEND_PREFIXES)) else e
             for _, _, e in GOLDEN_COURSE_PAIRS
         }
-        assert used <= COURSE_EXPECTATIONS | {"suggests"}, used
+        assert used <= COURSE_EXPECTATIONS | {"suggests:", *ATTEND_PREFIXES}, used
+
+    @pytest.mark.parametrize("prefix", ATTEND_PREFIXES)
+    def test_the_evaluator_has_a_branch_for_each_attendability_expectation(
+        self, prefix: str
+    ) -> None:
+        assert f'"{prefix}"' in EVALUATOR, prefix
 
 
 class TestEveryLabelNamesSomethingThatExists:
@@ -152,3 +160,72 @@ class TestTheSetIsWorthHaving:
         in for a revenue signal. It had no labelled data of any kind until
         Sprint 29, which is why Sprint 28 found the gate uncitable."""
         assert len(GOLDEN_COURSE_PAIRS) >= 10
+
+
+class TestAttendabilityLabelsAreDerivedFromInputs:
+    """Sprint 58's labels name no scorer output. Each is a fact about where a candidate lives and
+    where, when and how many a course takes, computed here **independently** of
+    `matching.attendance` -- from the seed's own tables, by name -- so a mislabel fails here and a
+    broken ranking fails `make evaluate`, and neither can hide behind the other."""
+
+    PLACE = {c[0]: (c[3], c[4]) for c in CANDIDATES}
+    MODE = {c[0]: c[6] for c in COURSES}
+    ENROLLED = {
+        slug: sum(1 for _, s, status in COURSE_INTERESTS if s == slug and status == "enrolled")
+        for slug in {s for _, s, _ in COURSE_INTERESTS}
+    }
+
+    def facts(self, phone: str, slug: str) -> dict[str, object]:
+        state, district, offset, seats = course_intake(slug)
+        mine = self.PLACE[phone]
+        if self.MODE[slug] == "online":
+            reach = "online"
+        elif district == mine[1]:
+            reach = "district"
+        elif state == mine[0]:
+            reach = "state"
+        else:
+            reach = "elsewhere"
+        started = offset < 0
+        full = self.ENROLLED.get(slug, 0) >= seats
+        return {
+            "reach": reach,
+            "attendable": reach != "elsewhere" and not started and not full,
+        }
+
+    def labels(self) -> list[tuple[str, str, str]]:
+        return [(p, j, e) for p, j, e in GOLDEN_COURSE_PAIRS if e.startswith(ATTEND_PREFIXES)]
+
+    def test_there_are_attendability_labels_to_check(self) -> None:
+        kinds = {e.split(":", 1)[0] for _, _, e in self.labels()}
+        assert kinds == {"attendable", "not_attendable", "reach"}, kinds
+
+    def test_every_label_matches_what_the_inputs_say(self) -> None:
+        for phone, _job, expectation in self.labels():
+            kind, _, rest = expectation.partition(":")
+            if kind == "reach":
+                slug, _, wanted = rest.rpartition(":")
+                assert self.facts(phone, slug)["reach"] == wanted, expectation
+            else:
+                assert self.facts(phone, rest)["attendable"] is (kind == "attendable"), expectation
+
+    def test_every_course_named_is_seeded_and_has_an_intake(self) -> None:
+        for _, _, expectation in self.labels():
+            slug = expectation.split(":")[1]
+            assert slug in COURSE_SLUGS, expectation
+            course_intake(slug)
+
+    def test_the_set_covers_every_way_a_course_can_be_out_of_reach(self) -> None:
+        named = {e.split(":")[1] for _, _, e in self.labels() if e.startswith("not_attendable")}
+        reasons = set()
+        for phone, _job, e in self.labels():
+            if e.startswith("not_attendable"):
+                f = self.facts(phone, e.split(":")[1])
+                _state, _district, offset, seats = course_intake(e.split(":")[1])
+                if f["reach"] == "elsewhere":
+                    reasons.add("elsewhere")
+                if offset < 0:
+                    reasons.add("started")
+                if self.ENROLLED.get(e.split(":")[1], 0) >= seats:
+                    reasons.add("full")
+        assert named and reasons == {"elsewhere", "started", "full"}, reasons

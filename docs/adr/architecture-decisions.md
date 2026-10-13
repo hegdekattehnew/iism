@@ -3393,3 +3393,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **The budget is per address and per sender, advisory by design** (a cap that deters abuse may stay advisory, ADR-051): Redis is the counter, and an outage fails open.
 - **Measured by tests that fail without the rule:** a stranger's data request, a stranger with nowhere to reply, the honeypot storing, each of the two budgets (separately: the first version of the test could not tell them apart), the retention age, a contact message counted overdue, an acknowledged one counted late to acknowledge, the operator's note reaching the sender's notice, and the queue default hiding an acknowledged message. One mutant is equivalent and documented: the purge of an open row (the CHECK keeps `resolved_at` null there).
 - **Not done:** the dashboard's open and overdue counts, an SMS notice (waits on DLT), threading a reply into the product, a per-sender view of an operator's reply, and a reply template. Appointing the officer and a reply mailbox are the owner's.
+
+## ADR-068: A Recommendation Says Whether You Can Act on It: a Course Has a Place, an Intake and Seats, and Attendability Orders Suggestions Without Touching the Score
+
+**Status:** Accepted (October 2026). Sprint 58 (BL-14.5, BL-14.6). Migration 0051. Extends ADR-036, ADR-037 and ADR-047.
+
+**Context:** The product's pitch is "here is your gap, and the courses that close it". `courses_closing_gap` ranked by how much of the gap a course closes and then by title. A `Course` had a mode, language, fee and duration and **no place, no start date and no seat count**, so an offline course in another state was recommended exactly like one next door, a course that began last month like one that begins on Monday, and a full one like an empty one. Four screens each hand-rolled the same list item and none showed fee, place or start.
+
+**Decision:**
+
+- **Six nullable columns on `courses`**: `location_state`, `location_district` (free text), `state_id`, `district_id` (`SET NULL` foreign keys, resolved on write with the one `geography.resolve_location`, **before anything changes**, the Sprint 55 refuse-first rule), `starts_on` (a calendar date; null is a rolling or unstated intake) and `seats` (CHECK `>= 1`). Nothing is backfilled: a course published before this has no stated place, and a guess would be a factual claim the data does not support. A place is never required to save or publish, so an online course needs none; an offline course with none gets a hint in the editor and a warning in bulk upload.
+- **Seats left is derived, never stored.** `seats - count(enrolled interests)`, floored at zero (`interests.enrolled_counts`, chunked by 5,000 for the bind-parameter limit). A counter would drift the first time somebody is un-enrolled, withdraws or erases their account; the derived figure cannot. It is only as true as the provider's own "enrolled" marks (ADR-047), so the screens say "seats left", never a guarantee. `started` is derived from `starts_on` and the date in India (`core/clock.today_ist`), never stored.
+- **Attendability is its own pure module, `matching/attendance.py`**, like `scoring.py`: no I/O, no clock, no settings. It reads `candidate_facts` (the one reader of a person's locations), classifies a course as `online`, `district`, `state`, `unknown` or `elsewhere`, and says whether it has started, is full, or is within a budget. **It is not part of the score** (ADR-037): no match percentage changes; it orders and labels suggestions that were already chosen by what they teach.
+- **The order**: a course that closes a mandatory standard first (never outranked by a nearer one that closes none), then one the person can attend, then the nearer, then by how much of the gap it closes. **Nothing is hidden**: a started, full, faraway or over-budget course stays in the list, labelled, because it may be the only one teaching the standard and intakes are often rolling. **An unknown place is neutral** (between "your state" and "elsewhere"), and a person with no location on file gets no reordering from place at all: no evidence must not read as "far away".
+- **Only candidate-facing callers pass the context** (`match_detail`, `careers`, "why not me"). `courses_closing_gap(..., attend=None)` is the old order exactly, which the employer-facing sponsorship callers rely on: they know no candidate. Every suggestion carries its attendance either way, so every screen can say where, when and how many places. `CourseSuggestionOut.from_suggestion` stays the one construction site.
+- **The budget is a per-request query parameter** (`budget_inr`, `0..10,000,000`), remembered in the browser only. A profile column would be personal data needing export and erasure treatment (ADR-055), and a number typed once to see another ordering is not a fact about the person.
+- **One shared `SuggestedCourses` list** replaces the four hand-rolled ones. Interest in a full or started course is **not refused**: an interest is a request for contact, not an enrolment (ADR-047).
+- **Bulk upload** gains `state`, `district`, `starts_on`, `seats` through the same planning and `update_course` path, so the refuse-first rule and the "published keeps a standard" invariant apply; a new state clears the old district for courses as for vacancies.
+
+**Options considered:**
+
+1. A stored `seats_left` counter
+2. **Seats left derived from enrolled interests** (chosen)
+3. Hide courses the person cannot attend
+4. **Rank them last and label them** (chosen)
+5. Fold distance and fee into the match score
+6. **Keep the score untouched; order suggestions separately** (chosen)
+7. Store the budget on the profile
+8. **Pass it per request** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ One read ❌ Wrong after the first un-enrolment or erasure, with nothing to reconcile it against.
+- Option 3: ✅ A shorter list ❌ A person with one faraway option is told there is none, and a rolling intake is hidden because its date has passed.
+- Option 5: ✅ One number ❌ Breaks ADR-037's rule that a score is defensible to an employer and reproducible against the golden set, and ranks employers' candidate lists by proximity.
+
+**Consequences:**
+
+- **Start dates go stale.** `starts_on` is the provider's to update; the badge says "started", not "closed", and an online course with an old date still shows, labelled.
+- **Seeded courses now carry places** (relative start dates, so the demo never ages; two are made full by a seeded enrolled learner), and the offline-without-place **warning in bulk upload changes five existing expectations from `ok` to `warning`**, which is the intended pressure on providers.
+- **Measured by tests that fail without the rule:** each reach, started (today is not started), full, the budget edges and a null fee, the order including "a mandatory closer is never outranked", no-context equals the old order (a started course is not demoted), the derived seat count (only `enrolled`, never negative, a seat returns on withdrawal), the refuse-first update, and a golden set whose attendability labels are derived from the seed's own tables and checked independently in CI and by `make evaluate` (25 course expectations hold; breaking the attendable tier fails it).
+- **Not done:** a place filter on course browse, travel time or a distance measure (district and state only), a waiting list, and language preference in the ranking.

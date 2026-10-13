@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.core.clock import today_ist
 from api.core.config import get_settings
 from api.modules.marketplace.models import (
     CandidatePreferredLocation,
@@ -27,6 +28,13 @@ from api.modules.marketplace.models import (
     Job,
     JobSkill,
     open_job,
+)
+from api.modules.matching.attendance import (
+    Attendance,
+    AttendContext,
+    CourseFacts,
+    assess,
+    rank_key,
 )
 from api.modules.matching.retrieval import best_jobs_for, retrieval_limit
 from api.modules.matching.scoring import (
@@ -148,6 +156,26 @@ class CourseSuggestion:
     closes_count: int
     gap_size: int
     covers_mandatory: int
+    # Whether the person can act on it (Sprint 58, BL-14.6). Always filled, so every screen can say
+    # where, when and how many places; only a candidate-facing caller passes the context that makes
+    # the *ordering* depend on it.
+    attendance: Attendance
+    seats_left: int | None = None
+
+
+async def attend_context(
+    db: AsyncSession, profile_id: uuid.UUID, budget_inr: int | None = None
+) -> AttendContext:
+    """Where this person lives and would work, what they would pay, and what day it is.
+
+    Reads `candidate_facts` -- the one reader of a candidate's locations -- rather than a second
+    query of its own. The clock is read here, at the service boundary, so `attendance.assess`
+    stays pure.
+    """
+    facts = await candidate_facts(db, profile_id)
+    return AttendContext(
+        states=facts.states, districts=facts.districts, budget_inr=budget_inr, today=today_ist()
+    )
 
 
 @dataclass(frozen=True)
@@ -309,13 +337,23 @@ def attained_level(held: list[HeldSkill], required: list[RequiredSkill]) -> Deci
 
 
 async def courses_closing_gap(
-    db: AsyncSession, missing: list[MissingSkill], *, limit: int = 5
+    db: AsyncSession,
+    missing: list[MissingSkill],
+    *,
+    limit: int = 5,
+    attend: AttendContext | None = None,
 ) -> list[CourseSuggestion]:
     """Rank courses by how much of *this* gap they close.
 
     Not by how good the course is in general -- by how much of what this person
     is missing it covers. A course teaching nine things they already have and
     one they need is worth less than a course teaching only the one.
+
+    **With `attend`** (a candidate-facing caller that knows who is asking) the order also reflects
+    whether the person can take the course -- see `attendance.rank_key`: a mandatory closer first,
+    then one they can attend, then the nearer. **Without it the order is exactly what it was**, so
+    the employer-facing sponsorship callers, which know no candidate, are unchanged. Either way
+    every suggestion carries its `attendance`, so a screen can say where, when and how many places.
     """
     if not missing:
         return []
@@ -343,26 +381,69 @@ async def courses_closing_gap(
         if key in wanted:
             covered.setdefault(r.course_id, {})[key] = r.name
 
-    courses = {
-        c.id: c
-        for c in (await db.scalars(select(Course).where(Course.id.in_(list(covered.keys()))))).all()
-    }
+    courses = await _load_courses(db, list(covered.keys()))
 
-    suggestions = [
-        CourseSuggestion(
-            course=courses[course_id],
-            closes=sorted(names.values()),
-            closes_count=len(names),
-            gap_size=len(missing),
-            covers_mandatory=len(set(names.keys()) & mandatory_keys),
+    # Function-level: `interests` imports `marketplace`, which this module also depends on, and the
+    # module-level form is a cycle.
+    from api.modules.interests import enrolled_counts
+
+    limited = [c.id for c in courses.values() if c.seats is not None]
+    enrolled = await enrolled_counts(db, limited) if limited else {}
+    context = attend or AttendContext(
+        states=frozenset(), districts=frozenset(), budget_inr=None, today=today_ist()
+    )
+
+    suggestions: list[CourseSuggestion] = []
+    for course_id, names in covered.items():
+        course = courses.get(course_id)
+        if course is None:
+            continue
+        left = None if course.seats is None else max(0, course.seats - enrolled.get(course_id, 0))
+        suggestions.append(
+            CourseSuggestion(
+                course=course,
+                closes=sorted(names.values()),
+                closes_count=len(names),
+                gap_size=len(missing),
+                covers_mandatory=len(set(names.keys()) & mandatory_keys),
+                attendance=assess(
+                    CourseFacts(
+                        mode=course.mode,
+                        state_id=course.state_id,
+                        district_id=course.district_id,
+                        starts_on=course.starts_on,
+                        seats_left=left,
+                        fee_inr=course.fee_inr,
+                    ),
+                    context,
+                ),
+                seats_left=left,
+            )
         )
-        for course_id, names in covered.items()
-        if course_id in courses
-    ]
-    # Mandatory coverage first: a course that unblocks an application beats one
-    # that merely improves a score.
-    suggestions.sort(key=lambda s: (-s.covers_mandatory, -s.closes_count, s.course.title))
+    if attend is None:
+        # Mandatory coverage first: a course that unblocks an application beats one
+        # that merely improves a score.
+        suggestions.sort(key=lambda s: (-s.covers_mandatory, -s.closes_count, s.course.title))
+    else:
+        suggestions.sort(
+            key=lambda s: rank_key(
+                s.attendance,
+                covers_mandatory=s.covers_mandatory,
+                closes_count=s.closes_count,
+                title=s.course.title,
+            )
+        )
     return suggestions[:limit]
+
+
+async def _load_courses(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, Course]:
+    """The courses, in chunks: a common standard is taught by hundreds, and an `IN (...)` list is
+    bounded (asyncpg refuses more than 32,767 bind parameters)."""
+    loaded: dict[uuid.UUID, Course] = {}
+    for start in range(0, len(ids), 5_000):
+        rows = await db.scalars(select(Course).where(Course.id.in_(ids[start : start + 5_000])))
+        loaded.update({c.id: c for c in rows.all()})
+    return loaded
 
 
 @dataclass(frozen=True)
@@ -709,7 +790,12 @@ class ScoredJobDetail:
 
 
 async def match_detail(
-    db: AsyncSession, profile_id: uuid.UUID, user_id: uuid.UUID, slug: str
+    db: AsyncSession,
+    profile_id: uuid.UUID,
+    user_id: uuid.UUID,
+    slug: str,
+    *,
+    budget_inr: int | None = None,
 ) -> ScoredJobDetail | None:
     """Everything one match screen needs, measured as it is assembled.
 
@@ -725,7 +811,8 @@ async def match_detail(
     if scored is None:
         return None
 
-    courses = await courses_closing_gap(db, scored.result.missing)
+    attend = await attend_context(db, profile_id, budget_inr)
+    courses = await courses_closing_gap(db, scored.result.missing, attend=attend)
     entry = await entry_routes_for_job(db, scored.job.id)
 
     from api.modules.analytics import record, record_many

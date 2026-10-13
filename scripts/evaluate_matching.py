@@ -33,7 +33,12 @@ from sqlalchemy import select
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.identity.models import User
 from api.modules.marketplace.models import CandidateProfile
-from api.modules.matching.service import courses_closing_gap, match_job_by_slug, match_jobs
+from api.modules.matching.service import (
+    attend_context,
+    courses_closing_gap,
+    match_job_by_slug,
+    match_jobs,
+)
 
 # How far down a "ranked" expectation may look. Five is what the candidate
 # actually sees above the fold; a larger window would make the claim weaker
@@ -170,8 +175,14 @@ async def main() -> None:
             if scored is None:
                 failures.append(f"{phone} -> {slug}: job not found")
                 continue
-            suggestions = await courses_closing_gap(db, scored.result.missing)
+            # With the person's own context, as every candidate-facing screen asks (Sprint 58);
+            # a wide window, because an attendability label may name a course below the fold.
+            attend = await attend_context(db, profile.id)
+            suggestions = await courses_closing_gap(
+                db, scored.result.missing, limit=50, attend=attend
+            )
             slugs = [s.course.slug for s in suggestions]
+            by_slug = {s.course.slug: s for s in suggestions}
 
             if expectation == "closes_mandatory":
                 if not suggestions:
@@ -189,6 +200,33 @@ async def main() -> None:
                     failures.append(
                         f"{phone} -> {slug}: expected {wanted} among the suggestions, "
                         f"got {', '.join(slugs) or 'nothing'}"
+                    )
+            elif expectation == "attendable_first":
+                if not suggestions or not suggestions[0].attendance.attendable:
+                    failures.append(
+                        f"{phone} -> {slug}: an attendable course exists, so the first suggestion "
+                        f"must be one the person can take; got {slugs[0] if slugs else 'nothing'}"
+                    )
+            elif expectation.startswith(("attendable:", "not_attendable:")):
+                kind, wanted = expectation.split(":", 1)
+                got = by_slug.get(wanted)
+                if got is None:
+                    failures.append(f"{phone} -> {slug}: {wanted} is not among the suggestions")
+                elif got.attendance.attendable != (kind == "attendable"):
+                    failures.append(
+                        f"{phone} -> {slug}: expected {wanted} to be {kind.replace('_', ' ')}, "
+                        f"got reach={got.attendance.reach} started={got.attendance.started} "
+                        f"full={got.attendance.full}"
+                    )
+            elif expectation.startswith("reach:"):
+                _, wanted, reach = expectation.split(":", 2)
+                got = by_slug.get(wanted)
+                if got is None:
+                    failures.append(f"{phone} -> {slug}: {wanted} is not among the suggestions")
+                elif got.attendance.reach != reach:
+                    failures.append(
+                        f"{phone} -> {slug}: expected {wanted} reach {reach}, "
+                        f"got {got.attendance.reach}"
                     )
             elif expectation == "no_suggestions":
                 if suggestions:

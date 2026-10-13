@@ -279,7 +279,16 @@
     "backToCourses": "All courses",
     "level": "NSQF level {level}",
     "feeLabel": "Fee",
-    "durationLabel": "Duration"
+    "durationLabel": "Duration",
+    "placeNotStated": "Place not stated",
+    "startsOn": "Starts {date}",
+    "startedOn": "Started {date}",
+    "startNotStated": "Start date not stated",
+    "placeLabel": "Where",
+    "intakeLabel": "Next intake",
+    "seatsLabel": "Places",
+    "seatsLeft": "{count, plural, one {# seat left} other {# seats left}}",
+    "full": "Full"
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -509,7 +518,6 @@
     "youNeed": "You need",
     "mandatory": "Required",
     "capped": "One required standard is missing, which limits this match.",
-    "closesGap": "Closes {closed} of your {total} missing",
     "coursesHeading": "Courses that close this gap",
     "noCourses": "No course on the platform covers this gap yet.",
     "entryHeading": "Getting qualified",
@@ -520,7 +528,6 @@
     "viewJob": "View the job",
     "backToMatches": "All matches",
     "loadError": "Could not load your matches.",
-    "hours": "{hours} hours",
     "nearDistrict": "In your district",
     "nearState": "In your state",
     "experienceShort": "{years, plural, one {# year} other {# years}} short of the experience this role asks for",
@@ -944,7 +951,14 @@
       "noCourses": "No published courses yet.",
       "interestSecondary": "{live} currently live"
     },
-    "uploadCourses": "Upload a spreadsheet"
+    "uploadCourses": "Upload a spreadsheet",
+    "locationState": "State where it is taught",
+    "locationDistrict": "District or city",
+    "placeHint": "Leave the place blank for an online course.",
+    "startsOn": "Next intake starts",
+    "startsOnHint": "Leave blank if you admit people all the time.",
+    "seats": "Seats in the next intake",
+    "seatsHint": "Seats left is worked out from the learners you mark as enrolled."
   },
   "chooser": {
     "title": "I'm here to…",
@@ -1772,5 +1786,32 @@
     "resolve": "Resolve",
     "dismiss": "Dismiss",
     "decideFailed": "Could not save that decision. Try again."
+  },
+  "suggestedCourses": {
+    "mode": {
+      "online": "Online",
+      "offline": "In person",
+      "hybrid": "Hybrid"
+    },
+    "placeNotStated": "Place not stated",
+    "startsOn": "Starts {date}",
+    "startedOn": "Started {date}",
+    "startNotStated": "Start date not stated",
+    "free": "Free",
+    "fee": "₹{amount}",
+    "hours": "{hours} hours",
+    "seatsLeft": "{count, plural, one {# seat left} other {# seats left}}",
+    "reach": {
+      "online": "Online",
+      "district": "In your district",
+      "state": "In your state",
+      "elsewhere": "Elsewhere"
+    },
+    "started": "Already started",
+    "full": "Full",
+    "overBudget": "Over your budget",
+    "closesGap": "Closes {closed} of {total} of your gap",
+    "budgetLabel": "What would you pay for a course? (₹)",
+    "budgetClear": "Clear"
   }
 }

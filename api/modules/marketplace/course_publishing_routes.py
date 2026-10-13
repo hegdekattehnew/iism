@@ -12,9 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
-from api.modules.marketplace import course_publishing, schemas
+from api.modules.marketplace import course_publishing, schemas, service
+from api.modules.marketplace.models import Course
 
 router = APIRouter(prefix="/org/{org_slug}/courses", tags=["publishing"])
+
+
+async def _out(db: AsyncSession, courses: list[Course]) -> list[schemas.OrgCourseOut]:
+    """A provider's own listings, with the seats still free on each (Sprint 58)."""
+    left = await service.seats_left_for(db, courses)
+    return [
+        schemas.OrgCourseOut.model_validate(c).model_copy(update={"seats_left": left[c.id]})
+        for c in courses
+    ]
+
 
 # Built once at import: `Depends(require(...))` inline rebuilds the dependency
 # on every call, which is what B008 exists to catch.
@@ -32,10 +43,7 @@ async def list_courses(
 ) -> list[schemas.OrgCourseOut]:
     """Drafts included. Every public listing query filters on published, so this
     is the only place an unfinished course is visible at all."""
-    return [
-        schemas.OrgCourseOut.model_validate(c)
-        for c in await course_publishing.list_courses(db, context.tenant.id)
-    ]
+    return await _out(db, await course_publishing.list_courses(db, context.tenant.id))
 
 
 @router.post("", response_model=schemas.OrgCourseOut, status_code=status.HTTP_201_CREATED)
@@ -45,7 +53,7 @@ async def create_course(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgCourseOut:
     course = await course_publishing.create_course(db, context.tenant.id, payload)
-    return schemas.OrgCourseOut.model_validate(course)
+    return (await _out(db, [course]))[0]
 
 
 @router.get("/{slug}", response_model=schemas.OrgCourseOut)
@@ -55,7 +63,7 @@ async def get_course(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgCourseOut:
     course = await course_publishing.get_course(db, context.tenant.id, slug)
-    return schemas.OrgCourseOut.model_validate(course)
+    return (await _out(db, [course]))[0]
 
 
 @router.put("/{slug}", response_model=schemas.OrgCourseOut)
@@ -66,7 +74,7 @@ async def update_course(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgCourseOut:
     course = await course_publishing.update_course(db, context.tenant.id, slug, payload)
-    return schemas.OrgCourseOut.model_validate(course)
+    return (await _out(db, [course]))[0]
 
 
 @router.post("/{slug}/publish", response_model=schemas.OrgCourseOut)
@@ -77,7 +85,7 @@ async def publish_course(
 ) -> schemas.OrgCourseOut:
     """Explicit, and refused for a course teaching no standards."""
     course = await course_publishing.set_published(db, context.tenant.id, slug, True)
-    return schemas.OrgCourseOut.model_validate(course)
+    return (await _out(db, [course]))[0]
 
 
 @router.post("/{slug}/unpublish", response_model=schemas.OrgCourseOut)
@@ -87,7 +95,7 @@ async def unpublish_course(
     db: AsyncSession = Depends(get_db_session),
 ) -> schemas.OrgCourseOut:
     course = await course_publishing.set_published(db, context.tenant.id, slug, False)
-    return schemas.OrgCourseOut.model_validate(course)
+    return (await _out(db, [course]))[0]
 
 
 @router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)

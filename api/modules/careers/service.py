@@ -29,6 +29,7 @@ from api.modules.marketplace.models import (
 from api.modules.matching import (
     CourseSuggestion,
     RoleFit,
+    attend_context,
     courses_closing_gap,
     score_against_roles,
 )
@@ -115,6 +116,8 @@ async def career_ladder(
     user_id: uuid.UUID,
     profile_id: uuid.UUID,
     role_slug: str | None,
+    *,
+    budget_inr: int | None = None,
 ) -> CareerLadder:
     """The roles that build on the person's, with their fit for each.
 
@@ -143,12 +146,13 @@ async def career_ladder(
         return CareerLadder(ladder=None, source=source, has_skills=has_skills, steps=[])
 
     fits = await score_against_roles(db, profile_id, [s.qp_id for s in ladder.steps])
+    attend = await attend_context(db, profile_id, budget_inr)
     steps = [
         CareerStep(
             step=step,
             fit=fits[step.qp_id],
             courses=await courses_closing_gap(
-                db, fits[step.qp_id].result.missing, limit=COURSES_PER_STEP
+                db, fits[step.qp_id].result.missing, limit=COURSES_PER_STEP, attend=attend
             ),
         )
         for step in ladder.steps

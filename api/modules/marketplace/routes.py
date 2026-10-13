@@ -133,8 +133,9 @@ async def get_course(
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
     overrides = await overrides_for(db, "course", [course], ("title", "description"), locale)
+    left = (await service.seats_left_for(db, [course]))[course.id]
     return schemas.CourseDetail.model_validate(course).model_copy(
-        update=overrides.get(course.id, {})
+        update={**overrides.get(course.id, {}), "seats_left": left}
     )
 
 

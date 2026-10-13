@@ -22,6 +22,9 @@ async def career_ladder(
             "from the profile, and says so in `anchor_source`."
         ),
     ),
+    budget_inr: int | None = Query(
+        None, ge=0, le=10_000_000, description="What the person would pay for a course, in rupees."
+    ),
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_candidate),
 ) -> schemas.CareerLadderOut:
@@ -31,5 +34,5 @@ async def career_ladder(
     # the `record()` inside the service has none of our uncommitted work to sweep.
     profile = await ensure_profile(db, user.id)
     return schemas.CareerLadderOut.from_ladder(
-        await service.career_ladder(db, user.id, profile.id, role)
+        await service.career_ladder(db, user.id, profile.id, role, budget_inr=budget_inr)
     )
