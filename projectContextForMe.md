@@ -4,11 +4,11 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-12 · **Sprints 1–53 built and merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30, `63ba8a0`; 53 as PR #35, `6993241`), then seven
-dependabot PRs one at a time, PR #36 (the e2e job's actions to v7) and PR #37 (docs); **`main` is `846738e` and CI on it is green** (§11, "CI facts"). **Sprint 54 (pages that do not jump, and an enforced CSP;
-ADR-065, no migration) is on `sprint-54`, uncommitted.** It measured layout shift on a phone profile and found the footer jumping on every list (0.2 to 0.6; 0.1 is good): one CSS rule plus real placeholders
-fixed it, the browser harness now fails a page that jumps (on a phone viewport too), and the CSP is enforced in a production build. **No next sprint is chosen** (§11, "Queued after Sprint 53"). SEO,
-deployment and monetisation were deferred by the owner on 2026-10-12. K stays 500; real external integrations stay deferred.
+**Last updated:** 2026-10-13 · **Sprints 1–55 built and merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30; 53 as PR #35; 54 as PR #38; the code review's ten
+fixes as PRs #39 and #40), with seven dependabot PRs, PR #36 (the e2e job's actions to v7) and PR #37 (docs) in between; **`main` is `ab9f2c5`**, every PR's CI was green (§11, "CI facts"). **The next six
+sprints are planned** (§11, "Roadmap: Sprints 56 to 61", and backlog v1.15 Epic B14): *never locked out*, *a way to complain*, *courses you can attend*, *a marketplace you can trust*, *hiring that finishes*,
+*a pilot with an agency*. The plan came from a review of all 65 ADRs, the product documents and the code: the product already delivers every PRD story, and what a first real user would trip over is the
+journeys around the core loop. SEO, deployment and monetisation were deferred by the owner on 2026-10-12. K stays 500; real external integrations stay deferred.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -24,11 +24,11 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-54` (Sprint 54, **uncommitted**, 2026-10-12), cut from `main` at `846738e`, which has everything through Sprint 53, every dependabot bump and the docs. No open PR. Every merged branch is deleted, locally and on `origin`. |
-| **CI** | Green on `main` (run `38206302111`, 2026-10-12): Web 1m24s, API 3m29s, **E2E 3m01s**. Read it yourself with `~/bin/gh run list --repo hegdekattehnew/iism --branch main` (§6 explains `gh`; §11 "CI facts" has the rest). |
-| **Last sprint** | 54 — **pages that do not jump, and a policy that blocks** (ADR-065): `checkPage` fails a page whose layout-shift window is above 0.1 (API reads delayed 250 ms, network idle awaited, and a 360x640 phone pass over the public and signed-in pages); the footer is hidden (`visibility`) while any `[data-loading]` placeholder is on the page, three screens that rendered nothing while loading now render a `Skeleton`, the job, course and skill lists have a `ListSkeleton`; the web CSP is enforced in a production build. 119 browser tests, 435 unit tests. Before it: 53 — **every page, an invariant, and the update half of bulk upload**: a browser sweep of ~45 routes in two languages (88 browser tests in all, ~54 s), a flush-against-border check, two defect classes fixed (colour-only inline links, unnamed selects), `npm audit fix` (production audit clean), "a published listing keeps at least one standard" enforced at every write, and `existing=update` on bulk upload (by `external_ref`, only the columns the file carries, live listings acknowledged) (ADR-064, no migration). Before it: 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
-| **Next sprint** | None chosen. Candidates are in §11 "Queued after Sprint 53". `BL-1.3` stays not started. |
-| **Tests** | 1,337 backend (`make check`, re-run on `main` 2026-10-12), 435 web (`cd web && npm test`), **119 browser tests** (`make e2e`: 112 sweep, desktop and phone, + 7 journeys, ~1.9 min warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/profile` 680 of 684 KB |
+| **Branch** | `main` at `ab9f2c5` (2026-10-13), which has everything through Sprint 55. The roadmap documents (backlog v1.15, this file) are on `docs-roadmap`, **uncommitted** until you say so. Every merged branch is deleted, locally and on `origin`. |
+| **CI** | Green on every PR through #40 (2026-10-12): Web about 1m30s, API about 3m30s, **E2E 4m43s to 5m00s**, up from 3 minutes since the phone pass and the read delay (the split is due at about 8). Read it yourself with `~/bin/gh run list --repo hegdekattehnew/iism --branch main` (§6 explains `gh`; §11 "CI facts" has the rest). |
+| **Last sprint** | 55 — **the code review's fixes**: all ten findings of the review of Sprints 51-54 (a `nan` cell, a refused bulk update saved by the next row, a lost insert race, check/apply disagreeing about gigs, a stale district, the update permission, a superscript digit, a duplicate key, two sweep tidy-ups). Before it: 54 — **pages that do not jump, and a policy that blocks** (ADR-065): `checkPage` fails a page whose layout-shift window is above 0.1 (API reads delayed 250 ms, network idle awaited, and a 360x640 phone pass over the public and signed-in pages); the footer is hidden (`visibility`) while any `[data-loading]` placeholder is on the page, three screens that rendered nothing while loading now render a `Skeleton`, the job, course and skill lists have a `ListSkeleton`; the web CSP is enforced in a production build. 119 browser tests, 435 unit tests. Before it: 53 — **every page, an invariant, and the update half of bulk upload**: a browser sweep of ~45 routes in two languages (88 browser tests in all, ~54 s), a flush-against-border check, two defect classes fixed (colour-only inline links, unnamed selects), `npm audit fix` (production audit clean), "a published listing keeps at least one standard" enforced at every write, and `existing=update` on bulk upload (by `external_ref`, only the columns the file carries, live listings acknowledged) (ADR-064, no migration). Before it: 52 — **journeys in a real browser**: Playwright against a production build, six journeys (candidate, employer, provider, operator, Hindi at 360x640, bulk upload), each page checked for console errors, failed requests, CSP violations and contrast-on axe in both colour schemes; it found and fixed five real defects (ADR-062, migration 0049). Before it: 51 — **bulk upload**: an employer uploads a CSV of vacancies and a provider a CSV of courses; the file is checked (nothing written), created as drafts through `create_job`/`create_course`, then published as a separate confirmed act; a `job_role` column expands to the role's compulsory standards (exact or alias only, shown for review, mandatory defaulting to no); idempotent by `external_ref` or a title match; 100 rows a day unverified, 500 verified (ADR-063, migration 0048). Before it: 50.5 — the homepage shows who is here and what has been done, with defined figures and a demonstration marker (ADR-061, no migration). Before it: 50 — scale the rest: the programme report asked once instead of per candidate, the employer overview counted in the database, stall-proof embedding sweeps, a drain index, JIT off, small counts hidden on the programme-by-district view (ADR-060, migration 0047). Before it: 49 — matching you can trust at volume: retrieval ranks before it caps, a scale harness, the district skill-gap view, notification retention and an authorization matrix (ADR-056 to ADR-059, no migration). Before it: 48 the export shows what erasure deletes (ADR-055), 47 an operator screen for role aliases (ADR-054, migration 0046), 46 dependency triage and the slug-uniqueness races (ADR-053), 45 a concurrency audit of the candidate-facing writes and abbreviations in multi-word role search (ADR-052), 44 hand an organisation over in one act and the ownership race (ADR-051, migration 0045), 43 role search trust and the Verified-badge email, 42 career ladders, 41 "Why not me" and "Hire and train" |
+| **Next sprint** | **56 — Never locked out** (BL-14.1 resend a code with a cooldown on every one-time-code path; BL-14.2 replace or remove a sign-in credential). The whole plan, Sprints 56-61, is §11 "Roadmap". `BL-1.3` stays not started. |
+| **Tests** | 1,365 backend (`make check`, 2026-10-12), 436 web (`cd web && npm test`), **119 browser tests** (`make e2e`: 112 sweep, desktop and phone, + 7 journeys, ~1.9 min warm; needs Chromium) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/profile` 680 of 684 KB |
 | **Migrations** | head `0049` (Sprint 52: a partial index on `jobs.closes_at`; **the dev database `iism` is at 0048, so `make migrate` is owed**); 65 ADRs (001-065) |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
@@ -75,13 +75,13 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 
 | Document | What it holds |
 |---|---|
-| `docs/adr/architecture-decisions.md` | **42 ADRs — the source of truth for every design decision.** Read before any structural change. |
+| `docs/adr/architecture-decisions.md` | **65 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. **Read the next row with it.** |
 | `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. **A status table at the top (2026-10-03) says where each stands now**: five closed or mostly closed, two partly closed; the body is left as written. `docs/IISM-Scope-Reconciliation.docx` is the same ledger rewritten for top management (executive summary, scorecard, decisions requested, what to say plainly); regenerate or edit it when a gap's status changes. |
-| `docs/IISM-Product-Backlog.docx` | **Every story's status** — done, in progress, to do (Now / Next / Later), waiting or deferred. Version 1.2 (2026-10-03) adds a status-at-a-glance table, Epic 13 (what shipped in Sprints 33–42), Epics B11–B13, and §4.4 with a proposal for the next sprint. It had stopped at Sprint 38 and still tagged the dashboards `[NOW]`. **Update it when a story's status changes** — it went five sprints stale once. |
+| `docs/IISM-Product-Backlog.docx` | **Every story's status** — done, in progress, to do (Now / Next / Later), waiting or deferred. Version 1.15 (2026-10-13) adds Epic B14 (First-User Readiness) and the Sprint 56-61 roadmap on top of a status-at-a-glance table, Epic 13 (what shipped in Sprints 33–42), Epics B11–B13, and §4.4 with a proposal for the next sprint. It had stopped at Sprint 38 and still tagged the dashboards `[NOW]`. **Update it when a story's status changes** — it went five sprints stale once. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
-| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — Sprints 30–31's is the latest). Lives outside the repo. |
+| `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — currently the Sprint 56-61 MVP roadmap, mirrored in §11 and in the backlog's section 4.4). Lives outside the repo. |
 | `docs/nsqf-source-data-findings.md` | **Everything measured about the NSQF corpus** — field-naming traps, level distributions, content volumes, deduplication rates, translation costs, data-quality issues. Read before touching the importer. |
 | This file | Session-to-session continuity, environment quirks, hard-won gotchas. |
 
@@ -2419,7 +2419,7 @@ Owner decisions: run `npm audit fix` first; widen the browser net first; bulk-up
   `read -s "T?Token: "` then `git credential-osxkeychain store` (zsh: the prompt goes inside the quotes, `read -p` is bash); a push that touches `.github/workflows/` needs the token's **`workflow`** scope;
   a fine-grained token needs Contents and Workflows read-write on `iism`.
 
-### Sprint 54: pages that do not jump, and a policy that blocks (done 2026-10-12, ADR-065, no migration, **uncommitted**)
+### Sprint 54: pages that do not jump, and a policy that blocks (done 2026-10-12, ADR-065, no migration; merged in PR #38)
 
 Owner decisions: the recommended sprint was SEO and share previews plus layout stability; **the owner took only the stability and CSP halves** ("let SEO, deployment and monetisation be taken up later").
 
@@ -2449,7 +2449,7 @@ Owner decisions: the recommended sprint was SEO and share previews plus layout s
   (1,778 names shared by 4,838 standards) are measured; a `NEXT_PUBLIC_SITE_URL` setting that omits canonicals rather than emitting `localhost`; a share button (Web Share, else `wa.me`). Needs a live site for
   Google's Rich Results Test. **Deployment is the real gate to traffic**, and monetisation waits for traffic (ADR-047).
 
-### Sprint 55: the code review's fixes (2026-10-12, no migration; four merged in PR #39, the other six **uncommitted** on `fix-review-rest`)
+### Sprint 55: the code review's fixes (2026-10-12, no migration; merged in PRs #39 and #40)
 
 Findings 1 to 4 of the `/code-review` of Sprints 51-54 (PR #39): 20 new backend tests; every new test fails against the old code (19 of the 20; the 20th is a guard).
 - **A number that is not a number** (`bulk._int`, `_float`): `nan`, `inf`, `-inf` and `1e999` raised ValueError/OverflowError and turned the whole upload into a 500. pandas writes a missing number as `nan`.
@@ -2492,12 +2492,76 @@ Findings 1 to 4 of the `/code-review` of Sprints 51-54 (PR #39): 20 new backend 
 - **How to look**: `~/bin/gh run list --repo hegdekattehnew/iism --branch main`, `gh run view <id>`, `gh run view <id> --log-failed`, `gh run watch <id> --exit-status`, `gh pr checks <n> --repo ...`.
   CI runs on pull requests and `main` only, so a branch needs a PR before it has a run. See §6 for the `gh` and git quirks on this Mac.
 
-### Queued after Sprint 53: do not lose
+### Roadmap: Sprints 56 to 61 (MVP: ready for the first real users), planned 2026-10-13
+
+*Mirrors backlog v1.15 (Epic B14, section 4.4) and the plan file. Every sprint is code-only: no external account, no deployment, no billing.*
+
+**How it was chosen.** Read: all 65 ADRs, the PRD/BRD/FRS/Product-Definition/Scope-Reconciliation documents, backlog v1.14, the code (every gap below was grepped). The documents never say "MVP"; the PRD and FRS
+call v1 complete, and it is: all 25 user stories and every FRS "shall" are built. So the MVP question became *what would a first real user trip over?* A planning agent then pressure-tested the order against the
+code: trust moved ahead of courses, report/takedown was split from contact/grievance, and alert preferences and a partner write API were dropped.
+
+| Gap (verified) | Why it matters |
+|---|---|
+| Sign-up has no "send a new code" (only `SignInForm.tsx`); no server resend cooldown | A one-time code is the only way in; a lost SMS is a lost user |
+| Credentials can be linked, never unlinked or replaced | A lost number locks the account out |
+| `Course` has no location, intake date or seats; recommendations rank by mandatory-gap closure only | An offline course in another state is recommended like one next door |
+| No way to report a vacancy or course; no operator takedown | Fake vacancies are the main trust risk |
+| `/contact` is a `PlaceholderPage`; `/grievance` is static text | The DPDP Act expects a working grievance route |
+| An employer can change a status but cannot say when or where | The hiring loop stops one step short |
+| No notification page or unread badge (notices only inside `/applications`) | A candidate may never see a status change |
+| Agency enrolment is a CLI an engineer must run | The agency actor cannot pilot |
+
+| Sprint | Theme | Backlog | Migration | Size |
+|---|---|---|---|---|
+| 56 | **Never locked out** | BL-14.1 resend + cooldown; BL-14.2 replace/remove a credential | none | M |
+| 57 | **A way to complain** | BL-14.3 `/contact` and `/grievance` forms, operator queue, retention | 0050 `grievances` | S-M |
+| 58 | **Courses you can attend** | BL-14.5 course place + next intake + seats; BL-14.6 attendable-and-affordable ranking | 0051 `courses` columns | M |
+| 59 | **A marketplace you can trust** | BL-14.4 report a listing; operator takedown | 0052 `listing_reports`, takedown columns, CHECK, template | L |
+| 60 | **Hiring that finishes** | BL-14.7 status message; BL-14.8 notes + CSV export; BL-14.9 notification page | 0053 `applications` columns | M |
+| 61 | **A pilot with an agency** | BL-14.10 operator enrolment upload | 0054 `enrolment_batches` | M |
+
+**Per-sprint notes (reuse, and watch for).**
+- **56.** Cooldown in `core/security.py` `enforce_otp_rate_limit` (`SET NX EX`, a 429 with `retry_after`) so all four callers get it; the cooldown is 0 in `tests/conftest.py`. `replace_credential` / `unlink_credential` beside
+  `confirm_link` / `request_link_code` in `identity/service.py`: unlink refused for the only credential, replace needs a code to the new identifier and a live session, both revoke refresh tokens;
+  `ck_users_has_identifier` already guards "at least one"; `IntegrityError` on the unique index is a 409. `SignUpForm.tsx` gets the resend control with a countdown. The ADR must say that phone codes reach a real
+  phone only once DLT exists (so recovery works first by email; add a "backup email" nudge) and that a recycled number lets its new holder in.
+- **57.** `grievances` (reference, kind contact/grievance/data_request, body, optional `user_id` FK SET NULL, status). A user FK makes it a person table: add it to `EXPORTED` in `tests/test_privacy_coverage.py`; a
+  reply address is stored by value and purged on a schedule like `notifications.purge_expired`. New `OPS_GRIEVANCE_*` permissions (update `TIER_PERMISSIONS` and `tests/test_authorization_matrix.py`). Anonymous write:
+  the write limiter, a length cap and a honeypot field.
+- **58.** `state_id`, `district_id`, `starts_on`, `seats` on `courses`, resolved with `geography.resolve_location` in `course_publishing.py`; extend `bulk.py` (`COURSE_COLUMNS`, `_plan_course`, `_merge_updates`).
+  **Seats are derived** from enrolled `CourseInterest` rows, never a counter. Ranking: an optional attend context on `courses_closing_gap` (`matching/service.py`); sort = covers-mandatory, then attendable, then
+  closes-count, so a nearby course never outranks one that unblocks a mandatory standard; a past `starts_on` is not attendable. Extend `CourseSuggestionOut.from_suggestion` (shared with `careers/service.py` and
+  `applications/service.py`). Budget is a query parameter (a profile column would need export/erasure treatment). **Do not touch `scoring.py` (ADR-037).** Golden-set expectations derived from inputs.
+- **59.** `listing_reports` (`target_type`, `target_id` with no FK, title snapshot, reason, reporter FK SET NULL, unique per reporter and target). **No third `Job.status`** (fourteen places compare
+  `status == "published"`): takedown sets `status="draft"` and stamps `taken_down_at` / `takedown_reason`; `publishing.publish_job`, `course_publishing` and `bulk.publish_many` refuse while stamped; a taken-down
+  vacancy also closes with a reason so applicants hear through `vacancy_closed`. Hand-written CHECK migrations for events `listing_reported` / `listing_taken_down` and the `listing_removed` template (the 0041 / 0044
+  pattern). `record()` after the commit, in the service (`tests/test_route_delegation.py`). Takedown is admin tier, dismiss is support tier.
+- **60.** `applications.status_message`, `status_message_at` (candidate-visible), `employer_notes` (private). Free text in the outbox: cap it and decide once how it sits with "the outbox holds no phone number" (an
+  interview contact may contain one; notices are kept 90 days). Message in the privacy export; notes included or excused with the reason written down. CSV export through the **same serialiser as the applicant list**
+  (a second construction site would break `candidate_card()`'s guarantee), obeying `contact_is_visible`, neutralising leading `= + - @` (check `bulk.errors_csv`), recording `applicants_exported`. Notification page:
+  unread badge, `/notifications`, mark-one-read, paging past 50 (`web/src/components/Notices.tsx` already renders `GET /me/notifications`).
+- **61.** Move the engine out of `scripts/bulk_enrol_candidates.py` into `api/modules/operations/enrolment.py` (the script becomes a thin caller): a **sibling** of `bulk.py` (ADR-026; `bulk.run` is hard-wired to a tenant
+  and the jobs/courses `Kind`) reusing `parse_file`, `decode`, `template_csv`, `errors_csv`, `_int`. Calls `identity.provision_candidate` and `geography.resolve_location` through public interfaces
+  (`tests/test_module_boundaries.py`). `OPS_ENROL`, admin tier only; the operator attests that the privacy notice was read out and the batch records who attested; phones masked in reports (`redaction.py`).
+
+**Cut lines.** 56 keeps resend + cooldown and defers replace/remove; 59 ships report + takedown and defers the notice template; 60 ships the message and defers export; 61 can wait for a real agency.
+
+**Considered and not scheduled.** Alert preferences beyond on/off (the job alert is the only unsolicited message); a partner write API / ATS push (BL-12.18; no partner has asked, and it needs signed outbound webhooks
+and a key-to-tenant binding); XLSX upload, upload history and async above 200 rows (BL-12.18, on demand).
+
+**Gated, with the unblocker.** CV upload and résumé extraction (BL-4.1, BL-4.2): needs the ADR-023 encryption path (BL-13.2) first; build them together, only when an employer segment asks (the PRD persona is phone-only,
+and Sprint 23 found a CV fills experience and education, which no scorer reads). Real embedding model (BL-5.3): a ~470 MB download and a hosting decision; if wanted, a measured shadow evaluation against the golden set
+before `match_weight_semantic` goes above 0. SMS alerts (BL-12.9): DLT registration. Hindi standards corpus (BL-12.10): translation credentials. Observability (BL-13.1): needs a deployed instance. Course credit chips
+(BL-12.8): no course links to a qualification. Needs a person, not code: BL-12.11 (confirm the PWA on one phone) and BL-12.12 (a labour-market reviewer for role aliases: 43 of 3,417 roles).
+
+**Owner decisions this roadmap needs (none block Sprint 56).** Confirm the order (trust before courses is the recommendation); CV upload with the encryption path: build or hold; real embedding model: shadow-evaluate or
+hold; someone for the alias review and the five-minute PWA check.
+
+### Also queued, do not lose
 
 - **Watch the first CI run after 2026-10-19** (Ubuntu 26, above) and the next audit result.
-- **`make migrate` on the dev database `iism`** (0049 is owed; Sprint 53 added no migration).
-- **Bulk upload later stories:** 14.9 XLSX (a dependency to justify under ADR-053), 14.10 partner/ATS push (needs a `ServiceAccount`-to-tenant binding and a write scope), 14.11 upload history, 14.12 async
-  through the worker (a 200-row apply is now 3 to 6 s in a request; ADR-063's "revisit above 200" stands).
+- **Restart `make api` and `make worker`, and run `make migrate`** (0049 is owed; the dev API and worker have run since Oct 6 and serve old code).
+- **Bulk upload later stories** are one backlog item, **BL-12.18** (XLSX, partner/ATS push, upload history, async above 200 rows); earlier notes called them "14.9 to 14.12", which are not backlog ids.
 - **Not covered by the browser checks:** visual regression, other browsers, real devices, and padding that is present but wrong. Screenshot comparison stays rejected as a larger, noisier dependency.
 - The rest of "Also outstanding" below, and the owner-held items under "Known gaps".
 
