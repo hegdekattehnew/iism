@@ -608,6 +608,39 @@ GOLDEN_COURSE_PAIRS: list[tuple[str, str, str]] = [
     ("+919000000012", "lab-technician-hyderabad", "closes_mandatory"),
     ("+919000000015", "ecg-technician-chennai", "closes_mandatory"),
     ("+919000000016", "ward-boy-chennai", "closes_mandatory"),
+    # Can the person take it? (Sprint 58, BL-14.6.) Every label here is derivable from two
+    # inputs and nothing the ranking says: the candidate's own place in `CANDIDATES` and the
+    # course's place, start offset and seats in `seed_marketplace.course_intake` (with
+    # `COURSE_INTERESTS` for who is enrolled). `tests/test_golden_set.py` derives them
+    # independently and fails on a mislabel.
+    (
+        "+919000000002",
+        "general-duty-assistant-chennai",
+        "attendable:general-duty-assistant-certificate",
+    ),
+    (
+        "+919000000002",
+        "general-duty-assistant-chennai",
+        "reach:general-duty-assistant-certificate:district",
+    ),
+    ("+919000000002", "general-duty-assistant-chennai", "attendable_first"),
+    # Another state: not somewhere a Chennai candidate can go.
+    (
+        "+919000000002",
+        "general-duty-assistant-chennai",
+        "not_attendable:phlebotomy-technician-course",
+    ),
+    # Online, but its intake began two weeks ago.
+    (
+        "+919000000002",
+        "general-duty-assistant-chennai",
+        "not_attendable:infection-control-in-hospitals",
+    ),
+    # Same state, another city: near enough; and a course in the candidate's own city that is full.
+    ("+919000000009", "icu-attendant-pune", "attendable:oxygen-and-airway-support"),
+    ("+919000000009", "icu-attendant-pune", "reach:oxygen-and-airway-support:state"),
+    ("+919000000009", "icu-attendant-pune", "not_attendable:critical-care-support-skills"),
+    ("+919000000009", "icu-attendant-pune", "attendable_first"),
     # `inventory-clerk-nagpur` is deliberately absent from all three tables:
     # the seed closes it as filled on every run, and `match_job_by_slug` uses
     # `open_job()`, so a label against it can never be evaluated. A golden set

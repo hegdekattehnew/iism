@@ -1036,7 +1036,8 @@ class TestCourses:
         )
 
         checked = (await _post(client, f"/org/{org}/courses/bulk/check", text, headers)).json()
-        assert [r["status"] for r in checked["rows"]] == ["ok", "ok"]
+        # The offline course names no place, which is a warning (Sprint 58), never a refusal.
+        assert [r["status"] for r in checked["rows"]] == ["warning", "ok"]
         assert {s["code"]: s["level"] for s in checked["rows"][0]["standards"]} == {
             "HC/N0001": 4.0,
             "HC/N0002": 4.0,  # unlisted level: the standard's own
@@ -1120,7 +1121,7 @@ class TestCourses:
             header=COURSE_HEADER,
         )
         body = (await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)).json()
-        assert [r["status"] for r in body["rows"]] == ["ok", "skip"]
+        assert [r["status"] for r in body["rows"]] == ["warning", "skip"]
         again = (await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)).json()
         assert again["created"] == 0
         assert await _count(db, Course, org) == 1
@@ -1633,7 +1634,7 @@ class TestANumberThatIsNotANumber:
         response = await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)
         assert response.status_code == 200, response.text
         rows = response.json()["rows"]
-        assert [r["status"] for r in rows] == ["ok", "error"]
+        assert [r["status"] for r in rows] == ["warning", "error"]
         assert "duration_hours" in rows[1]["messages"][0]
 
 
@@ -1860,3 +1861,130 @@ class TestTheRestOfTheReview:
             asked = await _post(client, f"/org/{org}/{kind}/bulk/{step}{UPDATE}", text, headers)
             assert asked.status_code == 403, f"{step} with update: {asked.text}"
             assert getattr(Permission, dropped).value in asked.json()["detail"]
+
+
+# ================================================== a course has a place and an intake (Sprint 58)
+
+PLACE_HEADER = "external_ref,title,mode,state,district,starts_on,seats,standards"
+
+
+async def _course_rows(client: AsyncClient, headers: dict, org: str) -> dict[str, dict]:
+    listed = (await client.get(f"/org/{org}/courses", headers=headers)).json()
+    return {c["title"]: c for c in listed}
+
+
+class TestACoursePlaceAndIntake:
+    async def test_the_four_columns_are_checked_applied_and_stored(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Place Academy", "course_provider")
+        text = _csv(
+            "P1,Phlebotomy,offline,Maharashtra,Pune,2099-01-15,30,HC/N0001",
+            header=PLACE_HEADER,
+        )
+        checked = (await _post(client, f"/org/{org}/courses/bulk/check", text, headers)).json()
+        assert [r["status"] for r in checked["rows"]] == ["ok"], checked
+        assert (await _course_rows(client, headers, org)) == {}  # a check writes nothing
+
+        await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)
+        course = (await _course_rows(client, headers, org))["Phlebotomy"]
+        assert (course["location_state"], course["location_district"]) == ("Maharashtra", "Pune")
+        assert (course["starts_on"], course["seats"]) == ("2099-01-15", 30)
+
+    @pytest.mark.parametrize(
+        ("row", "fragment"),
+        [
+            ("P1,A course,offline,,,15/01/2099,,HC/N0001", "starts_on"),
+            ("P1,A course,offline,,,2099-02-31,,HC/N0001", "starts_on"),
+            ("P1,A course,offline,,,,0,HC/N0001", "seats"),
+            ("P1,A course,offline,,,,-4,HC/N0001", "seats"),
+            ("P1,A course,offline,,,,many,HC/N0001", "seats"),
+        ],
+    )
+    async def test_a_bad_date_or_seat_count_is_that_rows_error_naming_the_column(
+        self, client: AsyncClient, corpus: None, row: str, fragment: str
+    ) -> None:
+        headers, org = await _org(client, "Bad Cell Academy", "course_provider")
+        body = (
+            await _post(
+                client, f"/org/{org}/courses/bulk/check", _csv(row, header=PLACE_HEADER), headers
+            )
+        ).json()
+        assert body["rows"][0]["status"] == "error", row
+        assert fragment in " ".join(body["rows"][0]["messages"])
+
+    async def test_an_offline_course_with_no_place_is_a_warning_and_an_online_one_is_not(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Warn Academy", "course_provider")
+        text = _csv(
+            "W1,Offline no place,offline,,,,,HC/N0001",
+            "W2,Online no place,online,,,,,HC/N0001",
+            "W3,Hybrid no place,hybrid,,,,,HC/N0001",
+            header=PLACE_HEADER,
+        )
+        rows = (await _post(client, f"/org/{org}/courses/bulk/check", text, headers)).json()["rows"]
+        assert [r["status"] for r in rows] == ["warning", "ok", "warning"]
+        assert "no place" in " ".join(rows[0]["messages"])
+
+    async def test_a_district_that_is_not_recognised_is_a_warning_and_kept_as_typed(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Atlantis Academy", "course_provider")
+        text = _csv("A1,Diving,offline,Maharashtra,Atlantis,,,HC/N0001", header=PLACE_HEADER)
+        (row,) = (await _post(client, f"/org/{org}/courses/bulk/check", text, headers)).json()[
+            "rows"
+        ]
+        assert row["status"] == "warning" and "Atlantis" in " ".join(row["messages"])
+        await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)
+        assert (await _course_rows(client, headers, org))["Diving"][
+            "location_district"
+        ] == "Atlantis"
+
+    async def test_an_update_changes_only_the_columns_the_file_carries(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Update Academy", "course_provider")
+        first = _csv(
+            "U1,Phlebotomy,offline,Maharashtra,Pune,2099-01-15,30,HC/N0001", header=PLACE_HEADER
+        )
+        await _post(client, f"/org/{org}/courses/bulk/apply", first, headers)
+
+        text = "external_ref,title,seats,starts_on\nU1,Phlebotomy,12,2099-03-01\n"
+        checked = (
+            await _post(client, f"/org/{org}/courses/bulk/check{UPDATE}", text, headers)
+        ).json()
+        assert [r["status"] for r in checked["rows"]] == ["update"], checked
+        await _post(client, f"/org/{org}/courses/bulk/apply{UPDATE}", text, headers)
+
+        course = (await _course_rows(client, headers, org))["Phlebotomy"]
+        assert (course["seats"], course["starts_on"]) == (12, "2099-03-01")
+        # The place the file did not mention is untouched, ids included.
+        assert (course["location_state"], course["location_district"]) == ("Maharashtra", "Pune")
+
+    async def test_a_new_state_takes_the_old_district_with_it_for_a_course_too(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Move Academy", "course_provider")
+        await _post(
+            client,
+            f"/org/{org}/courses/bulk/apply",
+            _csv("M1,Phlebotomy,offline,Tamil Nadu,Chennai,,,HC/N0001", header=PLACE_HEADER),
+            headers,
+        )
+        text = "external_ref,title,state\nM1,Phlebotomy,Maharashtra\n"
+        (row,) = (
+            await _post(client, f"/org/{org}/courses/bulk/check{UPDATE}", text, headers)
+        ).json()["rows"]
+        assert row["status"] == "update"
+        assert "state" in row["messages"][0] and "district" in row["messages"][0]
+        await _post(client, f"/org/{org}/courses/bulk/apply{UPDATE}", text, headers)
+        course = (await _course_rows(client, headers, org))["Phlebotomy"]
+        assert (course["location_state"], course["location_district"]) == ("Maharashtra", None)
+
+    async def test_the_template_carries_the_new_columns(self, client: AsyncClient) -> None:
+        headers, org = await _org(client, "Template Academy", "course_provider")
+        text = (await client.get(f"/org/{org}/courses/bulk/template", headers=headers)).text
+        header = text.splitlines()[0].split(",")
+        assert {"state", "district", "starts_on", "seats"} <= set(header)
+        assert tuple(header) == bulk.COLUMNS["courses"]

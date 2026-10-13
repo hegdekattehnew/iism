@@ -143,6 +143,9 @@ export async function publishedCourse(
   org: { slug: string; tokens: Tokens },
   title: string,
   skillSlugs: string[],
+  // Place, intake and fee overrides (Sprint 58): `location_state`, `location_district`, `starts_on`,
+  // `seats`, `fee_inr`, `mode`.
+  extra: Record<string, unknown> = {},
 ): Promise<string> {
   const created = await request.post(api(`/org/${org.slug}/courses`), {
     headers: bearer(org.tokens),
@@ -152,6 +155,7 @@ export async function publishedCourse(
       language: "both",
       duration_hours: 120,
       fee_inr: 5000,
+      ...extra,
       skills: skillSlugs.map((skill_slug) => ({ skill_slug, level_taught: 4 })),
     },
   });

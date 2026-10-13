@@ -6,7 +6,8 @@ score (ADR-036).
 """
 
 import uuid
-from typing import Any
+from datetime import date
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,12 +90,24 @@ class CourseSuggestionOut(BaseModel):
     slug: str
     title: str
     mode: str
+    language: str
     duration_hours: int | None = None
     fee_inr: int | None = None
     closes: list[str]
     closes_count: int
     gap_size: int
     covers_mandatory: int
+    # Can this person take it? (Sprint 58, BL-14.6.) Every screen that suggests a course says where,
+    # when and how many places, so none has to guess from a title.
+    location_state: str | None = None
+    location_district: str | None = None
+    starts_on: date | None = None
+    seats_left: int | None = None
+    reach: Literal["online", "district", "state", "unknown", "elsewhere"] = "unknown"
+    started: bool = False
+    full: bool = False
+    within_budget: bool | None = None
+    attendable: bool = True
 
     @classmethod
     def from_suggestion(cls, c: Any) -> "CourseSuggestionOut":
@@ -103,12 +116,22 @@ class CourseSuggestionOut(BaseModel):
             slug=c.course.slug,
             title=c.course.title,
             mode=c.course.mode,
+            language=c.course.language,
             duration_hours=c.course.duration_hours,
             fee_inr=c.course.fee_inr,
             closes=c.closes,
             closes_count=c.closes_count,
             gap_size=c.gap_size,
             covers_mandatory=c.covers_mandatory,
+            location_state=c.course.location_state,
+            location_district=c.course.location_district,
+            starts_on=c.course.starts_on,
+            seats_left=c.seats_left,
+            reach=c.attendance.reach,
+            started=c.attendance.started,
+            full=c.attendance.full,
+            within_budget=c.attendance.within_budget,
+            attendable=c.attendance.attendable,
         )
 
 

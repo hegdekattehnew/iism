@@ -43,6 +43,7 @@ from api.modules.matching import (
     CourseSuggestion,
     MatchResult,
     ScoredJob,
+    attend_context,
     courses_closing_gap,
     match_jobs,
     score_profiles,
@@ -403,7 +404,7 @@ class ApplicationGap:
 
 
 async def application_gap(
-    db: AsyncSession, user: User, application_id: uuid.UUID
+    db: AsyncSession, user: User, application_id: uuid.UUID, *, budget_inr: int | None = None
 ) -> ApplicationGap:
     """The gap behind an application, computed now ("Why not me", Sprint 41).
 
@@ -432,5 +433,6 @@ async def application_gap(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
 
     result = (await score_profiles(db, application.job, [profile.id]))[profile.id]
-    courses = await courses_closing_gap(db, result.missing)
+    attend = await attend_context(db, profile.id, budget_inr)
+    courses = await courses_closing_gap(db, result.missing, attend=attend)
     return ApplicationGap(application=application, result=result, courses=courses)

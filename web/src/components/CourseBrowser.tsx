@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
@@ -21,6 +21,10 @@ type Course = {
   duration_hours?: number | null;
   fee_inr?: number | null;
   nsqf_level?: number | null;
+  location_state?: string | null;
+  location_district?: string | null;
+  starts_on?: string | null;
+  started?: boolean;
   tenant: { name: string; city?: string | null };
 };
 
@@ -36,6 +40,7 @@ export function feeLabel(
 
 export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) {
   const t = useTranslations("coursesPage");
+  const format = useFormatter();
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("");
@@ -174,6 +179,25 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
               </div>
               <h2 className="mt-2.5 text-base font-semibold">{title(c)}</h2>
               <p className="text-sm text-muted">{c.tenant.name}</p>
+              {(c.location_district || c.location_state || c.starts_on) && (
+                <p className="mt-1 text-xs text-muted">
+                  {[
+                    c.mode === "online"
+                      ? null
+                      : [c.location_district, c.location_state].filter(Boolean).join(", "),
+                    c.starts_on
+                      ? t(c.started ? "startedOn" : "startsOn", {
+                          date: format.dateTime(new Date(`${c.starts_on}T00:00:00Z`), {
+                            dateStyle: "medium",
+                            timeZone: "UTC",
+                          }),
+                        })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
               {desc(c) && (
                 <p className="mt-2 line-clamp-2 text-sm text-muted">{desc(c)}</p>
               )}

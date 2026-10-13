@@ -17,16 +17,16 @@ test("a provider uploads courses as drafts, publishes them, and later updates on
   await signInAs(page, org.tokens);
 
   const titles = { listed: `Blood collection ${id}`, byRole: `Phlebotomy basics ${id}`, broken: `Broken course ${id}` };
-  const header = "external_ref,title,description,mode,language,duration_hours,fee_inr,nsqf_level,standards,job_role";
+  const header = "external_ref,title,description,mode,language,duration_hours,fee_inr,nsqf_level,state,district,starts_on,seats,standards,job_role";
   const write = (name: string, fee: string) => {
     const file = testInfo.outputPath(name);
     writeFileSync(
       file,
       [
         header,
-        `E2E-${id}-1,${titles.listed},Hands-on,offline,both,100,${fee},4,HC/N0001:4,`,
-        `E2E-${id}-2,${titles.byRole},,hybrid,hi,80,,,,Phlebotomy Technician`,
-        `E2E-${id}-3,${titles.broken},,offline,both,,,,NOPE/N9999,`,
+        `E2E-${id}-1,${titles.listed},Hands-on,offline,both,100,${fee},4,Karnataka,Bengaluru,2099-02-01,25,HC/N0001:4,`,
+        `E2E-${id}-2,${titles.byRole},,hybrid,hi,80,,,Karnataka,Bengaluru,,,,Phlebotomy Technician`,
+        `E2E-${id}-3,${titles.broken},,offline,both,,,,Karnataka,Bengaluru,,,NOPE/N9999,`,
       ].join("\n") + "\n",
     );
     return file;

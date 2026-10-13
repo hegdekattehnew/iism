@@ -9,8 +9,9 @@ import { SkillChip } from "@/components/GapPanel";
 import { Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Badge, Button, ButtonLink, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
+import { CourseBudgetControl, SuggestedCourses } from "@/components/SuggestedCourses";
 import { api } from "@/lib/api";
+import { useCourseBudget } from "@/lib/course-budget";
 import type { paths } from "@/lib/api-schema";
 import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 
@@ -37,11 +38,14 @@ export function CareerLadder() {
   const [role, setRole] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
 
+  const budget = useCourseBudget();
   const ladder = useQuery({
-    queryKey: ["me", "careers", role],
+    queryKey: ["me", "careers", role, budget],
     queryFn: async () => {
       const { data, error, response } = await api.GET("/me/careers", {
-        params: { query: role ? { role } : {} },
+        params: {
+          query: { ...(role ? { role } : {}), ...(budget === null ? {} : { budget_inr: budget }) },
+        },
       });
       if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
@@ -85,6 +89,8 @@ export function CareerLadder() {
           </Button>
         </div>
       )}
+
+      {steps.length > 0 && <CourseBudgetControl />}
 
       {finding && (
         <RoleFinder
@@ -265,28 +271,9 @@ function StepCard({
               {courses.length === 0 ? (
                 <p className="mt-1.5 text-sm text-muted">{tm("noCourses")}</p>
               ) : (
-                <ul className="mt-1.5 space-y-2">
-                  {courses.map((c) => (
-                    <li key={c.slug} className="rounded-lg border border-border-token p-3">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <Link
-                          href={`/courses/${c.slug}`}
-                          className="text-sm font-semibold underline-offset-4 hover:underline"
-                        >
-                          {c.title}
-                        </Link>
-                        {c.duration_hours != null && (
-                          <span className="text-xs text-muted">
-                            {tm("hours", { hours: c.duration_hours })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-brand">
-                        {tm("closesGap", { closed: c.closes_count, total: c.gap_size })}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-1.5">
+                  <SuggestedCourses courses={courses} />
+                </div>
               )}
             </div>
           )}

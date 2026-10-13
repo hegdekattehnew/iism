@@ -79,6 +79,10 @@ export function CourseEditor({
       duration_hours: n("duration_hours"),
       fee_inr: n("fee_inr"),
       nsqf_level: n("nsqf_level"),
+      location_state: s("location_state"),
+      location_district: s("location_district"),
+      starts_on: s("starts_on"),
+      seats: n("seats"),
       skills: taught.map((s2) => ({
         skill_slug: s2.skill_slug,
         level_taught: s2.level_taught,
@@ -155,6 +159,34 @@ export function CourseEditor({
                 max={10}
                 step={0.5}
                 defaultValue={course?.nsqf_level ?? ""}
+              />
+            </Field>
+            {/* Where, when and how many (Sprint 58). The server resolves the place against the
+                national master; blank is right for an online course. */}
+            <Field label={t("locationState")} hint={t("placeHint")}>
+              <Text
+                name="location_state"
+                maxLength={120}
+                defaultValue={course?.location_state ?? ""}
+              />
+            </Field>
+            <Field label={t("locationDistrict")}>
+              <Text
+                name="location_district"
+                maxLength={120}
+                defaultValue={course?.location_district ?? ""}
+              />
+            </Field>
+            <Field label={t("startsOn")} hint={t("startsOnHint")}>
+              <Text name="starts_on" type="date" defaultValue={course?.starts_on ?? ""} />
+            </Field>
+            <Field label={t("seats")} hint={t("seatsHint")}>
+              <Text
+                name="seats"
+                type="number"
+                min={1}
+                max={100000}
+                defaultValue={course?.seats ?? ""}
               />
             </Field>
           </div>

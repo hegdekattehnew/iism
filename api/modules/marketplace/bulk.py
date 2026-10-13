@@ -118,6 +118,10 @@ COURSE_COLUMNS = (
     "duration_hours",
     "fee_inr",
     "nsqf_level",
+    "state",
+    "district",
+    "starts_on",
+    "seats",
     "standards",
     "job_role",
 )
@@ -175,10 +179,29 @@ _TEMPLATE_ROWS: dict[str, tuple[tuple[str, ...], ...]] = {
             "320",
             "12000",
             "4",
+            "Maharashtra",
+            "Pune",
+            "2026-12-01",
+            "30",
             "HSS/N6012:4; HSS/N6002:3",
             "",
         ),
-        ("GDA-02", "Home health aide", "", "hybrid", "hi", "240", "", "", "", "Home Health Aide"),
+        (
+            "GDA-02",
+            "Home health aide",
+            "",
+            "online",
+            "hi",
+            "240",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Home Health Aide",
+        ),
     ),
 }
 
@@ -431,6 +454,18 @@ def _closes_at(cells: dict[str, str], problems: list[str]) -> datetime | None:
         problems.append(f"closes_at: '{raw}' is not a date (use YYYY-MM-DD)")
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=IST)
+
+
+def _day(cells: dict[str, str], column: str, problems: list[str]) -> date | None:
+    """A calendar day, `YYYY-MM-DD` and nothing else: a start date is a day, not a moment."""
+    raw = cells.get(column, "")
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        problems.append(f"{column}: '{raw}' is not a date (use YYYY-MM-DD)")
+        return None
 
 
 def _yes_no(cells: dict[str, str], column: str, problems: list[str]) -> bool:
@@ -825,6 +860,7 @@ async def _plan_course(
     raw: RawRow,
     codes: dict[str, StandardRef],
     roles: dict[str, _Role],
+    places: dict[tuple[str, str], Any],
 ) -> _Plan:
     cells = raw.cells
     plan = _Plan(raw, cells.get("external_ref") or None, cells.get("title") or None)
@@ -847,6 +883,16 @@ async def _plan_course(
     level = _float(cells, "nsqf_level", problems)
     if level is not None:
         fields["nsqf_level"] = level
+    if cells.get("state"):
+        fields["location_state"] = cells["state"]
+    if cells.get("district"):
+        fields["location_district"] = cells["district"]
+    starts = _day(cells, "starts_on", problems)
+    if starts is not None:
+        fields["starts_on"] = starts
+    seats = _int(cells, "seats", problems)
+    if seats is not None:
+        fields["seats"] = seats
 
     plan.fields = fields
     try:
@@ -857,6 +903,18 @@ async def _plan_course(
     plan.standards = await _standards_for_row(
         db, "courses", cells, codes, roles, plan, role_mandatory=False
     )
+    state, district = cells.get("state", ""), cells.get("district", "")
+    if state or district:
+        if district and places[(state, district)].district_id is None:
+            plan.warnings.append(
+                f"district '{district}' was not recognised, so the course would be saved with the "
+                "place as typed and could not be matched to a learner's district"
+            )
+    elif fields["mode"] != "online":
+        plan.warnings.append(
+            "no place: an offline or hybrid course with no state or district is shown as 'place "
+            "not stated' and cannot be recommended as near anyone"
+        )
     if not plan.standards and not problems:
         plan.warnings.append(
             "no standards: it can be saved as a draft but cannot be published until it teaches one"
@@ -910,6 +968,10 @@ _UPDATE_COLUMNS: dict[Kind, dict[str, str]] = {
         "duration_hours": "duration_hours",
         "fee_inr": "fee_inr",
         "nsqf_level": "nsqf_level",
+        "state": "location_state",
+        "district": "location_district",
+        "starts_on": "starts_on",
+        "seats": "seats",
     },
 }
 
@@ -969,8 +1031,7 @@ async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: li
         # it belonged to, and the review says so.
         district_cleared = False
         if (
-            kind == "jobs"
-            and "state" in cells
+            "state" in cells
             and "district" not in cells
             and _norm(item.location_state) != _norm(merged.get("location_state"))
             and item.location_district
@@ -1135,17 +1196,16 @@ async def _plans(
             roles[_norm(text)] = await _resolve_role(db, text)
 
     places: dict[tuple[str, str], Any] = {}
-    if kind == "jobs":
-        for row in rows:
-            pair = (row.cells.get("state", ""), row.cells.get("district", ""))
-            if (pair[0] or pair[1]) and pair not in places:
-                places[pair] = await resolve_location(db, pair[0] or None, pair[1] or None)
+    for row in rows:
+        pair = (row.cells.get("state", ""), row.cells.get("district", ""))
+        if (pair[0] or pair[1]) and pair not in places:
+            places[pair] = await resolve_location(db, pair[0] or None, pair[1] or None)
 
     plans = [
         await (
             _plan_job(db, r, codes, roles, places)
             if kind == "jobs"
-            else _plan_course(db, r, codes, roles)
+            else _plan_course(db, r, codes, roles, places)
         )
         for r in rows
     ]

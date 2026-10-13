@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 
 import { CoverageBar } from "@/components/CoverageBar";
+import { CourseBudgetControl, SuggestedCourses } from "@/components/SuggestedCourses";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { useCourseBudget } from "@/lib/course-budget";
 import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 
 /** One standard, as a chip: required ones say so, and the code is shown because
@@ -62,11 +63,15 @@ export function GapPanel({ applicationId }: { applicationId: string }) {
   const t = useTranslations("applications");
   const tm = useTranslations("matchesPage");
 
+  const budget = useCourseBudget();
   const gap = useQuery({
-    queryKey: ["me", "applications", applicationId, "gap"],
+    queryKey: ["me", "applications", applicationId, "gap", budget],
     queryFn: async () => {
       const { data, error, response } = await api.GET("/me/applications/{application_id}/gap", {
-        params: { path: { application_id: applicationId } },
+        params: {
+          path: { application_id: applicationId },
+          query: budget === null ? {} : { budget_inr: budget },
+        },
       });
       const status = response.status;
       if (error || !data) throw new ApiError(status, readDetail(error));
@@ -117,28 +122,10 @@ export function GapPanel({ applicationId }: { applicationId: string }) {
           {courses.length === 0 ? (
             <p className="mt-1.5 text-sm text-muted">{tm("noCourses")}</p>
           ) : (
-            <ul className="mt-1.5 space-y-2">
-              {courses.map((c) => (
-                <li key={c.slug} className="rounded-lg border border-border-token p-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <Link
-                      href={`/courses/${c.slug}`}
-                      className="text-sm font-semibold underline-offset-4 hover:underline"
-                    >
-                      {c.title}
-                    </Link>
-                    {c.duration_hours != null && (
-                      <span className="text-xs text-muted">
-                        {tm("hours", { hours: c.duration_hours })}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-brand">
-                    {tm("closesGap", { closed: c.closes_count, total: c.gap_size })}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-1.5 space-y-3">
+              <CourseBudgetControl />
+              <SuggestedCourses courses={courses} />
+            </div>
           )}
         </div>
       )}

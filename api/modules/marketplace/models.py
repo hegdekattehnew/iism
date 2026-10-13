@@ -365,6 +365,7 @@ class Course(Base):
             "nsqf_level IS NULL OR (nsqf_level >= 1 AND nsqf_level <= 10)",
             name="ck_courses_nsqf_level",
         ),
+        CheckConstraint("seats IS NULL OR seats >= 1", name="ck_courses_seats"),
         Index("ix_courses_tenant_id", "tenant_id"),
         Index("ix_courses_status", "status"),
         Index("ix_courses_status_mode", "status", "mode"),
@@ -397,6 +398,23 @@ class Course(Base):
     # Nullable by design: Qualification Pack anchoring arrives with the NSQF
     # hierarchy in a later sprint, without restructuring this table.
     qualification_pack_code: Mapped[str | None] = mapped_column(default=None)
+
+    # Where it is taught, when the next intake starts and how many places there are (Sprint 58,
+    # BL-14.5, ADR-068). All nullable: none is known for a course published before this, and a
+    # missing place is "not stated", never a guess. The ids sit beside the free text exactly as on
+    # `Job`. **Seats left is derived** from enrolled interests (`interests.enrolled_counts`), never
+    # a counter here: a counter drifts the first time somebody is un-enrolled, withdraws or erases
+    # their account.
+    location_state: Mapped[str | None] = mapped_column(default=None)
+    location_district: Mapped[str | None] = mapped_column(default=None)
+    state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("states.id", ondelete="SET NULL"), index=True, default=None
+    )
+    district_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("districts.id", ondelete="SET NULL"), index=True, default=None
+    )
+    starts_on: Mapped[date | None] = mapped_column(default=None)
+    seats: Mapped[int | None] = mapped_column(default=None)
 
     status: Mapped[str] = mapped_column(default="published")
     # The provider's own reference, written only by a bulk upload (see `Job.external_ref`).

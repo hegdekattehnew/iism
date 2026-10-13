@@ -5,6 +5,7 @@ that belongs to the intelligence layer and arrives in a later sprint.
 """
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,27 @@ from api.modules.marketplace.models import (
 from api.modules.skills.models import Skill
 
 PUBLISHED = "published"
+
+
+def seats_left(seats: int | None, enrolled: int) -> int | None:
+    """Places left on a course, or `None` when the provider gave no seat count.
+
+    Never negative: a provider may mark more learners enrolled than they said they had room for,
+    and "-2 seats left" is a number nobody can act on.
+    """
+    return None if seats is None else max(0, seats - enrolled)
+
+
+async def seats_left_for(
+    db: AsyncSession, courses: Sequence[Course]
+) -> dict[uuid.UUID, int | None]:
+    """Seats left for each course, in one grouped query for the ones that have a seat count."""
+    # Function-level: `interests` imports this module, so the module-level form is a cycle.
+    from api.modules.interests import enrolled_counts
+
+    limited = [c for c in courses if c.seats is not None]
+    enrolled = await enrolled_counts(db, [c.id for c in limited]) if limited else {}
+    return {c.id: seats_left(c.seats, enrolled.get(c.id, 0)) for c in courses}
 
 
 def _text_filter(stmt: Select, model: type[Job] | type[Course], q: str) -> Select:

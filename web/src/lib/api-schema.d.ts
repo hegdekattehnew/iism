@@ -3432,9 +3432,24 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Seats */
+            seats?: number | null;
             tenant: components["schemas"]["TenantOut"];
             /** Skills */
             skills?: components["schemas"]["CourseSkillOut"][];
+            /** Seats Left */
+            seats_left?: number | null;
+            /**
+             * Started
+             * @description Derived from the date, never stored: a stored flag is wrong the morning after.
+             */
+            readonly started: boolean;
         };
         /**
          * CourseDismissedIn
@@ -3478,6 +3493,14 @@ export interface components {
             fee_inr?: number | null;
             /** Nsqf Level */
             nsqf_level?: number | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Seats */
+            seats?: number | null;
             /** Skills */
             skills?: components["schemas"]["CourseSkillIn"][];
         };
@@ -3533,7 +3556,20 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Seats */
+            seats?: number | null;
             tenant: components["schemas"]["TenantOut"];
+            /**
+             * Started
+             * @description Derived from the date, never stored: a stored flag is wrong the morning after.
+             */
+            readonly started: boolean;
         };
         /** CoursePage */
         CoursePage: {
@@ -3617,6 +3653,8 @@ export interface components {
             title: string;
             /** Mode */
             mode: string;
+            /** Language */
+            language: string;
             /** Duration Hours */
             duration_hours?: number | null;
             /** Fee Inr */
@@ -3629,6 +3667,37 @@ export interface components {
             gap_size: number;
             /** Covers Mandatory */
             covers_mandatory: number;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Seats Left */
+            seats_left?: number | null;
+            /**
+             * Reach
+             * @default unknown
+             * @enum {string}
+             */
+            reach: "online" | "district" | "state" | "unknown" | "elsewhere";
+            /**
+             * Started
+             * @default false
+             */
+            started: boolean;
+            /**
+             * Full
+             * @default false
+             */
+            full: boolean;
+            /** Within Budget */
+            within_budget?: boolean | null;
+            /**
+             * Attendable
+             * @default true
+             */
+            attendable: boolean;
         };
         /**
          * CredentialChangedOut
@@ -4818,9 +4887,19 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Seats */
+            seats?: number | null;
             tenant: components["schemas"]["TenantOut"];
             /** Skills */
             skills?: components["schemas"]["CourseSkillOut"][];
+            /** Seats Left */
+            seats_left?: number | null;
             /**
              * Status
              * @enum {string}
@@ -4831,6 +4910,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Started
+             * @description Derived from the date, never stored: a stored flag is wrong the morning after.
+             */
+            readonly started: boolean;
         };
         /**
          * OrgCreateRequest
@@ -8840,7 +8924,10 @@ export interface operations {
     };
     match_detail_me_matches__slug__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description What the person would pay for a course, in rupees. Per request and never stored: a profile column would need export and erasure treatment. */
+                budget_inr?: number | null;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -9277,6 +9364,8 @@ export interface operations {
     application_gap_me_applications__application_id__gap_get: {
         parameters: {
             query?: {
+                /** @description What the person would pay for a course, in rupees. */
+                budget_inr?: number | null;
                 /** @description Override the negotiated language */
                 locale?: string | null;
             };
@@ -10527,6 +10616,8 @@ export interface operations {
             query?: {
                 /** @description The slug of the role to start from. Omit it and the API guesses once, from the profile, and says so in `anchor_source`. */
                 role?: string | null;
+                /** @description What the person would pay for a course, in rupees. */
+                budget_inr?: number | null;
             };
             header?: never;
             path?: never;

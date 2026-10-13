@@ -5,9 +5,9 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { SkillChip } from "@/components/GapPanel";
+import { SuggestedCourses } from "@/components/SuggestedCourses";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 
@@ -32,7 +32,6 @@ export function SponsorPanel({
   reference: string;
 }) {
   const t = useTranslations("sponsor");
-  const tm = useTranslations("matchesPage");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
 
@@ -97,25 +96,7 @@ export function SponsorPanel({
               {courses.length === 0 ? (
                 <p className="text-sm text-muted">{t("noCourses")}</p>
               ) : (
-                <ul className="space-y-2">
-                  {courses.map((c) => (
-                    <li key={c.slug} className="rounded-lg border border-border-token p-3">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <Link
-                          href={`/courses/${c.slug}`}
-                          className="text-sm font-semibold underline-offset-4 hover:underline"
-                        >
-                          {c.title}
-                        </Link>
-                        {c.duration_hours != null && (
-                          <span className="text-xs text-muted">
-                            {tm("hours", { hours: c.duration_hours })}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <SuggestedCourses courses={courses} forPerson={false} />
               )}
 
               {data.offered ? (

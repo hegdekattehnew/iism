@@ -24,12 +24,14 @@ from api.modules.interests.models import (
 )
 from api.modules.interests.provider_routes import router as provider_router
 from api.modules.interests.routes import router
+from api.modules.interests.service import enrolled_counts
 
 __all__ = [
     "INTEREST_STATUSES",
     "LIVE_STATUSES",
     "PROVIDER_STATUSES",
     "CourseInterest",
+    "enrolled_counts",
     "provider_router",
     "router",
 ]

@@ -23,6 +23,7 @@ from legacy_skill_map import LEGACY_SKILL_MAP  # noqa: E402
 from sqlalchemy import delete, select
 
 from api.core import localisation
+from api.core.clock import today_ist
 from api.core.config import PRIVACY_NOTICE_VERSION
 from api.core.database import dispose_engine, get_sessionmaker
 from api.core.security import hash_secret
@@ -1614,6 +1615,39 @@ async def _seed_team(db, tenants: dict[str, Tenant]) -> tuple[int, int]:  # type
 # and `cashier-bengaluru` are what `make evaluate` ranks against, and a closed
 # vacancy leaves `match_jobs` -- so closing either would turn the golden set
 # red for a reason that has nothing to do with scoring.
+# Where each seeded course is taught, when the next intake starts and how many places there are
+# (Sprint 58, BL-14.5). Derived from a course's position rather than written beside fifty tuples:
+# an online course has no place, an offline or hybrid one rotates through four cities the seeded
+# candidates actually live in, and the start dates are **days from the day the seed runs**, so the
+# demonstration never goes stale. A start in the past means "started"; two courses are made full
+# (one place, and one learner already marked enrolled in `seed_candidates.COURSE_INTERESTS`).
+# The golden set's attendability labels are derived from this table and the candidates' own
+# places, never from what the ranking answers.
+INTAKE_CITIES = [
+    ("Tamil Nadu", "Chennai"),
+    ("Maharashtra", "Pune"),
+    ("Telangana", "Hyderabad"),
+    ("Maharashtra", "Nagpur"),
+]
+INTAKE_START_OFFSETS = [21, 35, 14, -14, 50, 28, -35, 42]
+INTAKE_SEATS = [30, 25, 20, 40, 15, 35, 20, 30]
+FULL_COURSES = {"critical-care-support-skills", "sterile-processing-essentials"}
+
+
+def course_intake(slug: str) -> tuple[str | None, str | None, int, int]:
+    """`(state, district, start offset in days, seats)` for a seeded course."""
+    for index, course in enumerate(COURSES):
+        if course[0] != slug:
+            continue
+        mode = course[6]
+        state, district = (
+            (None, None) if mode == "online" else INTAKE_CITIES[index % len(INTAKE_CITIES)]
+        )
+        seats = 1 if slug in FULL_COURSES else INTAKE_SEATS[index % len(INTAKE_SEATS)]
+        return state, district, INTAKE_START_OFFSETS[index % len(INTAKE_START_OFFSETS)], seats
+    raise KeyError(slug)
+
+
 CLOSED_VACANCY_SLUG = "inventory-clerk-nagpur"
 
 
@@ -1828,6 +1862,12 @@ async def seed() -> dict[str, int]:
             course.mode, course.language = mode, lang
             course.duration_hours, course.fee_inr = hours, fee
             course.nsqf_level = nsqf
+            intake_state, intake_district, start_offset, intake_seats = course_intake(slug)
+            course.location_state, course.location_district = intake_state, intake_district
+            placed = await resolve_location(db, intake_state, intake_district)
+            course.state_id, course.district_id = placed.state_id, placed.district_id
+            course.starts_on = today_ist() + timedelta(days=start_offset)
+            course.seats = intake_seats
             course.status = "published"
             await db.flush()
 

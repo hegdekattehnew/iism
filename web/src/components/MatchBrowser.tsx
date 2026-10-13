@@ -6,9 +6,11 @@ import { useState } from "react";
 
 import { CoverageBar, LevelScale } from "@/components/CoverageBar";
 import { SkillChip } from "@/components/GapPanel";
+import { CourseBudgetControl, SuggestedCourses } from "@/components/SuggestedCourses";
 import { ButtonLink, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { useCourseBudget } from "@/lib/course-budget";
 
 
 function ScoreDial({ score }: { score: number }) {
@@ -65,12 +67,16 @@ export function MatchBrowser() {
 
   // Detail is fetched only when a match is opened: it costs a gap analysis and
   // a course search per job, and nobody reads twenty of them.
+  const budget = useCourseBudget();
   const detail = useQuery({
-    queryKey: ["match", openSlug],
+    queryKey: ["match", openSlug, budget],
     enabled: openSlug !== null,
     queryFn: async () => {
       const { data, error } = await api.GET("/me/matches/{slug}", {
-        params: { path: { slug: openSlug as string } },
+        params: {
+          path: { slug: openSlug as string },
+          query: budget === null ? {} : { budget_inr: budget },
+        },
       });
       if (error || !data) throw new Error("match detail request failed");
       return data;
@@ -233,37 +239,13 @@ export function MatchBrowser() {
                   <p className="text-sm text-muted">{t("noCourses")}</p>
                 )}
                 {d && courses.length > 0 && (
-                  <ul className="space-y-2">
-                    {courses.map((c) => (
-                      <li
-                        key={c.slug}
-                        className="rounded-lg border border-border-token p-3"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <Link
-                            href={`/courses/${c.slug}`}
-                            onClick={() =>
-                              reportCourseOpened(c.slug, m.job.slug)
-                            }
-                            className="text-sm font-semibold underline-offset-4 hover:underline"
-                          >
-                            {c.title}
-                          </Link>
-                          {c.duration_hours != null && (
-                            <span className="text-xs text-muted">
-                              {t("hours", { hours: c.duration_hours })}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-brand">
-                          {t("closesGap", {
-                            closed: c.closes_count,
-                            total: c.gap_size,
-                          })}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="space-y-3">
+                    <CourseBudgetControl />
+                    <SuggestedCourses
+                      courses={courses}
+                      onOpen={(slug) => reportCourseOpened(slug, m.job.slug)}
+                    />
+                  </div>
                 )}
 
                 {/* How to become qualified at all, which is a different

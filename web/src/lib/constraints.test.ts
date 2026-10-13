@@ -95,6 +95,22 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     expect: { note: ["minLength={NOTE_MIN}", "maxLength={NOTE_MAX}"] },
   },
   {
+    file: "components/employer/CourseEditor.tsx",
+    label: "CourseIn (place and intake, Sprint 58)",
+    expect: {
+      location_state: ["maxLength={120}"],
+      location_district: ["maxLength={120}"],
+      seats: ["min={1}", "max={100000}"],
+    },
+  },
+  {
+    // `budget_inr` is a query parameter (`ge=0`, `le=10_000_000`), not a body field, but the input
+    // that sets it has the same duty to say so before a request is made.
+    file: "components/SuggestedCourses.tsx",
+    label: "the course budget query parameter",
+    expect: { budget_inr: ["min={0}", "max={10000000}"] },
+  },
+  {
     file: "components/ReviewControl.tsx",
     label: "ReviewIn",
     expect: { comment: ["maxLength={1000}"] },
@@ -210,5 +226,20 @@ describe("the grievance forms mirror the server's limits", () => {
     expect(schemas).toContain("note: Annotated[str, Field(min_length=10, max_length=1000)]");
     expect(lib).toContain("NOTE_MIN = 10");
     expect(lib).toContain("NOTE_MAX = 1000");
+  });
+});
+
+/** The budget ceiling is the server's own, read from the three routes that accept it. */
+describe("the course budget mirrors the server's ceiling", () => {
+  const root = join(SRC, "..", "..");
+  it("is the same number in the store and on each of the three routes", () => {
+    expect(read("lib/course-budget.ts")).toContain("BUDGET_MAX = 10_000_000");
+    for (const route of [
+      "api/modules/matching/routes.py",
+      "api/modules/careers/routes.py",
+      "api/modules/applications/routes.py",
+    ]) {
+      expect(readFileSync(join(root, route), "utf8"), route).toContain("le=10_000_000");
+    }
   });
 });

@@ -2,8 +2,9 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
+from api.core.clock import today_ist
 from api.modules.identity import TenantOut
 from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn, SkillOut
 
@@ -188,11 +189,26 @@ class CourseOut(BaseModel):
     fee_inr: int | None = None
     nsqf_level: NsqfLevel | None = None
     qualification_pack_code: str | None = None
+    # Where, when and how many (Sprint 58, BL-14.5). All optional: a course published before this
+    # has no stated place, and the screen says so rather than guessing.
+    location_state: str | None = None
+    location_district: str | None = None
+    starts_on: date | None = None
+    seats: int | None = None
     tenant: TenantOut
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def started(self) -> bool:
+        """Derived from the date, never stored: a stored flag is wrong the morning after."""
+        return self.starts_on is not None and self.starts_on < today_ist()
 
 
 class CourseDetail(CourseOut):
     skills: list[CourseSkillOut] = Field(default_factory=list)
+    # Places left: `seats` less the learners the provider has marked enrolled. Derived at read
+    # time (`service.seats_left_for`), `None` when the provider gave no seat count.
+    seats_left: int | None = None
 
 
 class CourseSkillIn(BaseModel):
@@ -224,6 +240,10 @@ class CourseIn(BaseModel):
     duration_hours: int | None = Field(None, ge=1, le=10_000)
     fee_inr: int | None = Field(None, ge=0)
     nsqf_level: NsqfLevelIn | None = None
+    location_state: str | None = Field(None, max_length=120)
+    location_district: str | None = Field(None, max_length=120)
+    starts_on: date | None = None
+    seats: int | None = Field(None, ge=1, le=100_000)
     skills: list[CourseSkillIn] = Field(default_factory=list, max_length=50)
 
 

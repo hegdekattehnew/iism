@@ -279,7 +279,16 @@
     "backToCourses": "सभी पाठ्यक्रम",
     "level": "NSQF स्तर {level}",
     "feeLabel": "शुल्क",
-    "durationLabel": "अवधि"
+    "durationLabel": "अवधि",
+    "placeNotStated": "स्थान नहीं बताया गया",
+    "startsOn": "शुरू {date}",
+    "startedOn": "शुरू हुआ {date}",
+    "startNotStated": "शुरू होने की तिथि नहीं बताई गई",
+    "placeLabel": "कहाँ",
+    "intakeLabel": "अगला बैच",
+    "seatsLabel": "स्थान",
+    "seatsLeft": "{count, plural, one {# सीट बची} other {# सीटें बचीं}}",
+    "full": "भरा हुआ"
   },
   "skillLinks": {
     "jobsTitle": "इस कौशल की माँग वाली नौकरियाँ",
@@ -509,7 +518,6 @@
     "youNeed": "आपको चाहिए",
     "mandatory": "अनिवार्य",
     "capped": "एक अनिवार्य मानक अनुपस्थित है, जिससे यह मिलान सीमित हो जाता है।",
-    "closesGap": "आपकी {total} में से {closed} कमियाँ पूरी करता है",
     "coursesHeading": "इस कमी को पूरा करने वाले पाठ्यक्रम",
     "noCourses": "अभी कोई पाठ्यक्रम इस कमी को पूरा नहीं करता।",
     "entryHeading": "योग्यता कैसे प्राप्त करें",
@@ -520,7 +528,6 @@
     "viewJob": "नौकरी देखें",
     "backToMatches": "सभी मिलान",
     "loadError": "आपके मिलान लोड नहीं हो सके।",
-    "hours": "{hours} घंटे",
     "nearDistrict": "आपके ज़िले में",
     "nearState": "आपके राज्य में",
     "experienceShort": "इस काम के लिए माँगे गए अनुभव से {years} वर्ष कम",
@@ -944,7 +951,14 @@
       "noCourses": "अभी तक कोई प्रकाशित पाठ्यक्रम नहीं।",
       "interestSecondary": "{live} अभी सक्रिय"
     },
-    "uploadCourses": "स्प्रेडशीट अपलोड करें"
+    "uploadCourses": "स्प्रेडशीट अपलोड करें",
+    "locationState": "जिस राज्य में पढ़ाया जाता है",
+    "locationDistrict": "ज़िला या शहर",
+    "placeHint": "ऑनलाइन कोर्स के लिए स्थान खाली छोड़ें।",
+    "startsOn": "अगला बैच शुरू होता है",
+    "startsOnHint": "यदि आप हमेशा प्रवेश देते हैं तो खाली छोड़ें।",
+    "seats": "अगले बैच में सीटें",
+    "seatsHint": "बची हुई सीटें उन शिक्षार्थियों से निकाली जाती हैं जिन्हें आप नामांकित चिह्नित करते हैं।"
   },
   "chooser": {
     "title": "मुझे क्या करना है?",
@@ -1772,5 +1786,32 @@
     "resolve": "समाधान करें",
     "dismiss": "खारिज करें",
     "decideFailed": "यह निर्णय सहेजा नहीं जा सका। पुनः प्रयास करें।"
+  },
+  "suggestedCourses": {
+    "mode": {
+      "online": "ऑनलाइन",
+      "offline": "आमने-सामने",
+      "hybrid": "मिश्रित"
+    },
+    "placeNotStated": "स्थान नहीं बताया गया",
+    "startsOn": "शुरू {date}",
+    "startedOn": "शुरू हुआ {date}",
+    "startNotStated": "शुरू होने की तिथि नहीं बताई गई",
+    "free": "निःशुल्क",
+    "fee": "₹{amount}",
+    "hours": "{hours} घंटे",
+    "seatsLeft": "{count, plural, one {# सीट बची} other {# सीटें बचीं}}",
+    "reach": {
+      "online": "ऑनलाइन",
+      "district": "आपके ज़िले में",
+      "state": "आपके राज्य में",
+      "elsewhere": "कहीं और"
+    },
+    "started": "पहले ही शुरू हो चुका",
+    "full": "भरा हुआ",
+    "overBudget": "आपके बजट से ऊपर",
+    "closesGap": "आपकी {total} कमियों में से {closed} पूरी करता है",
+    "budgetLabel": "आप किसी कोर्स के लिए कितना देंगे? (₹)",
+    "budgetClear": "हटाएँ"
   }
 }
