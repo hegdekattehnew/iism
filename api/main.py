@@ -60,6 +60,8 @@ from api.modules.matching import (
     provider_org_router,
 )
 from api.modules.matching import router as matching_router
+from api.modules.moderation import ops_router as moderation_ops_router
+from api.modules.moderation import router as moderation_router
 from api.modules.notifications import router as notifications_router
 from api.modules.operations import router as operations_router
 from api.modules.privacy import org_router as privacy_org_router
@@ -167,6 +169,8 @@ app.include_router(assessment_router)
 app.include_router(grievances_router)
 app.include_router(grievances_me_router)
 app.include_router(grievances_ops_router)
+app.include_router(moderation_router)
+app.include_router(moderation_ops_router)
 app.include_router(applications_router)
 app.include_router(applications_public_router)
 app.include_router(applications_employer_router)

@@ -96,6 +96,12 @@ class Permission(StrEnum):
     # person who answers the mailbox should not need the one tier that can verify organisations.
     OPS_GRIEVANCE_READ = "ops:grievance:read"
     OPS_GRIEVANCE_HANDLE = "ops:grievance:handle"
+    # Sprint 59, BL-14.4. Reports about listings. Reading and dismissing are the support tier's;
+    # **taking a listing down is the admin tier's alone**: it removes somebody's business from the
+    # public, the action with blast radius, as `OPS_ORG_VERIFY` is for a badge.
+    OPS_REPORT_READ = "ops:report:read"
+    OPS_REPORT_HANDLE = "ops:report:handle"
+    OPS_LISTING_TAKEDOWN = "ops:listing:takedown"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -154,6 +160,9 @@ OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.OPS_ALIAS_EDIT,
         Permission.OPS_GRIEVANCE_READ,
         Permission.OPS_GRIEVANCE_HANDLE,
+        Permission.OPS_REPORT_READ,
+        Permission.OPS_REPORT_HANDLE,
+        Permission.OPS_LISTING_TAKEDOWN,
     }
 )
 
@@ -173,6 +182,8 @@ TIER_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.OPS_CANDIDATE_VERIFY,
             Permission.OPS_GRIEVANCE_READ,
             Permission.OPS_GRIEVANCE_HANDLE,
+            Permission.OPS_REPORT_READ,
+            Permission.OPS_REPORT_HANDLE,
         }
     ),
     "admin": OPERATOR_PERMISSIONS,

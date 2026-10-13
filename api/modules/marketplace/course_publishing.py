@@ -43,6 +43,7 @@ from api.modules.marketplace.listings import (
 )
 from api.modules.marketplace.models import Course, CourseSkill
 from api.modules.marketplace.schemas import CourseIn, CourseSkillIn
+from api.modules.marketplace.takedown import refuse_while_taken_down
 
 log = structlog.get_logger("iism.marketplace")
 
@@ -207,6 +208,8 @@ async def set_published(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
 
     if published:
+        # An operator removed it (Sprint 59): the owner may not put it back by themselves.
+        refuse_while_taken_down(course)
         teaches = await db.scalar(
             select(CourseSkill.id).where(CourseSkill.course_id == course.id).limit(1)
         )

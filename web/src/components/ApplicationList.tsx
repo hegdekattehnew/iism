@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { GapPanel } from "@/components/GapPanel";
 import { ReviewControl } from "@/components/ReviewControl";
-import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { Badge, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
@@ -85,12 +85,20 @@ export function ApplicationList() {
               <CardBody>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link
-                      href={`/jobs/${application.job.slug}`}
-                      className="text-base font-semibold hover:underline"
-                    >
-                      {title(application.job)}
-                    </Link>
+                    {application.job.removed ? (
+                      // Removed by an operator: the page is gone, so there is nothing to link to.
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold">{title(application.job)}</span>
+                        <Badge tone="bad">{t("removed")}</Badge>
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/jobs/${application.job.slug}`}
+                        className="text-base font-semibold hover:underline"
+                      >
+                        {title(application.job)}
+                      </Link>
+                    )}
                     <p className="text-sm text-muted">{application.job.tenant.name}</p>
                   </div>
                   <span

@@ -36,6 +36,8 @@ export const world = {
   // Operator authority (ADR-042). Global, granted by nothing a membership can
   // give, so it is a field of its own rather than a role in `memberships`.
   isStaff: false,
+  // The operator's tier (ADR-044): `support` or `admin`. Only read where a control is tier-gated.
+  staffTier: "admin" as string | null,
   memberships: [] as TestMembership[],
   // How this person signs in (Sprint 56): what `/auth/me` says about the two credentials.
   account: {
@@ -53,6 +55,7 @@ export function resetWorld(): void {
   world.signedIn = true;
   world.pending = false;
   world.isStaff = false;
+  world.staffTier = "admin";
   world.memberships = [];
   world.account = {
     phone: "+919812349999",
@@ -102,6 +105,7 @@ function derived() {
             full_name: null,
             ...world.account,
             is_staff: world.isStaff,
+            staff_tier: world.staffTier,
           },
     isPending: world.pending,
     isError: signedOut,

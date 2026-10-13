@@ -52,6 +52,8 @@ from api.modules.marketplace.service import (
     list_courses,
     list_jobs,
 )
+from api.modules.marketplace.takedown import restore as restore_listing
+from api.modules.marketplace.takedown import take_down as take_down_listing
 
 __all__ = [
     "COURSE_LANGUAGES",
@@ -67,6 +69,8 @@ __all__ = [
     "Job",
     "JobSkill",
     "count_courses",
+    "restore_listing",
+    "take_down_listing",
     "count_jobs_open",
     "count_jobs_posted",
     "courses_router",

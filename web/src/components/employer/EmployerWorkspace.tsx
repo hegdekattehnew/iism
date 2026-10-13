@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { EmployerDashboard } from "@/components/employer/EmployerDashboard";
@@ -42,6 +42,7 @@ import {
 
 export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("employerWorkspace");
+  const format = useFormatter();
   const me = useMemberships();
   const jobs = useOrgJobs(orgSlug);
   const { create, update, setPublished, setOpen } = useOrgJobMutations(orgSlug);
@@ -205,7 +206,9 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                   {/* Three states, not two. A closed vacancy is published --
                       its page is still there -- so a published/draft badge
                       would call it open when it is not. */}
-                  {job.status !== "published" ? (
+                  {job.taken_down_at ? (
+                    <Badge tone="bad">{t("removed")}</Badge>
+                  ) : job.status !== "published" ? (
                     <Badge tone="warn">{t("draft")}</Badge>
                   ) : job.is_open ? (
                     <Badge tone="good">{t("published")}</Badge>
@@ -223,6 +226,20 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                     })}`}
                 </p>
 
+                {job.taken_down_at && (
+                  <Alert tone="warning" role={undefined} className="mt-3 space-y-1">
+                    <p className="font-medium">
+                      {t("removedOn", {
+                        date: format.dateTime(new Date(job.taken_down_at), {
+                          dateStyle: "medium",
+                        }),
+                      })}
+                    </p>
+                    <p>{job.takedown_reason}</p>
+                    <p className="text-xs">{t("removedExplain")}</p>
+                  </Alert>
+                )}
+
                 <div className="mt-4 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
@@ -231,6 +248,7 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                   >
                     {t("edit")}
                   </button>
+                  {!job.taken_down_at && (
                   <button
                     type="button"
                     disabled={setPublished.isPending}
@@ -248,7 +266,8 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                   >
                     {job.status === "published" ? t("unpublish") : t("publish")}
                   </button>
-                  {job.status === "published" && (
+                  )}
+                  {job.status === "published" && !job.taken_down_at && (
                     <button
                       type="button"
                       disabled={setOpen.isPending}

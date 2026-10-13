@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from api.modules.applications.models import (
     APPLICATION_STATUSES,
@@ -44,6 +44,14 @@ class JobRef(BaseModel):
     # The public view of the organisation: `TenantOut` deliberately carries no
     # contact email, and this payload is no place to start.
     tenant: TenantOut
+    # Read off the listing and not sent: only whether an operator removed it (Sprint 59), so the
+    # list says so instead of linking to a page that no longer exists.
+    taken_down_at: datetime | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def removed(self) -> bool:
+        return self.taken_down_at is not None
 
 
 class ApplicationIn(BaseModel):

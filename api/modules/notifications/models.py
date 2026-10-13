@@ -76,6 +76,11 @@ TEMPLATES = (
     # only, to a signed-in sender: an anonymous sender has no recipient to resolve, and we never
     # write to an address a stranger typed into a form.
     "grievance_update",
+    # Sprint 59, BL-14.4. An operator removed a listing, or put it back. Email to the
+    # organisation, with the reason the operator wrote for it; never the reporter, who is not
+    # named anywhere in the payload.
+    "listing_removed",
+    "listing_restored",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

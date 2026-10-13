@@ -96,6 +96,12 @@ class Settings(BaseSettings):
     # and writes a row: it is a spam sink unless somebody says how much.
     grievance_submissions_per_hour: int = Field(default=5, ge=0)
 
+    # Reports about listings (Sprint 59, ADR-069). One person may file this many a day (0 turns it
+    # off, as in the test suite); a closed report is kept this long after it was closed, an open one
+    # on a live listing never is.
+    report_submissions_per_day: int = Field(default=10, ge=0)
+    report_retention_days: int = Field(default=365, ge=30)
+
     # --- abuse protection ---
     # Per minute. Signed-in requests are limited per *user*, anonymous ones per
     # IP: Indian mobile carriers put many subscribers behind one address (CGNAT),

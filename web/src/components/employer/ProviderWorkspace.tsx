@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
@@ -43,6 +43,7 @@ import {
 export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("providerWorkspace");
   const te = useTranslations("employerWorkspace");
+  const format = useFormatter();
   const me = useMemberships();
   const courses = useOrgCourses(orgSlug);
   // One request for the whole list, joined by slug -- not one per card.
@@ -196,7 +197,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                         ` · ${t("nsqfLevelIs", { level: course.nsqf_level })}`}
                     </p>
                   </div>
-                  {course.status === "published" ? (
+                  {course.taken_down_at ? (
+                    <Badge tone="bad">{te("removed")}</Badge>
+                  ) : course.status === "published" ? (
                     <Badge tone="good">{te("published")}</Badge>
                   ) : (
                     <Badge tone="warn">{te("draft")}</Badge>
@@ -207,6 +210,20 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                   {t("teachesCount", { count: (course.skills ?? []).length })}
                 </p>
 
+                {course.taken_down_at && (
+                  <Alert tone="warning" role={undefined} className="mt-3 space-y-1">
+                    <p className="font-medium">
+                      {te("removedOn", {
+                        date: format.dateTime(new Date(course.taken_down_at), {
+                          dateStyle: "medium",
+                        }),
+                      })}
+                    </p>
+                    <p>{course.takedown_reason}</p>
+                    <p className="text-xs">{te("removedExplain")}</p>
+                  </Alert>
+                )}
+
                 <div className="mt-4 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
@@ -215,6 +232,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                   >
                     {te("edit")}
                   </button>
+                  {!course.taken_down_at && (
                   <button
                     type="button"
                     disabled={setPublished.isPending}
@@ -242,6 +260,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                       ? te("unpublish")
                       : te("publish")}
                   </button>
+                  )}
                   <Link
                     href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
                     className="text-sm font-medium text-brand underline-offset-4 hover:underline"

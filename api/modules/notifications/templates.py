@@ -81,6 +81,20 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "An update on your message {reference}",
             "Your message {reference} is now: {status}.\n\nSee where it stands:\n{link}\n",
         ),
+        "listing_removed": (
+            "{listing} was removed from IISM",
+            'Our team removed "{listing}" from IISM.\n\n'
+            "The reason we recorded: {reason}\n\n"
+            "It is no longer visible to anyone, and it cannot be published again until we have "
+            "restored it. You can still open and edit it:\n{link}\n\n"
+            "If you think this is a mistake, please reply to the IISM team and quote the "
+            "listing's name.\n",
+        ),
+        "listing_restored": (
+            "{listing} can be published again",
+            'We reviewed "{listing}" and restored it. It is saved as a draft: nothing is '
+            "visible until you publish it yourself.\n\nOpen it:\n{link}\n",
+        ),
     },
     "hi": {
         "application_received": (
@@ -145,6 +159,19 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
         "grievance_update": (
             "आपके संदेश {reference} की जानकारी",
             "आपका संदेश {reference} अब: {status}।\n\nदेखें कि यह कहाँ पहुँचा:\n{link}\n",
+        ),
+        "listing_removed": (
+            "{listing} को IISM से हटा दिया गया",
+            "हमारी टीम ने “{listing}” को IISM से हटा दिया है।\n\n"
+            "दर्ज किया गया कारण: {reason}\n\n"
+            "यह अब किसी को दिखाई नहीं देता, और हमारे बहाल करने तक इसे फिर प्रकाशित नहीं किया जा "
+            "सकता। आप इसे अब भी खोलकर बदल सकते हैं:\n{link}\n\n"
+            "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम को उत्तर दें और सूची का नाम लिखें।\n",
+        ),
+        "listing_restored": (
+            "{listing} फिर प्रकाशित किया जा सकता है",
+            "हमने “{listing}” की समीक्षा की और उसे बहाल कर दिया। वह मसौदे के रूप में सहेजा गया है: "
+            "जब तक आप स्वयं प्रकाशित नहीं करते, कुछ भी दिखाई नहीं देगा।\n\nखोलें:\n{link}\n",
         ),
     },
 }

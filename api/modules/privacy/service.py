@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
-from api.modules import grievances
+from api.modules import grievances, moderation
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, ApplicationReview, SavedJob
@@ -316,6 +316,7 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         update(AnalyticsEvent).where(AnalyticsEvent.user_id == user.id).values(user_id=None)
     )
     await grievances.erase_for_user(db, user.id)
+    await moderation.erase_for_user(db, user.id)
     # Unlike an analytics row, a notification is *addressed* to this person: it
     # cannot be anonymised by dropping the link, so it goes.
     await db.execute(
@@ -637,6 +638,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         # What they wrote to us (Sprint 57), and where each stands. The operator's note is the
         # operator's act, not data held about the person, and stays out.
         "grievances_raised": await grievances.export_for_user(db, user),
+        "listing_reports_made": await moderation.export_for_user(db, user),
         "activity": [
             {
                 "event": event.name,

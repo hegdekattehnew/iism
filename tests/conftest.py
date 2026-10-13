@@ -42,6 +42,8 @@ def _environment(_containers: tuple[str, str]) -> Iterator[None]:
     os.environ["OTP_RESEND_COOLDOWN_SECONDS"] = "0"
     # The same for the budget on public messages (Sprint 57): every test shares one address.
     os.environ["GRIEVANCE_SUBMISSIONS_PER_HOUR"] = "0"
+    # ...and on reports about listings (Sprint 59): a budget test switches it back on.
+    os.environ["REPORT_SUBMISSIONS_PER_DAY"] = "0"
     # A real-length key: PyJWT warns below 32 bytes for HMAC-SHA256, and the
     # warning is worth keeping meaningful rather than muting.
     os.environ["JWT_SECRET_KEY"] = "test-only-key-" + "x" * 40

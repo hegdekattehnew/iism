@@ -48,6 +48,7 @@ from api.modules.marketplace.models import (
     JobSkill,
 )
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
+from api.modules.marketplace.takedown import refuse_while_taken_down
 
 log = structlog.get_logger("iism.marketplace")
 
@@ -243,6 +244,8 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
 
     if published:
+        # An operator removed it (Sprint 59): the owner may not put it back by themselves.
+        refuse_while_taken_down(job)
         required = await db.scalar(select(JobSkill.id).where(JobSkill.job_id == job.id).limit(1))
         if required is None:
             # Not a nicety. Matching scores concept overlap, so a job requiring
@@ -350,6 +353,8 @@ async def reopen_job(
     job = await db.scalar(select(Job).where(Job.slug == slug, Job.tenant_id == tenant_id))
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    # Reopening is the other way a closed vacancy returns; a removed one stays removed.
+    refuse_while_taken_down(job)
 
     job.closed_at = None
     job.close_reason = None

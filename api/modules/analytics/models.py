@@ -96,6 +96,12 @@ EVENT_NAMES = (
     # payload is counts only (rows, created, skipped, rejected) and never a row's content.
     "jobs_bulk_uploaded",
     "courses_bulk_uploaded",
+    # Sprint 59, BL-14.4. Moderation. Subject to the **listing**; the payload is a reason code or a
+    # count, never the reporter and never free text.
+    "listing_reported",
+    "listing_reports_dismissed",
+    "listing_taken_down",
+    "listing_restored",
 )
 
 

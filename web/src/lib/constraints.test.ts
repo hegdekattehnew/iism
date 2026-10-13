@@ -111,6 +111,16 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     expect: { budget_inr: ["min={0}", "max={10000000}"] },
   },
   {
+    file: "components/ReportListing.tsx",
+    label: "ReportIn",
+    expect: { detail: ["maxLength={DETAIL_MAX}"] },
+  },
+  {
+    file: "components/ops/ReportQueue.tsx",
+    label: "DismissIn and TakedownIn",
+    expect: { note: ["minLength={NOTE_MIN}", "maxLength={NOTE_MAX}"] },
+  },
+  {
     file: "components/ReviewControl.tsx",
     label: "ReviewIn",
     expect: { comment: ["maxLength={1000}"] },
@@ -241,5 +251,31 @@ describe("the course budget mirrors the server's ceiling", () => {
     ]) {
       expect(readFileSync(join(root, route), "utf8"), route).toContain("le=10_000_000");
     }
+  });
+});
+
+/** The report forms' numbers are the server's, read from its source. */
+describe("the report forms mirror the server's limits", () => {
+  const root = join(SRC, "..", "..");
+  const models = readFileSync(join(root, "api/modules/moderation/models.py"), "utf8");
+  const schemas = readFileSync(join(root, "api/modules/moderation/schemas.py"), "utf8");
+  const lib = read("lib/moderation.ts");
+
+  it("the detail length", () => {
+    expect(models).toContain("DETAIL_MAX = 1000");
+    expect(lib).toContain("DETAIL_MAX = 1000");
+  });
+
+  it("the operator's note and the removal reason", () => {
+    expect(schemas).toContain("NOTE_MIN, NOTE_MAX = 10, 1000");
+    expect(lib).toContain("NOTE_MIN = 10");
+    expect(lib).toContain("NOTE_MAX = 1000");
+  });
+
+  it("the reasons are the server's, in the server's order", () => {
+    const listed = [...models.matchAll(/^\s+"([a-z_]+)",$/gm)].map((m) => m[1]);
+    const reasons = ["asks_for_money", "fake_or_misleading", "discriminatory", "unsafe_or_illegal", "spam_or_duplicate", "other"];
+    expect(listed).toEqual(expect.arrayContaining(reasons));
+    for (const reason of reasons) expect(lib).toContain(`"${reason}"`);
   });
 });
