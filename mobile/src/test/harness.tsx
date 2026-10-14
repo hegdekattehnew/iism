@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react-native";
+import { act, render } from "@testing-library/react-native";
 import type { ReactElement } from "react";
 
 import type { Locale } from "../core/locale";
@@ -21,4 +21,11 @@ export async function renderScreen(ui: ReactElement, locale: Locale = "en") {
       <QueryClientProvider client={client}>{ui}</QueryClientProvider>
     </Intl>,
   );
+}
+
+/** Let every pending update (a deferred search term, a query that has just answered) land inside `act`. */
+export async function settle() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }

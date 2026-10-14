@@ -16,3 +16,15 @@ POST /auth/refresh
 POST /auth/logout
 POST /auth/logout-all
 GET /auth/me
+
+# Browse without signing in (M2, Sprint 63): vacancies, courses, standards, and the search over them.
+GET /jobs
+GET /jobs/{slug}
+GET /courses
+GET /courses/{slug}
+GET /skills
+GET /skills/{slug}
+GET /skills/search
+GET /skills/{slug}/jobs
+GET /skills/{slug}/courses
+GET /roles/search

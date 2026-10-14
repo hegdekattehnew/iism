@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, OFFERED_LOCALES, resolveLocale } from "./locale";
+import { DEFAULT_LOCALE, OFFERED_LOCALES, isLocale, resolveLocale } from "./locale";
 
 describe("which language the app speaks", () => {
   it("takes the first device language it offers", () => {
@@ -18,5 +18,13 @@ describe("which language the app speaks", () => {
   it("does not offer Malay, which the web keeps but hides", () => {
     expect(OFFERED_LOCALES).not.toContain("ms");
     expect(resolveLocale(["ms-MY"])).toBe(DEFAULT_LOCALE);
+  });
+});
+
+describe("a remembered language", () => {
+  it("is used only if it is one the app offers", () => {
+    expect(isLocale("hi")).toBe(true);
+    expect(isLocale("en")).toBe(true);
+    for (const bad of ["ms", "fr", "", null, undefined, 7, "HI"]) expect(isLocale(bad)).toBe(false);
   });
 });

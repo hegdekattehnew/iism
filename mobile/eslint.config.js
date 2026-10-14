@@ -8,4 +8,10 @@ module.exports = defineConfig([
     // `schema.d.ts` is generated and `tokens.ts` is generated: neither is edited or linted.
     ignores: ["dist/*", ".expo/*", "src/api/schema.d.ts", "src/theme/tokens.ts"],
   },
+  {
+    // `jest.mock` factories run before the file's own imports exist, so they `require` (see
+    // `src/test/mocks.ts`).
+    files: ["src/test/**"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);

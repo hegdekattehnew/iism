@@ -6,28 +6,58 @@ signs in on the website.
 
 ## Status
 
-**Sprint 62 (M1), completed.** The toolchain is installed and everything in this folder is checked
-by `make mobile-check` (and by the `mobile` job in CI):
+**Sprint 63 (M2), completed: browse without signing in.** Home, Jobs, Courses and Standards tabs, the
+three detail screens, a search (vacancies, roles, standards), a remembered language, and a public
+cache that lets a list be read offline (ADR-073). It is read-only: applying, matches and the profile
+are M3. Everything here is checked by `make mobile-check` (and by the `mobile` job in CI):
 
-- strict `tsc` over the whole app, `eslint` (Expo's config), and **53 Jest tests**: the portable
-  core (`src/core`, 39) and the two screens (sign-in 9, home 5) rendered in a React Native test
-  renderer against the real catalogues;
-- a **Metro bundle for Android and iOS** (`npx expo export`), which is what catches a missing
-  import or an unresolvable asset.
+- strict `tsc`, `eslint` (Expo's config) and **171 Jest tests**: the portable core (`src/core`) in
+  plain Node, and the screens rendered in a React Native test renderer against the real catalogues;
+- a **Metro bundle for Android and iOS** compiled to Hermes bytecode (`npx expo export`), which
+  catches a missing import or an unresolvable asset.
 
-**Not verified yet, and no automated check stands in for it:** a run on an emulator or a real
-phone; whether Hermes (the phone's JavaScript engine) formats Hindi plurals and dates the way Node
-does (`use-intl` relies on `Intl`; check on a device before trusting the shared catalogues);
-TalkBack and VoiceOver; performance on a low-end Android. The first screen run on a device is M2's
-first job.
+**Run for real in a browser, not on a phone.** The same screens were run through `react-native-web`
+at 375x812 against the dev API (see below), in English and Hindi, including the error state and
+reading the cached lists with the API stopped.
+
+**Not verified yet, and no automated check stands in for it:** a run on an emulator or a real phone;
+whether Hermes formats and scrolls as expected (money and dates avoid `Intl`, plural rules are
+polyfilled, but only a device proves it); TalkBack and VoiceOver; performance on a low-end Android.
+
+## Run it
+
+**On a phone you own (about five minutes, no emulator).** Install Expo Go, start the API so the
+phone can reach it, and point the app at this machine's address:
+
+```bash
+set -a; . ./.env; set +a
+.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000   # from the repo root
+cd mobile
+EXPO_PUBLIC_API_BASE_URL=http://<this machine's LAN address>:8000 npx expo start
+# scan the QR code with Expo Go (Android) or the Camera app (iOS)
+```
+
+**In a browser (what the sprint's checks used).** `react-native-web` renders the same screens. The
+API refuses a browser origin it does not know, so start a second API with the web origin allowed:
+
+```bash
+set -a; . ./.env; set +a      # from the repo root
+WEB_BASE_URL=http://localhost:8081 .venv/bin/uvicorn api.main:app --port 8101
+cd mobile && EXPO_PUBLIC_API_BASE_URL=http://localhost:8101 npx expo start --web --port 8081
+```
+
+Restart Expo with `--clear` after changing a module under `src/core`: a stale Metro bundle hid a fix
+once.
 
 ## Layout
 
 ```
 app/                  Expo Router screens (one file, one route). No test files here: a file in
                       app/ is a route.
-src/core/             No React Native import: the API client, token store, sign-in flow, locale.
-                      Put logic here, not in a screen.
+src/core/             No React Native import: the API client, token store, sign-in flow, locale,
+                      formatting, labels, the public reads, the cache rules. Put logic here, not in
+                      a screen.
+src/lib/              Query hooks (every visitor query is keyed ["public", locale, ...])
 src/auth/             The one file that touches the Keychain / Keystore
 src/test/             Screen tests and the render harness
 src/api/schema.d.ts   GENERATED from the API: `make gen-api-mobile`

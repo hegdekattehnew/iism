@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(72 ADRs). Read it before making any structural decision — the summary below
+(73 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -419,13 +419,16 @@ mobile/                  (Sprint 62, ADR-072) The job seeker's Android and iOS a
                          a **second client of the same API**, not a second product. `src/core/` has no React
                          Native import; `app/` is the Expo Router screens (never put a test there: a file in
                          `app/` is a route; screen tests are `src/test/`). `make mobile-check` (and the `mobile`
-                         CI job) run `tsc`, `eslint`, 53 Jest tests and a Metro bundle. **Add Expo packages with
+                         CI job) run `tsc`, `eslint`, 171 Jest tests and a Metro bundle for both platforms. **Add Expo packages with
                          `npx expo install`, not `npm install`.** `src/api/schema.d.ts`,
                          `src/messages/{en,hi,ms}.json` and `src/theme/tokens.ts` are GENERATED from the web
                          (`make gen-api-mobile`, `make sync-mobile-messages`, `scripts/sync_mobile_tokens.py`)
                          and a test fails when they are stale. `contract/` is the list of API operations the
-                         released app calls and a snapshot of them. v1 is candidate-only. **Never run on a
-                         device yet.**
+                         released app calls and a snapshot of them. v1 is candidate-only. (Sprint 63, ADR-073) A visitor
+                         can browse jobs, courses and standards and search without signing in; every such
+                         query is keyed `["public", locale, ...]` and **only those are persisted** (the offline
+                         cache). Money and dates are formatted by `core/format.ts`, not `Intl`. **Run in a
+                         browser through `react-native-web`; never run on a device yet.**
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -595,6 +598,7 @@ split would have to turn into interfaces first; do not add to it casually.
   required request property or parameter, a tighter limit or a narrower enum. **Keep the old shape and add the new beside it**, or raise `MOBILE_MIN_VERSION_*` and re-record with
   `scripts/check_api_contract.py --release`. `make snapshot-contract` only *adds* operations, so it can never hide a break. **A check that compares two snapshots must first assert it found them**:
   the test asserts the snapshot is non-empty and equals the surface before comparing anything. Adding an operation to the surface and to the app's calls is one change, and a test holds the two lists equal.
+- **What a client persists is an allow-list, and a persisted failure must not erase what was kept** (ADR-073). The phone keeps a query only if its key starts with `"public"` (`mobile/src/core/persist.ts`) **and it has data**, never mutations, so a personal query added later is not cached by default (the web service worker's deny list fails open). Every visitor query is `["public", locale, kind, filter]`. Two defects here were found only by running the screens: a refetch that failed offline replaced the cache with nothing (`status === "success"` instead of `data !== undefined`), and a signed-out cold start wiped the cache because the token store reports `false` while loading (wipe on the **transition** signed-in to signed-out, never on the state). Money and dates avoid `Intl` (`formatInr`, `formatDate`) because Hermes cannot be run from here; plural rules are polyfilled only when missing. After editing `mobile/src/core`, restart Expo with `--clear`: a stale Metro bundle hid a fix.
 - **A client's generated parts are guarded by what can be derived, and its behaviour by tests that render it** (ADR-072). The mobile messages, schema and colours are generated from the web's; a test
   fails when a copy is stale, when a screen uses a message key the catalogue lacks, when a colour is named outside `tokens.ts`, when the privacy-notice version differs from the API's, when the native
   secure-store module is imported by more than one file, and when the app imports a package it does not declare. Logic goes in `mobile/src/core` (no React Native import); screens are rendered in
@@ -1049,6 +1053,8 @@ split would have to turn into interfaces first; do not add to it casually.
 > a committed snapshot, additive-only), generation of the typed client, messages and colours from the web, and the whole app: strict `tsc`, `eslint`, a Metro bundle for Android and iOS, and 53 Jest tests (the
 > portable core plus the sign-in and home screens rendered against the real catalogues), in a `mobile` CI job. **Not verified:** a run on an emulator or phone, Hermes' `Intl` for Hindi, accessibility and
 > low-end performance. Open before launch: real SMS (DLT), a store-reviewer login, deployment, the store accounts.
+>
+> **Sprint 63 (M2 of the mobile programme) is done** (ADR-073, no migration): *browse on the phone* (BL-15.2). A visitor who has not signed in can read vacancies, courses and standards, open the three details, search (vacancies, then roles, then standards) and switch language, and a public-only cache lets a list be read offline. Ten read operations joined the released surface (17 in all, additive-only). Verified: strict `tsc`, `eslint`, **171 Jest tests**, both platforms bundle to Hermes bytecode, `expo-doctor` 21/21, 28 mutation checks (each fails a test; **one found a real defect**: a fee of zero was not "free") and three Python guards (require cycle, one file per native module, declared packages); and **the real screens run in a browser through `react-native-web`** at 375x812 against the dev API in both languages, including the error state and reading cached lists with the API stopped, which found the two persistence defects in the convention above and a require cycle. **Not verified:** a native run, Hermes, TalkBack and VoiceOver, low-end performance. 1,687 backend tests. Next: M3, the profile, matches and applying.
 >
 > **Sprint 61 is done** (ADR-071, migration 0054): *a pilot with an agency*, the last of the six planned MVP sprints. An **admin-tier operator can enrol an agency's file from `/admin`**: pick a programme, upload a CSV, read what
 > would happen row by row (phones masked, problems first, the failed rows downloadable), confirm the privacy notice was read out, and enrol. The engine moved out of the script into `operations/enrolment.py` and is the one

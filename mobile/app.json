@@ -24,6 +24,10 @@
       "expo-secure-store",
       "expo-localization"
     ],
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
   }
 }
