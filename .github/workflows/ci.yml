@@ -71,6 +71,33 @@ jobs:
       # target: it stops the first-load JS growing unnoticed.
       - run: npm run budget
 
+  # The mobile app (Sprint 62 completion, ADR-072). No emulator and no device: this compiles it, lints it,
+  # runs the tests (the portable core and the screens, rendered in a React Native test renderer)
+  # and asks Metro to build the Android bundle, which is what catches a missing import or an
+  # unresolvable asset. The release-gating advisory level is `critical`: the high ones in the
+  # audit today are Metro, the Expo CLI and their dependencies, which never reach a phone.
+  mobile:
+    name: Mobile — lint, types, tests, bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=critical
+      - run: npx tsc --noEmit
+      - run: npx eslint .
+      - run: npx jest --ci
+      - run: npx expo export --platform android --output-dir "$RUNNER_TEMP/iism-export"
+
   # Real-browser journeys (Sprint 52, ADR-062). Nothing above renders a page: the component
   # tests mock three seams and run axe with colour-contrast off (jsdom has no layout), so this is
   # the only place a layout, a contrast ratio, a CSP violation or a console error can fail a build.
