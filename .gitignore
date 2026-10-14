@@ -23,6 +23,20 @@ next-env.d.ts
 # generated (regenerate with `make gen-api`)
 web/openapi.json
 
+# mobile (Expo): installed packages, native build output and local env
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/ios/
+mobile/android/
+mobile/web-build/
+mobile/.env*.local
+mobile/*.keystore
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.mobileprovision
+
 # os / editor
 .DS_Store
 *.swp

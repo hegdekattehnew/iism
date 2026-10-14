@@ -1,0 +1,635 @@
+{
+  "GET /auth/me": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "consent_version": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consented_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "email_verified_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "full_name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "is_staff": {
+                  "type": "boolean"
+                },
+                "memberships": {
+                  "items": {
+                    "properties": {
+                      "role": {
+                        "enum": [
+                          "owner",
+                          "admin",
+                          "member"
+                        ],
+                        "type": "string"
+                      },
+                      "tenant": {
+                        "properties": {
+                          "city": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "is_verified": {
+                            "type": "boolean"
+                          },
+                          "logo_url": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "tenant_type": {
+                            "enum": [
+                              "employer",
+                              "course_provider",
+                              "personal"
+                            ],
+                            "type": "string"
+                          },
+                          "website": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name",
+                          "tenant_type"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "role",
+                      "tenant"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "phone_verified_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_locale": {
+                  "type": "string"
+                },
+                "staff_tier": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "preferred_locale"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /health": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /auth/logout": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "refresh_token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "refresh_token"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "204": {},
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /auth/logout-all": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "204": {}
+    }
+  },
+  "POST /auth/otp/request": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "phone": {
+                "maxLength": 16,
+                "minLength": 8,
+                "type": "string"
+              }
+            },
+            "required": [
+              "phone"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "debug_code": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expires_in_seconds": {
+                  "type": "integer"
+                },
+                "resend_after_seconds": {
+                  "type": "integer"
+                },
+                "sent": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "sent",
+                "expires_in_seconds"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /auth/otp/verify": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "code": {
+                "maxLength": 8,
+                "minLength": 4,
+                "type": "string"
+              },
+              "consent_version": {
+                "anyOf": [
+                  {
+                    "maxLength": 32,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phone": {
+                "maxLength": 16,
+                "minLength": 8,
+                "type": "string"
+              }
+            },
+            "required": [
+              "phone",
+              "code"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "access_token": {
+                  "type": "string"
+                },
+                "created": {
+                  "type": "boolean"
+                },
+                "expires_in": {
+                  "type": "integer"
+                },
+                "organisation_slug": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "refresh_token": {
+                  "type": "string"
+                },
+                "token_type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "access_token",
+                "refresh_token",
+                "expires_in"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /auth/refresh": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "refresh_token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "refresh_token"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "access_token": {
+                  "type": "string"
+                },
+                "expires_in": {
+                  "type": "integer"
+                },
+                "refresh_token": {
+                  "type": "string"
+                },
+                "token_type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "access_token",
+                "refresh_token",
+                "expires_in"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(71 ADRs). Read it before making any structural decision — the summary below
+(72 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -83,6 +83,10 @@ api/                     FastAPI modular monolith
                          logger in the process can route around it.
     middleware.py        Pure ASGI request context: request_id, the access log.
     text.py              slugify, shared by identity and the NSQF importer
+    contract.py          (Sprint 62, ADR-072) What would break the released mobile app: pure functions over
+                         OpenAPI snapshots. `AppVersionMiddleware` in `middleware.py` answers 426 to a build
+                         older than `MOBILE_MIN_VERSION_ANDROID/_IOS`, and fails open on a missing or
+                         unreadable header.
   modules/
     identity/            Users, tenants, memberships, invitations. OTP sign-in by phone *or*
                          email, credential linking, organisation creation and the organisation
@@ -411,6 +415,15 @@ api/                     FastAPI modular monolith
                          a ~470 MB download) this story does not make silently. Every
                          implementation is pinned to 384 dimensions (ADR-031) so a real
                          model can replace this one with no schema change.
+mobile/                  (Sprint 62, ADR-072) The job seeker's Android and iOS app, Expo / React Native: a
+                         **second client of the same API**, not a second product. `src/core/` has no React
+                         Native import and is tested in Node; the screens, `src/ui` and the theme hook were
+                         written without the toolchain and have **never been compiled** (see its README).
+                         `src/api/schema.d.ts`, `src/messages/{en,hi,ms}.json` and `src/theme/tokens.ts` are
+                         GENERATED from the web (`make gen-api-mobile`, `make sync-mobile-messages`,
+                         `scripts/sync_mobile_tokens.py`) and a test fails when they are stale.
+                         `contract/` is the list of API operations the released app calls and a snapshot of
+                         them. v1 is candidate-only.
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -575,6 +588,14 @@ split would have to turn into interfaces first; do not add to it casually.
   act it previews run one decision function** (`enrolment._decide`), or the preview can promise what the act will not do. **A model never holds a foreign key into a module it may not import**: point the other
   way with a join table (`enrolment_batch_members`), or every script that loads one without the other fails at mapper configuration. A file of people is cheap to check (0.08 s for 1,000 rows) and not to apply
   (4.2 s): measure before raising `ENROLMENT_MAX_ROWS`.
+- **The API is additive-only for the operations the released mobile app calls** (ADR-072). An installed app cannot be updated by deploying, so `mobile/contract/surface.txt` lists what it calls,
+  `mobile/contract/openapi.snapshot.json` records them as they were at the last store release, and `tests/test_api_contract.py` (in `make check`) fails on a removed or retyped response property, a new
+  required request property or parameter, a tighter limit or a narrower enum. **Keep the old shape and add the new beside it**, or raise `MOBILE_MIN_VERSION_*` and re-record with
+  `scripts/check_api_contract.py --release`. `make snapshot-contract` only *adds* operations, so it can never hide a break. **A check that compares two snapshots must first assert it found them**:
+  the test asserts the snapshot is non-empty and equals the surface before comparing anything. Adding an operation to the surface and to the app's calls is one change, and a test holds the two lists equal.
+- **A client with no render test yet is guarded by what can be derived** (ADR-072). The mobile messages, schema and colours are generated from the web's; a test fails when a copy is stale, when a screen
+  uses a message key the catalogue lacks, when a colour is named outside `tokens.ts`, when the privacy-notice version differs from the API's, and when the native secure-store module is imported by more than one
+  file. Logic goes in `mobile/src/core` (no React Native import), where the web's `tsc` and Vitest can run it before the Expo toolchain exists.
 - **A browser's matching Chromium is not part of `npm ci`.** After a Playwright bump the suite cannot start until `npx playwright install chromium` has fetched the build it names (about 99 MB); CI does this itself.
   `web/AGENTS.md` is rewritten by Next's own tooling on install and build; it is not part of a change.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
@@ -1017,6 +1038,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 62 (M1 of the mobile programme) is done** (ADR-072, no migration): *the mobile app's foundations*, partly verified. A native job-seeker app (Expo / React Native, candidate-only for v1) is built **in this
+> repository as `mobile/`**, with no fork and no rebaseline. Verified: the **426 "update the app" gate** (`AppVersionMiddleware`, fails open), the **contract check** for released operations (`api/core/contract.py`,
+> a committed snapshot, additive-only), generation of the typed client, messages and colours from the web, and `mobile/src/core` (strict `tsc` and 39 tests with the web's toolchain). **Not verified:** the React
+> Native layer was written without the Expo toolchain (the owner declined the download) and has never been compiled. Open before launch: real SMS (DLT), a store-reviewer login, deployment, the store accounts.
 >
 > **Sprint 61 is done** (ADR-071, migration 0054): *a pilot with an agency*, the last of the six planned MVP sprints. An **admin-tier operator can enrol an agency's file from `/admin`**: pick a programme, upload a CSV, read what
 > would happen row by row (phones masked, problems first, the failed rows downloadable), confirm the privacy notice was read out, and enrol. The engine moved out of the script into `operations/enrolment.py` and is the one

@@ -1,0 +1,174 @@
+import type { ReactNode } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text as NativeText,
+  TextInput,
+  View,
+  type TextInputProps,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { MIN_TOUCH, radius, space, text, useColours } from "../theme";
+
+/**
+ * The few primitives every screen is built from. They are the phone's `ui/` library: tokens only
+ * (no colour is named here), a 48 dp minimum touch target, and an accessible name and role on
+ * everything that can be pressed. Not a design system; the smallest set M1 needs.
+ */
+
+export function Screen({ children }: { children: ReactNode }) {
+  const c = useColours();
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+      <ScrollView
+        contentContainerStyle={{ padding: space.xl, gap: space.lg, flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function Text({
+  children,
+  variant = "body",
+  tone = "foreground",
+}: {
+  children: ReactNode;
+  variant?: keyof typeof text;
+  tone?: "foreground" | "muted" | "danger";
+}) {
+  const c = useColours();
+  const colour = tone === "foreground" ? c.foreground : tone === "muted" ? c.muted : c.dangerText;
+  return (
+    <NativeText
+      accessibilityRole={variant === "title" ? "header" : "text"}
+      style={{
+        color: colour,
+        fontSize: text[variant],
+        fontWeight: variant === "title" ? "700" : "400",
+        // Devanagari needs more line height than Latin (the web's `html[lang=hi]` rule).
+        lineHeight: Math.round(text[variant] * 1.6),
+      }}
+    >
+      {children}
+    </NativeText>
+  );
+}
+
+export function Button({
+  label,
+  onPress,
+  disabled = false,
+  busy = false,
+  variant = "primary",
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  variant?: "primary" | "secondary";
+}) {
+  const c = useColours();
+  const inactive = disabled || busy;
+  const primary = variant === "primary";
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: inactive, busy }}
+      disabled={inactive}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: MIN_TOUCH,
+        borderRadius: radius.md,
+        paddingHorizontal: space.lg,
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: space.sm,
+        opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
+        backgroundColor: primary ? c.brand : c.surface,
+        borderWidth: primary ? 0 : StyleSheet.hairlineWidth * 2,
+        borderColor: c.inputBorder,
+      })}
+    >
+      {busy && <ActivityIndicator color={primary ? c.brandContrast : c.brand} />}
+      <NativeText
+        style={{
+          color: primary ? c.brandContrast : c.brand,
+          fontSize: text.body,
+          fontWeight: "600",
+        }}
+      >
+        {label}
+      </NativeText>
+    </Pressable>
+  );
+}
+
+export function TextField({
+  label,
+  ...input
+}: { label: string } & Omit<TextInputProps, "style" | "accessibilityLabel">) {
+  const c = useColours();
+  return (
+    <View style={{ gap: space.xs }}>
+      <NativeText style={{ color: c.foreground, fontSize: text.small, fontWeight: "600" }}>
+        {label}
+      </NativeText>
+      <TextInput
+        accessibilityLabel={label}
+        placeholderTextColor={c.muted}
+        style={{
+          minHeight: MIN_TOUCH,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          // Not `border`: a control's edge must be findable (WCAG 1.4.11), as on the web.
+          borderColor: c.inputBorder,
+          backgroundColor: c.surface,
+          color: c.foreground,
+          paddingHorizontal: space.md,
+          fontSize: text.body,
+        }}
+        {...input}
+      />
+    </View>
+  );
+}
+
+export function Notice({
+  children,
+  tone = "info",
+}: {
+  children: ReactNode;
+  tone?: "info" | "danger" | "warning";
+}) {
+  const c = useColours();
+  const palette = {
+    info: [c.infoSurface, c.infoBorder, c.infoText],
+    danger: [c.dangerSurface, c.dangerBorder, c.dangerText],
+    warning: [c.warningSurface, c.warningBorder, c.warningText],
+  }[tone];
+  return (
+    <View
+      accessibilityRole={tone === "danger" ? "alert" : undefined}
+      accessibilityLiveRegion={tone === "danger" ? "polite" : "none"}
+      style={{
+        backgroundColor: palette[0],
+        borderColor: palette[1],
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: space.md,
+      }}
+    >
+      <NativeText style={{ color: palette[2], fontSize: text.body, lineHeight: 26 }}>
+        {children}
+      </NativeText>
+    </View>
+  );
+}

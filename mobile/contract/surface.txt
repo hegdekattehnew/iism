@@ -1,0 +1,18 @@
+# The API operations the released mobile app calls (Sprint 62, ADR-072).
+#
+# One per line, "METHOD /path". The CI check `make check-contract` compares each of these against
+# the snapshot taken at the last store release and fails on a change that would break an installed
+# app. Add an operation here in the same change that makes the app call it, then run
+# `make snapshot-contract`; nothing outside this list is checked, because the web app deploys with
+# the API and may change freely.
+
+# Health: the app's own start-up probe.
+GET /health
+
+# Sign in and out, by phone (candidate-only for v1: an organisation signs in on the web).
+POST /auth/otp/request
+POST /auth/otp/verify
+POST /auth/refresh
+POST /auth/logout
+POST /auth/logout-all
+GET /auth/me
