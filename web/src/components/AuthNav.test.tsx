@@ -11,6 +11,10 @@ vi.mock(
   async () => (await import("@/test/harness")).navigationMock,
 );
 
+// The header's unread count asks the server; these tests are about who is shown what, so the
+// count is a value they set. `AuthNav.updates.test.tsx` is the one that cares about it.
+vi.mock("@/lib/unread-count", () => ({ useUnreadCount: () => 0 }));
+
 beforeEach(resetWorld);
 
 const link = (name: string) => screen.queryByRole("link", { name });

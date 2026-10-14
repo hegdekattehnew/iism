@@ -586,6 +586,12 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
                 "organisation": cast(Tenant, application.job.tenant).name,
                 "status": application.status,
                 "message": application.message,
+                # What an employer said to them, and wrote about them (Sprint 60, ADR-070). The
+                # notes are personal data about this person processed here, so the right of access
+                # covers them even though the product never shows them.
+                "employer_message": application.status_message,
+                "employer_message_at": _iso(application.status_message_at),
+                "employer_notes": application.employer_notes,
                 "applied_at": _iso(application.created_at),
                 "contact_shared_at": _iso(application.contact_shared_at),
                 "contact_revoked_at": _iso(application.contact_revoked_at),

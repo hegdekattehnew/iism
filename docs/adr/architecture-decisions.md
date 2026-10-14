@@ -3475,3 +3475,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **A reporter is not told the outcome**, and learners who registered interest in a removed course are not told (only a vacancy's applicants are). Both would need a notice design of their own.
 - **Measured by tests that fail without the rule:** each of the three publish writers (job, course and `reopen_job`), the closure with its own reason, a restore that keeps a filled vacancy filled, a draft staying a draft after restore, self-report, a draft being reportable, support able to take down, dismissal needing the wrong tier, the retention age, an open report being purged, the queue order and an unmasked reporter; in the browser, a support operator is not offered the removal, the applicant's list says so, the owner cannot publish and an admin's restore lets them.
 - **Not done:** an appeals queue, a reporter-facing outcome, notifying learners, language in a takedown notice beyond English and Hindi, and acting on a listing from its public page.
+
+## ADR-070: A Message With a Status Is Read From the Application and Never Copied Into the Outbox; Notes Are the Employer's and in the Person's Export; One Serialiser Feeds the List and the Spreadsheet
+
+**Status:** Accepted (October 2026). Sprint 60 (BL-14.7 to BL-14.9). Migration 0053. Extends ADR-006, ADR-023, ADR-037 and ADR-055.
+
+**Context:** An employer could move an application to shortlisted, rejected or hired but could not say when or where an interview was; the candidate's notice said only the new status. There was nowhere to keep a note on an applicant and no way to take the list into a spreadsheet. A candidate's notices existed only inside the applications page, capped at the newest fifty with no unread count anywhere. Reading the code: `Application.message` is the *candidate's* covering note (withdrawing takes it back), so the employer's words need a different column; `employer_service.set_status` is the one writer of a status; the rule that contact and the covering note vanish on withdrawal lived in a pure function sitting inside a route module; the outbox holds a recipient and a payload and, by ADR-006/023, no address or phone; and `bulk.errors_csv` wrote cells exactly as uploaded.
+
+**Decision:**
+
+- **The message is stored on the application and never in the outbox.** `status_message` (500 characters, a CHECK as well as the schema) is **replaced when one is given, cleared when the status really changes and none is given, and left alone when the status is unchanged and none is given** (a second click on "Shortlist" must not erase an interview time). The notice carries `has_message: true` and the path; the words are read from the application page, where the candidate already is, and the email says only that there is one. An interview contact will often contain a phone number, and the outbox keeps free text for 90 days and mails it in clear; not copying the words keeps the rule without trying to detect phone numbers. A message uses its own template (`application_status_message`) rather than a conditional in the old one.
+- **One latest message, not a thread.** A thread is a messaging product with moderation, notifications and abuse of its own; one message per application covers "when and where".
+- **Employer notes are the employer's, private in the product, and in the person's data export.** `employer_notes` (2,000 characters) is never in any candidate-facing schema (a test walks every response model reachable from `/me/*` for the field), survives the candidate's withdrawal (withdrawing takes back what they shared, not what the employer wrote) and is deleted with the application on erasure. It **is** listed in the DPDP export: it is personal data about the person processed here, and a summary of what is held is the right of access (ADR-055's rule that what erasure deletes the export shows). The note field tells the employer so.
+- **One serialiser.** `applicant_out` moved out of the route module into `applications/serialisers.py`; the CSV is built from the `ApplicantOut` objects it makes, never from the rows beside them, so a withdrawn applicant's name, phone, email and covering note are blank in the spreadsheet for the same reason they are blank on screen. The export is `CANDIDATE_SHORTLIST`-gated like the list, the employer's own vacancy only, as heavy as opening the list (it goes through `inbox()`), and recorded as `applicants_exported` with a count and no name.
+- **Every cell is safe to open** (`core.text.csv_safe`): a cell that starts with `=` or `@`, a tab or a carriage return, or `+`/`-` followed by anything that is not a plain number, is prefixed with a single quote; a plain number keeps its sign (`+919876543210` is a constant, and prefixing it would break the phone column). It is applied to **`bulk.errors_csv` as well**, whose cells come from an uploaded file and had the same hole.
+- **Notifications page.** `GET /me/notifications` takes `limit` (default 50, max 100) and a cursor of **`before` and `before_id` together**, because `created_at` is the transaction's time and an alert sweep or an erasure queues hundreds of notices in one transaction with the same timestamp: a cursor on time alone skips every one of them past the page boundary. `GET /me/notifications/unread-count` is one indexed count; `POST /me/notifications/{id}/read` is idempotent and a 404 for somebody else's notice. The one switch that words a notice is now `lib/notice-text.ts`, shared by the panel and the page. The header's "Updates" link shows the count for anyone signed in and asks nothing of a signed-out visitor.
+
+**Options considered:**
+
+1. Put the message text in the notice payload
+2. **A flag in the payload and the words on the application** (chosen)
+3. Detect phone numbers and redact them
+4. **Do not copy free text at all** (chosen)
+5. Exclude employer notes from the export
+6. **Include them, and say so on the form** (chosen)
+7. A second CSV writer beside the list
+8. **One serialiser for both** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ The email carries the details ❌ A phone number sits in a table and a mailbox; the retention purge is the only thing between it and an incident.
+- Option 3: ✅ Keeps the convenience ❌ A regular expression is a promise it cannot keep (a number written in words, a name and an address), and the failure is silent.
+- Option 5: ✅ Employers write more freely ❌ It is a legal right of access over data this product holds; hiding it makes the product a place where notes about people cannot be asked about.
+
+**Consequences:**
+
+- **A candidate with only a phone is reached in-app**, as every notice is; the email path is the minority's.
+- **Free text to a person is unmoderated.** A reported vacancy is moderated (ADR-069); a message inside an application is a private channel between two people who already share contact details by the candidate's own act. Capped, tied to a row the candidate can delete by withdrawing or erasing; not solved.
+- **The header gained a request on every page for a signed-in person** (one count, on mount and on focus, not polled). Its hook is a separate module from the page's heavier ones: putting the infinite-query code in the header's import graph took `/profile` over its 684 KB budget by a kilobyte, and the split brought it to 683. **The budget headroom is now 1 KB.**
+- **Found by the browser run, fixed at the cause:** an `aria-label` on the Updates link replaced the visible words and failed WCAG 2.5.3 (label in name), so the link has no label and says the count once, in words, beside a drawn number hidden from assistive technology; and an unread notice panel above the application list pushed the list down by its own height (a layout shift of 0.110 on a phone), so the panel now sits below it.
+- **Measured by tests that fail without the rule:** a message not replaced, cleared on the wrong transition, or erased by a no-op click; the words reaching the outbox; the plain template used for a message; a withdrawn applicant leaking into the spreadsheet; each of the formula cases; a cursor on time alone; a notice readable by somebody else; the notes in a candidate's response or missing from their export. One mutant (adding a `notes=` argument to the candidate's constructor) is equivalent: Pydantic ignores it, and the structural test guards the schema instead.
+- **Not done:** a message thread, notes visible to the candidate, a per-vacancy bulk status change, an email digest, and a count on the employer's side for unread applications.

@@ -13,9 +13,16 @@ vi.mock(
 
 const GET = vi.fn();
 const PATCH = vi.fn();
+const PUT = vi.fn();
 vi.mock("@/lib/api", () => ({
-  api: { GET: (...a: unknown[]) => GET(...a), PATCH: (...a: unknown[]) => PATCH(...a) },
+  api: {
+    GET: (...a: unknown[]) => GET(...a),
+    PATCH: (...a: unknown[]) => PATCH(...a),
+    PUT: (...a: unknown[]) => PUT(...a),
+  },
 }));
+const saveCsv = vi.fn();
+vi.mock("@/lib/download", () => ({ saveCsv: (...a: unknown[]) => saveCsv(...a) }));
 
 /**
  * The one screen where a candidate's contact details appear, and the one that
@@ -64,7 +71,10 @@ beforeEach(() => {
   resetWorld();
   GET.mockReset();
   PATCH.mockReset();
+  PUT.mockReset();
+  saveCsv.mockReset();
   PATCH.mockResolvedValue({ data: {}, error: undefined, response: { status: 200 } });
+  PUT.mockResolvedValue({ data: {}, error: undefined, response: { status: 200 } });
 });
 
 const inbox = () => <EmployerInbox org="apollo-care-hospitals" jobSlug="gda-chennai" />;
@@ -217,3 +227,90 @@ describe("EmployerInbox -- one failed save", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 });
+
+describe("EmployerInbox -- a message with a status, a private note, and the spreadsheet (Sprint 60)", () => {
+  it("sends the message with the status button that is pressed, then empties the field", async () => {
+    answer([applicant()]);
+    renderUi(inbox());
+    fireEvent.change(await screen.findByLabelText(/Message for this person/), {
+      target: { value: "  Interview Tuesday 11 am, Kothrud clinic.  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Shortlist" }));
+    await waitFor(() => expect(PATCH).toHaveBeenCalledTimes(1));
+    expect(PATCH.mock.calls[0][1].body).toEqual({
+      status: "shortlisted",
+      message: "Interview Tuesday 11 am, Kothrud clinic.",
+    });
+    await waitFor(() =>
+      expect((screen.getByLabelText(/Message for this person/) as HTMLTextAreaElement).value).toBe(""),
+    );
+  });
+
+  it("sends no message at all when nothing was typed", async () => {
+    answer([applicant()]);
+    renderUi(inbox());
+    fireEvent.click(await screen.findByRole("button", { name: "Not suitable" }));
+    await waitFor(() => expect(PATCH).toHaveBeenCalled());
+    expect(PATCH.mock.calls[0][1].body).toEqual({ status: "rejected", message: undefined });
+  });
+
+  it("shows what you last told them, and does not offer a message to a withdrawn applicant", async () => {
+    answer([
+      applicant({
+        status: "shortlisted",
+        status_message: "Bring your ID.",
+        status_message_at: "2026-10-10T08:00:00Z",
+      }),
+      applicant({ application_id: "a2", status: "withdrawn", contact: null }),
+    ]);
+    renderUi(inbox());
+    expect(await screen.findByText("Bring your ID.")).toBeTruthy();
+    expect(screen.getAllByLabelText(/Message for this person/)).toHaveLength(1);
+  });
+
+  it("saves a note only once it has changed, and says what the server said when it cannot", async () => {
+    answer([applicant({ notes: "Strong." })]);
+    renderUi(inbox());
+    const field = (await screen.findByLabelText("Your private note")) as HTMLTextAreaElement;
+    const save = screen.getByRole("button", { name: "Save note" }) as HTMLButtonElement;
+    expect(field.value).toBe("Strong.");
+    expect(save.disabled).toBe(true);
+
+    fireEvent.change(field, { target: { value: "Strong. Call back." } });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() => expect(PUT).toHaveBeenCalledTimes(1));
+    expect(PUT.mock.calls[0][1].body).toEqual({ notes: "Strong. Call back." });
+
+    PUT.mockResolvedValue({
+      data: undefined,
+      error: { detail: "Too long." },
+      response: { status: 422 },
+    });
+    fireEvent.change(field, { target: { value: "x" } });
+    fireEvent.click(save);
+    expect(await screen.findByText("Too long.")).toBeTruthy();
+  });
+
+  it("downloads the spreadsheet the server built, and says so when it cannot", async () => {
+    answer([applicant()]);
+    renderUi(inbox());
+    const button = await screen.findByRole("button", { name: "Download as spreadsheet" });
+    GET.mockResolvedValue({ data: "reference,name\r\nC-1,A\r\n", error: undefined, response: { status: 200 } });
+    fireEvent.click(button);
+    await waitFor(() => expect(saveCsv).toHaveBeenCalledWith("applicants-gda-chennai.csv", expect.stringContaining("reference")));
+    expect(GET.mock.calls.at(-1)?.[1].parseAs).toBe("text");
+
+    GET.mockResolvedValue({ data: undefined, error: { detail: "Nope" }, response: { status: 500 } });
+    fireEvent.click(button);
+    expect(await screen.findByText("Nope")).toBeTruthy();
+  });
+
+  it("offers no spreadsheet for an empty inbox", async () => {
+    answer([]);
+    renderUi(inbox());
+    await screen.findByText(/empty|No one/i).catch(() => undefined);
+    expect(screen.queryByRole("button", { name: "Download as spreadsheet" })).toBeNull();
+  });
+});
+

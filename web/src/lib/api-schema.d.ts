@@ -1949,6 +1949,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/jobs/{job_slug}/applications/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Applicants
+         * @description This vacancy's applicants as a CSV, built from the same function as the list: a withdrawn
+         *     applicant's name, phone, email and covering note are blank. Recorded with a count.
+         */
+        get: operations["export_applicants_org__org_slug__jobs__job_slug__applications_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}": {
         parameters: {
             query?: never;
@@ -1984,6 +2005,29 @@ export interface paths {
          * @description Rate the worker of a completed gig engagement (Sprint 37, Epic B8).
          */
         post: operations["review_worker_org__org_slug__jobs__job_slug__applications__application_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Notes
+         * @description Your own private note on an applicant (up to 2,000 characters; blank clears it).
+         *
+         *     The candidate never sees it in the product; a person may ask for a copy of what is held about
+         *     them (the data export), so write what you would stand behind.
+         */
+        put: operations["set_notes_org__org_slug__jobs__job_slug__applications__application_id__notes_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2177,6 +2221,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unread Count
+         * @description What the header's count shows. One indexed count, cheap enough to ask on every page.
+         */
+        get: operations["unread_count_me_notifications_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/notifications/read": {
         parameters: {
             query?: never;
@@ -2188,6 +2252,23 @@ export interface paths {
         put?: never;
         /** Mark Read */
         post: operations["mark_read_me_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark One Read */
+        post: operations["mark_one_read_me_notifications__notification_id__read_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2934,6 +3015,14 @@ export interface components {
              * @default false
              */
             reviewed: boolean;
+            /** Status Message */
+            status_message?: string | null;
+            /** Status Message At */
+            status_message_at?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Notes At */
+            notes_at?: string | null;
         };
         /** ApplicantPage */
         ApplicantPage: {
@@ -2989,6 +3078,9 @@ export interface components {
         /**
          * ApplicationOut
          * @description The candidate's own view of an application.
+         *
+         *     It carries the employer's **message** (Sprint 60) and **never the employer's notes**: a test
+         *     walks every response model reachable from `/me/*` for that field.
          */
         ApplicationOut: {
             /**
@@ -3004,6 +3096,10 @@ export interface components {
             status: "applied" | "withdrawn" | "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
             /** Message */
             message?: string | null;
+            /** Status Message */
+            status_message?: string | null;
+            /** Status Message At */
+            status_message_at?: string | null;
             /**
              * Applied At
              * Format: date-time
@@ -5002,6 +5098,14 @@ export interface components {
             nsqf_level?: number | null;
         };
         /**
+         * NotesIn
+         * @description A private note on an applicant. Blank clears it.
+         */
+        NotesIn: {
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
          * NotificationOut
          * @description An in-app notice. The words are rendered by the client from `template`
          *     and `payload`, so they follow the language the reader is browsing in rather
@@ -6121,6 +6225,9 @@ export interface components {
         /**
          * StatusIn
          * @description What an employer may set. `applied` and `withdrawn` are the candidate's.
+         *
+         *     `message` is optional and short: an interview time and place, not a thread. See
+         *     `employer_service.set_status` for when it replaces, clears or leaves the last one.
          */
         StatusIn: {
             /**
@@ -6128,6 +6235,8 @@ export interface components {
              * @enum {string}
              */
             status: "shortlisted" | "rejected" | "hired" | "completed" | "no_show";
+            /** Message */
+            message?: string | null;
         };
         /**
          * StepBasisOut
@@ -10039,6 +10148,38 @@ export interface operations {
             };
         };
     };
+    export_applicants_org__org_slug__jobs__job_slug__applications_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_application_status_org__org_slug__jobs__job_slug__applications__application_id__patch: {
         parameters: {
             query?: never;
@@ -10100,6 +10241,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_notes_org__org_slug__jobs__job_slug__applications__application_id__notes_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_slug: string;
+                application_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicantOut"];
                 };
             };
             /** @description Validation Error */
@@ -10388,7 +10566,13 @@ export interface operations {
     };
     my_notifications_me_notifications_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                /** @description Return notices older than this time (the last one of the previous page). */
+                before?: string | null;
+                /** @description With `before`: the last notice's id, so same-time notices stay. */
+                before_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10402,6 +10586,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unread_count_me_notifications_unread_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -10424,6 +10639,35 @@ export interface operations {
                     "application/json": {
                         [key: string]: number;
                     };
+                };
+            };
+        };
+    };
+    mark_one_read_me_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

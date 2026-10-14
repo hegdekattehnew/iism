@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
@@ -11,15 +11,15 @@ from api.modules.applications.reputation import reviewed_ids
 from api.modules.applications.schemas import (
     ApplicantOut,
     ApplicantPage,
-    ContactOut,
     EmployerDashboardOut,
     JobRef,
+    NotesIn,
     ReputationOut,
     ReviewIn,
     ReviewOut,
     StatusIn,
 )
-from api.modules.matching import candidate_card
+from api.modules.applications.serialisers import applicant_out
 from api.modules.matching.schemas import JobPoolOut, JobSummary
 
 # Employers only, and only their own vacancies. `require` asks both questions
@@ -73,32 +73,6 @@ async def employer_dashboard(
     )
 
 
-def _applicant(  # type: ignore[no-untyped-def]
-    application, profile, user, result, reviewed: bool = False
-) -> ApplicantOut:
-    """One applicant, de-identified card plus the disclosure beside it.
-
-    One construction site, because the rule that contact disappears on
-    withdrawal is a property of this function and nothing else.
-    """
-    live = application.contact_is_visible
-    return ApplicantOut(
-        application_id=application.id,
-        status=application.status,
-        applied_at=application.created_at,
-        # The candidate's own words are part of what withdrawing takes back,
-        # exactly as `interests.provider_routes._learner` already does.
-        message=application.message if live else None,
-        reviewed=reviewed,
-        candidate=candidate_card(profile, result),
-        contact=(
-            ContactOut(full_name=user.full_name, phone=user.phone, email=user.email)
-            if live
-            else None
-        ),
-    )
-
-
 @router.get("", response_model=ApplicantPage)
 async def list_applicants(
     job_slug: str,
@@ -110,11 +84,31 @@ async def list_applicants(
     job, rows = await employer_service.inbox(db, context.tenant.id, job_slug)
     overrides = await overrides_for(db, "job", [job], ("title",), locale)
     rated = await reviewed_ids(db, [row[0].id for row in rows], "worker")
-    items = [_applicant(*row, reviewed=row[0].id in rated) for row in rows]
+    items = [applicant_out(*row, reviewed=row[0].id in rated) for row in rows]
     return ApplicantPage(
         job=JobRef.model_validate(job).model_copy(update=overrides.get(job.id, {})),
         items=items,
         total=len(items),
+    )
+
+
+@router.get(
+    "/export",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {"schema": {"type": "string"}}}}},
+)
+async def export_applicants(
+    job_slug: str,
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """This vacancy's applicants as a CSV, built from the same function as the list: a withdrawn
+    applicant's name, phone, email and covering note are blank. Recorded with a count."""
+    text, _count = await employer_service.export_applicants(db, context.tenant.id, job_slug)
+    return Response(
+        text,
+        media_type="text/csv; charset=utf-8",
+        headers={"content-disposition": f'attachment; filename="applicants-{job_slug}.csv"'},
     )
 
 
@@ -129,10 +123,10 @@ async def set_application_status(
     """Shortlist, reject, hire -- or, for a gig, complete/no-show. A withdrawn
     application cannot be moved."""
     row = await employer_service.set_status_and_reload(
-        db, context.tenant.id, job_slug, application_id, payload.status
+        db, context.tenant.id, job_slug, application_id, payload.status, payload.message
     )
     rated = await reviewed_ids(db, [row[0].id], "worker")
-    return _applicant(*row, reviewed=row[0].id in rated)
+    return applicant_out(*row, reviewed=row[0].id in rated)
 
 
 @router.post(
@@ -156,3 +150,23 @@ async def review_worker(
         author_user_id=context.user.id,
     )
     return ReviewOut.model_validate(review)
+
+
+@router.put("/{application_id}/notes", response_model=ApplicantOut)
+async def set_notes(
+    job_slug: str,
+    application_id: uuid.UUID,
+    payload: NotesIn,
+    context: TenantContext = CanShortlist,
+    db: AsyncSession = Depends(get_db_session),
+) -> ApplicantOut:
+    """Your own private note on an applicant (up to 2,000 characters; blank clears it).
+
+    The candidate never sees it in the product; a person may ask for a copy of what is held about
+    them (the data export), so write what you would stand behind.
+    """
+    row = await employer_service.set_notes_and_reload(
+        db, context.tenant.id, job_slug, application_id, payload.notes
+    )
+    rated = await reviewed_ids(db, [row[0].id], "worker")
+    return applicant_out(*row, reviewed=row[0].id in rated)

@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, func, insert, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider
@@ -183,19 +183,67 @@ async def drain(db: AsyncSession, *, limit: int = 50) -> dict[str, int]:
     return counts
 
 
-async def unread_for(db: AsyncSession, user_id: uuid.UUID) -> list[Notification]:
-    """The candidate's in-app notices, newest first."""
+async def list_for(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    limit: int = 50,
+    before: datetime | None = None,
+    before_id: uuid.UUID | None = None,
+) -> list[Notification]:
+    """A person's in-app notices, newest first, read ones included.
+
+    (Named `unread_for` until Sprint 60, though it never filtered.) The cursor is the last
+    notice's `(created_at, id)`: **both**, because `created_at` is the transaction's time and an
+    alert sweep or an erasure queues hundreds of notices in one transaction with the *same*
+    timestamp. A cursor on time alone would skip every one of them past the page boundary.
+    """
+    query = select(Notification).where(
+        Notification.recipient_kind == "user",
+        Notification.recipient_id == user_id,
+        Notification.channel == "in_app",
+    )
+    if before is not None and before_id is not None:
+        query = query.where(tuple_(Notification.created_at, Notification.id) < (before, before_id))
+    elif before is not None:
+        query = query.where(Notification.created_at < before)
     rows = await db.scalars(
-        select(Notification)
+        query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit)
+    )
+    return list(rows.all())
+
+
+async def unread_count(db: AsyncSession, user_id: uuid.UUID) -> int:
+    """How many in-app notices this person has not opened: what the header's count shows."""
+    return (
+        await db.scalar(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.recipient_kind == "user",
+                Notification.recipient_id == user_id,
+                Notification.channel == "in_app",
+                Notification.read_at.is_(None),
+            )
+        )
+    ) or 0
+
+
+async def mark_read(db: AsyncSession, user_id: uuid.UUID, notification_id: uuid.UUID) -> bool:
+    """Open one notice. `False` when it is not this person's, which the route answers with a 404:
+    a notice's existence is not news to anyone but its recipient."""
+    result = await db.execute(
+        update(Notification)
         .where(
+            Notification.id == notification_id,
             Notification.recipient_kind == "user",
             Notification.recipient_id == user_id,
             Notification.channel == "in_app",
         )
-        .order_by(Notification.created_at.desc())
-        .limit(50)
+        .values(read_at=func.coalesce(Notification.read_at, func.now()))
     )
-    return list(rows.all())
+    await db.commit()
+    return bool(getattr(result, "rowcount", 0))
 
 
 async def mark_all_read(db: AsyncSession, user_id: uuid.UUID) -> int:

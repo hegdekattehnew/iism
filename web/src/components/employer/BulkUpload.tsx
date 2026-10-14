@@ -20,6 +20,7 @@ import {
   invalidatePublicCounts,
   providerDashboardKey,
 } from "@/lib/counts";
+import { saveCsv } from "@/lib/download";
 import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
 
 type Kind = "jobs" | "courses";
@@ -39,17 +40,6 @@ const TONE = {
   skip: "neutral",
   update: "brand",
 } as const;
-
-/** Save text as a UTF-8 CSV Excel will open with Devanagari intact (hence the BOM). */
-function saveCsv(name: string, text: string) {
-  const blob = new Blob(["﻿", text], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 /** The file is the request body, so the typed client is told not to JSON-encode it. */
 const csv = {

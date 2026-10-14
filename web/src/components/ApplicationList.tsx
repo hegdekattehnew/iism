@@ -108,6 +108,18 @@ export function ApplicationList() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-muted">{t(`statusHint.${status}`)}</p>
+                {application.status_message && (
+                  <div className="mt-3 rounded-lg border border-border-token bg-surface-muted px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      {t("fromEmployer", { organisation: application.job.tenant.name })}
+                      {application.status_message_at &&
+                        ` · ${format.dateTime(new Date(application.status_message_at), {
+                          dateStyle: "medium",
+                        })}`}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">{application.status_message}</p>
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-muted">
                   {t("appliedOn", {
                     date: format.dateTime(new Date(application.applied_at), {

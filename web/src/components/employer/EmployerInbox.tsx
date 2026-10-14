@@ -2,14 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
+import { useState } from "react";
 
 import { CoverageBar } from "@/components/CoverageBar";
+import { ApplicantNotes } from "@/components/employer/ApplicantNotes";
 import { ReviewControl } from "@/components/ReviewControl";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
+import { saveCsv } from "@/lib/download";
 import { ApiError, detailOf, readDetail } from "@/lib/http";
+import { STATUS_MESSAGE_MAX } from "@/lib/hiring";
 
 // Derived from the generated schema, never restated: the hand-written
 // three-value union this replaced is why `completed` and `no_show` could not
@@ -49,13 +53,37 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
     },
   });
 
+  // What the employer has typed for each applicant and not yet sent (Sprint 60). It goes with the
+  // next status button they press, and is cleared once it has been sent.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const exportCsv = useMutation({
+    mutationFn: async () => {
+      const { data, error, response } = await api.GET(
+        "/org/{org_slug}/jobs/{job_slug}/applications/export",
+        { params: { path: { org_slug: org, job_slug: jobSlug } }, parseAs: "text" },
+      );
+      const code = response.status;
+      if (error || typeof data !== "string") throw new ApiError(code, readDetail(error));
+      saveCsv(`applicants-${jobSlug}.csv`, data);
+    },
+  });
+
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: EmployerStatus }) => {
+    mutationFn: async ({
+      id,
+      status,
+      message,
+    }: {
+      id: string;
+      status: EmployerStatus;
+      message?: string;
+    }) => {
       const { error, response } = await api.PATCH(
         "/org/{org_slug}/jobs/{job_slug}/applications/{application_id}",
         {
           params: { path: { org_slug: org, job_slug: jobSlug, application_id: id } },
-          body: { status },
+          body: { status, message: message || undefined },
         },
       );
       // Read before the check, and keep what the server said: "only a hired
@@ -65,7 +93,8 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
     },
     // Every mutation that can fail needs an onError: a form that silently does
     // nothing is worse than an error (Sprint 14).
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
+      setDrafts((d) => ({ ...d, [variables.id]: "" }));
       await qc.invalidateQueries({ queryKey: key });
       // A hire can fill the last position and close the vacancy, which moves
       // the dashboard, the workspace's job list and the public counts.
@@ -104,8 +133,28 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
         <h1 className="text-2xl font-bold tracking-tight">
           {data.job.title}
         </h1>
-        <Badge>{t("count", { count: data.total })}</Badge>
+        <div className="flex items-center gap-3">
+          <Badge>{t("count", { count: data.total })}</Badge>
+          {data.total > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={exportCsv.isPending}
+              onClick={() => exportCsv.mutate()}
+            >
+              {t("exportCsv")}
+            </Button>
+          )}
+        </div>
       </div>
+      {exportCsv.isError && (
+        <p
+          role="alert"
+          className="mt-3 rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text"
+        >
+          {detailOf(exportCsv.error) ?? t("exportFailed")}
+        </p>
+      )}
       <ButtonLink href={`/employer/${org}`} variant="ghost" size="sm" className="-ml-3 mt-2">
         ← {t("backToConsole")}
       </ButtonLink>
@@ -200,8 +249,47 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                         />
                       ))}
 
+                    {applicant.status_message && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                          {t("youTold")}
+                          {applicant.status_message_at &&
+                            ` · ${format.dateTime(new Date(applicant.status_message_at), {
+                              dateStyle: "medium",
+                            })}`}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{applicant.status_message}</p>
+                      </div>
+                    )}
+
                     {!withdrawn && !ended && (
-                      <div className="mt-4 flex flex-wrap gap-2">
+                      <div className="mt-4">
+                        <label
+                          className="block text-sm font-medium"
+                          htmlFor={`message-${applicant.application_id}`}
+                        >
+                          {t("messageLabel")}
+                        </label>
+                        <textarea
+                          id={`message-${applicant.application_id}`}
+                          name="status_message"
+                          rows={2}
+                          maxLength={STATUS_MESSAGE_MAX}
+                          value={drafts[applicant.application_id] ?? ""}
+                          onChange={(event) =>
+                            setDrafts((d) => ({
+                              ...d,
+                              [applicant.application_id]: event.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-input-border bg-background px-3 py-2 text-sm"
+                        />
+                        <p className="mt-1 text-xs text-muted">{t("messageHint")}</p>
+                      </div>
+                    )}
+
+                    {!withdrawn && !ended && (
+                      <div className="mt-3 flex flex-wrap gap-2">
                         {(["shortlisted", "rejected", "hired"] as const).map((status) => (
                           <Button
                             key={status}
@@ -209,7 +297,11 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                             variant={applicant.status === status ? "primary" : "secondary"}
                             disabled={setStatus.isPending && mine}
                             onClick={() =>
-                              setStatus.mutate({ id: applicant.application_id, status })
+                              setStatus.mutate({
+                                id: applicant.application_id,
+                                status,
+                                message: drafts[applicant.application_id]?.trim(),
+                              })
                             }
                           >
                             {status === "shortlisted"
@@ -228,7 +320,11 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                               variant="secondary"
                               disabled={setStatus.isPending && mine}
                               onClick={() =>
-                                setStatus.mutate({ id: applicant.application_id, status })
+                                setStatus.mutate({
+                                id: applicant.application_id,
+                                status,
+                                message: drafts[applicant.application_id]?.trim(),
+                              })
                               }
                             >
                               {status === "completed" ? t("markCompleted") : t("markNoShow")}
@@ -236,6 +332,14 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                           ))}
                       </div>
                     )}
+
+                    <ApplicantNotes
+                      org={org}
+                      jobSlug={jobSlug}
+                      applicationId={applicant.application_id}
+                      notes={applicant.notes ?? ""}
+                      onSaved={() => qc.invalidateQueries({ queryKey: key })}
+                    />
 
                     {setStatus.isError && mine && (
                       <p

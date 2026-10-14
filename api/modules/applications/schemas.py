@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Literal, get_args
+from typing import Annotated, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from api.modules.applications.models import (
     APPLICATION_STATUSES,
@@ -79,7 +79,11 @@ class PosterRatingOut(BaseModel):
 
 
 class ApplicationOut(BaseModel):
-    """The candidate's own view of an application."""
+    """The candidate's own view of an application.
+
+    It carries the employer's **message** (Sprint 60) and **never the employer's notes**: a test
+    walks every response model reachable from `/me/*` for that field.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,6 +91,8 @@ class ApplicationOut(BaseModel):
     job: JobRef
     status: ApplicationStatus
     message: str | None = None
+    status_message: str | None = None
+    status_message_at: datetime | None = None
     applied_at: datetime
     updated_at: datetime
     # Has this candidate already rated the poster. Without it the rating form
@@ -152,6 +158,12 @@ class ApplicantOut(BaseModel):
     contact: ContactOut | None = None
     # Has the employer already rated this worker (see `ApplicationOut.reviewed`).
     reviewed: bool = False
+    # What the employer last told this candidate, and their own private note (Sprint 60). Both are
+    # the employer's; neither is blanked on withdrawal (see `Application.employer_notes`).
+    status_message: str | None = None
+    status_message_at: datetime | None = None
+    notes: str | None = None
+    notes_at: datetime | None = None
 
 
 class ApplicantPage(BaseModel):
@@ -160,10 +172,40 @@ class ApplicantPage(BaseModel):
     total: int
 
 
+STATUS_MESSAGE_MAX = 500
+NOTES_MAX = 2000
+
+
+def _strip_or_none(value: str | None) -> str | None:
+    value = (value or "").strip()
+    return value or None
+
+
 class StatusIn(BaseModel):
-    """What an employer may set. `applied` and `withdrawn` are the candidate's."""
+    """What an employer may set. `applied` and `withdrawn` are the candidate's.
+
+    `message` is optional and short: an interview time and place, not a thread. See
+    `employer_service.set_status` for when it replaces, clears or leaves the last one.
+    """
 
     status: EmployerStatus
+    message: Annotated[str, Field(max_length=STATUS_MESSAGE_MAX)] | None = None
+
+    @field_validator("message")
+    @classmethod
+    def _blank_is_none(cls, v: str | None) -> str | None:
+        return _strip_or_none(v)
+
+
+class NotesIn(BaseModel):
+    """A private note on an applicant. Blank clears it."""
+
+    notes: Annotated[str, Field(max_length=NOTES_MAX)] | None = None
+
+    @field_validator("notes")
+    @classmethod
+    def _blank_is_none(cls, v: str | None) -> str | None:
+        return _strip_or_none(v)
 
 
 class ReviewIn(BaseModel):

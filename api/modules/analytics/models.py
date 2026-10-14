@@ -102,6 +102,9 @@ EVENT_NAMES = (
     "listing_reports_dismissed",
     "listing_taken_down",
     "listing_restored",
+    # Sprint 60, BL-14.8. An employer exported a vacancy's applicants. Subject to the vacancy; the
+    # payload is the count, never a name.
+    "applicants_exported",
 )
 
 

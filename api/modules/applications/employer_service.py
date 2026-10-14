@@ -86,9 +86,18 @@ async def set_status(
     job_slug: str,
     application_id: uuid.UUID,
     new_status: str,
+    message: str | None = None,
 ) -> Application:
     """Move an application along: shortlisted, rejected, hired -- or, for a
-    gig engagement only, completed/no_show (Sprint 37, Epic B8)."""
+    gig engagement only, completed/no_show (Sprint 37, Epic B8).
+
+    `message` is what the employer wants the candidate to know about it (Sprint 60, BL-14.7). **It
+    is replaced when one is given, cleared when the status really changes and none is given, and
+    left alone when the status is unchanged and none is given**: a second click on "Shortlist"
+    must not erase an interview time. It is stored on the application and **never put in the
+    notification payload** -- the outbox holds no free text that may carry a phone number -- so
+    the notice says only that there is one, and the candidate reads it where they already are.
+    """
     job = await _job_of(db, tenant_id, job_slug)
     # `FOR UPDATE`, for the reason `service.withdraw` takes it: the "withdrawn"
     # check below is only true if the candidate cannot withdraw between it and the
@@ -133,7 +142,14 @@ async def set_status(
                 "Only a gig engagement can be marked completed or no-show",
             )
 
+    changed = application.status != new_status
     application.status = new_status
+    if message is not None:
+        application.status_message = message
+        application.status_message_at = datetime.now(UTC)
+    elif changed:
+        application.status_message = None
+        application.status_message_at = None
     filled = await _close_if_filled(db, job)
 
     # The candidate hears about it. In-app always -- most signed up with a
@@ -142,19 +158,26 @@ async def set_status(
     profile = await db.get(CandidateProfile, application.profile_id)
     user = await db.get(User, profile.user_id) if profile is not None else None
     if user is not None:
-        payload = {
+        payload: dict[str, str | bool] = {
             "vacancy": job.title,
             "organisation": cast(Tenant, job.tenant).name,
             "status": new_status,
             "path": "/applications",
         }
+        if message is not None:
+            # A flag, not the words (see the docstring).
+            payload["has_message"] = True
         for channel in ("in_app", "email"):
             await enqueue(
                 db,
                 recipient_kind="user",
                 recipient_id=user.id,
                 channel=channel,
-                template="application_status_changed",
+                template=(
+                    "application_status_message"
+                    if message is not None
+                    else "application_status_changed"
+                ),
                 payload=payload,
                 locale=user.preferred_locale,
             )
@@ -185,6 +208,7 @@ async def set_status_and_reload(
     job_slug: str,
     application_id: uuid.UUID,
     new_status: str,
+    message: str | None = None,
 ) -> tuple[Application, CandidateProfile, User, MatchResult]:
     """Move an application along, and return the row the screen re-renders.
 
@@ -196,7 +220,63 @@ async def set_status_and_reload(
     lookup here means the day it can, this function answers it instead of
     crashing.
     """
-    application = await set_status(db, tenant_id, job_slug, application_id, new_status)
+    application = await set_status(db, tenant_id, job_slug, application_id, new_status, message)
+    return await _reload(db, tenant_id, job_slug, application)
+
+
+async def set_notes_and_reload(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    job_slug: str,
+    application_id: uuid.UUID,
+    notes: str | None,
+) -> tuple[Application, CandidateProfile, User, MatchResult]:
+    """Write (or clear) the employer's private note on one applicant (Sprint 60, BL-14.8).
+
+    No row lock and no notice: a note is the employer's own record, nobody is told, and two
+    teammates editing at once is last-writer-wins, which is what a shared note is. Not refused
+    for a withdrawn applicant -- the employer may still record why they did not go ahead.
+    """
+    job = await _job_of(db, tenant_id, job_slug)
+    application = await db.scalar(
+        select(Application)
+        .where(Application.id == application_id, Application.job_id == job.id)
+        .execution_options(populate_existing=True)
+    )
+    if application is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+    application.employer_notes = notes
+    application.employer_notes_at = datetime.now(UTC) if notes is not None else None
+    await db.commit()
+    return await _reload(db, tenant_id, job_slug, application)
+
+
+async def export_applicants(
+    db: AsyncSession, tenant_id: uuid.UUID, job_slug: str
+) -> tuple[str, int]:
+    """Everyone who applied to one vacancy, as a CSV (Sprint 60, BL-14.8).
+
+    Built from `serialisers.applicant_out` -- the same function the list uses -- so a withdrawn
+    applicant's contact and covering note are blank here for the same reason they are blank on
+    screen. The act is recorded with a count and no name.
+    """
+    from api.modules.applications.serialisers import applicant_out, applicants_csv
+
+    job, rows = await inbox(db, tenant_id, job_slug)
+    items = [applicant_out(*row) for row in rows]
+    await record(
+        db,
+        "applicants_exported",
+        subject_type="job",
+        subject_id=job.id,
+        payload={"count": len(items)},
+    )
+    return applicants_csv(items), len(items)
+
+
+async def _reload(
+    db: AsyncSession, tenant_id: uuid.UUID, job_slug: str, application: Application
+) -> tuple[Application, CandidateProfile, User, MatchResult]:
     # **One row, not the whole inbox** (Sprint 50). This used to re-run `inbox()` -- load and
     # score every applicant -- to return the one row that changed, so each shortlist click cost
     # as much as opening the page (3.5 s at 5,000 applicants). A score is a function of one

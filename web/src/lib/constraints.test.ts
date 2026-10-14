@@ -121,6 +121,16 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     expect: { note: ["minLength={NOTE_MIN}", "maxLength={NOTE_MAX}"] },
   },
   {
+    file: "components/employer/EmployerInbox.tsx",
+    label: "StatusIn (the message with a status, Sprint 60)",
+    expect: { status_message: ["maxLength={STATUS_MESSAGE_MAX}"] },
+  },
+  {
+    file: "components/employer/ApplicantNotes.tsx",
+    label: "NotesIn",
+    expect: { notes: ["maxLength={NOTES_MAX}"] },
+  },
+  {
     file: "components/ReviewControl.tsx",
     label: "ReviewIn",
     expect: { comment: ["maxLength={1000}"] },
@@ -277,5 +287,19 @@ describe("the report forms mirror the server's limits", () => {
     const reasons = ["asks_for_money", "fake_or_misleading", "discriminatory", "unsafe_or_illegal", "spam_or_duplicate", "other"];
     expect(listed).toEqual(expect.arrayContaining(reasons));
     for (const reason of reasons) expect(lib).toContain(`"${reason}"`);
+  });
+});
+
+/** The hiring forms' limits are the server's, read from its source. */
+describe("the hiring forms mirror the server's limits", () => {
+  const root = join(SRC, "..", "..");
+  const schemas = readFileSync(join(root, "api/modules/applications/schemas.py"), "utf8");
+  const lib = read("lib/hiring.ts");
+
+  it("the message with a status and the private note", () => {
+    expect(schemas).toContain("STATUS_MESSAGE_MAX = 500");
+    expect(schemas).toContain("NOTES_MAX = 2000");
+    expect(lib).toContain("STATUS_MESSAGE_MAX = 500");
+    expect(lib).toContain("NOTES_MAX = 2000");
   });
 });
