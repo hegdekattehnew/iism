@@ -294,14 +294,27 @@ def _normal_header(name: str) -> str:
 
 
 def parse_file(text: str, kind: Kind) -> tuple[list[RawRow], list[str], list[str]]:
+    """`(rows, notes, header)` for a vacancy or course file -- see `parse_records`."""
+    return parse_records(
+        text,
+        columns=COLUMNS[kind],
+        required=REQUIRED,
+        max_rows=get_settings().bulk_max_rows,
+    )
+
+
+def parse_records(
+    text: str, *, columns: Sequence[str], required: set[str], max_rows: int
+) -> tuple[list[RawRow], list[str], list[str]]:
     """`(rows, notes, header)` -- or `BulkFileError` for a file nothing can be done with.
 
-    A BOM is tolerated (Excel's "CSV UTF-8" writes one), CRLF and a quoted newline inside a cell
-    are the csv module's job, and a blank record is skipped. Row numbers are **records**, not lines,
-    so they match the number the person sees in their spreadsheet even with a multi-line cell.
+    Kind-free, so a different file (the operator's agency enrolment, Sprint 61) is read by the same
+    rules rather than a second copy of them. A BOM is tolerated (Excel's "CSV UTF-8" writes one),
+    CRLF and a quoted newline inside a cell are the csv module's job, and a blank record is skipped.
+    Row numbers are **records**, not lines, so they match the number the person sees in their
+    spreadsheet even with a multi-line cell.
     """
-    settings = get_settings()
-    text = text.lstrip("﻿")
+    text = text.lstrip("\ufeff")
     if not text.strip():
         raise BulkFileError("The file is empty.")
 
@@ -313,11 +326,11 @@ def parse_file(text: str, kind: Kind) -> tuple[list[RawRow], list[str], list[str
         raise BulkFileError("The file is empty.")
 
     header = [_normal_header(h) for h in records[0]]
-    allowed = set(COLUMNS[kind])
+    allowed = set(columns)
     duplicated = sorted({h for h in header if h and header.count(h) > 1})
     if duplicated:
         raise BulkFileError(f"The column {', '.join(duplicated)} appears more than once.")
-    missing = sorted(REQUIRED - set(header))
+    missing = sorted(required - set(header))
     if missing:
         raise BulkFileError(
             f"The header row must include: {', '.join(missing)}. "
@@ -339,10 +352,9 @@ def parse_file(text: str, kind: Kind) -> tuple[list[RawRow], list[str], list[str
         rows.append(RawRow(index, cells, extra_cells=max(0, len(record) - len(header))))
     if not rows:
         raise BulkFileError("The file has a header and no rows.")
-    if len(rows) > settings.bulk_max_rows:
+    if len(rows) > max_rows:
         raise BulkFileError(
-            f"At most {settings.bulk_max_rows} rows per file; this has {len(rows)}. "
-            "Split it into smaller files.",
+            f"At most {max_rows} rows per file; this has {len(rows)}. Split it into smaller files.",
             status_code=413,
         )
     return rows, notes, header
@@ -428,6 +440,11 @@ def _int(cells: dict[str, str], column: str, problems: list[str]) -> int | None:
         problems.append(f"{column}: '{cells[column]}' must be a whole number")
         return None
     return int(value)
+
+
+# The same rule for a whole-number cell, for a different file (the operator's enrolment, Sprint 61):
+# `nan`/`inf` and a decimal are a problem on the row, never an exception.
+int_cell = _int
 
 
 def _float(cells: dict[str, str], column: str, problems: list[str]) -> float | None:

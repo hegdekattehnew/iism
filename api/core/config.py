@@ -128,6 +128,8 @@ class Settings(BaseSettings):
     bulk_max_rows: int = Field(default=200, ge=1)
     bulk_rows_per_day_unverified: int = Field(default=100, ge=1)
     bulk_rows_per_day_verified: int = Field(default=500, ge=1)
+    # An agency's cohort is larger than an organisation's vacancy list (Sprint 61, BL-14.10).
+    enrolment_max_rows: int = Field(default=1000, ge=1)
 
     # Applying is cheap for a candidate and expensive for an employer reading
     # the inbox. The per-minute write limit stops a script; this stops a day of

@@ -1904,5 +1904,40 @@
     "open": "Open",
     "older": "Show older updates",
     "loading": "Loading…"
+  },
+  "enrolment": {
+    "title": "Enrol an agency's file",
+    "subtitle": "Create accounts for the people an agency has registered, and tag them with the programme. Admin tier only. Nothing is written until you have checked the file and confirmed.",
+    "downloadTemplate": "Download the template",
+    "programme": "Programme name",
+    "programmePlaceholder": "for example PMKVY-2026-TN-Batch1",
+    "programmeHelp": "Every person in the file is filed under this name, and the programme report is read by it. Pick one that exists to add to it.",
+    "chooseFile": "Choose the CSV file",
+    "tooBig": "That file is larger than 2 MB. Split it into smaller files.",
+    "check": "Check the file",
+    "checking": "Checking…",
+    "failed": "That did not work. Try again.",
+    "reviewTitle": "What would happen",
+    "doneTitle": "Enrolled",
+    "summary": "{programme}: {created} new, {tagged} existing and tagged, {already} left alone, {errors} with errors.",
+    "row": "Row {row}",
+    "moreRows": "{count} more rows are not listed.",
+    "status": {
+      "new": "New",
+      "tag": "Tagged",
+      "already": "Left alone",
+      "error": "Error"
+    },
+    "downloadErrors": "Download the rows to fix",
+    "attest": "I confirm the privacy notice was read out to everyone in this file.",
+    "attestHelp": "Their consent is recorded on this account's word, against the current notice version, with your name on the batch. It cannot be undone from here.",
+    "enrol": "Enrol {count, plural, one {# person} other {# people}}",
+    "enrolling": "Enrolling…",
+    "nothingToEnrol": "Nobody in this file can be enrolled yet.",
+    "recent": "Recent enrolments",
+    "noBatches": "Nothing has been enrolled yet.",
+    "formerOperator": "a former operator",
+    "batchLine": "{when} · {operator} · notice {version}",
+    "batchCounts": "{created} new, {tagged} tagged, {already} left alone, {errors} errors"
   }
 }

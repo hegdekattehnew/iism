@@ -249,6 +249,30 @@ describe("the grievance forms mirror the server's limits", () => {
   });
 });
 
+/** The agency enrolment's limits are the engine's own (Sprint 61), mirrored on the form. */
+describe("the enrolment form mirrors the engine's limits", () => {
+  const root = join(SRC, "..", "..");
+  const engine = readFileSync(join(root, "api/modules/operations/enrolment.py"), "utf8");
+  const lib = read("lib/enrolment.ts");
+  const form = read("components/ops/EnrolmentUpload.tsx");
+
+  it("the programme name", () => {
+    expect(engine).toContain("MAX_PROGRAMME = 120");
+    expect(engine).toContain("len(name) < 2");
+    expect(lib).toContain("PROGRAMME_MAX = 120");
+    expect(lib).toContain("PROGRAMME_MIN = 2");
+    expect(form).toContain("minLength={PROGRAMME_MIN}");
+    expect(form).toContain("maxLength={PROGRAMME_MAX}");
+  });
+
+  it("the file size", () => {
+    expect(lib).toContain("MAX_FILE_BYTES = 2 * 1024 * 1024");
+    expect(readFileSync(join(root, "api/core/config.py"), "utf8")).toContain(
+      "max_bulk_body_bytes: int = 2 * 1024 * 1024",
+    );
+  });
+});
+
 /** The budget ceiling is the server's own, read from the three routes that accept it. */
 describe("the course budget mirrors the server's ceiling", () => {
   const root = join(SRC, "..", "..");

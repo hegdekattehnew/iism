@@ -102,6 +102,10 @@ class Permission(StrEnum):
     OPS_REPORT_READ = "ops:report:read"
     OPS_REPORT_HANDLE = "ops:report:handle"
     OPS_LISTING_TAKEDOWN = "ops:listing:takedown"
+    # Sprint 61, BL-14.10. Enrolling a file of people for an agency programme. **Admin tier only**:
+    # it creates accounts for people who have not touched the product and stamps consent against
+    # them, which is the most sensitive thing the back office does.
+    OPS_ENROL = "ops:enrol"
 
 
 # Seeing who else works here is the one thing every member may do. It names
@@ -163,6 +167,7 @@ OPERATOR_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.OPS_REPORT_READ,
         Permission.OPS_REPORT_HANDLE,
         Permission.OPS_LISTING_TAKEDOWN,
+        Permission.OPS_ENROL,
     }
 )
 

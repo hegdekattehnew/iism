@@ -215,9 +215,11 @@ class _BodyTooLarge(Exception):
     pass
 
 
-# The two bulk-upload steps that carry a file (Sprint 51). Publishing a batch carries a list of
-# slugs, so it keeps the ordinary limit.
-_BULK_UPLOAD_PATH = re.compile(r"^/org/[^/]+/(jobs|courses)/bulk/(check|apply)$")
+# The bulk-upload steps that carry a file (Sprint 51), and the operator's agency enrolment
+# (Sprint 61). Publishing a batch carries a list of slugs, so it keeps the ordinary limit.
+_BULK_UPLOAD_PATH = re.compile(
+    r"^(/org/[^/]+/(jobs|courses)/bulk/(check|apply)|/ops/enrolment/(check|apply))$"
+)
 
 
 def body_limit_for(path: str) -> int:

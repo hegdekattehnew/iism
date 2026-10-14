@@ -15,7 +15,11 @@ from api.modules.identity.models import (
 )
 from api.modules.identity.routes import account_router, router
 from api.modules.identity.schemas import TenantOut, TenantType, UserOut, normalise_phone
-from api.modules.identity.service import request_otp, verify_otp_and_sign_in
+from api.modules.identity.service import (
+    provision_candidate,
+    request_otp,
+    verify_otp_and_sign_in,
+)
 from api.modules.identity.tenant_routes import router as organisation_router
 
 __all__ = [
@@ -35,6 +39,7 @@ __all__ = [
     "UserOut",
     "normalise_phone",
     "organisation_router",
+    "provision_candidate",
     "request_otp",
     "router",
     "team_router",
