@@ -415,15 +415,17 @@ api/                     FastAPI modular monolith
                          a ~470 MB download) this story does not make silently. Every
                          implementation is pinned to 384 dimensions (ADR-031) so a real
                          model can replace this one with no schema change.
-mobile/                  (Sprint 62, ADR-072) The job seeker's Android and iOS app, Expo / React Native: a
-                         **second client of the same API**, not a second product. `src/core/` has no React
-                         Native import and is tested in Node; the screens, `src/ui` and the theme hook were
-                         written without the toolchain and have **never been compiled** (see its README).
-                         `src/api/schema.d.ts`, `src/messages/{en,hi,ms}.json` and `src/theme/tokens.ts` are
-                         GENERATED from the web (`make gen-api-mobile`, `make sync-mobile-messages`,
-                         `scripts/sync_mobile_tokens.py`) and a test fails when they are stale.
-                         `contract/` is the list of API operations the released app calls and a snapshot of
-                         them. v1 is candidate-only.
+mobile/                  (Sprint 62, ADR-072) The job seeker's Android and iOS app, Expo SDK 57 / React Native 0.86:
+                         a **second client of the same API**, not a second product. `src/core/` has no React
+                         Native import; `app/` is the Expo Router screens (never put a test there: a file in
+                         `app/` is a route; screen tests are `src/test/`). `make mobile-check` (and the `mobile`
+                         CI job) run `tsc`, `eslint`, 53 Jest tests and a Metro bundle. **Add Expo packages with
+                         `npx expo install`, not `npm install`.** `src/api/schema.d.ts`,
+                         `src/messages/{en,hi,ms}.json` and `src/theme/tokens.ts` are GENERATED from the web
+                         (`make gen-api-mobile`, `make sync-mobile-messages`, `scripts/sync_mobile_tokens.py`)
+                         and a test fails when they are stale. `contract/` is the list of API operations the
+                         released app calls and a snapshot of them. v1 is candidate-only. **Never run on a
+                         device yet.**
 web/                     Next.js PWA, mobile-first, en + hi (ADR-029, ADR-033)
   src/i18n/              Locale routing and request config
   src/messages/          en.json, hi.json — no user-facing string is hardcoded
@@ -593,9 +595,12 @@ split would have to turn into interfaces first; do not add to it casually.
   required request property or parameter, a tighter limit or a narrower enum. **Keep the old shape and add the new beside it**, or raise `MOBILE_MIN_VERSION_*` and re-record with
   `scripts/check_api_contract.py --release`. `make snapshot-contract` only *adds* operations, so it can never hide a break. **A check that compares two snapshots must first assert it found them**:
   the test asserts the snapshot is non-empty and equals the surface before comparing anything. Adding an operation to the surface and to the app's calls is one change, and a test holds the two lists equal.
-- **A client with no render test yet is guarded by what can be derived** (ADR-072). The mobile messages, schema and colours are generated from the web's; a test fails when a copy is stale, when a screen
-  uses a message key the catalogue lacks, when a colour is named outside `tokens.ts`, when the privacy-notice version differs from the API's, and when the native secure-store module is imported by more than one
-  file. Logic goes in `mobile/src/core` (no React Native import), where the web's `tsc` and Vitest can run it before the Expo toolchain exists.
+- **A client's generated parts are guarded by what can be derived, and its behaviour by tests that render it** (ADR-072). The mobile messages, schema and colours are generated from the web's; a test
+  fails when a copy is stale, when a screen uses a message key the catalogue lacks, when a colour is named outside `tokens.ts`, when the privacy-notice version differs from the API's, when the native
+  secure-store module is imported by more than one file, and when the app imports a package it does not declare. Logic goes in `mobile/src/core` (no React Native import); screens are rendered in
+  `src/test` with the real catalogues and a hand-mocked `../runtime`. **A `jest.mock` factory runs when the screen is first imported, before the test file's own `const`s exist**, so every use of a
+  `mock*` variable inside the factory goes through a function that looks it up later; and **`../../app` resolves to `app.json`**, so import `../../app/index`.
+- **A React Native test must not leave a timer running**: TanStack Query's five-minute garbage-collection timer keeps Jest's event loop alive and the run appears to hang (the harness sets `gcTime: Infinity`).
 - **A browser's matching Chromium is not part of `npm ci`.** After a Playwright bump the suite cannot start until `npx playwright install chromium` has fetched the build it names (about 99 MB); CI does this itself.
   `web/AGENTS.md` is rewritten by Next's own tooling on install and build; it is not part of a change.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
@@ -1039,10 +1044,11 @@ split would have to turn into interfaces first; do not add to it casually.
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
 >
-> **Sprint 62 (M1 of the mobile programme) is done** (ADR-072, no migration): *the mobile app's foundations*, partly verified. A native job-seeker app (Expo / React Native, candidate-only for v1) is built **in this
+> **Sprint 62 (M1 of the mobile programme) is done** (ADR-072, no migration): *the mobile app's foundations*, compiled and tested but **never run on a device**. A native job-seeker app (Expo / React Native, candidate-only for v1) is built **in this
 > repository as `mobile/`**, with no fork and no rebaseline. Verified: the **426 "update the app" gate** (`AppVersionMiddleware`, fails open), the **contract check** for released operations (`api/core/contract.py`,
-> a committed snapshot, additive-only), generation of the typed client, messages and colours from the web, and `mobile/src/core` (strict `tsc` and 39 tests with the web's toolchain). **Not verified:** the React
-> Native layer was written without the Expo toolchain (the owner declined the download) and has never been compiled. Open before launch: real SMS (DLT), a store-reviewer login, deployment, the store accounts.
+> a committed snapshot, additive-only), generation of the typed client, messages and colours from the web, and the whole app: strict `tsc`, `eslint`, a Metro bundle for Android and iOS, and 53 Jest tests (the
+> portable core plus the sign-in and home screens rendered against the real catalogues), in a `mobile` CI job. **Not verified:** a run on an emulator or phone, Hermes' `Intl` for Hindi, accessibility and
+> low-end performance. Open before launch: real SMS (DLT), a store-reviewer login, deployment, the store accounts.
 >
 > **Sprint 61 is done** (ADR-071, migration 0054): *a pilot with an agency*, the last of the six planned MVP sprints. An **admin-tier operator can enrol an agency's file from `/admin`**: pick a programme, upload a CSV, read what
 > would happen row by row (phones masked, problems first, the failed rows downloadable), confirm the privacy notice was read out, and enrol. The engine moved out of the script into `operations/enrolment.py` and is the one

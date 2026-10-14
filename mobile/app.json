@@ -11,12 +11,19 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "in.iism.app"
+      "package": "in.iism.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1f4e79",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-localization"
-    ]
+    ],
+    "icon": "./assets/icon.png"
   }
 }

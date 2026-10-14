@@ -272,3 +272,9 @@ fmt: ## Auto-format
 
 .PHONY: check
 check: lint test ## Everything CI runs
+
+# The mobile app's own checks (Sprint 62 completion): types, lint, tests, and a Metro bundle. CI runs the same.
+.PHONY: mobile-check
+mobile-check: ## tsc, eslint, jest and an Android bundle for mobile/
+	cd mobile && PATH="$(NODE_BIN):$$PATH" npx tsc --noEmit && PATH="$(NODE_BIN):$$PATH" npx eslint . \
+	  && PATH="$(NODE_BIN):$$PATH" npx jest && PATH="$(NODE_BIN):$$PATH" CI=1 npx expo export --platform android --output-dir /tmp/iism-export

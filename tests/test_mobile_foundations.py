@@ -157,3 +157,23 @@ def test_the_native_module_is_touched_in_one_file() -> None:
         if 'from "expo-secure-store"' in p.read_text(encoding="utf-8")
     ]
     assert users == ["secure-backend.ts"]
+
+
+def test_every_package_the_app_imports_is_declared_and_locked() -> None:
+    """An import that only resolves because a dependency hoisted it is a break waiting for the next
+    install. Every bare import in the app's own code must be in `package.json`, which must be
+    locked, and the entry point must be Expo Router's."""
+    manifest = json.loads((MOBILE / "package.json").read_text(encoding="utf-8"))
+    declared = {*manifest["dependencies"], *manifest["devDependencies"]}
+    assert manifest["main"] == "expo-router/entry"
+    assert (MOBILE / "package-lock.json").exists()
+
+    seen: set[str] = set()
+    for path in _hand_written():
+        for spec in re.findall(
+            r'(?:from|jest\.mock\(|require\()\s*"([^."][^"]*)"', path.read_text(encoding="utf-8")
+        ):
+            package = "/".join(spec.split("/")[: 2 if spec.startswith("@") else 1])
+            seen.add(package)
+            assert package in declared, f"{path.name} imports {package}, which is not declared"
+    assert {"react", "react-native", "use-intl", "expo-router", "openapi-fetch"} <= seen

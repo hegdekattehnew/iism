@@ -27,9 +27,13 @@ export default function Home() {
     queryKey: ["me"],
     enabled: signedIn,
     queryFn: async () => {
-      const { data, error, response } = await api.GET("/auth/me");
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
-      return data;
+      // Status read before the check: `/auth/me` documents no error body, so on the failure branch
+      // openapi-fetch narrows the whole result to `never` (the web's `useOperatorDashboard`).
+      const result = await api.GET("/auth/me");
+      const status = result.response.status;
+      const errorBody: unknown = result.error;
+      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      return result.data;
     },
   });
 
