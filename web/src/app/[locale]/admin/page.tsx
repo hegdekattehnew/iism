@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { DistrictSkillGap } from "@/components/ops/DistrictSkillGap";
+import { EnrolmentUpload } from "@/components/ops/EnrolmentUpload";
 import { GrievanceQueue } from "@/components/ops/GrievanceQueue";
 import { ReportQueue } from "@/components/ops/ReportQueue";
 import { OperatorDashboard } from "@/components/ops/OperatorDashboard";
@@ -49,6 +50,9 @@ export default async function Page({
         </div>
         <div className="mt-12">
           <RoleAliasEditor />
+        </div>
+        <div className="mt-12">
+          <EnrolmentUpload />
         </div>
       </OperatorOnly>
     </div>

@@ -105,6 +105,9 @@ EVENT_NAMES = (
     # Sprint 60, BL-14.8. An employer exported a vacancy's applicants. Subject to the vacancy; the
     # payload is the count, never a name.
     "applicants_exported",
+    # Sprint 61, BL-14.10. An operator enrolled a file of people for an agency programme. Subject
+    # to nobody; the payload is the four counts and the programme, never a number or a name.
+    "enrolment_applied",
 )
 
 

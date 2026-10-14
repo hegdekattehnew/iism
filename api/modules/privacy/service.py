@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
-from api.modules import grievances, moderation
+from api.modules import grievances, moderation, operations
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, ApplicationReview, SavedJob
@@ -575,6 +575,12 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             for membership, tenant in memberships
         ],
         "candidate_profile": profile_out,
+        # How the person came to be in an agency programme, if an operator enrolled them or tagged
+        # them (Sprint 61, ADR-071): the programme, when, whether an account was made for them and
+        # the notice version an operator attested was read out. Never the operator.
+        "agency_enrolment": (
+            await operations.enrolments_for_profile(db, profile.id) if profile is not None else None
+        ),
         # What this person asked for, and what they were told about it. The
         # disclosure each application carried is part of their record, not only
         # the employer's.

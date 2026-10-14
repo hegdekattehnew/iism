@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(70 ADRs). Read it before making any structural decision — the summary below
+(71 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -344,6 +344,14 @@ api/                     FastAPI modular monolith
                          (`/ops/districts`, `.../skill-gap`; `OPS_PROGRAMME_READ`): every standard an open vacancy
                          in the district requires, ranked by shortfall, **a supply of one to four residents never
                          shown** (`MIN_CELL_SIZE = 5`) and the shortfall beside it a minimum.
+                         (Sprint 61, BL-14.10, ADR-071) `enrolment.py` is **the** engine that enrols an agency's file
+                         (the back office's `/ops/enrolment/*` and `scripts/bulk_enrol_candidates.py` both call it).
+                         A sibling of `marketplace/bulk.py` that reuses its `parse_records` / `decode` / `errors_csv` /
+                         `int_cell`. The check and the apply run the same `_decide`; an apply needs `attest=true` (the
+                         privacy notice was read out) and records who, when and which notice version in
+                         `enrolment_batches`. **Admin tier only** (`OPS_ENROL`). It never overwrites a person, each row is
+                         a savepoint, and no phone is ever returned whole. `enrolment_batch_members` points at the
+                         profile from this side because `marketplace` cannot import `operations`.
     assessment/          (Sprint 35, BL-3.1) The one webhook an assessment provider
                          calls. No model of its own: ADR-023 names "assessment results"
                          among the data an encryption path must exist for before it is
@@ -562,6 +570,13 @@ split would have to turn into interfaces first; do not add to it casually.
   over its 684 KB budget by a kilobyte. Headroom is **1 KB** (683 KB): the next thing the header imports will breach it.
 - **The suite's `db` fixture is one outer transaction, so `db.rollback()` inside a test rolls back the set-up too** (Sprint 59, found writing the "a refused takedown leaves the reports open" test). Assert that nothing
   was *flushed or committed* instead (autoflush is off, so the database still says what it said), and use committed rows (`tests/concurrency.py`) when a rollback is the thing under test.
+- **Consent stamped on a person's behalf is an attested claim with a name on it, never an assumption** (ADR-071). Anything that creates an account for somebody who has not touched the product goes through
+  `identity.provision_candidate`, needs the operator's explicit attestation, and records who, when and which notice version; a person's export says it happened and never names the operator. **A check and the
+  act it previews run one decision function** (`enrolment._decide`), or the preview can promise what the act will not do. **A model never holds a foreign key into a module it may not import**: point the other
+  way with a join table (`enrolment_batch_members`), or every script that loads one without the other fails at mapper configuration. A file of people is cheap to check (0.08 s for 1,000 rows) and not to apply
+  (4.2 s): measure before raising `ENROLMENT_MAX_ROWS`.
+- **A browser's matching Chromium is not part of `npm ci`.** After a Playwright bump the suite cannot start until `npx playwright install chromium` has fetched the build it names (about 99 MB); CI does this itself.
+  `web/AGENTS.md` is rewritten by Next's own tooling on install and build; it is not part of a change.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
   it**: an empty list hid the invalid `<dl>` that only a populated one showed. `checkPage` also asks whether text sits flush against a border (the missing-`CardBody` bug).
 - No business logic in route handlers — routes validate input/auth and delegate to a module's
@@ -1002,6 +1017,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 61 is done** (ADR-071, migration 0054): *a pilot with an agency*, the last of the six planned MVP sprints. An **admin-tier operator can enrol an agency's file from `/admin`**: pick a programme, upload a CSV, read what
+> would happen row by row (phones masked, problems first, the failed rows downloadable), confirm the privacy notice was read out, and enrol. The engine moved out of the script into `operations/enrolment.py` and is the one
+> both call; it never overwrites a person, runs each row in a savepoint, validates an Indian mobile properly (the script accepted any eight digits) and records the attestation (who, when, notice version) in
+> `enrolment_batches`. The enrolled person signs in by phone like anyone and their export says how they came to be in the programme. 1,588 + new backend / 562 web / 129 browser tests (`CLAUDE.md` and
+> `projectContextForMe.md` carry the exact counts); 19 engine and 7 screen breakages each fail a test. **Consent remains asserted, not verified.**
 >
 > **Sprint 60 is done** (ADR-070, migration 0053): *hiring that finishes*. An employer can leave a **message with a status change** (an interview time and place: the latest one, read from the application and never
 > copied into the outbox), keep a **private note** on an applicant (in the person's data export, in no candidate-facing response) and **download the applicants as a spreadsheet** built by the same function as the list

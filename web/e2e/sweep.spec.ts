@@ -20,6 +20,7 @@ import {
   signInAs,
   suffix,
   type Tokens,
+  uniquePhone,
 } from "./support/identities";
 
 /**
@@ -87,6 +88,16 @@ test.beforeAll(async () => {
       data: { status: "shortlisted", message: "Interview on Tuesday at 11 am." },
     },
   );
+
+  // The operator has enrolled a file, so `/admin` is swept with a batch in its list (Sprint 61).
+  const enrolled = await request.post(
+    `${E2E.API}/ops/enrolment/apply?programme=${encodeURIComponent(`Sweep Programme ${id}`)}&attest=true`,
+    {
+      headers: { authorization: `Bearer ${operator.tokens.access_token}`, "content-type": "text/csv" },
+      data: `phone,full_name,headline,state,district,years_experience\r\n${uniquePhone()},Sweep Trainee,Trainee,,,0\r\n`,
+    },
+  );
+  expect(enrolled.status()).toBe(200);
 
   world = { jobSlug, courseSlug, employer, provider, seeker, operator };
   await request.dispose();

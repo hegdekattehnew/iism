@@ -270,3 +270,53 @@ class RoleAliasEventOut(BaseModel):
     job_role: str
     note: str | None = None
     created_at: datetime
+
+
+# ---------------------------------------------------------------- agency enrolment (Sprint 61)
+
+EnrolmentStatus = Literal["new", "tag", "already", "error"]
+
+
+class EnrolmentRowOut(BaseModel):
+    """One row of a check or an apply. **Nothing here can be dialled**: the phone is masked and
+    the name is its first word. The operator already holds the file."""
+
+    row: int
+    status: EnrolmentStatus
+    phone: str | None = None
+    first_name: str | None = None
+    warnings: list[str] = []
+    errors: list[str] = []
+
+
+class EnrolmentReportOut(BaseModel):
+    programme: str
+    applied: bool
+    rows: list[EnrolmentRowOut]
+    notes: list[str]
+    new: int
+    tag: int
+    already: int
+    errors: int
+    # The rows that failed, exactly as uploaded plus an `error` column (formula-safe).
+    errors_csv: str | None = None
+    batch_id: uuid.UUID | None = None
+
+
+class EnrolmentBatchOut(BaseModel):
+    id: uuid.UUID
+    programme: str
+    file_name: str | None = None
+    # Masked, and `None` once the operator has erased their account.
+    operator: str | None = None
+    attested_notice_version: str
+    attested_at: datetime
+    created: int
+    tagged: int
+    already: int
+    errors: int
+    created_at: datetime
+
+
+class EnrolmentBatchesOut(BaseModel):
+    batches: list[EnrolmentBatchOut]

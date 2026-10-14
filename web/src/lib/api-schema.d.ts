@@ -2669,6 +2669,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ops/enrolment/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enrolment Template
+         * @description The columns, with two example rows. Served here so there is one list of them.
+         */
+        get: operations["enrolment_template_ops_enrolment_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/enrolment/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Enrolment
+         * @description Say what an enrolment of this file would do, row by row. **Writes nothing.**
+         */
+        post: operations["check_enrolment_ops_enrolment_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/enrolment/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Enrolment
+         * @description Check the file again, then enrol it. Refused (422, nothing written) without `attest`.
+         */
+        post: operations["apply_enrolment_ops_enrolment_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ops/enrolment/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enrolment Batches
+         * @description Recent enrolments, newest first, with who attested and which notice version.
+         */
+        get: operations["enrolment_batches_ops_enrolment_batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/candidates/{job_slug}/{reference}/training": {
         parameters: {
             query?: never;
@@ -4156,6 +4236,96 @@ export interface components {
             scarce?: components["schemas"]["ScarceSkillOut"][];
             /** Candidates Total */
             candidates_total: number;
+        };
+        /** EnrolmentBatchOut */
+        EnrolmentBatchOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Programme */
+            programme: string;
+            /** File Name */
+            file_name?: string | null;
+            /** Operator */
+            operator?: string | null;
+            /** Attested Notice Version */
+            attested_notice_version: string;
+            /**
+             * Attested At
+             * Format: date-time
+             */
+            attested_at: string;
+            /** Created */
+            created: number;
+            /** Tagged */
+            tagged: number;
+            /** Already */
+            already: number;
+            /** Errors */
+            errors: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** EnrolmentBatchesOut */
+        EnrolmentBatchesOut: {
+            /** Batches */
+            batches: components["schemas"]["EnrolmentBatchOut"][];
+        };
+        /** EnrolmentReportOut */
+        EnrolmentReportOut: {
+            /** Programme */
+            programme: string;
+            /** Applied */
+            applied: boolean;
+            /** Rows */
+            rows: components["schemas"]["EnrolmentRowOut"][];
+            /** Notes */
+            notes: string[];
+            /** New */
+            new: number;
+            /** Tag */
+            tag: number;
+            /** Already */
+            already: number;
+            /** Errors */
+            errors: number;
+            /** Errors Csv */
+            errors_csv?: string | null;
+            /** Batch Id */
+            batch_id?: string | null;
+        };
+        /**
+         * EnrolmentRowOut
+         * @description One row of a check or an apply. **Nothing here can be dialled**: the phone is masked and
+         *     the name is its first word. The operator already holds the file.
+         */
+        EnrolmentRowOut: {
+            /** Row */
+            row: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "tag" | "already" | "error";
+            /** Phone */
+            phone?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+            /**
+             * Errors
+             * @default []
+             */
+            errors: string[];
         };
         /** EntryRouteOut */
         EntryRouteOut: {
@@ -11232,6 +11402,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleAliasEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrolment_template_ops_enrolment_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    check_enrolment_ops_enrolment_check_post: {
+        parameters: {
+            query: {
+                programme: string;
+                file_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_enrolment_ops_enrolment_apply_post: {
+        parameters: {
+            query: {
+                programme: string;
+                /** @description The operator confirms the privacy notice was read out to everyone enrolled. */
+                attest?: boolean;
+                file_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrolment_batches_ops_enrolment_batches_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentBatchesOut"];
                 };
             };
             /** @description Validation Error */

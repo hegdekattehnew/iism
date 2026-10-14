@@ -55,6 +55,7 @@ EXPORTED: dict[str, str] = {
     "application_reviews": "ratings_received",
     "grievances": "grievances_raised",
     "listing_reports": "listing_reports_made",
+    "enrolment_batch_members": "agency_enrolment",
     # No foreign key, so named rather than discovered.
     "notifications": "notices",
 }
@@ -66,6 +67,10 @@ EXEMPT: dict[str, str] = {
     "on the organisation's record, not data held about the operator as a data subject.",
     "tenant_verification_events": "The operator's audit trail of decisions about an organisation. "
     "`actor_user_id` is `SET NULL` on erasure so the record outlives its author.",
+    "enrolment_batches": "The operator's record of an enrolment (Sprint 61): the programme, "
+    "counts and who attested the notice was read out. `actor_user_id` is `SET NULL` on erasure so "
+    "the record outlives its author; a person's own link to it is `enrolment_batch_members`, "
+    "which is exported.",
     "role_alias_events": "The operator's audit trail of decisions about role aliases (Sprint 47); "
     "`actor_user_id` is `SET NULL` on erasure for the same reason.",
 }

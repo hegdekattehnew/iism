@@ -6,6 +6,7 @@ alone** -- never by a membership role, so an organisation's owner cannot verify
 their own organisation. See ADR-042.
 """
 
+from api.modules.operations.enrolment import enrolments_for_profile
 from api.modules.operations.models import VERIFICATION_DECISIONS, TenantVerificationEvent
 from api.modules.operations.routes import router
 from api.modules.operations.service import set_staff, staff_roster
@@ -13,6 +14,7 @@ from api.modules.operations.service import set_staff, staff_roster
 __all__ = [
     "VERIFICATION_DECISIONS",
     "TenantVerificationEvent",
+    "enrolments_for_profile",
     "router",
     "set_staff",
     "staff_roster",

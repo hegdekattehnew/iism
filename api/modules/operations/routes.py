@@ -1,12 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import OperatorContext, Permission, require_operator
 from api.core.database import get_db_session
 from api.modules import skills
-from api.modules.operations import schemas, service, skill_gap
+from api.modules.marketplace.bulk import BulkFileError, decode
+from api.modules.operations import enrolment, schemas, service, skill_gap
 
 router = APIRouter(prefix="/ops", tags=["operations"])
 
@@ -20,6 +21,7 @@ CanVerifyOrgs = Depends(require_operator(Permission.OPS_ORG_VERIFY))
 CanReadProgrammes = Depends(require_operator(Permission.OPS_PROGRAMME_READ))
 CanVerifyCandidates = Depends(require_operator(Permission.OPS_CANDIDATE_VERIFY))
 CanEditAliases = Depends(require_operator(Permission.OPS_ALIAS_EDIT))
+CanEnrol = Depends(require_operator(Permission.OPS_ENROL))
 
 
 @router.get("/organisations", response_model=list[schemas.UnverifiedOrganisation])
@@ -376,3 +378,135 @@ async def role_alias_history(
         schemas.RoleAliasEventOut.model_validate(e)
         for e in await skills.recent_events(db, limit=limit)
     ]
+
+
+# ------------------------------------------------------------- agency enrolment (Sprint 61)
+
+# The file is the request body, read raw (the Sprint 51 shape): FastAPI cannot see it, so declaring
+# it here is what puts `text/csv` in the OpenAPI document and a `string` body in the client.
+_CSV_BODY: dict[str, object] = {
+    "requestBody": {"required": True, "content": {"text/csv": {"schema": {"type": "string"}}}}
+}
+
+
+def _enrolment_out(report: enrolment.EnrolmentReport) -> schemas.EnrolmentReportOut:
+    return schemas.EnrolmentReportOut(
+        programme=report.programme,
+        applied=report.applied,
+        rows=[
+            schemas.EnrolmentRowOut(
+                row=r.row,
+                status=r.status,
+                phone=r.phone,
+                first_name=r.first_name,
+                warnings=r.warnings,
+                errors=r.errors,
+            )
+            for r in report.rows
+        ],
+        notes=report.notes,
+        new=report.count("new"),
+        tag=report.count("tag"),
+        already=report.count("already"),
+        errors=report.count("error"),
+        errors_csv=report.errors_csv,
+        batch_id=report.batch_id,
+    )
+
+
+async def _enrol(
+    request: Request,
+    db: AsyncSession,
+    context: OperatorContext,
+    *,
+    programme: str,
+    apply: bool,
+    attested: bool,
+    file_name: str | None,
+) -> schemas.EnrolmentReportOut:
+    try:
+        report = await enrolment.run(
+            db,
+            decode(await request.body()),
+            programme=programme,
+            apply=apply,
+            attested=attested,
+            actor=context.user,
+            file_name=file_name,
+        )
+    except BulkFileError as error:
+        raise HTTPException(error.status_code, error.message) from error
+    return _enrolment_out(report)
+
+
+@router.get("/enrolment/template")
+async def enrolment_template(context: OperatorContext = CanEnrol) -> Response:
+    """The columns, with two example rows. Served here so there is one list of them."""
+    return Response(
+        enrolment.template_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers={"content-disposition": 'attachment; filename="enrolment-template.csv"'},
+    )
+
+
+@router.post(
+    "/enrolment/check",
+    response_model=schemas.EnrolmentReportOut,
+    openapi_extra=_CSV_BODY,
+)
+async def check_enrolment(
+    request: Request,
+    programme: str = Query(..., max_length=200),
+    file_name: str | None = Query(None, max_length=200),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEnrol,
+) -> schemas.EnrolmentReportOut:
+    """Say what an enrolment of this file would do, row by row. **Writes nothing.**"""
+    return await _enrol(
+        request,
+        db,
+        context,
+        programme=programme,
+        apply=False,
+        attested=False,
+        file_name=file_name,
+    )
+
+
+@router.post(
+    "/enrolment/apply",
+    response_model=schemas.EnrolmentReportOut,
+    openapi_extra=_CSV_BODY,
+)
+async def apply_enrolment(
+    request: Request,
+    programme: str = Query(..., max_length=200),
+    attest: bool = Query(
+        False,
+        description="The operator confirms the privacy notice was read out to everyone enrolled.",
+    ),
+    file_name: str | None = Query(None, max_length=200),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEnrol,
+) -> schemas.EnrolmentReportOut:
+    """Check the file again, then enrol it. Refused (422, nothing written) without `attest`."""
+    return await _enrol(
+        request,
+        db,
+        context,
+        programme=programme,
+        apply=True,
+        attested=attest,
+        file_name=file_name,
+    )
+
+
+@router.get("/enrolment/batches", response_model=schemas.EnrolmentBatchesOut)
+async def enrolment_batches(
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db_session),
+    context: OperatorContext = CanEnrol,
+) -> schemas.EnrolmentBatchesOut:
+    """Recent enrolments, newest first, with who attested and which notice version."""
+    rows = await enrolment.recent_batches(db, limit=limit)
+    return schemas.EnrolmentBatchesOut(batches=[schemas.EnrolmentBatchOut(**vars(b)) for b in rows])
