@@ -3561,3 +3561,47 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Found while doing it:** the Dependabot bump moved Playwright to 1.64 and the browser suite could not start until its matching Chromium build was installed (`npx playwright install chromium`, 99 MB), a step CI performs itself.
 - **Measured by tests that fail without the rule** (19 breakages each fail a test): no attestation, a check that writes, a non-mobile number, a repeated number, an overwritten profile, a re-tagged person, no savepoint, a wrong member outcome, an unmasked phone, a wrong notice version, no actor, years and name limits, a dropped place warning, no consent stamp, support allowed, the body limit, and an export that drops the enrolment. The component has seven (the attestation, the admin gate, forgetting a review when the programme changes, the attest flag sent, the file forgotten after use, problems sorted first, an oversize file never read). One is **not** guarded: clearing the file input after reading it (a browser fires no `change` for the same file twice), which jsdom cannot model, as in Sprint 52.
 - **Not done:** an agency login, a consent receipt from the person, an SMS to say they were enrolled, a programme table (the name stays free text), undoing a batch, and an upload history beyond the 50 most recent batches.
+
+## ADR-072: The Mobile App Is a Second Client of the Same API, in the Same Repository; Released Operations Are Additive-Only and an Old Build Is Told to Update
+
+**Status:** Accepted (October 2026). Sprint 62 (BL-15.1, BL-15.7). Extends ADR-002, ADR-016 and ADR-029. No migration.
+
+**Context:** The owner asked whether the product should be carved into a separate branch and rebaselined to ship as an Android and iOS app. The web app is a Next 16 application with 43 pages, 87 client components, 12 families of dynamic routes and 26 files that fetch on the server, so it cannot be packaged into an app shell without reworking every dynamic page. The owner chose a native client (Expo / React Native) for the job seeker, with deployment and the mobile launch run together. The question underneath is what stays shared and what must change when a client can no longer be updated by deploying.
+
+**Decision:**
+
+- **No separate branch and no rebaseline.** The backend is the contract and stays one. The app lives in a new top-level **`mobile/`** directory of this repository; `web/` and `api/` are not moved. Work is on short-lived `mobile-N` branches merged to `main`, one per sprint, like Sprints 56 to 61; a store release is tagged `mobile-vX.Y.Z` so a build can be reproduced and a hotfix cut from the tag.
+- **v1 is candidate-only.** The PRD persona is a phone-only candidate on a low-end Android. Employers, providers and operators work on the website, which is already responsive; a phone signed in as one is told so rather than shown half an app. About 16 screens, not 43 pages.
+- **One generator, one set of words, one set of colours.** `make gen-api-mobile` writes `mobile/src/api/schema.d.ts` from a fresh `app.openapi()` with the web's own `openapi-typescript` (a clean run is a zero-line diff against the web's schema, which it was). `make sync-mobile-messages` copies the web's catalogues, read by `use-intl` (next-intl's framework-free core, ICU plurals included); the phone-only strings are `app.en.json` and `app.hi.json` under a `mobile` namespace. `scripts/sync_mobile_tokens.py` generates `tokens.ts` from `globals.css` (colours only; shadows are CSS and the overlay is rewritten to `rgba()`), so a palette cannot be edited in one place and not the other. `tests/test_mobile_foundations.py` fails when any of the three is stale.
+- **The portable core has no React Native import** (`mobile/src/core`): the API client, the token store, the sign-in flow, the locale rule. It is a port of `web/src/lib/api.ts` and keeps what that file cost a day each to learn (one refresh at a time; auth endpoints matched by exact pathname; the request is cloned before it is sent), with four differences: tokens are injected and async, the language is injected, every request names the build, and a **426** reaches the app.
+- **Tokens live in the Keychain and the Keystore** (`expo-secure-store`, device-only), behind one file, with an in-memory copy because the client asks on every request. A locked keystore means "signed out", never a crash.
+- **Released operations are additive-only.** A web page ships with the API; an installed app does not and cannot be updated on demand. `mobile/contract/surface.txt` names the operations the app calls and `mobile/contract/openapi.snapshot.json` records them as they were at the last store release (every `$ref` inlined). `api/core/contract.py` says what would break an installed app: a removed operation or success response; a response property removed, retyped, made nullable or no longer always present; a request that now needs something the app does not send (a new required property or parameter, a smaller maximum, a narrower enum). A widened *response* enum is reported and does not fail, because whether it breaks depends on whether the app is exhaustive over it. `tests/test_api_contract.py` holds the real API against the snapshot inside `make check`, and `make snapshot-contract` only **adds** operations (`--release` re-records everything at a store release, after the minimum version has been raised if a build must be retired). The surface file is held equal to the operations the app's code calls by a test, so the list cannot drift from the code.
+- **An old build is told to update.** The app sends `X-App-Version` and `X-App-Platform`; `AppVersionMiddleware` answers **426 Upgrade Required**, with the minimum in `X-Min-App-Version`, when the version is below `MOBILE_MIN_VERSION_ANDROID` or `_IOS` (separate, because the two stores review at different speeds). The default `0.0.0` retires nothing. **It fails open on purpose**: a missing header (the web app), an unreadable version or an unknown platform is served, because locking out someone whose header was garbled is a worse failure than serving an old build. `/health` is never gated. The app replaces itself with an update screen on any 426.
+- **A styling dependency was left out of M1.** The plan named NativeWind; M1 uses a plain token hook and `StyleSheet` instead, because NativeWind's build configuration is the part most likely to be wrong when it cannot be run, and the tokens are the same either way. It can be adopted later without touching the tokens.
+
+**Options considered:**
+
+1. A separate long-lived branch or fork for mobile
+2. **A `mobile/` directory in the same repository on ordinary short branches** (chosen)
+3. A Capacitor shell over the hosted web app
+4. A bundled static export of the web app
+5. **A native client (Expo / React Native) for the job seeker** (chosen by the owner)
+6. Hand-maintaining the mobile types, strings and colours
+7. **Generating all three from the web's** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ No risk to `main` ❌ Doubles the upkeep of an API and a web app that do not change, and the two drift.
+- Option 3: ✅ Weeks, not months ❌ Apple's minimum-functionality review is a real risk for a wrapper, and it needs the web app deployed first.
+- Option 4: ✅ Works offline ❌ Needs every dynamic route and server-rendered page reworked for static export.
+- Option 5: ✅ The feel and store acceptance the owner wants ❌ The most expensive: every one of the 87 client components' behaviour is re-implemented, only the data layer carries over.
+
+**Consequences:**
+
+- **Two front ends will diverge.** Mitigation: the API is the one contract, a feature reaches the phone only after it is on the API, and `projectContextForMe.md` carries a parity list.
+- **The API becomes additive-only for the operations on the surface.** This is the largest change in how the project is run: a rename the web would have taken in a sprint now needs the old and the new shape side by side until the minimum version is raised.
+- **The React Native layer of M1 was written without the toolchain installed** (the owner declined a download of roughly 400 to 700 MB). `src/core/` was verified with the web's TypeScript and Vitest (strict `tsc`, 39 tests, each able to fail), and everything derivable is guarded in Python; the screens, `src/ui`, the theme hook, the i18n provider and the Expo config have **never been compiled or run**, and the first install should be expected to need version and typing fixes. There is no `package.json`: guessed versions of an SDK-matched set are worse than none, and `mobile/README.md` gives the steps that create one.
+- **Real SMS and a reviewer login are still open.** A phone code cannot reach an App Store or Play reviewer, and without SMS delivery (DLT, deferred) nobody outside development can sign in. They are BL-15.8 and BL-12.9 and gate the launch more than any screen does.
+- **The application id `in.iism.app`, the name and the store URLs are placeholders** until the store accounts exist.
+- **Measured by tests that fail without the rule:** a version compared as text, `/health` gated, a missing header locking somebody out, the platform ignored, no minimum in the 426, and each of ten contract rules (15 breakages, each fails a test).
+- **Not done in M1:** a CI job for the app (there is nothing to install yet), push notifications, deep links, any screen beyond sign-in and a front door, and the Hermes `Intl` / ICU-plural check for Hindi.

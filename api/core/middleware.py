@@ -232,6 +232,75 @@ def body_limit_for(path: str) -> int:
     return settings.max_request_body_bytes
 
 
+_APP_VERSION = re.compile(r"^([0-9]{1,4})\.([0-9]{1,4})\.([0-9]{1,4})$")
+# Never gated: a store reviewer, a monitor and the app's own start-up probe must be able to ask
+# whether the service is up even when the build is too old to use it.
+_VERSION_EXEMPT = ("/health",)
+
+
+def parse_app_version(value: str) -> tuple[int, int, int] | None:
+    """`"1.4.0"` -> `(1, 4, 0)`, or `None` for anything that is not exactly three small integers.
+
+    Strict on purpose: a version compared as text puts `"1.10.0"` below `"1.9.0"`, and a loosely
+    parsed one lets a malformed header decide whether somebody is locked out.
+    """
+    match = _APP_VERSION.match(value.strip())
+    return (int(match[1]), int(match[2]), int(match[3])) if match else None
+
+
+class AppVersionMiddleware:
+    """Answer **426 Upgrade Required** to an installed mobile app older than the oldest build the
+    API still supports (Sprint 62, BL-15.7, ADR-072).
+
+    A web page ships with the API; an installed app does not, so the day a released field is
+    removed the old build breaks in a way nobody can fix from the server. The way out is to say so
+    plainly: the app sends `X-App-Version` and `X-App-Platform`, and one below the platform's
+    minimum (`MOBILE_MIN_VERSION_ANDROID` / `_IOS`) gets a 426 whose body the app turns into an
+    "update to continue" screen.
+
+    **It fails open, deliberately.** A request with no header is the web app or a script and is
+    never gated; so is one whose version, or platform, is missing or unreadable. Locking out
+    somebody whose header was garbled is a worse outcome than serving them a build that may be old.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["path"].startswith(_VERSION_EXEMPT):
+            await self.app(scope, receive, send)
+            return
+
+        version = platform = None
+        for name, value in scope["headers"]:
+            if name == b"x-app-version":
+                version = parse_app_version(value.decode("latin-1"))
+            elif name == b"x-app-platform":
+                platform = value.decode("latin-1").strip().lower()
+
+        minimum = self._minimum(platform)
+        if version is not None and minimum is not None and version < minimum:
+            shown = ".".join(str(n) for n in minimum)
+            log.warning("http.app_too_old", platform=platform, minimum=shown)
+            await _reject(
+                send,
+                426,
+                "This version of the app is no longer supported. Update it to continue.",
+                [(b"x-min-app-version", shown.encode())],
+            )
+            return
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    def _minimum(platform: str | None) -> tuple[int, int, int] | None:
+        settings = get_settings()
+        raw = {
+            "android": settings.mobile_min_version_android,
+            "ios": settings.mobile_min_version_ios,
+        }.get(platform or "")
+        return parse_app_version(raw) if raw else None
+
+
 class BodySizeLimitMiddleware:
     """Refuse a request body larger than `max_request_body_bytes`.
 

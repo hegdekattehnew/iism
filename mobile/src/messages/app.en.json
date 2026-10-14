@@ -1,0 +1,25 @@
+{
+  "home": {
+    "title": "Find work that fits your skills",
+    "subtitle": "Sign in to see jobs and courses matched to what you can do.",
+    "signedIn": "You are signed in.",
+    "organisationNote": "This app is for job seekers. To post vacancies or courses, sign in on the website."
+  },
+  "signIn": {
+    "phoneLabel": "Mobile number",
+    "phonePlaceholder": "10-digit mobile number",
+    "consentLink": "Read the privacy notice",
+    "consentAgree": "I have read the privacy notice and agree to the terms of use.",
+    "needConsent": "There is no account for this number yet. Tick the box to agree to the privacy notice, then ask for a new code: that one has been used."
+  },
+  "update": {
+    "title": "Please update the app",
+    "body": "This version of the app is no longer supported. Update it from the store to continue.",
+    "openStore": "Open the store"
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "hindi": "हिन्दी"
+  }
+}

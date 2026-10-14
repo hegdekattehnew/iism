@@ -228,6 +228,32 @@ web: ## Run the Next.js dev server (http://localhost:3000)
 gen-api: ## Regenerate the TypeScript client from the live OpenAPI schema
 	cd web && PATH="$(NODE_BIN):$$PATH" npm run gen:api
 
+# The mobile app's typed client, from a **fresh** app (never whatever is running on :8000, which may
+# not have reloaded) and with the web's own openapi-typescript, so there is one generator. A zero-line
+# diff against `web/src/lib/api-schema.d.ts` is what a healthy run looks like.
+.PHONY: gen-api-mobile
+gen-api-mobile: ## Regenerate mobile/src/api/schema.d.ts from a fresh app
+	$(VENV)/bin/python -c "import json; from api.main import app; json.dump(app.openapi(), open('web/openapi.json', 'w'))"
+	cd web && PATH="$(NODE_BIN):$$PATH" npx openapi-typescript openapi.json -o ../mobile/src/api/schema.d.ts
+	@rm -f web/openapi.json
+
+# The messages are the web app's: one set of words, read by both. The mobile copy is generated, and
+# `tests/test_mobile_foundations.py` fails when it is not the same.
+.PHONY: sync-mobile-messages
+sync-mobile-messages: ## Copy web/src/messages into mobile/src/messages
+	$(VENV)/bin/python scripts/sync_mobile_messages.py
+
+# What the released mobile app depends on (ADR-072). `check-contract` fails on a change that would
+# break an installed app; `snapshot-contract` records newly listed operations; a store release
+# re-records everything with `scripts/check_api_contract.py --release`.
+.PHONY: check-contract
+check-contract: ## Fail if the API would break the released mobile app
+	$(VENV)/bin/python scripts/check_api_contract.py
+
+.PHONY: snapshot-contract
+snapshot-contract: ## Record operations newly added to mobile/contract/surface.txt
+	$(VENV)/bin/python scripts/check_api_contract.py --update
+
 # ---------------------------------------------------------------- quality
 .PHONY: test
 test: ## Run the Python test suite (uses disposable containers)

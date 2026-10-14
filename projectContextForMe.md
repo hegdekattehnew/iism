@@ -4,10 +4,10 @@ Working notes for Claude Code. Purpose: recover full context on a new session wi
 re-reading the codebase or the conversation history. Update it at the end of any session
 that changes the shape of the project.
 
-**Last updated:** 2026-10-14 · **Sprints 1–60 built and merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30; 53 as PR #35; 54 as PR #38; the code review's ten fixes as PRs #39 and #40;
-the roadmap documents as PR #41; 56 as PR #42; 57 as PR #43; 58 as PR #44; 59 as PR #45; the three Dependabot bumps as #46 to #48; 60 as PR #49); **`main` is `2e0c6a4`**. **Sprint 61 (a pilot with an agency: BL-14.10; ADR-071, migration 0054) is on `sprint-61`, uncommitted.**
-It is the last of the six planned sprints (§11, "Roadmap: Sprints 56 to 61"): an admin-tier operator enrols an agency's file from the back office. **The roadmap is complete once it merges.** SEO, deployment and monetisation
-were deferred by the owner on 2026-10-12. K stays 500; real external integrations stay deferred.
+**Last updated:** 2026-10-14 · **Sprints 1–61 built and merged into `main`** (Sprints 41–50 as PRs #17–#27; 50.5 and 51 as PR #29; 52 as PR #30; 53 as PR #35; 54 as PR #38; the code review's ten fixes as PRs #39 and #40;
+the roadmap documents as PR #41; 56 as PR #42; 57 as PR #43; 58 as PR #44; 59 as PR #45; the three Dependabot bumps as #46 to #48; 60 as PR #49; 61 as PR #50); **`main` is `12aa779`**, and the dev database, API, worker and web run it
+(migration 0054). **Sprint 62 (M1 of the mobile app: ADR-072, BL-15.1 and BL-15.7) is on `mobile-1`, uncommitted.** The six-sprint MVP roadmap (§11) is complete; the mobile programme (§11, "The mobile app, Sprints 62 to 66")
+is the next body of work. SEO, deployment and monetisation were deferred by the owner on 2026-10-12 and **deployment is now on the mobile launch's critical path**. K stays 500; real external integrations stay deferred.
 
 > Every count in this file is dated. An undated number in a document that survives fifteen
 > sprints is a number nobody can trust and nobody can check — the header above claimed
@@ -23,12 +23,12 @@ has been wrong before, and §10 explains how.*
 
 | | |
 |---|---|
-| **Branch** | `sprint-61` (Sprint 61, **uncommitted**, 2026-10-14), cut from `main` at `2e0c6a4`, which has everything through Sprint 60. No open PR. Every merged branch is deleted, locally and on `origin`. |
+| **Branch** | `mobile-1` (Sprint 62 / M1, **uncommitted**, 2026-10-14), cut from `main` at `12aa779`, which has everything through Sprint 61. No open PR. `docs/help/` (the owner's untracked user guides) and `web/AGENTS.md` (rewritten by Next's tooling) are **not** part of any change. Every merged branch is deleted, locally and on `origin`. |
 | **CI** | Green on every PR through #40 (2026-10-12): Web about 1m30s, API about 3m30s, **E2E 4m43s to 5m00s**, up from 3 minutes since the phone pass and the read delay (the split is due at about 8). Read it yourself with `~/bin/gh run list --repo hegdekattehnew/iism --branch main` (§6 explains `gh`; §11 "CI facts" has the rest). |
-| **Last sprint** | 61 — **a pilot with an agency** (ADR-071, migration 0054): `POST /ops/enrolment/check` and `/apply` (`text/csv` body, `?programme=`, apply needs `&attest=true`), `GET /ops/enrolment/template` and `/batches`, **`OPS_ENROL`, admin tier only**; the engine is `operations/enrolment.py` (the script is a thin caller): the check and the apply run one `_decide`, a person is never overwritten (an existing account gains only the tag, one already in a programme is left alone), each row is a savepoint, a phone must be an Indian mobile, no number is returned whole, and `enrolment_batches` records who attested the notice was read out, when and which version (`enrolment_batch_members` points at the profile from this side). A person's export gains `agency_enrolment`. Panel: `web/src/components/ops/EnrolmentUpload.tsx` on `/admin`, admin tier only. Before it: 60 — hiring that finishes (ADR-070).
-| **Next sprint** | **None planned.** The Sprint 56-61 roadmap (§11) is complete. What is left needs a person or an owner decision (§11 "Owner decisions", "Gated, with the unblocker"): the grievance officer and mailbox, a labour-market reviewer for role aliases, one real phone for the PWA check, CV upload with its encryption path, the real embedding model. `BL-1.3` stays not started. |
-| **Tests** | 1,617 backend (`make check`, 2026-10-14), 562 web (`cd web && npm test`), **129 browser tests** (`make e2e`: 115 sweep, desktop and phone, + 14 journeys, ~2.5 min warm; three clean runs; needs Chromium, and after a Playwright bump `npx playwright install chromium`) — and `cd web && npx tsc --noEmit` plus `npm run lint`, which the web tests do not run. First-load budget: `/admin` **680 of 684 KB**, `/profile` 678 |
-| **Migrations** | head `0054` (Sprint 61: `enrolment_batches`, `enrolment_batch_members`, one widened CHECK; **the dev database `iism` is at 0053, so `make migrate` is owed once it merges**); 71 ADRs (001-071) |
+| **Last sprint** | 62 — **M1 of the mobile app: foundations** (ADR-072, no migration), **partly verified**. `mobile/` is an Expo / React Native job-seeker app **in this repository** (no fork, no rebaseline). Verified: `AppVersionMiddleware` (**426 Upgrade Required** to a build below `MOBILE_MIN_VERSION_ANDROID/_IOS`, fails open, `/health` exempt), `api/core/contract.py` + `mobile/contract/{surface.txt,openapi.snapshot.json}` + `scripts/check_api_contract.py` (`make check-contract`, `make snapshot-contract`: additive-only for the operations the released app calls), `make gen-api-mobile`, `make sync-mobile-messages`, `scripts/sync_mobile_tokens.py`, and `mobile/src/core` (the API client, token store, sign-in flow; strict `tsc` and 39 tests using the **web's** TypeScript and Vitest). **Not verified: the React Native layer (`app/`, `src/ui`, theme hook, i18n provider, Expo config) was written without the toolchain installed (the owner declined the ~400-700 MB download) and has never been compiled; there is no `package.json` (`mobile/README.md` creates one).** Before it: 61 — a pilot with an agency (ADR-071).
+| **Next sprint** | **M2 (Sprint 63): browse on the phone**, after the owner's prerequisites (§11 "The mobile app"): permission to install the toolchain so M1's unverified layer can be compiled first, the store accounts and bundle id, deployment, SMS/DLT. The whole plan is §11 and `~/.claude/plans/i-want-to-create-lively-phoenix.md`. `BL-1.3` stays not started. |
+| **Tests** | 1,685 backend (`make check`, 2026-10-14), 562 web (`cd web && npm test`, untouched), **129 browser tests** (`make e2e`, untouched this sprint), **39 mobile-core tests** run with the web's Vitest (no mobile runner exists yet) — and `cd web && npx tsc --noEmit` plus `npm run lint`. First-load budget: `/admin` **680 of 684 KB**, `/profile` 678 |
+| **Migrations** | head `0054` (applied to the dev database `iism`); no new migration in Sprint 62; 72 ADRs (001-072) |
 | **Golden set** | `make evaluate` must print **all 34 golden pairs, 7 orderings and 16 course expectations hold** — note the *numbers* behind several `CAPPED` cases dropped this sprint (e.g. the visual-merchandiser case fell from 45 to 31) because the mandatory-gap cap now tapers with thin coverage; the orderings and booleans are unchanged by design |
 | **Deployment** | deferred by the owner; nothing is deployed anywhere |
 
@@ -77,7 +77,7 @@ India-first, multi-sector, Hindi + English at launch, free in v1.
 | `docs/adr/architecture-decisions.md` | **65 ADRs — the source of truth for every design decision.** Read before any structural change. |
 | `docs/IISM-Product-Definition.docx` | 20-page product definition: problem, actors, intelligence layer, scope, risks, decision appendix. Written for the founding team, deliberately candid. **Read the next row with it.** |
 | `docs/scope-reconciliation.md` | **Where the product definition and the tree disagree** (2026-09-24). Seven divergences, each naming the file that proves it — semantic similarity, weights-in-configuration, dismissal instrumentation, course↔role alignment, five of eight actor types, the provider's market signal, `SkillRelation`. The `.docx` is deliberately not amended; this sits beside it. **A status table at the top (2026-10-03) says where each stands now**: five closed or mostly closed, two partly closed; the body is left as written. `docs/IISM-Scope-Reconciliation.docx` is the same ledger rewritten for top management (executive summary, scorecard, decisions requested, what to say plainly); regenerate or edit it when a gap's status changes. |
-| `docs/IISM-Product-Backlog.docx` | **Every story's status** — done, in progress, to do (Now / Next / Later), waiting or deferred. Version 1.21 (2026-10-14) adds Epic B14 (First-User Readiness) and records Sprints 56 to 61 as done, which completes the roadmap on top of a status-at-a-glance table, Epic 13 (what shipped in Sprints 33–42), Epics B11–B13, and §4.4 with a proposal for the next sprint. It had stopped at Sprint 38 and still tagged the dashboards `[NOW]`. **Update it when a story's status changes** — it went five sprints stale once. |
+| `docs/IISM-Product-Backlog.docx` | **Every story's status** — done, in progress, to do (Now / Next / Later), waiting or deferred. Version 1.22 (2026-10-14) adds Epic B15 (the mobile app) and records Sprint 62 (M1) as done, partly verified, on top of the completed Sprint 56-61 roadmap on top of a status-at-a-glance table, Epic 13 (what shipped in Sprints 33–42), Epics B11–B13, and §4.4 with a proposal for the next sprint. It had stopped at Sprint 38 and still tagged the dashboards `[NOW]`. **Update it when a story's status changes** — it went five sprints stale once. |
 | `CLAUDE.md` | Working conventions, repo layout, current state. Auto-loaded each session. |
 | `README.md` | Setup and run instructions. |
 | `~/.claude/plans/i-want-to-create-lively-phoenix.md` | **The most recent sprint plan** (overwritten each sprint — currently the Sprint 61 plan; the roadmap is mirrored in §11 and in the backlog's section 4.4). Lives outside the repo. |
@@ -2626,7 +2626,7 @@ Owner: "plan and start Sprint 60". BL-14.7, BL-14.8 and BL-14.9 of the roadmap.
 - **Not done (and why):** a thread, notes visible to the candidate, a bulk status change, an email digest, a count for the employer. **Owner-side:** `make migrate` (0053) on the dev database, then restart
   `make api` and `make worker`.
 
-### Sprint 61: a pilot with an agency (done 2026-10-14, ADR-071, migration 0054, **uncommitted** on `sprint-61`)
+### Sprint 61: a pilot with an agency (done 2026-10-14, ADR-071, migration 0054, merged as PR #50)
 
 Owner: "plan and start Sprint 61". BL-14.10, the last story of the roadmap.
 
@@ -2639,6 +2639,35 @@ Owner: "plan and start Sprint 61". BL-14.10, the last story of the roadmap.
 - **Measured.** `tests/test_enrolment_upload.py` (26) and `tests/test_bulk_enrolment.py` (9, the script's original six ported and three added); 19 engine breakages each fail a test, 7 of 8 screen breakages do (the unguarded one is clearing the file input, which jsdom cannot model). A 1,000-row check takes 0.08 s and an apply 4.2 s (about 4 ms a row), so the cap stays at 1,000. Journey 14 (`web/e2e/enrolment.spec.ts`): an admin checks a file (nothing written, no number whole), attests, enrols, re-runs it (creates nobody), the enrolled person signs in by code and finds the profile and the export line, and a support operator never sees the panel; `/admin` is swept with a batch in its list.
 - **Gotchas.** The Dependabot bump to Playwright 1.64 needs its own Chromium build: `npx playwright install chromium` (99 MB) before `make e2e` (CI does it itself). `web/AGENTS.md` is rewritten by Next's tooling on install and build; do not commit that change. `mask_email` keeps the local part's length (`op********@example.org`).
 - **Not done (and why):** an agency login, a consent receipt from the person, an SMS to say they were enrolled (no SMS yet), a programme table (the name stays free text), undoing a batch, upload history beyond the latest 50. **Consent is asserted, not verified**, and the page says so. **Owner-side:** `make migrate` (0054) on the dev database after it merges, then restart `make api` and `make worker`.
+
+### Sprint 62: M1 of the mobile app, foundations (done 2026-10-14, ADR-072, no migration, **uncommitted** on `mobile-1`)
+
+Owner: asked whether to branch and rebaseline to ship on both stores; chose a **native rewrite (Expo / React Native)**, candidate-only for v1, deployment and mobile launch together; then "start M1". **Declined the toolchain download**, so M1 is written but only partly verified (said plainly in the ADR, the README and `CLAUDE.md`).
+
+- **Answer to the branch question.** No fork, no rebaseline, no long-lived branch: `mobile/` beside `web/` and `api/`, short `mobile-N` branches merged to `main`, a `mobile-vX.Y.Z` tag per store release.
+- **Verified here.** `AppVersionMiddleware` (30 tests; 5 breakages each fail one); `api/core/contract.py` (27 tests including the real API against the committed snapshot; 10 rules, 10 breakages each fail one); `make gen-api-mobile` reproduces the web's schema with a zero-line diff; the messages, colours, privacy-notice version and "what the app calls = the contract surface" are held by `tests/test_mobile_foundations.py` (11 tests); `mobile/src/core` passes strict `tsc` and 39 tests under the web's toolchain (a temporary Vitest config and tsconfig, not committed).
+- **Not verified.** `mobile/app/*`, `src/ui`, `src/theme/index.tsx`, `src/i18n`, `src/runtime.ts`, `src/auth/secure-backend.ts`, `app.json`, `babel.config.js`, `tsconfig.json`. No `package.json` on purpose (an SDK-matched dependency set must come from `create-expo-app`/`expo install`; `mobile/README.md` has the steps). **First job when the toolchain is allowed: install, compile, run the core tests under jest-expo, fix what turns up, add the CI job.**
+- **Deviation from the plan.** NativeWind was left out of M1 (a plain token hook and `StyleSheet`): its build configuration is the part most likely to be wrong unrun, and the tokens are identical either way.
+- **Gotchas.** `mobile/` core tests must not use jest- or vitest-only mocking (they use hand-rolled fakes and globals) so they run under both. `Response` refuses a body on a 204: a fake network must build `new Response(null, ...)`. `/auth/logout` and `/auth/logout-all` are terminal-401 paths, so a test of the refresh must use another route (`GET /me/profile`). `use-intl` Hindi plurals on Hermes are unchecked.
+- **Open before any launch:** real SMS (DLT, BL-12.9), a store-reviewer login (BL-15.8), deployment, the Apple and Google accounts and the real bundle id (`in.iism.app` is a placeholder), push (BL-15.6).
+
+### The mobile app, Sprints 62 to 66 (planned 2026-10-14; mirrors backlog v1.22 Epic B15)
+
+| Sprint | Theme | Backlog | Migration |
+|---|---|---|---|
+| 62 | **M1 Foundations** — done, partly verified | BL-15.1, BL-15.7 | none |
+| 63 | **M2 Browse**: home, search, jobs, courses, skills (public reads), language switch, public-data cache only | BL-15.2 | none |
+| 64 | **M3 Profile, matches, applying** (the largest) | BL-15.3 | none |
+| 65 | **M4 Alerts and account**: push (backend + app), notifications, deep links, export, delete, grievance, report a listing; the reviewer login | BL-15.4, BL-15.6, BL-15.8 | 0055 `device_tokens` |
+| 66 | **M5 Store readiness and release** | BL-15.5 | none |
+
+**Scope (owner, 2026-10-14): candidate-only for v1.** Employers, providers and operators stay on the web; a phone signed in as one is told to use the website. About 16 screens.
+
+**Parity list (what the phone has that the web has).** Built on both: OTP sign-in and sign-up. Web only today: everything else. Update this table in the sprint that adds a screen; a feature reaches the phone only after it is on the API.
+
+**Store requirements to meet** (as understood on 2026-10-14; re-check at submission): in-app account deletion (exists: `DELETE /me/account`), a privacy-policy URL (the web's `/privacy`), a report mechanism for user content (exists), App Privacy labels and the Play Data Safety form, a demo/reviewer login, a working login for review, Apple minimum-functionality (the reason for the native build), a 14-day closed test for a new personal Play account (an organisation account avoids it).
+
+**Owner decisions still open.** The app name and bundle id; who holds the Apple and Google accounts and whether they are individual or organisation; un-deferring deployment and SMS (DLT); the additive-only API policy (ADR-072, adopted in M1's code, awaiting the owner's explicit nod); the reviewer-login mechanism (an allowlisted number with a fixed code needs its own ADR because `otp_expose_in_response` must never be on in production).
 
 ### Roadmap: Sprints 56 to 61 (MVP: ready for the first real users), planned 2026-10-13
 

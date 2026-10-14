@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "IISM",
+    "slug": "iism",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "iism",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "in.iism.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "in.iism.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization"
+    ]
+  }
+}

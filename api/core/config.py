@@ -130,6 +130,11 @@ class Settings(BaseSettings):
     bulk_rows_per_day_verified: int = Field(default=500, ge=1)
     # An agency's cohort is larger than an organisation's vacancy list (Sprint 61, BL-14.10).
     enrolment_max_rows: int = Field(default=1000, ge=1)
+    # The oldest installed mobile app each store build may be, per platform (Sprint 62, ADR-072).
+    # An app below it is answered 426 and shown an update screen; "0.0.0" retires nothing. Raised
+    # only when a breaking API change ships, because an installed app cannot be updated on demand.
+    mobile_min_version_android: str = "0.0.0"
+    mobile_min_version_ios: str = "0.0.0"
 
     # Applying is cheap for a candidate and expensive for an employer reading
     # the inbox. The per-minute write limit stops a script; this stops a day of

@@ -14,6 +14,7 @@ from api.core.database import dispose_engine
 from api.core.health import DeepHealth, check_database, check_redis, check_worker
 from api.core.logging import configure_logging
 from api.core.middleware import (
+    AppVersionMiddleware,
     BodySizeLimitMiddleware,
     RateLimitMiddleware,
     RequestContextMiddleware,
@@ -130,6 +131,8 @@ app = FastAPI(
 #   RateLimit
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(BodySizeLimitMiddleware)
+# Outside the body and rate limits (an app that must update need not be read), inside CORS.
+app.add_middleware(AppVersionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[_settings.web_base_url],
@@ -140,7 +143,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     # So the browser client can read the id and a bug report can quote it.
-    expose_headers=["x-request-id"],
+    expose_headers=["x-request-id", "x-min-app-version"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
