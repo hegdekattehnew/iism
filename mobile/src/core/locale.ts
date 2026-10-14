@@ -10,6 +10,10 @@ export const OFFERED_LOCALES = ["en", "hi"] as const;
 export type Locale = (typeof OFFERED_LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
 
+/** Whether a stored or received value is one of the languages the app offers. */
+export const isLocale = (value: unknown): value is Locale =>
+  typeof value === "string" && (OFFERED_LOCALES as readonly string[]).includes(value);
+
 /** `"hi-IN"` -> `"hi"`, `"fr-FR"` -> `"en"`: the first of the device's languages we offer. */
 export function resolveLocale(deviceLanguages: readonly string[]): Locale {
   for (const language of deviceLanguages) {

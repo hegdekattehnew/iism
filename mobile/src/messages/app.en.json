@@ -3,7 +3,10 @@
     "title": "Find work that fits your skills",
     "subtitle": "Sign in to see jobs and courses matched to what you can do.",
     "signedIn": "You are signed in.",
-    "organisationNote": "This app is for job seekers. To post vacancies or courses, sign in on the website."
+    "organisationNote": "This app is for job seekers. To post vacancies or courses, sign in on the website.",
+    "browseJobs": "Browse jobs",
+    "browseCourses": "Browse courses",
+    "browseStandards": "Browse standards"
   },
   "signIn": {
     "phoneLabel": "Mobile number",
@@ -21,5 +24,53 @@
     "language": "Language",
     "english": "English",
     "hindi": "हिन्दी"
+  },
+  "tabs": {
+    "home": "Home",
+    "jobs": "Jobs",
+    "courses": "Courses",
+    "standards": "Standards"
+  },
+  "list": {
+    "loading": "Loading",
+    "retry": "Try again",
+    "loadMoreFailed": "Could not load more. Your list is still here.",
+    "end": "That is everything.",
+    "filters": "Filter"
+  },
+  "detail": {
+    "signInToMatch": "Sign in to see how well you match this.",
+    "signInAction": "Sign in",
+    "otherwise": "Not what you were looking for?"
+  },
+  "months": {
+    "short": {
+      "m1": "Jan",
+      "m2": "Feb",
+      "m3": "Mar",
+      "m4": "Apr",
+      "m5": "May",
+      "m6": "Jun",
+      "m7": "Jul",
+      "m8": "Aug",
+      "m9": "Sep",
+      "m10": "Oct",
+      "m11": "Nov",
+      "m12": "Dec"
+    },
+    "long": {
+      "m1": "January",
+      "m2": "February",
+      "m3": "March",
+      "m4": "April",
+      "m5": "May",
+      "m6": "June",
+      "m7": "July",
+      "m8": "August",
+      "m9": "September",
+      "m10": "October",
+      "m11": "November",
+      "m12": "December"
+    }
   }
 }

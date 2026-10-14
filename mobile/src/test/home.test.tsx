@@ -1,12 +1,13 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 
-// `../../app` alone would resolve to app.json.
-import Home from "../../app/index";
-import { renderScreen } from "./harness";
+// Not `../../app`: that resolves to app.json.
+import Home from "../../app/(tabs)/index";
+import { renderScreen, settle } from "./harness";
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), navigate: mockNavigate }),
 }));
 
 let mockSignedIn = false;
@@ -63,6 +64,7 @@ describe("the home screen", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Sign out" }));
     expect(mockApi.POST).toHaveBeenCalledWith("/auth/logout", { body: { refresh_token: "r" } });
     expect(mockClear).toHaveBeenCalled();
+    await settle();
   });
 
   it("tells an organisation account that this app is for job seekers", async () => {
@@ -78,6 +80,25 @@ describe("the home screen", () => {
     await renderScreen(<Home />);
     await screen.findByText("You are signed in.");
     expect(screen.queryByText(/This app is for job seekers/)).toBeNull();
+  });
+
+  it("searches for what was typed, and not for nothing", async () => {
+    await renderScreen(<Home />);
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+    await fireEvent.changeText(
+      screen.getByLabelText("e.g. General Duty Assistant, welding, retail sales"),
+      "  welder ",
+    );
+    await fireEvent.press(screen.getByRole("button", { name: "Search" }));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: "/search", params: { q: "welder" } });
+  });
+
+  it("goes to each list", async () => {
+    await renderScreen(<Home />);
+    await fireEvent.press(screen.getByRole("button", { name: "Browse jobs" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Browse courses" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Browse standards" }));
+    expect(mockNavigate.mock.calls.map((c) => c[0])).toEqual(["/jobs", "/courses", "/skills"]);
   });
 
   it("changes the language when asked", async () => {

@@ -1,21 +1,38 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { getLocales } from "expo-localization";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
-import { resolveLocale } from "../src/core/locale";
+import { APP_VERSION } from "../src/config";
+import { CACHE_STORAGE_KEY, MAX_AGE_MS, dehydrateOptions } from "../src/core/persist";
+import { installPluralRules } from "../src/core/plural-polyfill";
+import { createSignOutWatch } from "../src/core/sign-out-watch";
 import { Intl } from "../src/i18n";
-import { api, setLocale, tokens, useLocale, useUpgradeRequired } from "../src/runtime";
+import {
+  api,
+  forgetPersistedCache,
+  restoreLocale,
+  tokens,
+  useLocale,
+  useUpgradeRequired,
+} from "../src/runtime";
 import { UpdateRequired } from "../src/screens/UpdateRequired";
+import { storage } from "../src/storage";
 import { useColours } from "../src/theme";
 
 /**
  * The root: providers, then start-up, then the gate.
  *
- * **Start-up reads the session before anything renders.** The API client asks for the token on
- * every request, and it is read from the Keychain once, here, into memory (`tokens.load`). A screen
- * that rendered first would make its first request signed out.
+ * **Start-up reads the session and the language before anything renders.** The API client asks for
+ * the token on every request, and it is read from the Keychain once, here, into memory
+ * (`tokens.load`); the language is what the person chose last time (`restoreLocale`). A screen that
+ * rendered first would make its first request signed out and in the wrong language.
+ *
+ * **What is remembered is public data only** (`core/persist.ts`: an allow-list of query keys, a day
+ * at most). When the session ends, the in-memory cache and the stored one are both cleared.
  *
  * **The update gate is above the router.** When the API answers 426 to any request, the whole app
  * is replaced by the update screen: nothing underneath it can do anything useful with a server that
@@ -24,9 +41,15 @@ import { useColours } from "../src/theme";
 const queryClient = new QueryClient({
   defaultOptions: {
     // A phone on mobile data: do not hammer a failing request, and do not refetch on every focus.
-    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 },
+    // `gcTime` matches the persisted age: an entry restored from disk must not be collected at once.
+    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000, gcTime: MAX_AGE_MS },
   },
 });
+
+const persister = createAsyncStoragePersister({ storage, key: CACHE_STORAGE_KEY });
+
+// Before the first message is formatted: Hindi's plural rule is not one every engine has.
+installPluralRules();
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -35,13 +58,19 @@ export default function RootLayout() {
   const colours = useColours();
 
   useEffect(() => {
-    setLocale(resolveLocale(getLocales().map((l) => l.languageTag)));
-    void tokens.load().finally(() => setReady(true));
-    // When the session ends (a refresh was refused, or the person signed out), nothing cached
-    // about them may be shown to whoever signs in next: the web's `qc.clear()` on sign-out.
-    return tokens.subscribe((signedIn) => {
-      if (!signedIn) queryClient.clear();
-    });
+    void Promise.all([restoreLocale(getLocales().map((l) => l.languageTag)), tokens.load()]).finally(
+      () => setReady(true),
+    );
+    // When a session that was there ends (a refresh was refused, or the person signed out), nothing
+    // cached may be shown to whoever uses the phone next: the web's `qc.clear()` on sign-out. Only
+    // the *transition* counts: the first load of a signed-out phone is not a sign-out, and wiping
+    // then emptied the offline cache on every launch.
+    return tokens.subscribe(
+      createSignOutWatch(() => {
+        queryClient.clear();
+        void forgetPersistedCache();
+      }),
+    );
   }, []);
 
   if (!ready) {
@@ -54,13 +83,26 @@ export default function RootLayout() {
 
   return (
     <Intl locale={locale}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister, maxAge: MAX_AGE_MS, buster: APP_VERSION, dehydrateOptions }}
+      >
         {upgrade ? (
           <UpdateRequired minVersion={upgrade.minVersion} />
         ) : (
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: colours.surface },
+              headerTintColor: colours.brand,
+              headerTitleStyle: { color: colours.foreground },
+              contentStyle: { backgroundColor: colours.background },
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          </Stack>
         )}
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </Intl>
   );
 }

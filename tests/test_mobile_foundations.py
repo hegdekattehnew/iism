@@ -62,7 +62,9 @@ def test_the_phone_only_strings_exist_in_both_languages_with_the_same_keys() -> 
 
 def test_every_message_the_screens_use_exists() -> None:
     """A missing key renders as the key itself; the web's `renderUi` throws on it, and this is the
-    same guard for a layer that has no render test yet."""
+    same guard for the keys a screen names literally. Scoped per function, because `t` is a
+    different namespace in each (a component may translate `errors` in one and `mobile.list` in
+    another)."""
     catalogue = json.loads((WEB_MESSAGES / "en.json").read_text(encoding="utf-8"))
     catalogue["mobile"] = json.loads(
         (MOBILE / "src/messages/app.en.json").read_text(encoding="utf-8")
@@ -70,18 +72,17 @@ def test_every_message_the_screens_use_exists() -> None:
     used = 0
     for path in _hand_written():
         source = path.read_text(encoding="utf-8")
-        for namespace_var, namespace in re.findall(
-            r'(\w+) = useTranslations\("([\w.]+)"\)', source
-        ):
-            for key in re.findall(rf"\b{namespace_var}\(\s*\"([\w.]+)\"", source):
-                node: object = catalogue
-                for part in [*namespace.split("."), *key.split(".")]:
-                    assert isinstance(node, dict) and part in node, (
-                        f"{path.name}: {namespace}.{key} is not in the catalogue"
-                    )
-                    node = node[part]
-                used += 1
-    assert used >= 15, "the check found almost nothing to check"
+        for block in re.split(r"(?m)^(?=(?:export )?(?:default )?(?:async )?function\b)", source):
+            for var, namespace in re.findall(r'(\w+) = useTranslations\("([\w.]+)"\)', block):
+                for key in re.findall(rf"\b{var}\(\s*\"([\w.]+)\"", block):
+                    node: object = catalogue
+                    for part in [*namespace.split("."), *key.split(".")]:
+                        assert isinstance(node, dict) and part in node, (
+                            f"{path.name}: {namespace}.{key} is not in the catalogue"
+                        )
+                        node = node[part]
+                    used += 1
+    assert used >= 40, "the check found almost nothing to check"
 
 
 def test_the_colour_tokens_are_generated_from_the_webs() -> None:
@@ -150,13 +151,20 @@ def test_the_app_is_a_candidate_app_with_placeholder_ids_marked() -> None:
     assert "placeholder" in readme.lower()
 
 
-def test_the_native_module_is_touched_in_one_file() -> None:
-    users = [
-        p.name
-        for p in _hand_written()
-        if 'from "expo-secure-store"' in p.read_text(encoding="utf-8")
-    ]
-    assert users == ["secure-backend.ts"]
+def test_each_native_module_is_touched_in_one_file() -> None:
+    """The Keychain in one file and the plain store in another: a secret can never end up in the
+    store that holds the language and the public cache because nothing else imports either."""
+    owners = {
+        "expo-secure-store": ["secure-backend.ts"],
+        "@react-native-async-storage/async-storage": ["storage.ts"],
+    }
+    for module, expected in owners.items():
+        users = sorted(
+            p.name
+            for p in _hand_written()
+            if f'from "{module}"' in p.read_text(encoding="utf-8") and ".test." not in p.name
+        )
+        assert users == expected, f"{module} is imported by {users}"
 
 
 def test_every_package_the_app_imports_is_declared_and_locked() -> None:
@@ -171,9 +179,42 @@ def test_every_package_the_app_imports_is_declared_and_locked() -> None:
     seen: set[str] = set()
     for path in _hand_written():
         for spec in re.findall(
-            r'(?:from|jest\.mock\(|require\()\s*"([^."][^"]*)"', path.read_text(encoding="utf-8")
+            r'(?m)^(?:import\b.*?\bfrom\s+|\}\s*from\s+|import\s+)"([^."][^"]*)"',
+            path.read_text(encoding="utf-8"),
         ):
             package = "/".join(spec.split("/")[: 2 if spec.startswith("@") else 1])
             seen.add(package)
             assert package in declared, f"{path.name} imports {package}, which is not declared"
     assert {"react", "react-native", "use-intl", "expo-router", "openapi-fetch"} <= seen
+
+
+def test_the_apps_modules_do_not_import_each_other_in_a_circle() -> None:
+    """A require cycle works until an import is used at module level, then it is an `undefined`
+    nobody can explain (Metro warns, and the first browser run did: `ui/index` and `ui/list`)."""
+    sources = {
+        p.relative_to(MOBILE).with_suffix(""): p.read_text(encoding="utf-8")
+        for p in _hand_written()
+        if ".test." not in p.name
+    }
+    edges: dict[Path, set[Path]] = {}
+    for module, source in sources.items():
+        edges[module] = set()
+        for spec in re.findall(r'(?m)(?:from\s+|import\s+)"(\.[^"]*)"', source):
+            target = (MOBILE / module.parent / spec).resolve().relative_to(MOBILE.resolve())
+            for candidate in (target, target / "index"):
+                if candidate in sources:
+                    edges[module].add(candidate)
+    assert len(edges) >= 20 and sum(len(v) for v in edges.values()) >= 30
+
+    def cycle_from(start: Path, path: tuple[Path, ...] = ()) -> tuple[Path, ...] | None:
+        if start in path:
+            return (*path[path.index(start) :], start)
+        for nxt in edges.get(start, ()):
+            found = cycle_from(nxt, (*path, start))
+            if found:
+                return found
+        return None
+
+    for module in edges:
+        found = cycle_from(module)
+        assert found is None, "import cycle: " + " -> ".join(str(p) for p in found or ())

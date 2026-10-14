@@ -3607,3 +3607,43 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **The application id `in.iism.app`, the name and the store URLs are placeholders** until the store accounts exist.
 - **Measured by tests that fail without the rule:** a version compared as text, `/health` gated, a missing header locking somebody out, the platform ignored, no minimum in the 426, and each of ten contract rules (15 breakages, each fails a test).
 - **Not done in M1:** push notifications, deep links, any screen beyond sign-in and a front door, and the on-device checks above. The CI job for the app exists (`mobile`: audit at `critical`, `tsc`, `eslint`, `jest`, an Android Metro bundle).
+
+
+## ADR-073: The Phone Persists Public Data Only, by an Allow-List of Query Keys, and Formats Numbers and Dates Without `Intl`
+
+**Status:** Accepted (October 2026). Sprint 63 (BL-15.2, M2 of the mobile programme). Extends ADR-072. No migration, no API change beyond ten read operations added to the released surface.
+
+**Context:** M2 gives a visitor who has not signed in the three catalogues (vacancies, courses, standards), a search and a remembered language. The target is a low-end Android on mobile data, so a list that blanks when the connection drops is a defect, and a cache of what was last seen is wanted. Two things made the obvious route wrong. First, the web's service worker keeps personal data out of its cache with a **deny list**, and a deny list fails open: a new personal endpoint is cached until someone remembers to add it. Second, the shared catalogues format with `Intl` (`use-intl`, `Intl.NumberFormat("en-IN")`, `format.dateTime`), and Hermes, the phone's JavaScript engine, does not give the same answer as Node for Hindi plurals or `en-IN` grouping on every device. Neither a simulator nor a phone exists on the machine this was written on, so the answer had to be one that does not depend on the engine.
+
+**Decision:**
+
+- **What is persisted is an allow-list, not a deny-list.** Every visitor query is keyed `["public", <locale>, kind, filter]` (`mobile/src/lib/queries.ts`). `persist.ts`'s `isPublicKey` accepts only a first key element of `"public"`; the persister keeps a query only if it is public **and has data** (`query.state.data !== undefined`). `shouldDehydrateMutation` is `() => false`. A personal query (`["me"]`, `["profile"]`, `["matches"]`, anything later) is therefore not persisted **by default**, and a test names each. The cache lasts 24 hours and is cleared when a person signs out.
+- **A failed refetch must not discard what is on the screen.** The first version kept only `status === "success"`, so a request that failed while offline replaced the stored list with nothing; the browser run found it. The condition is `data !== undefined`, which is also what lets the app read offline.
+- **The wipe is the transition, not the state.** The root layout wipes the stored cache when the signed-in state goes from true to false (`createSignOutWatch`), never on `false` alone: the token store reports `false` while it loads on every cold start of a signed-out visitor, which wiped the cache at every launch.
+- **The language is a stored choice** (`iism.locale`), restored before the first screen, with the device language as the first-run default and **not written back** (so a changed phone language is followed until the person chooses one).
+- **Numbers and dates are formatted by two small pure functions, not `Intl`.** `formatInr` groups in the Indian way (2,38,370), and `formatDate` reads `YYYY-MM-DD` with month names from the catalogue (`mobile.months.*`); India has no daylight saving, so a calendar date needs no time zone and cannot slip a day. Both are tested at the lakh and crore boundaries and across a leap year.
+- **`Intl.PluralRules` is polyfilled only where it is missing**, with `@formatjs/intl-pluralrules` and `en` and `hi` data, installed synchronously at start-up (`installPluralRules`, before `use-intl` formats anything). It is the one thing the shared ICU messages need from the engine.
+- **A screen is a function of the one scorer's fields, a list never says "no results" before its first answer, and an outage is not a 404** (the web's rules, Sprints 20 and 54): `ResultList` shows a skeleton until the first answer, a failure notice that keeps the server's own sentence and a retry when the first page fails, and keeps the rows already on screen when a later page fails.
+- **The labels are ported, not shared.** `experienceLabel`, `salaryLabel`, `feeLabel`, `whereLabel`, `intakeLabel` and `seatsLabel` are pure functions over a translator in `mobile/src/core/labels.ts`, copying the web components' rules (zero and unstated fees both read "free"; an online course has no place to name). Two copies can drift; the catalogues are shared, and the rules are tested on the phone side.
+
+**Options considered:**
+
+1. Persist everything and filter personal queries out by a deny-list (the web's service worker)
+2. **Persist only what is keyed public** (chosen)
+3. Persist nothing
+4. `Intl` for numbers and dates, with Hermes' behaviour checked on a device later
+5. **Two pure functions** (chosen), and a polyfill for plural rules only
+
+**Trade-offs:**
+
+- Option 1: ✅ one rule for the whole app ❌ fails open; the first personal query added after it is cached.
+- Option 3: ✅ nothing to leak ❌ a dropped connection blanks a list the person was reading.
+- Option 4: ✅ no code to maintain ❌ cannot be proved from here, and a wrong plural or a wrong digit grouping reads as a fault.
+
+**Consequences:**
+
+- **Verified by running the real screens in a browser**, through `react-native-web` at 375x812 against a second API instance: Home, Jobs (148 vacancies, `₹2,45,000–3,25,000`), Courses in Hindi (the language survives a reload, "179 पाठ्यक्रम"), the three details, search (vacancies, then roles, then standards), the error and retry state, and **reading the cached courses with the API stopped**. This is not Hermes and not a native run; it is a real rendering of the same components. Both platforms compile to Hermes bytecode (`expo export`), which proves the syntax and imports and nothing about runtime behaviour.
+- **Mutation-checked**: 28 behaviours in the portable core and the screens, each broken and each failing a test (a persisted personal key, mutations kept, a no-data query kept, a wipe at every launch, an off-by-one page, a page size, a fee of zero, the order of standards, a 404 for an outage, a query key without the language, a skeleton or failure shown out of order, the language not stored). **One real defect was found by it**: `feeLabel` did not treat a fee of zero as free, which the test already asserted; the file on disk disagreed with it, and it was fixed. Three Python guards also fail when broken (a require cycle, a second file touching async-storage, an undeclared package).
+- **Still not verified**: a run on Android or iOS, Hermes' actual `Intl` behaviour, TalkBack and VoiceOver, scrolling on a low-end device, and a physical phone against a real network. The README says how to run the app on one in five minutes.
+- **The released surface grows by ten operations** (`/jobs`, `/jobs/{slug}`, `/courses`, `/courses/{slug}`, `/skills`, `/skills/{slug}`, `/skills/search`, `/skills/{slug}/jobs`, `/skills/{slug}/courses`, `/roles/search`), which are now additive-only for as long as a build that calls them is installed.
+- **Not in M2:** applying, matches, the profile, notices, reporting a listing (M3 and M4), push notifications and deep links.

@@ -1,0 +1,83 @@
+import { CACHE_STORAGE_KEY } from "../core/persist";
+import { forgetPersistedCache, getLocale, restoreLocale, setLocale } from "../runtime";
+import { storage } from "../storage";
+
+// A store in memory, and the two native modules the runtime would otherwise load.
+jest.mock("../storage", () => {
+  const data = new Map<string, string>();
+  return {
+    LOCALE_KEY: "iism.locale",
+    storage: {
+      data,
+      failing: false,
+      getItem: async (key: string) => {
+        if ((jest.requireMock("../storage") as { storage: { failing: boolean } }).storage.failing) {
+          throw new Error("unreadable");
+        }
+        return data.get(key) ?? null;
+      },
+      setItem: async (key: string, value: string) => void data.set(key, value),
+      removeItem: async (key: string) => void data.delete(key),
+    },
+  };
+});
+jest.mock("../auth/secure-backend", () => ({
+  secureBackend: { read: async () => null, write: async () => undefined, remove: async () => undefined },
+}));
+jest.mock("../config", () => ({ API_BASE_URL: "http://api.test", APP_VERSION: "1.0.0", PLATFORM: "android" }));
+
+type Fake = { data: Map<string, string>; failing: boolean };
+const fake = () => storage as unknown as Fake;
+
+beforeEach(() => {
+  fake().data.clear();
+  fake().failing = false;
+});
+
+describe("the language the person chose", () => {
+  it("follows the phone's own language the first time, and does not write it down", async () => {
+    await restoreLocale(["hi-IN", "en-IN"]);
+    expect(getLocale()).toBe("hi");
+    expect(fake().data.has("iism.locale")).toBe(false);
+  });
+
+  it("falls back to English for a phone in a language the app does not offer", async () => {
+    await restoreLocale(["fr-FR"]);
+    expect(getLocale()).toBe("en");
+  });
+
+  it("remembers a choice across a restart, over the phone's language", async () => {
+    setLocale("hi");
+    await Promise.resolve();
+    expect(fake().data.get("iism.locale")).toBe("hi");
+
+    // A restart: the module state is gone, the store is not.
+    await restoreLocale(["en-IN"]);
+    expect(getLocale()).toBe("hi");
+  });
+
+  it("ignores a stored value the app does not offer", async () => {
+    fake().data.set("iism.locale", "ms");
+    await restoreLocale(["hi-IN"]);
+    expect(getLocale()).toBe("hi");
+    fake().data.set("iism.locale", "klingon");
+    await restoreLocale(["en-GB"]);
+    expect(getLocale()).toBe("en");
+  });
+
+  it("treats a store that cannot be read as nothing saved, not a crash at launch", async () => {
+    fake().failing = true;
+    await expect(restoreLocale(["hi-IN"])).resolves.toBeUndefined();
+    expect(getLocale()).toBe("hi");
+  });
+});
+
+describe("signing out", () => {
+  it("removes the stored public cache and leaves the language alone", async () => {
+    fake().data.set(CACHE_STORAGE_KEY, '{"clientState":{}}');
+    fake().data.set("iism.locale", "hi");
+    await forgetPersistedCache();
+    expect(fake().data.has(CACHE_STORAGE_KEY)).toBe(false);
+    expect(fake().data.get("iism.locale")).toBe("hi");
+  });
+});
