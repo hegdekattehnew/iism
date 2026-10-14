@@ -95,6 +95,15 @@ class Application(Base):
         # `GROUP BY job_id, status` (`matching.employer._application_counts`); this lets it read
         # the index alone.
         Index("ix_applications_job_status", "job_id", "status"),
+        # Bounded by the database too, not only the schema: free text from an employer.
+        CheckConstraint(
+            "status_message IS NULL OR length(status_message) <= 500",
+            name="ck_application_status_message",
+        ),
+        CheckConstraint(
+            "employer_notes IS NULL OR length(employer_notes) <= 2000",
+            name="ck_application_employer_notes",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -115,6 +124,24 @@ class Application(Base):
         DateTime(timezone=True), default=None
     )
     contact_revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+    # What the employer said when they moved it (an interview time and place, say) -- the
+    # **latest one**, not a thread (Sprint 60, BL-14.7, ADR-070). Replaced when a new one is
+    # given, cleared when the status changes without one. It is read from here by the candidate
+    # and **never copied into the notification outbox**, which holds no free text that may carry
+    # a phone number. Deleted with the application, like the candidate's own `message`.
+    status_message: Mapped[str | None] = mapped_column(Text, default=None)
+    status_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # The employer's private working note about this applicant (BL-14.8). Never in a
+    # candidate-facing schema; included in the person's data export, because it is personal data
+    # about them processed here. Kept when they withdraw -- withdrawal takes back what they
+    # shared, not what the employer wrote -- and deleted with the application.
+    employer_notes: Mapped[str | None] = mapped_column(Text, default=None)
+    employer_notes_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
 

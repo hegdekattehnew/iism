@@ -81,6 +81,11 @@ TEMPLATES = (
     # named anywhere in the payload.
     "listing_removed",
     "listing_restored",
+    # Sprint 60, BL-14.7. An employer moved an application and **left a message** (an interview
+    # time and place, say). In-app and email, like a plain status change, but the payload says only
+    # *that* there is one: the words are read from the application, never copied into the outbox,
+    # which holds no free text that may carry a phone number.
+    "application_status_message",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

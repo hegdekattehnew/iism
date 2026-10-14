@@ -73,6 +73,20 @@ test.beforeAll(async () => {
   await applyTo(request, seeker, jobSlug);
   await saveJob(request, seeker, jobSlug);
   await registerInterest(request, seeker, courseSlug);
+  // The employer answers it, with a message, so the seeker has an update and an application that
+  // carries what the employer said (Sprint 60): the notification page is swept with rows in it.
+  const applicants = await (
+    await request.get(`${E2E.API}/org/${employer.slug}/jobs/${jobSlug}/applications`, {
+      headers: { authorization: `Bearer ${employer.tokens.access_token}` },
+    })
+  ).json();
+  await request.patch(
+    `${E2E.API}/org/${employer.slug}/jobs/${jobSlug}/applications/${applicants.items[0].application_id}`,
+    {
+      headers: { authorization: `Bearer ${employer.tokens.access_token}` },
+      data: { status: "shortlisted", message: "Interview on Tuesday at 11 am." },
+    },
+  );
 
   world = { jobSlug, courseSlug, employer, provider, seeker, operator };
   await request.dispose();
@@ -114,7 +128,16 @@ const PUBLIC = [
 ];
 
 /** The pages a seeker reaches, one list for the desktop pass and the phone pass. */
-const SEEKER_ROUTES = ["/profile", "/matches", "/applications", "/saved", "/interests", "/account", "/career-paths"];
+const SEEKER_ROUTES = [
+  "/profile",
+  "/matches",
+  "/applications",
+  "/notifications",
+  "/saved",
+  "/interests",
+  "/account",
+  "/career-paths",
+];
 
 /** A public page, checked. Shared by the desktop and phone groups so a route or an allowance added to
  * one is in the other. */

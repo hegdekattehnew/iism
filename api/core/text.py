@@ -11,6 +11,26 @@ import re
 import unicodedata
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
+_PLAIN_NUMBER = re.compile(r"[+-]?\d+(\.\d+)?")
+
+
+def csv_safe(value: object) -> str:
+    """A cell that a spreadsheet will show as text and never run (Sprint 60, ADR-070).
+
+    A cell that starts with `=`, `+`, `-` or `@` is a **formula** to Excel and Sheets, and one that
+    starts with a tab or a carriage return can be turned into one. Everything an export writes is
+    somebody else's words (an applicant's note, an uploaded file's cell), so each is prefixed with
+    a single quote when it could be read that way. A plain number is left alone, with its sign:
+    `-5` and `+919876543210` are constants, not formulae, and prefixing them would break the
+    phone number column of the export.
+    """
+    text = "" if value is None else str(value)
+    if not text:
+        return text
+    first = text[0]
+    if first in "=@\t\r" or (first in "+-" and not _PLAIN_NUMBER.fullmatch(text)):
+        return "'" + text
+    return text
 
 
 def slugify(text: str) -> str:

@@ -62,6 +62,9 @@ def _out(  # type: ignore[no-untyped-def]
         job=job,
         status=application.status,
         message=application.message,
+        # The employer's message to *this* candidate; never `employer_notes` (Sprint 60).
+        status_message=application.status_message,
+        status_message_at=application.status_message_at,
         applied_at=application.created_at,
         updated_at=application.updated_at,
         reviewed=reviewed,

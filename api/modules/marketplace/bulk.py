@@ -62,6 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
+from api.core.text import csv_safe
 from api.modules.geography import resolve_location
 from api.modules.marketplace import course_publishing, publishing
 from api.modules.marketplace.models import (
@@ -377,7 +378,11 @@ def errors_csv(header: Sequence[str], rows: Sequence[RawRow], failed: dict[int, 
     writer.writerow([*columns, "error"])
     for row in rows:
         if row.number in failed:
-            writer.writerow([*(row.cells.get(c, "") for c in columns), failed[row.number]])
+            # `csv_safe`: these cells came from an uploaded file, and a `=cmd()` in one must not
+            # come back out of a download as a formula.
+            writer.writerow(
+                [*(csv_safe(row.cells.get(c, "")) for c in columns), csv_safe(failed[row.number])]
+            )
     return out.getvalue()
 
 

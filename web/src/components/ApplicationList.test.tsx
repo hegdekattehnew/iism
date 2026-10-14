@@ -241,3 +241,22 @@ describe("a vacancy an operator removed (Sprint 59)", () => {
   });
 });
 
+describe("the employer's message (Sprint 60)", () => {
+  it("shows it on the application, with who said it, and shows nothing when there is none", async () => {
+    GET.mockResolvedValue({
+      data: [
+        {
+          ...application("shortlisted", "msg"),
+          status_message: "Interview on Tuesday at 11 am.",
+          status_message_at: "2026-10-10T08:00:00Z",
+        },
+        application("applied", "quiet"),
+      ],
+      error: undefined,
+    });
+    renderUi(<ApplicationList />);
+    expect(await screen.findByText("Interview on Tuesday at 11 am.")).toBeTruthy();
+    expect(screen.getAllByText(/A message from Acme/)).toHaveLength(1);
+  });
+});
+

@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { useActiveOrg } from "@/components/ContextSwitcher";
 import { ButtonLink, buttonVariants } from "@/components/ui";
+import { useUnreadCount } from "@/lib/unread-count";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, getRefreshToken, useIsSignedIn } from "@/lib/auth";
@@ -40,6 +41,31 @@ import { useDismiss } from "@/lib/use-dismiss";
  * already-expanded menu is a second thing to open for no gain, and on a phone
  * the row is not competing for space with anything.
  */
+/** "Updates", with how many are unread (Sprint 60). A count of nothing is not shown. */
+function UpdatesLink({ unread, className }: { unread: number; className: string }) {
+  const t = useTranslations("auth");
+  return (
+    // No `aria-label`: it replaced the visible words, and axe's label-in-name rule (WCAG 2.5.3)
+    // rightly says a name must contain what is on screen. The number is drawn, hidden from
+    // assistive technology, and said once in words beside it.
+    <Link href="/notifications" className={className}>
+      {t("updates")}
+      {unread > 0 && (
+        <>
+          {" "}
+          <span
+            aria-hidden="true"
+            className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-brand-contrast"
+          >
+            {unread > 99 ? "99+" : unread}
+          </span>
+          <span className="sr-only">{t("updatesUnread", { count: unread })}</span>
+        </>
+      )}
+    </Link>
+  );
+}
+
 export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const t = useTranslations("auth");
   const tn = useTranslations("nav");
@@ -47,6 +73,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
   const router = useRouter();
   const qc = useQueryClient();
   const signedIn = useIsSignedIn();
+  const unread = useUnreadCount(signedIn);
   const active = useActiveOrg();
   const { organisations, isJobSeeker, isPending } = useMemberships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,6 +146,10 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
               {i.label}
             </ButtonLink>
           ))}
+          <UpdatesLink
+            unread={unread}
+            className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
+          />
           <Link
             href="/account"
             className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
@@ -139,6 +170,10 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
     return (
       <>
         {primary}
+        <UpdatesLink
+          unread={unread}
+          className={cn(buttonVariants({ variant: "ghost", size }), "text-foreground")}
+        />
         <div className="relative" ref={menuRef}>
           <button
             type="button"

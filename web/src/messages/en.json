@@ -331,7 +331,9 @@
     "unregisteredAction": "Create an account",
     "accountSettings": "Privacy and data",
     "sessionExpired": "Your session has expired. Sign in again to continue.",
-    "signInAgain": "Sign in again"
+    "signInAgain": "Sign in again",
+    "updates": "Updates",
+    "updatesUnread": "{count} unread"
   },
   "profilePage": {
     "title": "My profile",
@@ -1251,7 +1253,8 @@
     },
     "vacancyClosed": "This vacancy is closed and is no longer taking applications.",
     "errorWithdrawDecided": "A decision has been made on this application, so it cannot be withdrawn here. Contact the employer.",
-    "removed": "Removed by our team"
+    "removed": "Removed by our team",
+    "fromEmployer": "A message from {organisation}"
   },
   "employerInbox": {
     "title": "Applicants",
@@ -1278,7 +1281,17 @@
     "appliedOn": "Applied on {date}",
     "errorGeneric": "That could not be saved. Try again.",
     "newBadge": "New",
-    "applicantsLink": "Applicants ({count})"
+    "applicantsLink": "Applicants ({count})",
+    "exportCsv": "Download as spreadsheet",
+    "exportFailed": "Could not prepare the spreadsheet. Try again.",
+    "youTold": "You told them",
+    "messageLabel": "Message for this person (optional)",
+    "messageHint": "Sent with the button you press below, for example an interview time and place. They read it on their applications page. Do not put anything you would not want kept.",
+    "notesLabel": "Your private note",
+    "notesHint": "Only your organisation sees this. A person may still ask for a copy of what is held about them, so write what you would stand behind.",
+    "notesSave": "Save note",
+    "notesSaving": "Saving…",
+    "notesFailed": "Could not save the note."
   },
   "notices": {
     "title": "{count, plural, one {# update} other {# updates}}",
@@ -1309,7 +1322,8 @@
       "acknowledged": "being looked at",
       "resolved": "resolved",
       "dismissed": "closed"
-    }
+    },
+    "statusMessage": "{organisation} moved your application for {vacancy} to: {status}, and left you a message. Read it below."
   },
   "searchPage": {
     "title": "Results for “{q}”",
@@ -1875,5 +1889,20 @@
     "takedown": "Take it down",
     "restore": "Restore (as a draft)",
     "decideFailed": "Could not save that decision. Try again."
+  },
+  "notificationsPage": {
+    "title": "Updates",
+    "subtitle": "Everything we have told you, newest first.",
+    "signedOut": "Sign in to see your updates.",
+    "empty": "Nothing yet. When an employer or a provider replies, or we have news about a message you sent, it appears here.",
+    "failed": "Could not load your updates.",
+    "actionFailed": "Could not do that. Try again.",
+    "summary": "{unread, plural, =0 {Everything read} one {# unread} other {# unread}}",
+    "markAll": "Mark all as read",
+    "markOne": "Mark as read",
+    "new": "New",
+    "open": "Open",
+    "older": "Show older updates",
+    "loading": "Loading…"
   }
 }

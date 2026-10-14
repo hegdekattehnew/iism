@@ -16,7 +16,7 @@ multi-sector and taxonomy-first (ADR-024, superseding ADR-015). Hindi and Englis
 launch (ADR-033); further languages are rows rather than a migration (ADR-041).
 
 Full architecture rationale lives in [docs/adr/architecture-decisions.md](docs/adr/architecture-decisions.md)
-(69 ADRs). Read it before making any structural decision — the summary below
+(70 ADRs). Read it before making any structural decision — the summary below
 is a condensed index, not a replacement.
 
 ## Architecture at a glance
@@ -267,6 +267,13 @@ api/                     FastAPI modular monolith
                          wipe it. (Sprint 45, ADR-052) `withdraw`, `employer_service.set_status`
                          and `apply` lock the application row before the check, and a double
                          submit is a 409, not a 500.
+                         (Sprint 60, ADR-070) `serialisers.py` is the **one** place an `ApplicantOut` is built
+                         (`applicant_out`), and the CSV (`applicants_csv`) is made from those objects, so what
+                         the list withholds on withdrawal the spreadsheet withholds too. `status_message` is the
+                         employer's one latest message to a candidate: **read from the application, never copied
+                         into the outbox** (the notice carries `has_message`); `employer_notes` is private in
+                         the product, absent from every `/me/*` response model (a test walks them) and **present
+                         in the person's data export**.
     interests/           Registering interest in a course, and the provider's
                          view of who did. A **sibling** of applications/, not an
                          extension: a course publishes what it teaches, so an
@@ -287,6 +294,8 @@ api/                     FastAPI modular monolith
                          `NOTIFICATION_RETENTION_DAYS` (90), an unopened notice after twice that, and **never a
                          `pending` row**.
                          (Sprint 52) `enqueue_many` writes many notices as batched INSERTs; erasure uses it, not one object per applicant.
+                         (Sprint 60) `list_for` pages with a **`(created_at, id)` cursor** (one alert sweep queues
+                         hundreds in one transaction, so time alone would skip them), `unread_count`, `mark_read`.
     alerts/              Telling a candidate about a vacancy they did not go
                          looking for, and closing one whose date has passed.
                          Both run in the **worker**, never in a request. Uses
@@ -543,6 +552,14 @@ split would have to turn into interfaces first; do not add to it casually.
   `reopen_job`. A new path that can put a listing live calls `takedown.refuse_while_taken_down` first, and a test per writer fails without it. **A report that points at a row it does not own is not a foreign key**
   (the owner may delete the listing); the retention purge finds the orphans with `NOT EXISTS`, so no new writer of a deleted listing has to know reports exist. **Free text that leaves the building (an emailed takedown
   reason) is named as such on the form that takes it**, and the identity of whoever prompted it is in no payload, event or screen the other party sees.
+- **Free text that reaches a person is stored where they will read it and never copied into the outbox** (ADR-070). The notice says *that* there is a message; the words stay on the application, a row the person controls.
+  Do not try to redact phone numbers out of free text: a regular expression is a promise it cannot keep. **Every cell of an export or a download passes `core.text.csv_safe`** (a leading `= @ tab CR`, or `+`/`-` before
+  anything that is not a plain number, gets a quote), including a file the product only echoes back (`bulk.errors_csv`). **A paged list over rows queued together pages by `(created_at, id)`**, never time alone.
+- **A block that arrives after its query answers goes below what is already on screen** (Sprint 60). The unread-notices panel sat above the application list and pushed it down by its own height (a layout shift of
+  0.110 on a phone); the page does not wait for it and nothing below it moves. Equally, **a link's accessible name must contain its visible text** (WCAG 2.5.3): an `aria-label` that replaces the words fails axe's
+  label-in-name rule, so give a count a drawn, `aria-hidden` number and say it once in words (`sr-only`).
+- **The header's import graph is on every route's first load.** The unread count lives in `lib/unread-count.ts` (a single `useQuery`), not beside the page's infinite query and mutations; mixing them took `/profile`
+  over its 684 KB budget by a kilobyte. Headroom is **1 KB** (683 KB): the next thing the header imports will breach it.
 - **The suite's `db` fixture is one outer transaction, so `db.rollback()` inside a test rolls back the set-up too** (Sprint 59, found writing the "a refused takedown leaves the reports open" test). Assert that nothing
   was *flushed or committed* instead (autoflush is off, so the database still says what it said), and use committed rows (`tests/concurrency.py`) when a rollback is the thing under test.
 - **The browser sees every page, not only the journeys** (`web/e2e/sweep.spec.ts`, Sprint 53). A new route goes into that list in both languages, and a new list or table screen is visited **with rows in
@@ -985,6 +1002,12 @@ split would have to turn into interfaces first; do not add to it casually.
 > an organisation resends through the sign-in request, never by registering again), and a sign-in credential can be added, **changed** by proving the new one, or **removed** while another verified way in remains. Changing one ends
 > every other session and returns a fresh pair; the other credential is told. Reading the code found that linking silently *overwrote* a held credential (a stolen session could swap the number and keep the account), now refused
 > (409, replace instead). 453 web / 121 browser tests; the profile page loads the section lazily to stay under the first-load budget.
+>
+> **Sprint 60 is done** (ADR-070, migration 0053): *hiring that finishes*. An employer can leave a **message with a status change** (an interview time and place: the latest one, read from the application and never
+> copied into the outbox), keep a **private note** on an applicant (in the person's data export, in no candidate-facing response) and **download the applicants as a spreadsheet** built by the same function as the list
+> (a withdrawn applicant is blank, every cell is formula-safe, bulk upload's error download too). A candidate sees the message on the application, an **unread count in the header** and a **`/notifications` page**
+> with every notice, paged past fifty by a `(created_at, id)` cursor, read one at a time or all. 1,588 backend / 549 web / 128 browser tests; the browser run found a label-in-name failure and a layout shift, both fixed
+> at the cause. **First-load headroom on `/profile` is 1 KB.**
 >
 > **Sprint 59 is done** (ADR-069, migration 0052): *a marketplace you can trust*. A signed-in person can **report** a vacancy or course (once, not their own organisation's, a reason from a fixed list); an operator sees the
 > reports **grouped by listing** with the reporter masked and may dismiss them (support tier) or **take the listing down** with a reason the organisation is emailed (admin tier only), and restore it as a draft. A takedown is a

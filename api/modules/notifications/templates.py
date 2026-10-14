@@ -26,6 +26,12 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{organisation} has moved your application for {vacancy} to: {status}.\n\n"
             "See your applications:\n{link}\n",
         ),
+        "application_status_message": (
+            "{organisation} left you a message about {vacancy}",
+            "{organisation} has moved your application for {vacancy} to: {status}, and left you "
+            "a message.\n\n"
+            "Read it on your applications page:\n{link}\n",
+        ),
         "course_interest_registered": (
             "Somebody is interested in {course}",
             "Somebody has registered interest in {course}.\n\n"
@@ -107,6 +113,12 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{vacancy} के लिए आपके आवेदन पर अद्यतन",
             "{organisation} ने {vacancy} के लिए आपके आवेदन को इस स्थिति में बदला: {status}।\n\n"
             "अपने आवेदन देखें:\n{link}\n",
+        ),
+        "application_status_message": (
+            "{organisation} ने {vacancy} के बारे में आपके लिए संदेश छोड़ा है",
+            "{organisation} ने {vacancy} के लिए आपके आवेदन को इस स्थिति में बदला: {status}, और "
+            "आपके लिए एक संदेश छोड़ा है।\n\n"
+            "इसे अपने आवेदन पृष्ठ पर पढ़ें:\n{link}\n",
         ),
         "course_interest_registered": (
             "{course} में किसी की रुचि है",
