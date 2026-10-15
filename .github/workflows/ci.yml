@@ -97,6 +97,10 @@ jobs:
       - run: npx eslint .
       - run: npx jest --ci
       - run: npx expo export --platform android --output-dir "$RUNNER_TEMP/iism-export"
+      # Stdlib-only scripts, so this job needs no Python project (Sprint 66, ADR-077): a size ceiling,
+      # and the release configuration (defects fail; the owner's open decisions are only reported).
+      - run: python3 ../scripts/check_mobile_budget.py --export-dir "$RUNNER_TEMP/iism-export"
+      - run: python3 ../scripts/check_release_config.py --profile preview
 
   # Real-browser journeys (Sprint 52, ADR-062). Nothing above renders a page: the component
   # tests mock three seams and run axe with colour-contrast off (jsdom has no layout), so this is

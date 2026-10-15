@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-STAGING-API.invalid",
+        "EXPO_PUBLIC_WEB_BASE_URL": "https://REPLACE-WITH-STAGING-WEBSITE.invalid"
+      }
+    },
+    "production": {
+      "android": { "buildType": "app-bundle", "autoIncrement": "versionCode" },
+      "ios": { "autoIncrement": "buildNumber" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-PRODUCTION-API.invalid",
+        "EXPO_PUBLIC_WEB_BASE_URL": "https://REPLACE-WITH-PRODUCTION-WEBSITE.invalid",
+        "EXPO_PUBLIC_STORE_URL_ANDROID": "market://details?id=REPLACE_WITH_PACKAGE",
+        "EXPO_PUBLIC_STORE_URL_IOS": "https://apps.apple.com/app/idREPLACE_WITH_APP_STORE_ID"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH",
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID"
+      }
+    }
+  }
+}

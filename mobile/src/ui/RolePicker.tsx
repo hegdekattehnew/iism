@@ -205,7 +205,16 @@ function Check({
           justifyContent: "center",
         }}
       >
-        {checked ? <NativeText style={{ color: c.brandContrast, fontWeight: "700" }}>✓</NativeText> : null}
+        {checked ? (
+          <NativeText
+            // The mark is the checkbox's drawn state; its name and state are on the row.
+            importantForAccessibility="no"
+            accessibilityElementsHidden
+            style={{ color: c.brandContrast, fontWeight: "700" }}
+          >
+            ✓
+          </NativeText>
+        ) : null}
       </View>
       <View style={{ flex: 1 }}>
         <Text>{label}</Text>

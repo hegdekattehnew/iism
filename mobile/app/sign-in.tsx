@@ -7,6 +7,7 @@ import { WEB_BASE_URL } from "../src/config";
 import { ApiError } from "../src/core/errors";
 import { PRIVACY_NOTICE_VERSION, needsConsent, requestCode, verifyCode } from "../src/core/sign-in";
 import { api, tokens, useLocale } from "../src/runtime";
+import { MIN_TOUCH } from "../src/theme";
 import { Button, Notice, Screen, Text, TextField } from "../src/ui";
 import { useCountdown } from "../src/ui/use-countdown";
 
@@ -123,6 +124,7 @@ export default function SignIn() {
               <Text>{m("consentAgree")}</Text>
               <Pressable
                 accessibilityRole="link"
+                style={{ minHeight: MIN_TOUCH, justifyContent: "center" }}
                 onPress={() => void Linking.openURL(`${WEB_BASE_URL}/${locale}/privacy`)}
               >
                 <Text tone="muted">{m("consentLink")}</Text>

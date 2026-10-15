@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { MIN_TOUCH, radius, space, text, useColours } from "../theme";
+import { MAX_FONT_SCALE, MIN_TOUCH, radius, space, text, useColours } from "../theme";
 
 /**
  * The few primitives every screen is built from. They are the phone's `ui/` library: tokens only
@@ -46,6 +46,7 @@ export function Text({
   const colour = tone === "foreground" ? c.foreground : tone === "muted" ? c.muted : c.dangerText;
   return (
     <NativeText
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       accessibilityRole={variant === "title" ? "header" : "text"}
       style={{
         color: colour,
@@ -102,6 +103,7 @@ export function Button({
     >
       {busy && <ActivityIndicator color={primary ? c.brandContrast : c.brand} />}
       <NativeText
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         style={{
           color: primary ? c.brandContrast : c.brand,
           fontSize: text.body,
@@ -121,10 +123,14 @@ export function TextField({
   const c = useColours();
   return (
     <View style={{ gap: space.xs }}>
-      <NativeText style={{ color: c.foreground, fontSize: text.small, fontWeight: "600" }}>
+      <NativeText
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={{ color: c.foreground, fontSize: text.small, fontWeight: "600" }}
+      >
         {label}
       </NativeText>
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
         placeholderTextColor={c.muted}
         style={{
@@ -159,6 +165,8 @@ export function Notice({
   }[tone];
   return (
     <View
+      // One focusable item, so a screen reader reads the notice whole and an alert is announced.
+      accessible
       accessibilityRole={tone === "danger" ? "alert" : undefined}
       accessibilityLiveRegion={tone === "danger" ? "polite" : "none"}
       style={{
@@ -169,7 +177,10 @@ export function Notice({
         padding: space.md,
       }}
     >
-      <NativeText style={{ color: palette[2], fontSize: text.body, lineHeight: 26 }}>
+      <NativeText
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={{ color: palette[2], fontSize: text.body, lineHeight: 26 }}
+      >
         {children}
       </NativeText>
     </View>

@@ -6,7 +6,7 @@ import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 
-import { APP_VERSION } from "../src/config";
+import { APP_VERSION, CONFIG_PROBLEMS } from "../src/config";
 import { CACHE_STORAGE_KEY, MAX_AGE_MS, dehydrateOptions } from "../src/core/persist";
 import { installPluralRules } from "../src/core/plural-polyfill";
 import { createSignOutWatch, forgetEverything } from "../src/core/sign-out-watch";
@@ -19,6 +19,7 @@ import {
   useLocale,
   useUpgradeRequired,
 } from "../src/runtime";
+import { Misconfigured } from "../src/screens/Misconfigured";
 import { UpdateRequired } from "../src/screens/UpdateRequired";
 import { storage } from "../src/storage";
 import { useColours } from "../src/theme";
@@ -33,6 +34,9 @@ import { useColours } from "../src/theme";
  *
  * **What is remembered is public data only** (`core/persist.ts`: an allow-list of query keys, a day
  * at most). When the session ends, the in-memory cache and the stored one are both cleared.
+ *
+ * **A release build with no HTTPS origin does not start** (`core/release.ts`, ADR-077): it shows
+ * `Misconfigured` instead of the router, so it can never quietly call a localhost that is not there.
  *
  * **The update gate is above the router.** When the API answers 426 to any request, the whole app
  * is replaced by the update screen: nothing underneath it can do anything useful with a server that
@@ -58,6 +62,8 @@ export default function RootLayout() {
   const colours = useColours();
 
   useEffect(() => {
+    // The person sees a plain screen; whoever has the device sees why.
+    if (CONFIG_PROBLEMS.length > 0) console.error("release build misconfigured:", CONFIG_PROBLEMS.join(", "));
     // TanStack Query learns "the app came to the front" from the browser; a phone says it through
     // AppState. Without this nothing refetches on return, and the unread count would be stale.
     const sub = AppState.addEventListener("change", (state) => focusManager.setFocused(state === "active"));
@@ -91,7 +97,9 @@ export default function RootLayout() {
         client={queryClient}
         persistOptions={{ persister, maxAge: MAX_AGE_MS, buster: APP_VERSION, dehydrateOptions }}
       >
-        {upgrade ? (
+        {CONFIG_PROBLEMS.length > 0 ? (
+          <Misconfigured />
+        ) : upgrade ? (
           <UpdateRequired minVersion={upgrade.minVersion} />
         ) : (
           <Stack

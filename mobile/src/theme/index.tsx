@@ -17,3 +17,9 @@ export const radius = { sm: 6, md: 10, lg: 16 } as const;
 export const text = { small: 13, body: 16, lead: 18, title: 24 } as const;
 /** The smallest touch target either platform's guidelines allow (48 dp / 44 pt). */
 export const MIN_TOUCH = 48;
+/**
+ * The most a person's system font size may enlarge our text (200%, Android's and iOS's largest
+ * accessibility steps). Uncapped, a card's fixed-width badge or a tab label breaks the layout at the
+ * very size somebody chose in order to read it; capped, it still doubles.
+ */
+export const MAX_FONT_SCALE = 2;

@@ -278,3 +278,15 @@ check: lint test ## Everything CI runs
 mobile-check: ## tsc, eslint, jest and an Android bundle for mobile/
 	cd mobile && PATH="$(NODE_BIN):$$PATH" npx tsc --noEmit && PATH="$(NODE_BIN):$$PATH" npx eslint . \
 	  && PATH="$(NODE_BIN):$$PATH" npx jest && PATH="$(NODE_BIN):$$PATH" CI=1 npx expo export --platform android --output-dir /tmp/iism-export
+	$(MAKE) check-mobile-budget
+
+# Release readiness (Sprint 66, ADR-077). `check-release` fails on a defect in what is written down and
+# *reports* the owner's open decisions; `PROFILE=production` also fails on those, and is what stands
+# between a build and the stores. `check-mobile-budget` reads the export `mobile-check` just made.
+.PHONY: check-release
+check-release: ## Mobile release configuration (PROFILE=production is the gate)
+	$(VENV)/bin/python scripts/check_release_config.py --profile $(or $(PROFILE),preview)
+
+.PHONY: check-mobile-budget
+check-mobile-budget: ## Mobile bundle and asset size against mobile/budget.json
+	$(VENV)/bin/python scripts/check_mobile_budget.py

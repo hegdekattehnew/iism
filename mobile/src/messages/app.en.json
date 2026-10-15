@@ -103,5 +103,9 @@
   "contact": {
     "signedOutNote": "Sign in to send a request about your own data, or to see what you sent before.",
     "intro": "Ask a question or send us a note. For a complaint about how your data is handled, or about something on the marketplace, choose “A complaint” below: it carries a deadline we are held to."
+  },
+  "misconfigured": {
+    "title": "This copy of the app is not set up correctly",
+    "body": "It cannot reach our service safely, so it has not started. Please install the app again from the store. If this keeps happening, tell us at the website."
   }
 }
