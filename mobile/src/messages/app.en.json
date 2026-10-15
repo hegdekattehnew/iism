@@ -29,7 +29,9 @@
     "home": "Home",
     "jobs": "Jobs",
     "courses": "Courses",
-    "standards": "Standards"
+    "standards": "Standards",
+    "matches": "Matches",
+    "me": "Me"
   },
   "list": {
     "loading": "Loading",
@@ -72,5 +74,12 @@
       "m11": "November",
       "m12": "December"
     }
+  },
+  "me": {
+    "title": "Me",
+    "signInPrompt": "Sign in to see your matches, applications and profile.",
+    "unnamed": "Your profile",
+    "menu": "What would you like to do?",
+    "viewCourse": "View the course"
   }
 }

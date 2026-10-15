@@ -15,7 +15,7 @@ export const world = {
   params: {} as Record<string, string | undefined>,
 };
 
-export const api = { GET: jest.fn(), POST: jest.fn() };
+export const api = { GET: jest.fn(), POST: jest.fn(), PUT: jest.fn(), DELETE: jest.fn() };
 export const router = {
   push: jest.fn(),
   replace: jest.fn(),
@@ -31,6 +31,8 @@ export function resetWorld() {
   world.params = {};
   api.GET.mockReset();
   api.POST.mockReset();
+  api.PUT.mockReset();
+  api.DELETE.mockReset();
   for (const fn of Object.values(router)) fn.mockReset();
   setLocale.mockReset();
   tokens.clear.mockClear();
@@ -40,6 +42,8 @@ export const runtimeModule = {
   api: {
     GET: (...args: unknown[]) => api.GET(...args),
     POST: (...args: unknown[]) => api.POST(...args),
+    PUT: (...args: unknown[]) => api.PUT(...args),
+    DELETE: (...args: unknown[]) => api.DELETE(...args),
   },
   tokens,
   useLocale: () => world.locale,
@@ -113,4 +117,152 @@ export const skill = (n: number, extra: Record<string, unknown> = {}) => ({
   nos_code: `HSS/N${n}`,
   context: { qualification_name: "General Duty Assistant", sector: "Healthcare" },
   ...extra,
+});
+
+// ---- the signed-in person's side ----
+
+type Answer = unknown | ((init: unknown) => unknown);
+
+/**
+ * Answer by route: `serve(api.GET, { "/me/matches": ok(...) })`. A route nobody listed answers 404,
+ * so a screen that asks for something the test did not expect fails loudly instead of hanging.
+ */
+export function serve(method: jest.Mock, table: Record<string, Answer>) {
+  method.mockImplementation(async (path: string, init: unknown) => {
+    const answer = table[path];
+    if (answer === undefined) return failed(404);
+    return typeof answer === "function" ? (answer as (i: unknown) => unknown)(init) : answer;
+  });
+}
+
+const personal = { tenant: { id: "t0", slug: "me", name: "Personal workspace", tenant_type: "personal" }, role: "owner" };
+const organisation = { tenant: { id: "t1", slug: "apollo", name: "Apollo Care", tenant_type: "employer" }, role: "owner" };
+
+/** What `/auth/me` says: a job seeker, or an organisation owner who signed in on a phone. */
+export const account = (kind: "seeker" | "organisation" = "seeker") => ({
+  id: "u1",
+  memberships: [kind === "seeker" ? personal : organisation],
+});
+
+const skillRef = (name: string, mandatory: boolean, importance: number) => ({
+  nos_code: `HSS/${name.length}`,
+  name,
+  importance,
+  is_mandatory: mandatory,
+});
+
+export const matchItem = (n: number, extra: Record<string, unknown> = {}) => ({
+  job: {
+    slug: `ward-assistant-${n}`,
+    title: `Ward assistant ${n}`,
+    location_state: "Maharashtra",
+    location_district: "Pune",
+    employment_type: "full_time",
+    nsqf_level_min: 4,
+  },
+  score: 80 - n,
+  coverage: 0.75,
+  matched: [{ ...skillRef("Hand hygiene", false, 3), evidence: "self_declared", proficiency: 3 }],
+  missing: [
+    { ...skillRef("Bed making", false, 2), skill_id: "s2" },
+    { ...skillRef("Infection control", true, 5), skill_id: "s3" },
+  ],
+  missing_mandatory: 1,
+  level_shortfall: null,
+  experience_shortfall: null,
+  capped_by_mandatory: false,
+  locality: 0,
+  ...extra,
+});
+
+export const suggestion = (n: number, extra: Record<string, unknown> = {}) => ({
+  slug: `phlebotomy-${n}`,
+  title: `Phlebotomy ${n}`,
+  mode: "offline",
+  language: "hi",
+  duration_hours: 120,
+  fee_inr: 12500,
+  closes: ["Infection control"],
+  closes_count: 1,
+  gap_size: 2,
+  covers_mandatory: 1,
+  location_state: "Maharashtra",
+  location_district: "Pune",
+  starts_on: "2026-11-02",
+  seats_left: 5,
+  reach: "district",
+  started: false,
+  full: false,
+  within_budget: null,
+  attendable: true,
+  ...extra,
+});
+
+export const application = (n: number, extra: Record<string, unknown> = {}) => ({
+  id: `a${n}`,
+  job: {
+    slug: `ward-assistant-${n}`,
+    title: `Ward assistant ${n}`,
+    location_state: "Maharashtra",
+    location_district: "Pune",
+    employment_type: "full_time",
+    tenant,
+    removed: false,
+  },
+  status: "applied",
+  message: null,
+  status_message: null,
+  status_message_at: null,
+  applied_at: "2026-10-14T20:00:00+00:00",
+  updated_at: "2026-10-14T20:00:00+00:00",
+  reviewed: false,
+  ...extra,
+});
+
+export const interest = (n: number, extra: Record<string, unknown> = {}) => ({
+  id: `i${n}`,
+  course: { slug: `phlebotomy-${n}`, title: `Phlebotomy ${n}`, tenant: { ...tenant, name: "Pune Skills Academy" } },
+  status: "registered",
+  message: null,
+  registered_at: "2026-10-14T20:00:00+00:00",
+  updated_at: "2026-10-14T20:00:00+00:00",
+  ...extra,
+});
+
+export const profile = (extra: Record<string, unknown> = {}) => ({
+  id: "p1",
+  full_name: "Asha Rao",
+  headline: "Ward boy",
+  location_state: "Maharashtra",
+  location_district: "Pune",
+  years_experience: 3,
+  education_level: "secondary",
+  skills: [],
+  completeness: { percent: 60, missing: ["skills"] },
+  ...extra,
+});
+
+export const roleHit = (n: number, extra: Record<string, unknown> = {}) => ({
+  slug: `general-duty-assistant-${n}`,
+  job_role: `General Duty Assistant ${n}`,
+  qp_code: `HSS/Q5101-${n}`,
+  nsqf_level: 4,
+  sector_name: "Healthcare",
+  standards_count: 4,
+  variants: 1,
+  matched_on: "ward boy",
+  match_kind: "alias",
+  ...extra,
+});
+
+export const roleStandard = (slug: string, requirement: string, group_name: string | null = null) => ({
+  id: slug,
+  slug,
+  name: `Standard ${slug}`,
+  skill_type: "technical",
+  nsqf_level: 4,
+  qp_count: 1,
+  nos_code: `HSS/${slug}`,
+  requirement,
+  group_name,
 });

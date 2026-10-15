@@ -218,3 +218,48 @@ def test_the_apps_modules_do_not_import_each_other_in_a_circle() -> None:
     for module in edges:
         found = cycle_from(module)
         assert found is None, "import cycle: " + " -> ".join(str(p) for p in found or ())
+
+
+def _mutation_hooks() -> list[str]:
+    source = (MOBILE / "src/lib/me-queries.ts").read_text(encoding="utf-8")
+    return re.findall(r"export function (use\w+)\(\)\s*\{[^}]*?useMutation\(", source, flags=re.S)
+
+
+def test_every_write_can_report_its_own_failure() -> None:
+    """The web's `mutation-errors.test.ts` (Sprint 41), for the phone (Sprint 64, ADR-074).
+
+    openapi-fetch resolves on a non-2xx and TanStack swallows a rejection nobody reads, so a write
+    whose screen never looks at its error does nothing, in silence, on a 500. `tsc` and `eslint`
+    cannot see it. Every screen that calls a mutation hook must read `.isError` or `.error` of the
+    variable it bound the result to.
+    """
+    hooks = _mutation_hooks()
+    assert len(hooks) >= 8, hooks  # found them before judging anything
+    screens = [p for p in _hand_written() if ".test." not in p.name and p.name != "me-queries.ts"]
+    for hook in hooks:
+        users = [p for p in screens if re.search(rf"\b{hook}\(", p.read_text(encoding="utf-8"))]
+        assert users, f"{hook} is used by no screen"
+        for path in users:
+            text = path.read_text(encoding="utf-8")
+            bound = re.findall(rf"const (\w+) = {hook}\(", text)
+            assert bound, f"{path.name} calls {hook} without keeping the result"
+            for name in bound:
+                assert re.search(rf"\b{name}\.(isError|error)\b", text), (
+                    f"{path.name} never reads {name}.isError or {name}.error: a failed "
+                    f"{hook} would do nothing, in silence"
+                )
+
+
+def test_every_personal_query_key_starts_with_me() -> None:
+    """Persisting keeps only `"public"` keys and sign-out removes everything (the cache is
+    cleared whole), but a personal query keyed any other way would sit beside public data and be
+    invisible to anyone reading the key to decide what it is."""
+    source = (MOBILE / "src/lib/me-queries.ts").read_text(encoding="utf-8")
+    keys = re.findall(r"useQuery\(\{\s*queryKey:\s*([^,\n]+)", source)
+    assert len(keys) >= 8, keys
+    for key in keys:
+        assert key.strip().startswith("meKeys."), f"a personal query is not keyed by meKeys: {key}"
+    for path in (p for p in _hand_written() if "app" in p.parts or "ui" in p.parts):
+        assert "useQuery(" not in path.read_text(encoding="utf-8"), (
+            f"{path.name} builds its own query: personal reads belong in lib/me-queries.ts"
+        )

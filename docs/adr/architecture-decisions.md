@@ -3647,3 +3647,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Still not verified**: a run on Android or iOS, Hermes' actual `Intl` behaviour, TalkBack and VoiceOver, scrolling on a low-end device, and a physical phone against a real network. The README says how to run the app on one in five minutes.
 - **The released surface grows by ten operations** (`/jobs`, `/jobs/{slug}`, `/courses`, `/courses/{slug}`, `/skills`, `/skills/{slug}`, `/skills/search`, `/skills/{slug}/jobs`, `/skills/{slug}/courses`, `/roles/search`), which are now additive-only for as long as a build that calls them is installed.
 - **Not in M2:** applying, matches, the profile, notices, reporting a listing (M3 and M4), push notifications and deep links.
+
+
+## ADR-074: The Phone Holds a Person's Data in Memory Only and Drops It at Sign-Out; Applying and Registering Interest Are the Consent Moment and Say So; the Score Is Displayed, Never Derived
+
+**Status:** Accepted (October 2026). Sprint 64 (BL-15.3, M3 of the mobile programme). Extends ADR-037, ADR-070 and ADR-073. No migration, no backend change; sixteen operations are added to the released surface (33 in all).
+
+**Context:** M2 let a visitor read the catalogues. M3 is the first time the phone holds a person's data: their profile, their matches, their applications (with an employer's message) and the courses they asked about. It is also where the phone starts to *disclose* something on a person's behalf (a name, a mobile number and an email reach an employer or a provider). Three questions followed: where may personal data live on a phone that may be shared, what makes the disclosure the person's own act, and how much of the website's scoring display should the phone re-derive.
+
+**Decision:**
+
+- **Everything about a person is keyed `["me", ...]`** (`mobile/src/core/me-keys.ts`) and is **never persisted**: ADR-073's allow-list keeps only keys starting `"public"`, so a personal query cannot reach the disk by being added. A test names each key and refuses it; another fails if a personal query is built anywhere but `lib/me-queries.ts`.
+- **Signing out drops all of it, whole.** `forgetEverything` clears the query client (not merely the `"me"` keys: a half-cleared cache is a bug waiting for the next key) and the stored public cache. The transition rule from ADR-073 stays: a signed-out cold start is not a sign-out. The plan for this sprint assumed the in-memory cache was *not* cleared on sign-out; reading the layout found that M2 already did it, untested, in an inline callback. It is now one tested function, wired to the real token store in a test, and the browser run signed one candidate out and another in with nothing of the first remaining.
+- **A signed-out person, and an account with no job-seeker side, make no request that can only answer 401 or 403.** Every personal query waits for the account (`/auth/me`) to say there is a job-seeker membership; an organisation owner who signed in on a phone is told, in the web's words, that this is the job seeker's app.
+- **Applying and registering interest are the consent moment.** The confirmation step is the web's, from the same catalogue: it names the organisation, says that applying sends the person's name, mobile number and email for this vacancy only, and says that withdrawing takes them back. Nothing is sent by the button that opens it, nothing is pre-filled, and cancelling sends nothing. A closed vacancy says so *before* asking anyone to sign in.
+- **A failed write says what it was.** A table keyed by status (`applying.ts`) names a duplicate (409), the daily cap (429) and a non-seeker account (403); a withdrawal that meets a 409 says a decision was made; **401 is shown as an expired session, never as a failure**; the server's own sentence is shown when it kept one (a 60-standard cap, a salary range) and the generic line only when it did not. A Python guard fails when a screen calls a mutation hook and never reads its `.isError` or `.error`: the web's `mutation-errors.test.ts`, for the phone.
+- **The phone displays the scorer's fields and computes nothing about them** (ADR-037). Score, coverage, cap, shortfalls and locality are fields; the words around them are the web's. The only arithmetic is the one identity the web also allows (the level the person attained is the required level minus the shortfall).
+- **A card that holds a button is not a button.** The applications, saved and interests lists first made each card pressable *and* put Withdraw inside it. On the web that is a button inside a button (invalid HTML, found by running the screen in a browser); on a phone it hides the inner control from a screen reader. The card is plain and its own "View the job" button opens the page. A test per list asserts the card is not a button.
+- **Dates a person sees are the day in India.** `formatInstantDate` reads a timestamp by hand (the API sends microseconds, which engines parse differently) and shifts it by the fixed +05:30; 20:00 UTC on the 14th is the 15th. No `Intl`, as in ADR-073.
+- **The role picker is the web's, with its rules in a pure module** (`role-picker.ts`): nothing starts ticked, electives stay in their groups, a standard already held is shown ticked and cannot be ticked again or sent, and a batch is all or nothing at the server's cap of 60. Profile limits are mirrored on the inputs and the education levels are a record keyed by the schema's own union, so the compiler fails when the server adds one.
+
+**Options considered:**
+
+1. Persist the signed-in person's data so the app opens instantly offline
+2. **Memory only, dropped at sign-out** (chosen)
+3. Persist it encrypted in the Keychain
+4. Re-derive the score display on the phone from the matched and missing lists
+5. **Show the server's fields** (chosen)
+
+**Trade-offs:**
+
+- Option 1: ✅ a faster cold start ❌ on a shared phone the next person could see the last one's applications and an employer's message; and ADR-023 asks for an encryption path before this kind of data is kept.
+- Option 3: ✅ safe at rest ❌ a second secret-handling path that nothing here can test on a device; deferred, not refused.
+- Option 4: ✅ no round trip ❌ two derivations of one number, which is how a picture and a score come to disagree.
+
+**Consequences:**
+
+- **Verified by running the real screens in a browser** (`react-native-web`, 375x812, against the dev API as two seeded candidates, English and Hindi): matches with the gap and real courses, a match opened, applying through the confirmation, the application listed and withdrawn, the role picker through to a real skill added and removed, sign-out, and a second candidate who saw nothing of the first. It found the nested-button defect above. This is not Hermes and not native.
+- **Mutation-checked: 43 breakages**, each failing a check. Four survived the first pass: a personal key the keys test did not list, a role-picker mutant that was equivalent (the reset on choosing a role made it unobservable; a better one was written), a guard mutant that removed only `.isError` while `.error` was still read (the check was right, the mutant too weak), and, most usefully, **no test that adding a skill refreshes the matches**. Each was closed and re-run.
+- **A page reload signs the browser run out.** `expo-secure-store` has no web backend, so the session does not survive a reload under `react-native-web`; the phone's Keychain and Keystore are unaffected. It only constrains how the run is driven (navigate by tapping, never by URL).
+- **Not on the phone yet**, each deliberate: the per-request course budget (ADR-068; held in `localStorage` on the web), reporting that a suggested course was opened (the click-through metric of ADR-025 is therefore web-only until M4), the work history, education, certificates, languages, preferred-location and salary sections of the profile, "why not me", and career paths. The basics and the skills are what move a match and what BL-15.3 asks for.
+- **Still not verified**: a native run, Hermes, TalkBack and VoiceOver (the checkbox rows carry the `checkbox` role and a `checked` state, which is the part a test can assert), and scrolling on a low-end device. `expo-doctor` reports 20 of 21: five Expo packages are one patch version behind what the SDK now asks for; no package was changed in this sprint.

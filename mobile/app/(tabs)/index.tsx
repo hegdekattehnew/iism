@@ -1,13 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
 import { OFFERED_LOCALES } from "../../src/core/locale";
-import { ApiError, readDetail } from "../../src/core/errors";
 import { signOut } from "../../src/core/sign-in";
-import { api, setLocale, tokens, useLocale, useSignedIn } from "../../src/runtime";
+import { useAccount } from "../../src/lib/me-queries";
+import { api, setLocale, tokens, useLocale } from "../../src/runtime";
 import { Button, Notice, Screen, SearchBox, Text } from "../../src/ui";
 
 /**
@@ -20,26 +19,10 @@ export default function Home() {
   const ta = useTranslations("auth");
   const ts = useTranslations("searchPage");
   const router = useRouter();
-  const signedIn = useSignedIn();
+  const { signedIn, isJobSeeker } = useAccount();
   const locale = useLocale();
   const [q, setQ] = useState("");
 
-  // Signed out makes no request that can only answer 401 (the web's rule, Sprint 52).
-  const me = useQuery({
-    queryKey: ["me"],
-    enabled: signedIn,
-    queryFn: async () => {
-      // Status read before the check: `/auth/me` documents no error body, so on the failure branch
-      // openapi-fetch narrows the whole result to `never` (the web's `useOperatorDashboard`).
-      const result = await api.GET("/auth/me");
-      const status = result.response.status;
-      const errorBody: unknown = result.error;
-      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
-      return result.data;
-    },
-  });
-
-  const isJobSeeker = me.data?.memberships?.some((m) => m.tenant.tenant_type === "personal");
   const search = () => {
     const term = q.trim();
     if (term) router.push({ pathname: "/search", params: { q: term } });
@@ -62,7 +45,7 @@ export default function Home() {
       {signedIn ? (
         <>
           <Text>{t("home.signedIn")}</Text>
-          {me.data && !isJobSeeker ? <Notice tone="warning">{t("home.organisationNote")}</Notice> : null}
+          {isJobSeeker === false ? <Notice tone="warning">{t("home.organisationNote")}</Notice> : null}
           <Button variant="secondary" label={ta("signOut")} onPress={() => void signOut(api, tokens)} />
         </>
       ) : (

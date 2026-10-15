@@ -1,0 +1,57 @@
+import { useRouter } from "expo-router";
+import { View } from "react-native";
+import { useTranslations } from "use-intl";
+
+import { signOut } from "../../src/core/sign-in";
+import { useProfile } from "../../src/lib/me-queries";
+import { api, tokens, useSignedIn } from "../../src/runtime";
+import { space } from "../../src/theme";
+import { SeekerGate } from "../../src/ui/gate";
+import { Card } from "../../src/ui/list";
+import { Button, Screen, Text } from "../../src/ui/primitives";
+
+/**
+ * Where a signed-in person's own things are: their profile and how complete it is, their
+ * applications, the vacancies they saved and the courses they asked about. Signed out, it is the
+ * way in and makes no request.
+ */
+export default function Me() {
+  const t = useTranslations("mobile");
+  const ta = useTranslations("auth");
+  const signedIn = useSignedIn();
+  return (
+    <Screen>
+      <Text variant="title">{t("me.title")}</Text>
+      <SeekerGate prompt={t("me.signInPrompt")}>
+        <Menu />
+      </SeekerGate>
+      {signedIn ? (
+        <Button variant="secondary" label={ta("signOut")} onPress={() => void signOut(api, tokens)} />
+      ) : null}
+    </Screen>
+  );
+}
+
+function Menu() {
+  const t = useTranslations("mobile");
+  const tp = useTranslations("profilePage");
+  const ta = useTranslations("applications");
+  const tc = useTranslations("courseInterest");
+  const router = useRouter();
+  const profile = useProfile();
+  const p = profile.data;
+
+  return (
+    <View style={{ gap: space.md }}>
+      <Card onPress={() => router.push("/profile")} label={tp("title")}>
+        <Text variant="lead">{p?.full_name || t("me.unnamed")}</Text>
+        {p?.headline ? <Text tone="muted">{p.headline}</Text> : null}
+        {p ? <Text tone="muted">{tp("completeness", { percent: p.completeness?.percent ?? 0 })}</Text> : null}
+        <Text variant="small">{tp("title")}</Text>
+      </Card>
+      <Button variant="secondary" label={ta("pageTitle")} onPress={() => router.push("/applications")} />
+      <Button variant="secondary" label={ta("savedPageTitle")} onPress={() => router.push("/saved")} />
+      <Button variant="secondary" label={tc("pageTitle")} onPress={() => router.push("/interests")} />
+    </View>
+  );
+}

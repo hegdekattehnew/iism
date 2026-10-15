@@ -50,3 +50,34 @@ function daysIn(year: number, month: number): number {
   if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
+
+const INSTANT =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
+const IST_MINUTES = 5 * 60 + 30;
+
+/**
+ * The calendar day, in India, on which a moment happened: `"2026-10-14T20:00:00+00:00"` is the 15th
+ * in Mumbai. India has no daylight saving, so a fixed +05:30 is exact. Parsed by hand (never
+ * `Date.parse`: the API sends microseconds, and engines differ on a timestamp longer than the
+ * standard's milliseconds). A timestamp with no offset is read as UTC, which is what the API means.
+ * Anything that is not a timestamp returns `null`.
+ */
+export function formatInstantDate(
+  instant: string,
+  monthName: (month: number, style: MonthStyle) => string,
+  style: MonthStyle = "short",
+): string | null {
+  const m = INSTANT.exec(instant);
+  if (!m) return null;
+  const [y, mo, d, h, mi] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])];
+  if (mo < 1 || mo > 12 || d < 1 || d > daysIn(y, mo) || h > 23 || mi > 59) return null;
+  let offsetMinutes = 0;
+  const zone = m[6];
+  if (zone && zone !== "Z") {
+    const digits = zone.slice(1).replace(":", "");
+    const minutes = Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2) || "0");
+    offsetMinutes = zone.startsWith("-") ? -minutes : minutes;
+  }
+  const ist = new Date(Date.UTC(y, mo - 1, d, h, mi) - offsetMinutes * 60_000 + IST_MINUTES * 60_000);
+  return `${ist.getUTCDate()} ${monthName(ist.getUTCMonth(), style)} ${ist.getUTCFullYear()}`;
+}
