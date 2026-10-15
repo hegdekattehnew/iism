@@ -64,6 +64,8 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM", "ASYNC", "G", "LOG", "T20"]
 # Bilingual seed rows read better on one line than wrapped mid-sentence.
 "scripts/seed_skills.py" = ["E501"]
 "scripts/seed_sector_expansion.py" = ["E501"]
+# The register is built from prose (the assessments of each ADR), which reads better unwrapped.
+"scripts/build_adr_register.py" = ["E501"]
 # Operator CLIs, not services. `make seed`, `make import-nsqf` and `make
 # evaluate` print progress to stdout and failures to stderr because stdout
 # *is* their interface, and none of them runs under a log collector.

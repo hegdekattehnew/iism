@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 
 import Profile from "../../app/profile";
-import { account, api, failed, ok, profile, resetWorld, roleHit, roleStandard, serve, world } from "./mocks";
+import { account, api, failed, ok, profile, resetWorld, roleHit, roleStandard, router, serve, world } from "./mocks";
 import { renderScreen, settle } from "./harness";
 
 jest.mock("../runtime", () => require("./mocks").runtimeModule);
@@ -262,5 +262,68 @@ describe("naming a job and ticking what you can do", () => {
     await choose();
     await fireEvent.press(screen.getByRole("button", { name: "Choose a different job" }));
     expect(await screen.findByText("What work do you do?")).toBeTruthy();
+  });
+});
+
+describe("the history sections", () => {
+  it("lists the six sections with how many entries each holds, and opens one", async () => {
+    serveProfile(profile({ experiences: [{ id: "e1" }, { id: "e2" }], languages: [{ id: "l1" }] }));
+    await renderScreen(<Profile />);
+    await screen.findByText("Your history");
+    expect(screen.getByRole("button", { name: "Work history · 2 entries" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Languages · 1 entry" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Education · Nothing added" })).toBeTruthy();
+    await press("Work history · 2 entries");
+    expect(router.push).toHaveBeenCalledWith("/profile/experiences");
+  });
+});
+
+describe("what the person is looking for", () => {
+  it("starts from the profile as loaded", async () => {
+    serveProfile(
+      profile({ expected_salary_min_inr: 12000, expected_salary_max_inr: 18000, notice_period: "immediate", willing_to_relocate: true }),
+    );
+    await renderScreen(<Profile />);
+    expect(await screen.findByDisplayValue("12000")).toBeTruthy();
+    expect(screen.getByDisplayValue("18000")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Immediately" }).props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it("saves only what it edits: no name, no date of birth, no gender", async () => {
+    serveProfile(profile());
+    serve(api.PUT, { "/me/profile": ok(profile()) });
+    await renderScreen(<Profile />);
+    await fireEvent.changeText(await screen.findByLabelText("Expected salary from"), "15,000");
+    await press("Full time");
+    await press("Save: What you are looking for");
+    await settle();
+    expect(putBody()).toEqual({
+      expected_salary_min_inr: 15000,
+      expected_salary_max_inr: null,
+      notice_period: null,
+      preferred_employment_type: "full_time",
+      willing_to_relocate: false,
+      job_alerts_enabled: true,
+    });
+  });
+
+  it("refuses a top below the bottom before any request, saying which rule", async () => {
+    serveProfile(profile());
+    await renderScreen(<Profile />);
+    await fireEvent.changeText(await screen.findByLabelText("Expected salary from"), "20000");
+    await fireEvent.changeText(screen.getByLabelText("to"), "10000");
+    await press("Save: What you are looking for");
+    expect(await screen.findByText("The top of the range cannot be below the bottom.")).toBeTruthy();
+    expect(api.PUT).not.toHaveBeenCalled();
+  });
+
+  it("turning alerts off is sent", async () => {
+    serveProfile(profile());
+    serve(api.PUT, { "/me/profile": ok(profile()) });
+    await renderScreen(<Profile />);
+    await fireEvent(await screen.findByLabelText("Tell me when a matching vacancy is published"), "valueChange", false);
+    await press("Save: What you are looking for");
+    await settle();
+    expect(putBody().job_alerts_enabled).toBe(false);
   });
 });

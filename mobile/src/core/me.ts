@@ -12,7 +12,9 @@
 import type { components } from "../api/schema";
 import type { Api } from "./api";
 import { ApiError, readDetail } from "./errors";
+import { budgetQuery } from "./course-budget";
 import { unwrap } from "./public";
+import type { Collection } from "./profile-sections";
 
 export type Profile = components["schemas"]["CandidateProfileFull"];
 export type ProfileUpdate = components["schemas"]["CandidateProfileUpdateFull"];
@@ -49,6 +51,31 @@ export async function removeSkill(api: Api, slug: string) {
   );
 }
 
+// ------------------------------------------------------ profile sections
+
+/**
+ * The six repeating sections share three routes that take an **untyped body** (so the 422 for a bad
+ * one is a list, which `readDetail` joins), and each answers with the whole profile.
+ */
+export async function addEntry(api: Api, collection: Collection, body: Record<string, unknown>) {
+  return unwrap(await api.POST("/me/profile/{collection}", { params: { path: { collection } }, body }));
+}
+
+export async function updateEntry(api: Api, collection: Collection, id: string, body: Record<string, unknown>) {
+  return unwrap(
+    await api.PUT("/me/profile/{collection}/{entry_id}", {
+      params: { path: { collection, entry_id: id } },
+      body,
+    }),
+  );
+}
+
+export async function removeEntry(api: Api, collection: Collection, id: string) {
+  return unwrap(
+    await api.DELETE("/me/profile/{collection}/{entry_id}", { params: { path: { collection, entry_id: id } } }),
+  );
+}
+
 export async function searchRoleHits(api: Api, q: string, limit = 8) {
   return unwrap(await api.GET("/roles/search", { params: { query: { q: q.trim(), limit } } }));
 }
@@ -65,8 +92,28 @@ export async function listMatches(api: Api) {
   return unwrap(await api.GET("/me/matches", { params: { query: { limit: MATCH_LIMIT } } }));
 }
 
-export async function getMatch(api: Api, slug: string) {
-  return unwrap(await api.GET("/me/matches/{slug}", { params: { path: { slug } } }));
+export async function getMatch(api: Api, slug: string, budget: number | null = null) {
+  return unwrap(
+    await api.GET("/me/matches/{slug}", { params: { path: { slug }, query: budgetQuery(budget) } }),
+  );
+}
+
+// ------------------------------------------------------- why not me, careers
+
+/** What one of the person's own applications was missing, and the courses that teach it. */
+export async function getApplicationGap(api: Api, applicationId: string, budget: number | null = null) {
+  return unwrap(
+    await api.GET("/me/applications/{application_id}/gap", {
+      params: { path: { application_id: applicationId }, query: budgetQuery(budget) },
+    }),
+  );
+}
+
+/** The roles that build on the person's own: from `role` if they chose one, else a flagged guess. */
+export async function getCareers(api: Api, role: string | null, budget: number | null = null) {
+  return unwrap(
+    await api.GET("/me/careers", { params: { query: { ...(role ? { role } : {}), ...budgetQuery(budget) } } }),
+  );
 }
 
 // ------------------------------------------------------------- applications

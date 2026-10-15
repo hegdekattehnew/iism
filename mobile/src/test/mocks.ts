@@ -13,6 +13,7 @@ export const world = {
   signedIn: false,
   locale: "en" as "en" | "hi",
   params: {} as Record<string, string | undefined>,
+  budget: null as number | null,
 };
 
 export const api = { GET: jest.fn(), POST: jest.fn(), PUT: jest.fn(), DELETE: jest.fn() };
@@ -23,6 +24,7 @@ export const router = {
   setParams: jest.fn(),
 };
 export const setLocale = jest.fn();
+export const setCourseBudget = jest.fn();
 export const endSession = jest.fn(async () => undefined);
 export const tokens = { refresh: () => "r", access: () => null, clear: jest.fn(async () => undefined) };
 
@@ -30,6 +32,8 @@ export function resetWorld() {
   world.signedIn = false;
   world.locale = "en";
   world.params = {};
+  world.budget = null;
+  setCourseBudget.mockReset();
   api.GET.mockReset();
   api.POST.mockReset();
   api.PUT.mockReset();
@@ -58,6 +62,8 @@ export const runtimeModule = {
   useLocale: () => world.locale,
   setLocale: (...args: unknown[]) => setLocale(...args),
   endSession: () => endSession(),
+  useCourseBudget: () => world.budget,
+  setCourseBudget: (...args: unknown[]) => setCourseBudget(...args),
   useSignedIn: () => world.signedIn,
   useUpgradeRequired: () => null,
 };

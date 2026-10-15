@@ -1,6 +1,18 @@
+import { BUDGET_STORAGE_KEY } from "../core/course-budget";
 import { CACHE_STORAGE_KEY } from "../core/persist";
 import { unregisterThisDevice } from "../push";
-import { api, endSession, forgetPersistedCache, getLocale, restoreLocale, setLocale, tokens } from "../runtime";
+import {
+  api,
+  courseBudget,
+  endSession,
+  forgetPersistedCache,
+  getLocale,
+  restoreCourseBudget,
+  restoreLocale,
+  setCourseBudget,
+  setLocale,
+  tokens,
+} from "../runtime";
 import { storage } from "../storage";
 
 // A store in memory, and the two native modules the runtime would otherwise load.
@@ -81,6 +93,24 @@ describe("signing out", () => {
     await forgetPersistedCache();
     expect(fake().data.has(CACHE_STORAGE_KEY)).toBe(false);
     expect(fake().data.get("iism.locale")).toBe("hi");
+  });
+});
+
+describe("what the person would pay for a course", () => {
+  it("is remembered across a launch", async () => {
+    setCourseBudget(6000);
+    expect(fake().data.get(BUDGET_STORAGE_KEY)).toBe("6000");
+    courseBudget.set(null);
+    fake().data.set(BUDGET_STORAGE_KEY, "6000");
+    await restoreCourseBudget();
+    expect(courseBudget.get()).toBe(6000);
+  });
+
+  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts empty", async () => {
+    setCourseBudget(6000);
+    await forgetPersistedCache();
+    expect(courseBudget.get()).toBeNull();
+    expect(fake().data.has(BUDGET_STORAGE_KEY)).toBe(false);
   });
 });
 

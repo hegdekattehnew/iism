@@ -1,16 +1,24 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
-import { View } from "react-native";
+import { Switch, View } from "react-native";
 import { useTranslations } from "use-intl";
 
 import { ApiError, isSignedOut } from "../src/core/errors";
 import {
   EDUCATION_LEVELS,
+  EMPLOYMENT_TYPES,
   LIMITS,
+  NOTICE_PERIODS,
+  SALARY_DIGITS,
   basicsFrom,
+  preferencesBody,
+  preferencesFrom,
   profileBody,
   type BasicsForm,
+  type PreferencesForm,
+  type PreferencesProblem,
 } from "../src/core/profile";
+import { COLLECTIONS, type Collection } from "../src/core/profile-sections";
 import { useProfile, useRemoveSkill, useUpdateProfile } from "../src/lib/me-queries";
 import { space } from "../src/theme";
 import { SeekerGate } from "../src/ui/gate";
@@ -98,8 +106,12 @@ function Body() {
         </Text>
       </View>
 
+      <Sections profile={profile as unknown as Record<string, unknown[] | undefined>} />
+
       {/* Keyed on the loaded profile, so a refetch can never overwrite what is being typed. */}
       <Basics key={profile.id} initial={basicsFrom(profile)} />
+
+      <Preferences key={`${profile.id}-prefs`} initial={preferencesFrom(profile)} />
     </View>
   );
 }
@@ -160,6 +172,124 @@ function Basics({ initial }: { initial: BasicsForm }) {
         )
       ) : null}
       <Button label={save.isPending ? t("saving") : t("save")} busy={save.isPending} onPress={submit} />
+      {save.isSuccess && !save.isError ? <Text tone="muted">{t("saved")}</Text> : null}
+    </View>
+  );
+}
+
+/** The six history sections, each one screen (`profile/[section]`), with how many entries it holds. */
+function Sections({ profile }: { profile: Record<string, unknown[] | undefined> }) {
+  const s = useTranslations("mobile.profileSections");
+  const router = useRouter();
+  return (
+    <View style={{ gap: space.md }}>
+      <Text variant="lead">{s("title")}</Text>
+      <Text tone="muted">{s("intro")}</Text>
+      {COLLECTIONS.map((c: Collection) => {
+        const count = profile[c]?.length ?? 0;
+        return (
+          <Button
+            key={c}
+            variant="secondary"
+            label={`${s(`names.${c}`)} · ${s("count", { count })}`}
+            onPress={() => router.push(`/profile/${c}`)}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+/** Salary, notice period, work type, willingness to move and whether to be told of new vacancies. */
+function Preferences({ initial }: { initial: PreferencesForm }) {
+  const s = useTranslations("mobile.profileSections");
+  const sp = useTranslations("mobile.profileSections.preferencesProblem");
+  const t = useTranslations("profilePage");
+  const f = useTranslations("profilePage.fields");
+  const tj = useTranslations("jobsPage.employmentType");
+  const tn = useTranslations("profilePage.notice");
+  const [form, setForm] = useState(initial);
+  const [problem, setProblem] = useState<PreferencesProblem | null>(null);
+  const save = useUpdateProfile();
+  const set = <K extends keyof PreferencesForm>(key: K, value: PreferencesForm[K]) =>
+    setForm((cur) => ({ ...cur, [key]: value }));
+
+  const submit = () => {
+    const built = preferencesBody(form);
+    setProblem(built.ok ? null : built.problem);
+    if (built.ok) save.mutate(built.body);
+  };
+
+  return (
+    <View style={{ gap: space.md }}>
+      <Text variant="lead">{s("preferencesTitle")}</Text>
+      <TextField
+        label={f("salaryMin")}
+        value={form.salaryMin}
+        onChangeText={(v) => set("salaryMin", v)}
+        keyboardType="number-pad"
+        maxLength={SALARY_DIGITS + 3}
+      />
+      <TextField
+        label={f("salaryMax")}
+        value={form.salaryMax}
+        onChangeText={(v) => set("salaryMax", v)}
+        keyboardType="number-pad"
+        maxLength={SALARY_DIGITS + 3}
+      />
+      <Text tone="muted" variant="small">
+        {f("employmentType")}
+      </Text>
+      <ChipRow>
+        {EMPLOYMENT_TYPES.map((type) => (
+          <Chip
+            key={type}
+            label={tj(type)}
+            selected={form.employment === type}
+            onPress={() => set("employment", form.employment === type ? null : type)}
+          />
+        ))}
+      </ChipRow>
+      <Text tone="muted" variant="small">
+        {f("noticePeriod")}
+      </Text>
+      <ChipRow>
+        {NOTICE_PERIODS.map((n) => (
+          <Chip
+            key={n}
+            label={tn(n)}
+            selected={form.notice === n}
+            onPress={() => set("notice", form.notice === n ? null : n)}
+          />
+        ))}
+      </ChipRow>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+        <Switch value={form.relocate} onValueChange={(v) => set("relocate", v)} accessibilityLabel={f("relocate")} />
+        <View style={{ flex: 1 }}>
+          <Text>{f("relocate")}</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+        <Switch value={form.alerts} onValueChange={(v) => set("alerts", v)} accessibilityLabel={f("alertsOn")} />
+        <View style={{ flex: 1 }}>
+          <Text>{f("alertsOn")}</Text>
+        </View>
+      </View>
+      {problem ? <Notice tone="danger">{sp(problem)}</Notice> : null}
+      {save.isError ? (
+        isSignedOut(save.error) ? (
+          <SessionExpired />
+        ) : (
+          <Notice tone="danger">{save.error instanceof ApiError && save.error.detail ? save.error.detail : t("errors.generic")}</Notice>
+        )
+      ) : null}
+      <Button
+        label={save.isPending ? t("saving") : t("save")}
+        // Two forms on this screen each end in "Save": a screen reader must say which one.
+        accessibilityLabel={`${save.isPending ? t("saving") : t("save")}: ${s("preferencesTitle")}`}
+        busy={save.isPending}
+        onPress={submit}
+      />
       {save.isSuccess && !save.isError ? <Text tone="muted">{t("saved")}</Text> : null}
     </View>
   );

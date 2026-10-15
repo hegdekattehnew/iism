@@ -811,6 +811,820 @@
       }
     }
   },
+  "DELETE /me/profile/{collection}/{entry_id}": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "collection",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "path",
+        "name": "entry_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "certifications": {
+                  "items": {
+                    "properties": {
+                      "credential_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "expires_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "issued_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "issuing_body": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "nsqf_level": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "skill": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "context": {
+                                "anyOf": [
+                                  {
+                                    "properties": {
+                                      "awarding_body": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_code": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_slug": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "sector": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "id": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "nos_code": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "nsqf_level": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "qp_count": {
+                                "type": "integer"
+                              },
+                              "skill_type": {
+                                "enum": [
+                                  "technical",
+                                  "core",
+                                  "generic"
+                                ],
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "slug",
+                              "name",
+                              "skill_type"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "completeness": {
+                  "properties": {
+                    "missing": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "percent": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "date_of_birth": {
+                  "anyOf": [
+                    {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "education_level": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "none",
+                        "primary",
+                        "secondary",
+                        "higher_secondary",
+                        "iti",
+                        "diploma",
+                        "graduate",
+                        "postgraduate"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "educations": {
+                  "items": {
+                    "properties": {
+                      "education_level": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "none",
+                              "primary",
+                              "secondary",
+                              "higher_secondary",
+                              "iti",
+                              "diploma",
+                              "graduate",
+                              "postgraduate"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "institution": {
+                        "anyOf": [
+                          {
+                            "maxLength": 160,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "is_pursuing": {
+                        "type": "boolean"
+                      },
+                      "qualification": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "specialisation": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "year_completed": {
+                        "anyOf": [
+                          {
+                            "maximum": 2100.0,
+                            "minimum": 1950.0,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "qualification",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "expected_salary_max_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expected_salary_min_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "experiences": {
+                  "items": {
+                    "properties": {
+                      "employer_name": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "ended_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "is_current": {
+                        "type": "boolean"
+                      },
+                      "location": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "role_title": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "started_on": {
+                        "format": "date",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "employer_name",
+                      "role_title",
+                      "started_on",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "full_name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gender": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "female",
+                        "male",
+                        "other",
+                        "prefer_not_to_say"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "headline": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "job_alerts_enabled": {
+                  "type": "boolean"
+                },
+                "languages": {
+                  "items": {
+                    "properties": {
+                      "can_read": {
+                        "type": "boolean"
+                      },
+                      "can_write": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "language": {
+                        "maxLength": 40,
+                        "minLength": 2,
+                        "type": "string"
+                      },
+                      "proficiency": {
+                        "enum": [
+                          "basic",
+                          "conversational",
+                          "fluent",
+                          "native"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "language",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "location_district": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "location_state": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "notice_period": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "immediate",
+                        "within_15_days",
+                        "within_30_days",
+                        "over_30_days"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "onboarding_completed_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_employment_type": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "contract",
+                        "apprenticeship",
+                        "gig"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_locations": {
+                  "items": {
+                    "properties": {
+                      "district": {
+                        "anyOf": [
+                          {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "state": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "preferred_roles": {
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "skills": {
+                  "items": {
+                    "properties": {
+                      "proficiency": {
+                        "type": "integer"
+                      },
+                      "skill": {
+                        "properties": {
+                          "context": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "awarding_body": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_code": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_slug": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "sector": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "nos_code": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "nsqf_level": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "qp_count": {
+                            "type": "integer"
+                          },
+                          "skill_type": {
+                            "enum": [
+                              "technical",
+                              "core",
+                              "generic"
+                            ],
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name",
+                          "skill_type"
+                        ],
+                        "type": "object"
+                      },
+                      "source": {
+                        "enum": [
+                          "self_declared",
+                          "inferred",
+                          "assessed",
+                          "certified"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "skill",
+                      "proficiency",
+                      "source"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "willing_to_relocate": {
+                  "type": "boolean"
+                },
+                "years_experience": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "years_experience"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "DELETE /me/saved-jobs/{job_slug}": {
     "parameters": [
       {
@@ -2979,6 +3793,925 @@
                 "type": "object"
               },
               "type": "array"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/applications/{application_id}/gap": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "application_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "budget_inr",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "locale",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "application_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "capped_by_mandatory": {
+                  "type": "boolean"
+                },
+                "courses": {
+                  "items": {
+                    "properties": {
+                      "attendable": {
+                        "type": "boolean"
+                      },
+                      "closes": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "closes_count": {
+                        "type": "integer"
+                      },
+                      "covers_mandatory": {
+                        "type": "integer"
+                      },
+                      "duration_hours": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "fee_inr": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "full": {
+                        "type": "boolean"
+                      },
+                      "gap_size": {
+                        "type": "integer"
+                      },
+                      "language": {
+                        "type": "string"
+                      },
+                      "location_district": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "location_state": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "mode": {
+                        "type": "string"
+                      },
+                      "reach": {
+                        "enum": [
+                          "online",
+                          "district",
+                          "state",
+                          "unknown",
+                          "elsewhere"
+                        ],
+                        "type": "string"
+                      },
+                      "seats_left": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "slug": {
+                        "type": "string"
+                      },
+                      "started": {
+                        "type": "boolean"
+                      },
+                      "starts_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "within_budget": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "title",
+                      "mode",
+                      "language",
+                      "closes",
+                      "closes_count",
+                      "gap_size",
+                      "covers_mandatory"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "coverage": {
+                  "type": "number"
+                },
+                "job": {
+                  "properties": {
+                    "employment_type": {
+                      "type": "string"
+                    },
+                    "location_district": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "location_state": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "removed": {
+                      "readOnly": true,
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "tenant": {
+                      "properties": {
+                        "city": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "id": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "logo_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "tenant_type": {
+                          "enum": [
+                            "employer",
+                            "course_provider",
+                            "personal"
+                          ],
+                          "type": "string"
+                        },
+                        "website": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "name",
+                        "tenant_type"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "title",
+                    "employment_type",
+                    "tenant",
+                    "removed"
+                  ],
+                  "type": "object"
+                },
+                "level_shortfall": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "missing": {
+                  "items": {
+                    "properties": {
+                      "importance": {
+                        "type": "integer"
+                      },
+                      "is_mandatory": {
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "nos_code": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "nsqf_level": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "skill_id": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "skill_id",
+                      "name",
+                      "importance",
+                      "is_mandatory"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "missing_mandatory": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "applied",
+                    "withdrawn",
+                    "shortlisted",
+                    "rejected",
+                    "hired",
+                    "completed",
+                    "no_show"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "application_id",
+                "job",
+                "status",
+                "score",
+                "coverage",
+                "missing_mandatory",
+                "capped_by_mandatory"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/careers": {
+    "parameters": [
+      {
+        "in": "query",
+        "name": "role",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "budget_inr",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "anchor": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "job_role": {
+                          "type": "string"
+                        },
+                        "nsqf_level": {
+                          "type": "number"
+                        },
+                        "qp_code": {
+                          "type": "string"
+                        },
+                        "sector_name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "qp_code",
+                        "job_role",
+                        "nsqf_level"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "anchor_source": {
+                  "enum": [
+                    "chosen",
+                    "guessed",
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                "has_skills": {
+                  "type": "boolean"
+                },
+                "needs_choice": {
+                  "type": "boolean"
+                },
+                "steps": {
+                  "items": {
+                    "properties": {
+                      "basis": {
+                        "properties": {
+                          "compulsory_count": {
+                            "type": "integer"
+                          },
+                          "same_occupation": {
+                            "type": "boolean"
+                          },
+                          "shared_nco": {
+                            "type": "boolean"
+                          },
+                          "shared_standards": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "shared_standards",
+                          "compulsory_count",
+                          "same_occupation",
+                          "shared_nco"
+                        ],
+                        "type": "object"
+                      },
+                      "courses": {
+                        "items": {
+                          "properties": {
+                            "attendable": {
+                              "type": "boolean"
+                            },
+                            "closes": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "closes_count": {
+                              "type": "integer"
+                            },
+                            "covers_mandatory": {
+                              "type": "integer"
+                            },
+                            "duration_hours": {
+                              "anyOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "fee_inr": {
+                              "anyOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "full": {
+                              "type": "boolean"
+                            },
+                            "gap_size": {
+                              "type": "integer"
+                            },
+                            "language": {
+                              "type": "string"
+                            },
+                            "location_district": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "location_state": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "reach": {
+                              "enum": [
+                                "online",
+                                "district",
+                                "state",
+                                "unknown",
+                                "elsewhere"
+                              ],
+                              "type": "string"
+                            },
+                            "seats_left": {
+                              "anyOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "slug": {
+                              "type": "string"
+                            },
+                            "started": {
+                              "type": "boolean"
+                            },
+                            "starts_on": {
+                              "anyOf": [
+                                {
+                                  "format": "date",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "within_budget": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "slug",
+                            "title",
+                            "mode",
+                            "language",
+                            "closes",
+                            "closes_count",
+                            "gap_size",
+                            "covers_mandatory"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "coverage": {
+                        "type": "number"
+                      },
+                      "entry": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "education_options": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "lowest_experience_years": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "qp_code": {
+                                "type": "string"
+                              },
+                              "qp_name": {
+                                "type": "string"
+                              },
+                              "routes_total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "qp_code",
+                              "qp_name",
+                              "routes_total",
+                              "education_options"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "experience_shortfall": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "level_shortfall": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "missing": {
+                        "items": {
+                          "properties": {
+                            "importance": {
+                              "type": "integer"
+                            },
+                            "is_mandatory": {
+                              "type": "boolean"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "nos_code": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "nsqf_level": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "skill_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "skill_id",
+                            "name",
+                            "importance",
+                            "is_mandatory"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "missing_mandatory": {
+                        "type": "integer"
+                      },
+                      "role": {
+                        "properties": {
+                          "job_role": {
+                            "type": "string"
+                          },
+                          "nsqf_level": {
+                            "type": "number"
+                          },
+                          "qp_code": {
+                            "type": "string"
+                          },
+                          "sector_name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "qp_code",
+                          "job_role",
+                          "nsqf_level"
+                        ],
+                        "type": "object"
+                      },
+                      "score": {
+                        "type": "integer"
+                      },
+                      "variants": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "role",
+                      "basis",
+                      "variants",
+                      "score",
+                      "coverage",
+                      "missing_mandatory"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "anchor_source",
+                "needs_choice",
+                "has_skills"
+              ],
+              "type": "object"
             }
           }
         }
@@ -9683,6 +11416,821 @@
       }
     }
   },
+  "POST /me/profile/{collection}": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "collection",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "certifications": {
+                  "items": {
+                    "properties": {
+                      "credential_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "expires_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "issued_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "issuing_body": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "nsqf_level": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "skill": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "context": {
+                                "anyOf": [
+                                  {
+                                    "properties": {
+                                      "awarding_body": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_code": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_slug": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "sector": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "id": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "nos_code": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "nsqf_level": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "qp_count": {
+                                "type": "integer"
+                              },
+                              "skill_type": {
+                                "enum": [
+                                  "technical",
+                                  "core",
+                                  "generic"
+                                ],
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "slug",
+                              "name",
+                              "skill_type"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "completeness": {
+                  "properties": {
+                    "missing": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "percent": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "date_of_birth": {
+                  "anyOf": [
+                    {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "education_level": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "none",
+                        "primary",
+                        "secondary",
+                        "higher_secondary",
+                        "iti",
+                        "diploma",
+                        "graduate",
+                        "postgraduate"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "educations": {
+                  "items": {
+                    "properties": {
+                      "education_level": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "none",
+                              "primary",
+                              "secondary",
+                              "higher_secondary",
+                              "iti",
+                              "diploma",
+                              "graduate",
+                              "postgraduate"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "institution": {
+                        "anyOf": [
+                          {
+                            "maxLength": 160,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "is_pursuing": {
+                        "type": "boolean"
+                      },
+                      "qualification": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "specialisation": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "year_completed": {
+                        "anyOf": [
+                          {
+                            "maximum": 2100.0,
+                            "minimum": 1950.0,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "qualification",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "expected_salary_max_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expected_salary_min_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "experiences": {
+                  "items": {
+                    "properties": {
+                      "employer_name": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "ended_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "is_current": {
+                        "type": "boolean"
+                      },
+                      "location": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "role_title": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "started_on": {
+                        "format": "date",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "employer_name",
+                      "role_title",
+                      "started_on",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "full_name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gender": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "female",
+                        "male",
+                        "other",
+                        "prefer_not_to_say"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "headline": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "job_alerts_enabled": {
+                  "type": "boolean"
+                },
+                "languages": {
+                  "items": {
+                    "properties": {
+                      "can_read": {
+                        "type": "boolean"
+                      },
+                      "can_write": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "language": {
+                        "maxLength": 40,
+                        "minLength": 2,
+                        "type": "string"
+                      },
+                      "proficiency": {
+                        "enum": [
+                          "basic",
+                          "conversational",
+                          "fluent",
+                          "native"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "language",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "location_district": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "location_state": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "notice_period": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "immediate",
+                        "within_15_days",
+                        "within_30_days",
+                        "over_30_days"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "onboarding_completed_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_employment_type": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "contract",
+                        "apprenticeship",
+                        "gig"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_locations": {
+                  "items": {
+                    "properties": {
+                      "district": {
+                        "anyOf": [
+                          {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "state": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "preferred_roles": {
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "skills": {
+                  "items": {
+                    "properties": {
+                      "proficiency": {
+                        "type": "integer"
+                      },
+                      "skill": {
+                        "properties": {
+                          "context": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "awarding_body": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_code": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_slug": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "sector": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "nos_code": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "nsqf_level": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "qp_count": {
+                            "type": "integer"
+                          },
+                          "skill_type": {
+                            "enum": [
+                              "technical",
+                              "core",
+                              "generic"
+                            ],
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name",
+                          "skill_type"
+                        ],
+                        "type": "object"
+                      },
+                      "source": {
+                        "enum": [
+                          "self_declared",
+                          "inferred",
+                          "assessed",
+                          "certified"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "skill",
+                      "proficiency",
+                      "source"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "willing_to_relocate": {
+                  "type": "boolean"
+                },
+                "years_experience": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "years_experience"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "POST /me/saved-jobs": {
     "parameters": [
       {
@@ -10090,6 +12638,830 @@
                 ]
               }
             },
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "certifications": {
+                  "items": {
+                    "properties": {
+                      "credential_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "expires_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "issued_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "issuing_body": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "nsqf_level": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "skill": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "context": {
+                                "anyOf": [
+                                  {
+                                    "properties": {
+                                      "awarding_body": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_code": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "qualification_slug": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "sector": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "id": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "nos_code": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "nsqf_level": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "qp_count": {
+                                "type": "integer"
+                              },
+                              "skill_type": {
+                                "enum": [
+                                  "technical",
+                                  "core",
+                                  "generic"
+                                ],
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "slug",
+                              "name",
+                              "skill_type"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "completeness": {
+                  "properties": {
+                    "missing": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "percent": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "date_of_birth": {
+                  "anyOf": [
+                    {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "education_level": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "none",
+                        "primary",
+                        "secondary",
+                        "higher_secondary",
+                        "iti",
+                        "diploma",
+                        "graduate",
+                        "postgraduate"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "educations": {
+                  "items": {
+                    "properties": {
+                      "education_level": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "none",
+                              "primary",
+                              "secondary",
+                              "higher_secondary",
+                              "iti",
+                              "diploma",
+                              "graduate",
+                              "postgraduate"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "institution": {
+                        "anyOf": [
+                          {
+                            "maxLength": 160,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "is_pursuing": {
+                        "type": "boolean"
+                      },
+                      "qualification": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "specialisation": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "year_completed": {
+                        "anyOf": [
+                          {
+                            "maximum": 2100.0,
+                            "minimum": 1950.0,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "qualification",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "expected_salary_max_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expected_salary_min_inr": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "experiences": {
+                  "items": {
+                    "properties": {
+                      "employer_name": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "ended_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "is_current": {
+                        "type": "boolean"
+                      },
+                      "location": {
+                        "anyOf": [
+                          {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "role_title": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "started_on": {
+                        "format": "date",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "employer_name",
+                      "role_title",
+                      "started_on",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "full_name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gender": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "female",
+                        "male",
+                        "other",
+                        "prefer_not_to_say"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "headline": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "job_alerts_enabled": {
+                  "type": "boolean"
+                },
+                "languages": {
+                  "items": {
+                    "properties": {
+                      "can_read": {
+                        "type": "boolean"
+                      },
+                      "can_write": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "language": {
+                        "maxLength": 40,
+                        "minLength": 2,
+                        "type": "string"
+                      },
+                      "proficiency": {
+                        "enum": [
+                          "basic",
+                          "conversational",
+                          "fluent",
+                          "native"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "language",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "location_district": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "location_state": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "notice_period": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "immediate",
+                        "within_15_days",
+                        "within_30_days",
+                        "over_30_days"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "onboarding_completed_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_employment_type": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "contract",
+                        "apprenticeship",
+                        "gig"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preferred_locations": {
+                  "items": {
+                    "properties": {
+                      "district": {
+                        "anyOf": [
+                          {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "state": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "preferred_roles": {
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "skills": {
+                  "items": {
+                    "properties": {
+                      "proficiency": {
+                        "type": "integer"
+                      },
+                      "skill": {
+                        "properties": {
+                          "context": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "awarding_body": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_code": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualification_slug": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "sector": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "nos_code": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "nsqf_level": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "qp_count": {
+                            "type": "integer"
+                          },
+                          "skill_type": {
+                            "enum": [
+                              "technical",
+                              "core",
+                              "generic"
+                            ],
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name",
+                          "skill_type"
+                        ],
+                        "type": "object"
+                      },
+                      "source": {
+                        "enum": [
+                          "self_declared",
+                          "inferred",
+                          "assessed",
+                          "certified"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "skill",
+                      "proficiency",
+                      "source"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "willing_to_relocate": {
+                  "type": "boolean"
+                },
+                "years_experience": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "years_experience"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "PUT /me/profile/{collection}/{entry_id}": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "collection",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "path",
+        "name": "entry_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "additionalProperties": true,
             "type": "object"
           }
         }

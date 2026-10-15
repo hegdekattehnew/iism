@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 
 import { meKeys } from "../core/me-keys";
 import {
+  useAddEntry,
   useAddSkills,
   useApply,
   useReadAll,
   useReadOne,
+  useRemoveEntry,
+  useUpdateEntry,
   useSendMessage,
   useUnreadCount,
   UNREAD_POLL_MS,
@@ -35,6 +38,10 @@ function setup() {
     meKeys.profile,
     meKeys.matches,
     meKeys.match("ward-assistant-1"),
+    meKeys.match("ward-assistant-1", 5000),
+    meKeys.careers(null),
+    meKeys.careers("general-duty-assistant", 5000),
+    meKeys.gap("a1"),
     meKeys.applications,
     meKeys.saved,
     meKeys.interests,
@@ -66,6 +73,35 @@ describe("what a write refreshes", () => {
     expect(stale(meKeys.matches)).toBe(true);
     expect(stale(meKeys.match("ward-assistant-1"))).toBe(true);
     expect(stale(meKeys.applications)).toBe(false);
+  });
+
+  it("every variant of a match is refreshed whatever budget it was asked with (the budget is the last key element)", async () => {
+    const { wrapper, stale } = setup();
+    serve(api.POST, { "/me/profile/skills/bulk": ok(profile()) });
+    const { result } = await renderHook(() => useAddSkills(), { wrapper });
+    await run(() => result.current.mutate({ items: [{ skill_slug: "a", proficiency: 3 }], preferred_role_title: null }));
+    expect(stale(meKeys.match("ward-assistant-1", 5000))).toBe(true);
+    expect(stale(meKeys.match("ward-assistant-1"))).toBe(true);
+  });
+
+  it("adding, changing or removing a history entry puts the answer in the profile and refreshes matches and careers", async () => {
+    for (const [hook, args] of [
+      [() => useAddEntry("preferred_roles"), (r: ReturnType<typeof useAddEntry>) => r.mutate({ title: "Nurse" })],
+      [() => useUpdateEntry("preferred_roles"), (r: ReturnType<typeof useUpdateEntry>) => r.mutate({ id: "r1", body: { title: "Nurse" } })],
+      [() => useRemoveEntry("preferred_roles"), (r: ReturnType<typeof useRemoveEntry>) => r.mutate("r1")],
+    ] as const) {
+      const { qc, wrapper, stale } = setup();
+      serve(api.POST, { "/me/profile/{collection}": ok(profile({ headline: "NEW" })) });
+      serve(api.PUT, { "/me/profile/{collection}/{entry_id}": ok(profile({ headline: "NEW" })) });
+      serve(api.DELETE, { "/me/profile/{collection}/{entry_id}": ok(profile({ headline: "NEW" })) });
+      const { result } = await renderHook(hook as () => never, { wrapper });
+      await run(() => (args as (r: never) => void)(result.current as never));
+      expect((qc.getQueryData(meKeys.profile) as { headline: string }).headline).toBe("NEW");
+      expect(stale(meKeys.matches)).toBe(true);
+      expect(stale(meKeys.match("ward-assistant-1"))).toBe(true);
+      expect(stale(meKeys.careers(null))).toBe(true);
+      expect(stale(meKeys.applications)).toBe(false);
+    }
   });
 
   it("removing a skill does the same", async () => {

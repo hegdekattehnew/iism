@@ -16,7 +16,13 @@ export const meKeys = {
   account: [ME_KEY, "account"] as const,
   profile: [ME_KEY, "profile"] as const,
   matches: [ME_KEY, "matches"] as const,
-  match: (slug: string) => [ME_KEY, "match", slug] as const,
+  // The budget is the **last** element, so a prefix reaches every variant: `[ME_KEY, "match"]` (a skill
+  // changed: every score) and `matchesOf(slug)` (one vacancy, whatever budget it was asked with).
+  // A budget changes the order of courses, not the score, but it is a different answer.
+  match: (slug: string, budget: number | null = null) => [ME_KEY, "match", slug, budget] as const,
+  matchesOf: (slug: string) => [ME_KEY, "match", slug] as const,
+  gap: (applicationId: string, budget: number | null = null) => [ME_KEY, "gap", applicationId, budget] as const,
+  careers: (role: string | null, budget: number | null = null) => [ME_KEY, "careers", role, budget] as const,
   applications: [ME_KEY, "applications"] as const,
   saved: [ME_KEY, "saved"] as const,
   interests: [ME_KEY, "interests"] as const,

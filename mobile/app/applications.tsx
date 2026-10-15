@@ -89,6 +89,10 @@ function List() {
               </View>
             ) : null}
             <Button variant="secondary" label={tm("viewJob")} onPress={() => router.push(`/job/${a.job.slug}`)} />
+            {/* Only for a rejection: "why not me" answers a decision that was made (ADR-048). */}
+            {a.status === "rejected" ? (
+              <Button variant="secondary" label={t("whyNotMe")} onPress={() => router.push(`/gap/${a.id}`)} />
+            ) : null}
             {canWithdraw(a.status) ? (
               <Button
                 variant="secondary"

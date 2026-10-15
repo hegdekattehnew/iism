@@ -14,6 +14,7 @@ import { Intl } from "../src/i18n";
 import {
   api,
   forgetPersistedCache,
+  restoreCourseBudget,
   restoreLocale,
   tokens,
   useLocale,
@@ -67,7 +68,11 @@ export default function RootLayout() {
     // TanStack Query learns "the app came to the front" from the browser; a phone says it through
     // AppState. Without this nothing refetches on return, and the unread count would be stale.
     const sub = AppState.addEventListener("change", (state) => focusManager.setFocused(state === "active"));
-    void Promise.all([restoreLocale(getLocales().map((l) => l.languageTag)), tokens.load()]).finally(
+    void Promise.all([
+      restoreLocale(getLocales().map((l) => l.languageTag)),
+      restoreCourseBudget(),
+      tokens.load(),
+    ]).finally(
       () => setReady(true),
     );
     // When a session that was there ends (a refresh was refused, or the person signed out), nothing

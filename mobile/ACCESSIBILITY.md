@@ -28,6 +28,10 @@ Tick it off in the release runbook's go/no-go list.
 - [ ] The apply confirmation is read as a whole and the focus lands on it when it opens.
 - [ ] A failed request is announced (the danger notice is a live region) without moving focus.
 - [ ] The sign-in code field is filled from the SMS on Android and offered on iOS (`autoComplete`).
+- [ ] **Sprint 67 screens** (history sections, why-not-me, career paths, the budget field): the date's
+      month and year are announced as two fields with their names; a switch ("I work here now") is
+      announced with its state; an entry's Edit and Remove say which entry; a form's problem is
+      announced next to its field and not only drawn; a long career step reads in a sensible order.
 - [ ] The system font at **200%**: nothing is cut off on a 360 dp wide screen; the tab labels still fit.
 - [ ] **Display size / zoom** at its largest on iOS.
 - [ ] Dark theme and the system "bold text" and "high contrast" settings.

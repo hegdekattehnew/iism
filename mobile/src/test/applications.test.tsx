@@ -17,6 +17,15 @@ beforeEach(() => {
 describe("my applications", () => {
   const listed = (items: unknown[]) => serve(api.GET, { "/auth/me": ok(account()), "/me/applications": ok(items) });
 
+  it("offers 'why not me' on a rejection, and only on a rejection", async () => {
+    listed([application(1, { status: "rejected" }), application(2), application(3, { status: "shortlisted" }), application(4, { status: "withdrawn" })]);
+    await renderScreen(<Applications />);
+    await screen.findByText("Ward assistant 1");
+    expect(screen.getAllByRole("button", { name: "See what you were missing" })).toHaveLength(1);
+    await fireEvent.press(screen.getByRole("button", { name: "See what you were missing" }));
+    expect(router.push).toHaveBeenCalledWith("/gap/a1");
+  });
+
   it("makes no request when signed out", async () => {
     world.signedIn = false;
     await renderScreen(<Applications />);
