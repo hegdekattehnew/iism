@@ -141,6 +141,15 @@ describe("one match opened", () => {
     expect(call.params.query).toEqual({ budget_inr: 6000 });
   });
 
+  it("a match with nothing missing offers no courses, no budget and no 'no course covers this gap'", async () => {
+    open({ missing: [], missing_mandatory: 0, coverage: 1, score: 100, courses: [] });
+    await renderScreen(<MatchDetail />);
+    await screen.findByText("Ward assistant 1");
+    expect(screen.queryByLabelText("What would you pay for a course? (₹)")).toBeNull();
+    expect(screen.queryByText(/No course on the platform covers this gap/)).toBeNull();
+    expect(screen.queryByText("Courses that close this gap")).toBeNull();
+  });
+
   it("offers the budget field beside the courses", async () => {
     open();
     await renderScreen(<MatchDetail />);

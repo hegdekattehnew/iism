@@ -64,10 +64,14 @@ function Body({ slug }: { slug: string }) {
       <ScoreSummary match={m} />
       <GapLists match={m} />
 
-      <Section title={t("coursesHeading")}>
-        <BudgetField />
-        {courses.length > 0 ? <SuggestedCourses courses={courses} /> : <Text tone="muted">{t("noCourses")}</Text>}
-      </Section>
+      {/* Courses close a gap: with nothing missing there is nothing to close, and "no course covers
+          this gap" about a 100% match was wrong (found by the Sprint 68 review). */}
+      {(m.missing ?? []).length > 0 ? (
+        <Section title={t("coursesHeading")}>
+          <BudgetField />
+          {courses.length > 0 ? <SuggestedCourses courses={courses} /> : <Text tone="muted">{t("noCourses")}</Text>}
+        </Section>
+      ) : null}
 
       {m.entry ? (
         <Section title={t("entryHeading")}>
