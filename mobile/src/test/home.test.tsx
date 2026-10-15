@@ -14,14 +14,14 @@ let mockSignedIn = false;
 let mockLocale: "en" | "hi" = "en";
 const mockApi = { GET: jest.fn(), POST: jest.fn() };
 const mockSetLocale = jest.fn();
-const mockClear = jest.fn(async () => undefined);
+const mockEndSession = jest.fn(async () => undefined);
 // Looked up lazily: the factory runs at import time, before the `const`s above exist.
 jest.mock("../runtime", () => ({
   api: {
     GET: (...args: unknown[]) => mockApi.GET(...args),
     POST: (...args: unknown[]) => mockApi.POST(...args),
   },
-  tokens: { refresh: () => "r", clear: () => mockClear() },
+  endSession: () => mockEndSession(),
   useLocale: () => mockLocale,
   setLocale: (...args: unknown[]) => mockSetLocale(...args),
   useSignedIn: () => mockSignedIn,
@@ -62,8 +62,8 @@ describe("the home screen", () => {
     expect(await screen.findByText("You are signed in.")).toBeTruthy();
     expect(screen.queryByText(/This app is for job seekers/)).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Sign out" }));
-    expect(mockApi.POST).toHaveBeenCalledWith("/auth/logout", { body: { refresh_token: "r" } });
-    expect(mockClear).toHaveBeenCalled();
+    // The phone leaves the push list first, then the session ends: one function does both.
+    expect(mockEndSession).toHaveBeenCalledTimes(1);
     await settle();
   });
 

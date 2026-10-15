@@ -80,6 +80,28 @@
     "signInPrompt": "Sign in to see your matches, applications and profile.",
     "unnamed": "Your profile",
     "menu": "What would you like to do?",
-    "viewCourse": "View the course"
+    "viewCourse": "View the course",
+    "updatesCount": "{count, plural, one {# new update} other {# new updates}}"
+  },
+  "push": {
+    "title": "Get updates on your phone",
+    "body": "We can send a notification when an employer replies or a vacancy you applied for closes. It never shows your name, your phone number or what an employer wrote: it only says there is something to read here.",
+    "allow": "Turn on notifications",
+    "later": "Not now"
+  },
+  "invite": {
+    "title": "This invitation is for an organisation",
+    "body": "This app is for job seekers. To join an organisation, open the invitation in your phone's browser and sign in there.",
+    "open": "Open in the browser"
+  },
+  "account": {
+    "shareTitle": "My IISM data",
+    "shareFailed": "Could not open the share sheet. Try again.",
+    "signedOut": "Sign in to see your account.",
+    "readNotice": "Read the privacy notice"
+  },
+  "contact": {
+    "signedOutNote": "Sign in to send a request about your own data, or to see what you sent before.",
+    "intro": "Ask a question or send us a note. For a complaint about how your data is handled, or about something on the marketplace, choose “A complaint” below: it carries a deadline we are held to."
   }
 }

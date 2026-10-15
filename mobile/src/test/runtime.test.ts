@@ -1,5 +1,6 @@
 import { CACHE_STORAGE_KEY } from "../core/persist";
-import { forgetPersistedCache, getLocale, restoreLocale, setLocale } from "../runtime";
+import { unregisterThisDevice } from "../push";
+import { api, endSession, forgetPersistedCache, getLocale, restoreLocale, setLocale, tokens } from "../runtime";
 import { storage } from "../storage";
 
 // A store in memory, and the two native modules the runtime would otherwise load.
@@ -24,6 +25,7 @@ jest.mock("../storage", () => {
 jest.mock("../auth/secure-backend", () => ({
   secureBackend: { read: async () => null, write: async () => undefined, remove: async () => undefined },
 }));
+jest.mock("../push", () => ({ unregisterThisDevice: jest.fn(async () => undefined) }));
 jest.mock("../config", () => ({ API_BASE_URL: "http://api.test", APP_VERSION: "1.0.0", PLATFORM: "android" }));
 
 type Fake = { data: Map<string, string>; failing: boolean };
@@ -79,5 +81,30 @@ describe("signing out", () => {
     await forgetPersistedCache();
     expect(fake().data.has(CACHE_STORAGE_KEY)).toBe(false);
     expect(fake().data.get("iism.locale")).toBe("hi");
+  });
+});
+
+describe("ending the session", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("takes this phone off the push list while the session still exists, then ends it", async () => {
+    jest.spyOn(api, "POST").mockResolvedValue({ data: undefined, error: undefined, response: new Response(null, { status: 204 }) } as never);
+    await tokens.set({ access_token: "a", refresh_token: "r" });
+    const seen: (string | null)[] = [];
+    (unregisterThisDevice as jest.Mock).mockImplementationOnce(async () => {
+      seen.push(tokens.access());
+    });
+    await endSession();
+    // The server only lets a person remove their own phone, so it has to be done signed in.
+    expect(seen).toEqual(["a"]);
+    expect(tokens.access()).toBeNull();
+  });
+
+  it("ends the session even when the phone could not be taken off the list", async () => {
+    jest.spyOn(api, "POST").mockResolvedValue({ data: undefined, error: undefined, response: new Response(null, { status: 204 }) } as never);
+    await tokens.set({ access_token: "a", refresh_token: "r" });
+    (unregisterThisDevice as jest.Mock).mockRejectedValueOnce(new Error("offline"));
+    await endSession();
+    expect(tokens.access()).toBeNull();
   });
 });

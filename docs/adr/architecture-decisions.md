@@ -3688,3 +3688,73 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **A page reload signs the browser run out.** `expo-secure-store` has no web backend, so the session does not survive a reload under `react-native-web`; the phone's Keychain and Keystore are unaffected. It only constrains how the run is driven (navigate by tapping, never by URL).
 - **Not on the phone yet**, each deliberate: the per-request course budget (ADR-068; held in `localStorage` on the web), reporting that a suggested course was opened (the click-through metric of ADR-025 is therefore web-only until M4), the work history, education, certificates, languages, preferred-location and salary sections of the profile, "why not me", and career paths. The basics and the skills are what move a match and what BL-15.3 asks for.
 - **Still not verified**: a native run, Hermes, TalkBack and VoiceOver (the checkbox rows carry the `checkbox` role and a `checked` state, which is the part a test can assert), and scrolling on a low-end device. `expo-doctor` reports 20 of 21: five Expo packages are one patch version behind what the SDK now asks for; no package was changed in this sprint.
+
+
+## ADR-075: A Push Is Something the Worker Does for an In-App Notice, Says Nothing From the Notice, and Reaches a Person Only Through a Phone They Registered
+
+**Status:** Accepted (October 2026). Sprint 65 (BL-15.6, M4 of the mobile programme). Extends ADR-006, ADR-017, ADR-023 and ADR-070. Migration 0055.
+
+**Context:** After M3 the app could not tell a candidate anything: an employer's reply, or a vacancy that closed, was visible only on opening the app. A push notification is the way a phone is told. It is also a new place to leak: it is drawn on a lock screen, kept by the operating system, and sent through a vendor. The outbox already had two channels (`email`, `in_app`) and the rule that a row names a recipient and holds no address.
+
+**Decision:**
+
+- **A phone is a row** (`device_tokens`): the token, the platform, the language, two times. A token is unique and **belongs to one person at a time**: registering one another account holds *moves* it, in one atomic upsert, because on a shared phone the last person to sign in is the one the next push is for. A person holds at most ten; unregistering is idempotent, deletes only the caller's own, and answers the same whether the token was theirs, someone else's or unknown. It is erased with the account and shown in the export (platform and dates, **never the token**: it is a credential for sending to that phone, and a downloaded export is a file that gets forwarded).
+- **A push is not a channel. It is a stamp** (`notifications.pushed_at`) on an in-app notice to a person. The first design was a `push` channel with a companion row written when a notice was queued, only for a person with a phone; a statement-count test that already existed (the alert sweep must not query once per candidate) failed on it, because deciding "does this person have a phone" at queue time put a query on the request path for every notice. The worker decides instead (`notifications.service._sweep_push`, in the drain): it looks at in-app notices to people not yet stamped, sends to their phones, and stamps every row it looked at, phone or no phone, so the partial index it reads (`ix_notifications_unpushed`) holds only what is still owed. **Queuing a notice runs no query** and a test asserts it. A person with no phone costs a stamp; one who registers a phone later is not sent what they missed.
+- **Switching it on replays nothing.** Migration 0055 stamps every existing notice, and the sweep stamps without sending anything older than 24 hours (a worker that was down must not turn into a lock-screen flood): the `alerted_at` lesson of Sprint 27, again.
+- **A push says nothing from the notice.** Its words come from a fixed table keyed by template and language (`templates.PUSH_TEXT`, no format fields, English and Hindi); its data is the template name and an **in-app path** (anything that does not begin with a single `/` is dropped). No vacancy, organisation, person or employer message reaches it: a push is shown on a lock screen, and ADR-070 already says a regular expression cannot promise to keep a phone number out of free text, so none gets in. A template with no entry in the table is never pushed.
+- **The token is resolved at send time and stored on no notice row**, as an address is. A token the provider reports dead is deleted, so a phone that left is not held about for no purpose. A failure retries up to `MAX_ATTEMPTS` and then gives up; the in-app notice is untouched either way, and a push failure never changes an email's outcome.
+- **The provider is a port** (`api/adapters/push`, ADR-017). The console implementation logs a digest of the token and **refuses production**, like its siblings; a real provider (Expo Push, FCM, APNs) is a later one-file change with credentials the owner has not yet created.
+- **The app asks in context, never at launch**: the first time somebody opens their updates, with a sentence saying what a notification will and will not show, and a "not now" that is remembered. The decisions (`shouldAsk`, `shouldRegister`, where a tap goes) are pure functions; `src/push.ts` is the one file that touches `expo-notifications`. Registration is a quiet no-op on the web and in a build with **no EAS project id**, which Expo needs to issue a token and which belongs to the owner's account. Sign-out removes this phone from the list **before** the session ends (bounded to three seconds so a slow network never holds sign-out up).
+
+**Options considered:**
+
+1. A `push` channel with a companion row queued with each in-app notice
+2. **A stamp on the in-app notice, swept by the worker** (chosen)
+3. Send from the request that creates the notice
+4. A push that carries the vacancy's title and the organisation's name
+
+**Trade-offs:**
+
+- Option 1: ✅ one row per message, a status per push ❌ a query per notice at queue time (found by a statement-count test), and a second row for every in-app notice of a person with a phone.
+- Option 3: ✅ immediate ❌ an outage of the push vendor would fail the very thing being described (ADR-006).
+- Option 4: ✅ a more useful lock screen ❌ vacancy titles and an employer's words on a screen anyone can read, kept by the operating system.
+
+**Consequences:**
+
+- **Verified end to end against the real worker and the development database**: a phone registered over HTTP as a seeded candidate, three in-app notices queued, and one worker tick later the log shows three pushes with the fixed words and only a path as data, a digest instead of a token, and the notices stamped.
+- **Not verified**: a real notification on a real phone. There is no device, no EAS project and no vendor account here; `expo-notifications` is compiled and bundled, nothing more.
+- **A signed-out phone keeps its token until the next person registers it** when the session was ended by the server (a refused refresh) rather than by the person: the pushes it could carry say nothing, and the next registration moves the token.
+- **Every notice in the sweep is looked at once**, up to 500 a minute; at larger volume the batch size is the first thing to measure (`make seed-scale --notifications`).
+
+## ADR-076: Store Reviewers Sign In With a Fixed Code on Named Phones, Behind an Explicit Production Switch, and Only to a Demonstration Account
+
+**Status:** Accepted (October 2026). Sprint 65 (BL-15.8, M4 of the mobile programme). Extends ADR-032, ADR-038 and ADR-066. No migration.
+
+**Context:** Both app stores reject an app their reviewer cannot sign in to, and sign-in here is a code sent to a phone (there is no password anywhere, by decision). A code sent to a phone the reviewer does not hold cannot reach them, and SMS delivery (DLT) is not built. The setting that echoes codes in the API response, `otp_expose_in_response`, must never be on in production: it is refused at startup there, and `expose_otp` is `flag and is_local`.
+
+**Decision:**
+
+- **A named exception, off by default.** `REVIEWER_LOGIN_ENABLED` (false), `REVIEWER_PHONES` (at most five, each a phone), `REVIEWER_CODE` (exactly `otp_length` digits, from the environment, never the repository). For a listed phone `request_otp` stores the configured code and sends no SMS; every other number takes the normal path unchanged. **The request is otherwise identical**: same rate limit and cooldown, same answer, so it is no oracle for who is on the list; the attempt cap still burns the code after five wrong guesses.
+- **It does not weaken the echo.** `OTP_EXPOSE_IN_RESPONSE` is still refused outside development, whatever else is set; the end-to-end check ran the reviewer sign-in with the echo **off** and it worked on the fixed code alone.
+- **Startup validation refuses an unsafe configuration**, in every environment: no phones, an entry that is not a phone, more than five, a code that is not exactly `otp_length` digits, and (outside development) a guessable code (one digit repeated, or a straight run up or down).
+- **It opens only a demonstration account.** At verification a listed phone whose account is an **operator** or **holds an organisation** is refused (403, "demonstration accounts only") and a warning is logged without the phone. A misconfigured list naming a real person's number would otherwise hand a store reviewer that person's account, or an organisation's applicants.
+- **`scripts/create_reviewer.py` only ever creates.** It makes a candidate with the current notice recorded against `--attest` (ADR-071: consent on someone's behalf is an attested claim with a name on it), a place and four declared standards, so the reviewer sees matches. A phone that already has an account is an error and nothing is written. Dry run by default.
+
+**Options considered:**
+
+1. A reviewer password or a second credential type
+2. A bypass for any number when the switch is on
+3. **A fixed code for named phones** (chosen)
+4. Real SMS to a number the stores can read (a mailbox or a virtual number), with no exception in the code
+
+**Trade-offs:**
+
+- Option 1: ✅ familiar to a reviewer ❌ the product has no passwords and no hashing dependency, deliberately (ADR-038); adding one for a single audience adds a login path every attacker would try.
+- Option 2: ✅ nothing to configure ❌ every account becomes enterable.
+- Option 4: ✅ no exception ❌ needs SMS delivery, which does not exist, and the reviewers' number is theirs to change between submissions.
+
+**Consequences:**
+
+- **Verified end to end** on a second API instance with the echo off: the reviewer account was created by the script, signed in on `482913`, saw eight matches; a stranger's number with the same code got a 401; a second run of the script wrote nothing. The test account was erased afterwards.
+- **Mutation-checked**: the code accepted for any phone, with the switch off, for a staff account, for an organisation member, for an unnormalised phone, a guessable code, an empty list, and the script adopting an existing account or skipping the attestation each fail a test.
+- **The code is a shared secret with the stores**: it should be rotated after a review and the switch turned off between submissions. That is a procedure for the release runbook (BL-15.5), not something this change can enforce.

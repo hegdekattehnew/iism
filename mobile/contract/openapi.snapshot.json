@@ -1,4 +1,11 @@
 {
+  "DELETE /me/account": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "204": {}
+    }
+  },
   "DELETE /me/profile/skills/{skill_slug}": {
     "parameters": [
       {
@@ -2692,6 +2699,87 @@
       }
     }
   },
+  "GET /me/account/deletion": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "blocked_by": {
+                  "items": {
+                    "properties": {
+                      "listings": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name",
+                      "listings"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "organisations_deleted": {
+                  "items": {
+                    "properties": {
+                      "listings": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name",
+                      "listings"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "organisations_deleted",
+                "blocked_by"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/account/export": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "GET /me/applications": {
     "parameters": [
       {
@@ -3158,6 +3246,78 @@
                 }
               },
               "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/grievances": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "items": {
+                "properties": {
+                  "acknowledged_at": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "contact",
+                      "grievance",
+                      "data_request"
+                    ],
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "resolved_at": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "enum": [
+                      "open",
+                      "acknowledged",
+                      "resolved",
+                      "dismissed"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference",
+                  "kind",
+                  "status",
+                  "created_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             }
           }
         }
@@ -3917,6 +4077,166 @@
                   },
                   "type": "array"
                 }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/notifications": {
+    "parameters": [
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "before",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "before_id",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "items": {
+                "properties": {
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "payload": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "read_at": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "template": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "template",
+                  "payload",
+                  "created_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/notifications/unread-count": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": {
+                "type": "integer"
               },
               "type": "object"
             }
@@ -6911,6 +7231,367 @@
       }
     }
   },
+  "POST /courses/{slug}/report": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "slug",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "maxLength": 1000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "asks_for_money",
+                  "fake_or_misleading",
+                  "discriminatory",
+                  "unsafe_or_illegal",
+                  "spam_or_duplicate",
+                  "other"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "201": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "received": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /grievances": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "body": {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "contact",
+                  "grievance",
+                  "data_request"
+                ],
+                "type": "string"
+              },
+              "reply_to": {
+                "anyOf": [
+                  {
+                    "maxLength": 254,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "website": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "body"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "201": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "acknowledge_within_hours": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "enum": [
+                    "contact",
+                    "grievance",
+                    "data_request"
+                  ],
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "resolve_within_days": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "reference",
+                "kind",
+                "acknowledge_within_hours",
+                "resolve_within_days"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /jobs/{slug}/report": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "slug",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "maxLength": 1000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "asks_for_money",
+                  "fake_or_misleading",
+                  "discriminatory",
+                  "unsafe_or_illegal",
+                  "spam_or_duplicate",
+                  "other"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "201": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "received": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "POST /me/applications": {
     "parameters": [
       {
@@ -7870,6 +8551,247 @@
           }
         }
       },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/devices": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "locale": {
+                "maxLength": 8,
+                "minLength": 2,
+                "type": "string"
+              },
+              "platform": {
+                "enum": [
+                  "android",
+                  "ios"
+                ],
+                "type": "string"
+              },
+              "token": {
+                "maxLength": 512,
+                "minLength": 10,
+                "type": "string"
+              }
+            },
+            "required": [
+              "token",
+              "platform"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "204": {},
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/devices/unregister": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "token": {
+                "maxLength": 512,
+                "minLength": 10,
+                "type": "string"
+              }
+            },
+            "required": [
+              "token"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "204": {},
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/notifications/read": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/notifications/{notification_id}/read": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "notification_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "204": {},
       "422": {
         "content": {
           "application/json": {

@@ -35,7 +35,7 @@ from api.modules.marketplace.models import (
     JobSkill,
 )
 from api.modules.marketplace.schemas import CandidateProfileFull
-from api.modules.notifications.models import Notification
+from api.modules.notifications.models import DeviceToken, Notification
 from api.modules.operations.models import TenantVerificationEvent
 from api.modules.privacy.schemas import (
     DeletionPreview,
@@ -324,6 +324,10 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
             Notification.recipient_kind == "user", Notification.recipient_id == user.id
         )
     )
+    # The phones this person signed in on (ADR-075). They cascade from the user in the database;
+    # said here as well because "everything went" is a claim an erasure path never makes on
+    # assumption, and a token left behind would keep a phone addressable for someone who left.
+    await db.execute(delete(DeviceToken).where(DeviceToken.user_id == user.id))
     # An invitation addressed to an account being erased is withdrawn rather
     # than left live: accepting it later would recreate a membership for a
     # person who asked to be forgotten.
@@ -477,6 +481,24 @@ async def _export_notices(db: AsyncSession, user_id: uuid.UUID) -> list[dict[str
     ]
 
 
+async def _export_devices(db: AsyncSession, user_id: uuid.UUID) -> list[dict[str, Any]]:
+    """The phones this person has signed in on: which platform, in which language, and when. **Never
+    the token**: it is a credential for sending to that phone, and a downloaded export is a file
+    that gets forwarded."""
+    rows = await db.scalars(
+        select(DeviceToken).where(DeviceToken.user_id == user_id).order_by(DeviceToken.created_at)
+    )
+    return [
+        {
+            "platform": d.platform,
+            "locale": d.locale,
+            "registered_at": _iso(d.created_at),
+            "last_seen_at": _iso(d.last_seen_at),
+        }
+        for d in rows.all()
+    ]
+
+
 async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
     """Everything held about this person, as one JSON document.
 
@@ -547,6 +569,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         db, user, profile.id if profile is not None else None
     )
     notices = await _export_notices(db, user.id)
+    devices = await _export_devices(db, user.id)
 
     log.info("account.exported")
     return {
@@ -647,6 +670,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         "ratings_received": ratings_received,
         "ratings_given": ratings_given,
         "notices": notices,
+        "devices": devices,
         # What they wrote to us (Sprint 57), and where each stands. The operator's note is the
         # operator's act, not data held about the person, and stays out.
         "grievances_raised": await grievances.export_for_user(db, user),

@@ -10,7 +10,7 @@
  */
 
 import type { Api } from "./api";
-import { ApiError, readDetail } from "./errors";
+import { ApiError, readDetail, retryAfterSeconds } from "./errors";
 import type { TokenStore } from "./token-store";
 
 /** `api/core/config.py`'s `PRIVACY_NOTICE_VERSION`; `tests/test_mobile_foundations.py` compares them. */
@@ -26,7 +26,7 @@ export type CodeRequested = {
 export async function requestCode(api: Api, phone: string): Promise<CodeRequested> {
   const { data, error, response } = await api.POST("/auth/otp/request", { body: { phone } });
   if (error || !data) {
-    throw new ApiError(response.status, readDetail(error), retryAfter(response));
+    throw new ApiError(response.status, readDetail(error), retryAfterSeconds(response));
   }
   return {
     resendAfterSeconds: data.resend_after_seconds ?? 0,
@@ -58,7 +58,26 @@ export async function verifyCode(
 export const needsConsent = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 428;
 
-export async function signOut(api: Api, tokens: TokenStore): Promise<void> {
+/** How long to wait for what must happen before the session ends: a slow network never holds sign-out up. */
+export const BEFORE_END_MS = 3000;
+
+/**
+ * End the session. `beforeEnd` is for what needs the session while it still exists (removing this
+ * phone from the push list: the server only lets a person remove their own), and is **given a few
+ * seconds and no more**, whatever it does or fails to do: whatever else happens, this phone is
+ * signed out.
+ */
+export async function signOut(
+  api: Api,
+  tokens: TokenStore,
+  beforeEnd?: () => Promise<void>,
+): Promise<void> {
+  if (beforeEnd) {
+    await Promise.race([
+      beforeEnd().catch(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, BEFORE_END_MS)),
+    ]);
+  }
   const refresh_token = tokens.refresh();
   try {
     if (refresh_token) await api.POST("/auth/logout", { body: { refresh_token } });
@@ -66,9 +85,4 @@ export async function signOut(api: Api, tokens: TokenStore): Promise<void> {
     // Whatever the server said, this phone is signed out.
     await tokens.clear();
   }
-}
-
-function retryAfter(response: Response): number {
-  const seconds = Number(response.headers.get("retry-after"));
-  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0;
 }

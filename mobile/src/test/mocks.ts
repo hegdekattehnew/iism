@@ -23,6 +23,7 @@ export const router = {
   setParams: jest.fn(),
 };
 export const setLocale = jest.fn();
+export const endSession = jest.fn(async () => undefined);
 export const tokens = { refresh: () => "r", access: () => null, clear: jest.fn(async () => undefined) };
 
 export function resetWorld() {
@@ -35,7 +36,15 @@ export function resetWorld() {
   api.DELETE.mockReset();
   for (const fn of Object.values(router)) fn.mockReset();
   setLocale.mockReset();
+  endSession.mockClear();
   tokens.clear.mockClear();
+  push.permission = "undetermined";
+  push.declined = false;
+  push.ask.mockClear();
+  push.decline.mockClear();
+  push.register.mockClear();
+  push.taps.mockReset();
+  push.registration.mockReset();
 }
 
 export const runtimeModule = {
@@ -48,8 +57,34 @@ export const runtimeModule = {
   tokens,
   useLocale: () => world.locale,
   setLocale: (...args: unknown[]) => setLocale(...args),
+  endSession: () => endSession(),
   useSignedIn: () => world.signedIn,
   useUpgradeRequired: () => null,
+};
+
+/** What `src/push.ts` would say, so a screen test needs no operating system. */
+export const push = {
+  permission: "undetermined" as "undetermined" | "granted" | "denied",
+  declined: false,
+  ask: jest.fn(async (..._args: unknown[]) => undefined),
+  decline: jest.fn(),
+  register: jest.fn(async (..._args: unknown[]) => undefined),
+  taps: jest.fn((_go: (path: string) => void) => () => undefined),
+  registration: jest.fn((..._args: unknown[]) => undefined),
+};
+
+export const pushModule = {
+  usePushPermission: () => ({
+    permission: push.permission,
+    declined: push.declined,
+    ask: (...args: unknown[]) => push.ask(...args),
+    decline: () => push.decline(),
+  }),
+  registerThisDevice: (...args: unknown[]) => push.register(...args),
+  unregisterThisDevice: async () => undefined,
+  listenForTaps: (go: (path: string) => void) => push.taps(go),
+  showForegroundNotifications: () => undefined,
+  usePushRegistration: (...args: unknown[]) => push.registration(...args),
 };
 
 export const routerModule = {

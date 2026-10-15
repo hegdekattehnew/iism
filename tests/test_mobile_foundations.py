@@ -157,6 +157,8 @@ def test_each_native_module_is_touched_in_one_file() -> None:
     owners = {
         "expo-secure-store": ["secure-backend.ts"],
         "@react-native-async-storage/async-storage": ["storage.ts"],
+        # Push (ADR-075): the decisions are in `core/push.ts`, the operating system is touched here.
+        "expo-notifications": ["push.ts"],
     }
     for module, expected in owners.items():
         users = sorted(

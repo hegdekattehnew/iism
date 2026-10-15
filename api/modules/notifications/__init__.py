@@ -9,8 +9,16 @@ adapters (ADR-017); applications depends on it. Nothing here knows what an
 application *is* -- it is handed a template name and a payload.
 """
 
-from api.modules.notifications.models import Notification
-from api.modules.notifications.routes import router
+from api.modules.notifications.models import DeviceToken, Notification
+from api.modules.notifications.routes import devices_router, router
 from api.modules.notifications.service import drain, enqueue, enqueue_many
 
-__all__ = ["Notification", "drain", "enqueue", "enqueue_many", "router"]
+__all__ = [
+    "DeviceToken",
+    "Notification",
+    "devices_router",
+    "drain",
+    "enqueue",
+    "enqueue_many",
+    "router",
+]

@@ -16,11 +16,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, Index, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.core.database import Base, one_of
+from api.modules.identity import models as _identity_models  # noqa: F401 - the FK to users resolves against it
 
 # Who it is for. A `tenant` recipient resolves to the organisation's contact
 # address -- organisations have one, and their members may not all want it.
@@ -36,6 +37,11 @@ RECIPIENT_KINDS = ("user", "tenant", "invitation")
 # `in_app` is not a delivery channel so much as an absence of one: most
 # candidates signed up with a phone, have no email, and SMS waits on DLT
 # registration. It is what they get until then, and it is honest about that.
+#
+# A push (Sprint 65, ADR-075) is **not a channel of its own**: it is something the worker does *for*
+# an in-app notice, once, when the person has a registered phone (`pushed_at` says it has been
+# dealt with). Deciding that at the moment of queuing would put a query per notice on the request
+# path, and a loop that queues a hundred (the alert sweep) would pay it a hundred times.
 CHANNELS = ("email", "in_app")
 
 # Closed, like every other set here. The template decides the words; the
@@ -111,6 +117,16 @@ class Notification(Base):
             "created_at",
             postgresql_where=text("status = 'pending' AND channel = 'email'"),
         ),
+        # The push sweep's own query (Sprint 65): in-app notices to a person not yet dealt with.
+        # Partial, so it holds only what is still owed (the sweep stamps every row it looks at,
+        # phone or no phone), never the whole in-app backlog.
+        Index(
+            "ix_notifications_unpushed",
+            "created_at",
+            postgresql_where=text(
+                "channel = 'in_app' AND recipient_kind = 'user' AND pushed_at IS NULL"
+            ),
+        ),
         # The candidate's unread list.
         Index("ix_notifications_recipient", "recipient_kind", "recipient_id", "read_at"),
     )
@@ -133,3 +149,37 @@ class Notification(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # In-app only: when the person actually looked at it.
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # In-app, to a person only: when the push sweep dealt with this (sent it to their phones, or
+    # found there was nothing to send, or gave up). `NULL` means "still owed a look" (ADR-075).
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+# Closed, like every other set here; the database enforces it too (ck_device_token_platform).
+DEVICE_PLATFORMS = ("android", "ios")
+
+
+class DeviceToken(Base):
+    """A phone that may be sent a push (Sprint 65, BL-15.6, ADR-075).
+
+    **A token belongs to one person at a time.** Registering a token another account holds moves
+    it: on a shared phone the last person to sign in is the one the next push is for. It is a
+    person's data, so it is erased with the account (the foreign key cascades) and shown in their
+    export (the platform and the dates; **never the token itself**, which is a credential to send
+    to that phone).
+    """
+
+    __tablename__ = "device_tokens"
+    __table_args__ = (
+        CheckConstraint(one_of("platform", DEVICE_PLATFORMS), name="ck_device_token_platform"),
+        Index("ix_device_tokens_user", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token: Mapped[str] = mapped_column(Text, unique=True)
+    platform: Mapped[str]
+    locale: Mapped[str] = mapped_column(default="en")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

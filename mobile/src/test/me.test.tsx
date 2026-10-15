@@ -1,12 +1,11 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 
 import Me from "../../app/(tabs)/me";
-import { account, api, ok, profile, resetWorld, router, serve, world } from "./mocks";
+import { account, api, endSession, ok, profile, resetWorld, router, serve, world } from "./mocks";
 import { renderScreen, settle } from "./harness";
 
 jest.mock("../runtime", () => require("./mocks").runtimeModule);
 jest.mock("expo-router", () => require("./mocks").routerModule);
-jest.mock("../core/sign-in", () => ({ ...jest.requireActual("../core/sign-in"), signOut: jest.fn(async () => undefined) }));
 
 beforeEach(() => resetWorld());
 
@@ -21,7 +20,7 @@ describe("my page", () => {
     expect(router.push).toHaveBeenCalledWith("/sign-in");
   });
 
-  it("shows the person, how complete the profile is, and the four places to go", async () => {
+  it("shows the person, how complete the profile is, and the places to go", async () => {
     world.signedIn = true;
     serve(api.GET, { "/auth/me": ok(account()), "/me/profile": ok(profile()) });
     await renderScreen(<Me />);
@@ -30,9 +29,12 @@ describe("my page", () => {
     expect(screen.getByText("Profile 60% complete")).toBeTruthy();
     for (const [name, path] of [
       ["My profile", "/profile"],
+      ["Updates", "/notices"],
       ["My applications", "/applications"],
       ["Saved jobs", "/saved"],
       ["Courses I asked about", "/interests"],
+      ["Your account", "/account"],
+      ["Contact us", "/contact"],
     ] as const) {
       await fireEvent.press(screen.getByRole("button", { name }));
       expect(router.push).toHaveBeenCalledWith(path);
@@ -46,5 +48,36 @@ describe("my page", () => {
     expect(await screen.findByText(/This app is for job seekers/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
     expect(api.GET.mock.calls.map((c) => c[0])).toEqual(["/auth/me"]);
+  });
+
+  it("shows how many updates are new, in the label and for a screen reader", async () => {
+    world.signedIn = true;
+    serve(api.GET, {
+      "/auth/me": ok(account()),
+      "/me/profile": ok(profile()),
+      "/me/notifications/unread-count": ok({ unread: 3 }),
+    });
+    await renderScreen(<Me />);
+    expect(await screen.findByRole("button", { name: "Updates: 3 new updates" })).toBeTruthy();
+    expect(screen.getByText("Updates (3)")).toBeTruthy();
+  });
+
+  it("says nothing of a count when there are no new updates", async () => {
+    world.signedIn = true;
+    serve(api.GET, {
+      "/auth/me": ok(account()),
+      "/me/profile": ok(profile()),
+      "/me/notifications/unread-count": ok({ unread: 0 }),
+    });
+    await renderScreen(<Me />);
+    expect(await screen.findByRole("button", { name: "Updates" })).toBeTruthy();
+  });
+
+  it("signs out through the one function that takes the phone off the push list first", async () => {
+    world.signedIn = true;
+    serve(api.GET, { "/auth/me": ok(account("organisation")) });
+    await renderScreen(<Me />);
+    await fireEvent.press(await screen.findByRole("button", { name: "Sign out" }));
+    expect(endSession).toHaveBeenCalledTimes(1);
   });
 });

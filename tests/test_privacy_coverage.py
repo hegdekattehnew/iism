@@ -58,6 +58,7 @@ EXPORTED: dict[str, str] = {
     "enrolment_batch_members": "agency_enrolment",
     # No foreign key, so named rather than discovered.
     "notifications": "notices",
+    "device_tokens": "devices",
 }
 
 # Tables that reference a person and are **deliberately** not exported to them, each with the

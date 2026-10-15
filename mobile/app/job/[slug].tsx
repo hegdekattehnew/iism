@@ -6,6 +6,7 @@ import { experienceLabel, mandatoryFirst, salaryLabel } from "../../src/core/lab
 import { useJob } from "../../src/lib/queries";
 import { useSignedIn } from "../../src/runtime";
 import { ApplyPanel } from "../../src/ui/ApplyPanel";
+import { ReportPanel } from "../../src/ui/ReportPanel";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
@@ -59,6 +60,7 @@ export default function JobDetail() {
             </Section>
 
             <ApplyPanel jobSlug={job.slug} organisation={job.tenant.name} isOpen={job.is_open} />
+            <ReportPanel target="job" slug={job.slug} />
 
             {signedIn ? null : <SignInToMatch onPress={() => router.push("/sign-in")} />}
           </>

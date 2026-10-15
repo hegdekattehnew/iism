@@ -43,6 +43,7 @@ from api.core.slugs import add_with_unique_slug
 from api.core.text import slugify
 from api.modules.identity.invitations import PENDING_INVITE_KEY
 from api.modules.identity.models import Invitation, Membership, Tenant, User
+from api.modules.identity.schemas import normalise_phone
 
 log = structlog.get_logger("iism.identity")
 
@@ -91,6 +92,15 @@ async def _unique_tenant_slug(db: AsyncSession, name: str) -> str:
 # --------------------------------------------------------------- sending codes
 
 
+def reviewer_phones() -> frozenset[str]:
+    """The phones allowed the store reviewers' fixed code (ADR-076): **empty unless the switch is
+    on**, so every caller can ask `phone in reviewer_phones()` without checking the flag."""
+    settings = get_settings()
+    if not settings.reviewer_login_enabled:
+        return frozenset()
+    return frozenset(normalise_phone(p) for p in settings.reviewer_phones.split(",") if p.strip())
+
+
 async def request_otp(phone: str) -> tuple[int, str | None]:
     """Generate, store and send a one-time passcode to a phone.
 
@@ -101,10 +111,16 @@ async def request_otp(phone: str) -> tuple[int, str | None]:
     settings = get_settings()
     await enforce_otp_rate_limit("sms", phone)
 
-    code = generate_otp()
-    await store_otp("sms", phone, code)
-
-    await get_notification_provider().send_sms(phone, _CODE_MESSAGE.format(code=code))
+    if phone in reviewer_phones():
+        # A named store reviewer (ADR-076): the configured code, and no SMS, because the message
+        # would go to a phone nobody can read. The request is otherwise identical -- same budget,
+        # same cooldown, same answer -- so it is no oracle for who is on the list.
+        code = settings.reviewer_code
+        await store_otp("sms", phone, code)
+    else:
+        code = generate_otp()
+        await store_otp("sms", phone, code)
+        await get_notification_provider().send_sms(phone, _CODE_MESSAGE.format(code=code))
     return settings.otp_ttl_seconds, code if settings.expose_otp else None
 
 
@@ -162,6 +178,27 @@ async def provision_candidate(
     return user
 
 
+async def _refuse_a_real_account_for_a_reviewer(db: AsyncSession, user: User | None) -> None:
+    """The reviewers' code is shared with a store, so what it opens must be a demonstration
+    account and nothing that holds authority: an operator, or anybody who belongs to an
+    organisation (whose listings and applicants are other people's data). A misconfigured list
+    naming a real person's number would otherwise hand a store reviewer that person's account."""
+    if user is None:
+        return
+    holds_an_organisation = await db.scalar(
+        select(Membership.id)
+        .join(Tenant, Tenant.id == Membership.tenant_id)
+        .where(Membership.user_id == user.id, Tenant.tenant_type != "personal")
+        .limit(1)
+    )
+    if user.is_staff or holds_an_organisation is not None:
+        log.warning("reviewer.refused", reason="account holds authority")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Reviewer sign-in is for demonstration accounts only"
+        )
+    log.warning("reviewer.sign_in")
+
+
 async def verify_otp_and_sign_in(
     db: AsyncSession, phone: str, code: str, consent_version: str | None = None
 ) -> tuple[User, TokenPair, bool]:
@@ -176,6 +213,8 @@ async def verify_otp_and_sign_in(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect or expired code")
 
     user = await db.scalar(select(User).where(User.phone == phone))
+    if phone in reviewer_phones():
+        await _refuse_a_real_account_for_a_reviewer(db, user)
     created = False
     if user is None:
         # This path creates accounts, so it is where consent is recorded. The

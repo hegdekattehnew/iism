@@ -2275,6 +2275,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Device
+         * @description The phone says: send my pushes here. Called when somebody signs in on the app; moves the
+         *     token if another account held it (ADR-075).
+         */
+        post: operations["register_device_me_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/devices/unregister": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unregister Device
+         * @description Called while still signed in, as the person signs out. A POST with a body, not a DELETE
+         *     with the token in the path: an Expo token contains brackets. Idempotent.
+         */
+        post: operations["unregister_device_me_devices_unregister_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/account/export": {
         parameters: {
             query?: never;
@@ -4059,6 +4101,30 @@ export interface components {
             organisations_deleted: components["schemas"]["OrganisationFate"][];
             /** Blocked By */
             blocked_by: components["schemas"]["OrganisationFate"][];
+        };
+        /**
+         * DeviceIn
+         * @description A phone registering to be sent pushes. The token is opaque to us: only printable text with
+         *     no whitespace is accepted, so what is stored can be logged as a digest and sent as-is.
+         */
+        DeviceIn: {
+            /** Token */
+            token: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios";
+            /**
+             * Locale
+             * @default en
+             */
+            locale: string;
+        };
+        /** DeviceRemoveIn */
+        DeviceRemoveIn: {
+            /** Token */
+            token: string;
         };
         /** DismissIn */
         DismissIn: {
@@ -10823,6 +10889,68 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_device_me_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unregister_device_me_devices_unregister_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceRemoveIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

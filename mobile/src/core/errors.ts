@@ -51,3 +51,9 @@ export const isSignedOut = (error: unknown): boolean => statusOf(error) === 401;
 
 /** The server asked the client to update: see `core/api.ts` and ADR-072. */
 export const isUpgradeRequired = (error: unknown): boolean => statusOf(error) === 426;
+
+/** Seconds the server asked the caller to wait (`Retry-After`), or 0. */
+export function retryAfterSeconds(response: { headers: Headers }): number {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0;
+}
