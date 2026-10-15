@@ -62,12 +62,15 @@ export function Text({
 
 export function Button({
   label,
+  accessibilityLabel,
   onPress,
   disabled = false,
   busy = false,
   variant = "primary",
 }: {
   label: string;
+  /** What a screen reader says when it needs more than the visible words ("Remove: Hand hygiene"); it must contain `label`. */
+  accessibilityLabel?: string;
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
@@ -79,7 +82,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}

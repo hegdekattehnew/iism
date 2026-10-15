@@ -5,14 +5,14 @@ import { useTranslations } from "use-intl";
 import { experienceLabel, mandatoryFirst, salaryLabel } from "../../src/core/labels";
 import { useJob } from "../../src/lib/queries";
 import { useSignedIn } from "../../src/runtime";
+import { ApplyPanel } from "../../src/ui/ApplyPanel";
 import { space } from "../../src/theme";
-import { Badge, BadgeRow, Card, Notice, Screen, Text } from "../../src/ui";
+import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
 
 export default function JobDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const t = useTranslations("jobsPage");
-  const ta = useTranslations("applications");
   const router = useRouter();
   const signedIn = useSignedIn();
   const query = useJob(slug);
@@ -34,8 +34,6 @@ export default function JobDetail() {
               {job.location_district ? ` · ${job.location_district}` : ""}
               {job.location_state ? `, ${job.location_state}` : ""}
             </Text>
-
-            {job.is_open ? null : <Notice tone="warning">{ta("vacancyClosed")}</Notice>}
 
             <Facts>
               <Fact label={t("experienceLabel")} value={experienceLabel(job, (k, v) => t(k, v))} />
@@ -59,6 +57,8 @@ export default function JobDetail() {
                 ))}
               </View>
             </Section>
+
+            <ApplyPanel jobSlug={job.slug} organisation={job.tenant.name} isOpen={job.is_open} />
 
             {signedIn ? null : <SignInToMatch onPress={() => router.push("/sign-in")} />}
           </>

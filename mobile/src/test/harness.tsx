@@ -14,8 +14,10 @@ import { Intl } from "../i18n";
  */
 export async function renderScreen(ui: ReactElement, locale: Locale = "en") {
   // `gcTime: Infinity` because the default five-minute garbage-collection timer keeps Jest's event
-  // loop alive after the last test.
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  // loop alive after the last test. It applies to mutations too: each one holds its own timer.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false, gcTime: Infinity } },
+  });
   return render(
     <Intl locale={locale}>
       <QueryClientProvider client={client}>{ui}</QueryClientProvider>

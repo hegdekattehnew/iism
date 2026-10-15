@@ -9,7 +9,7 @@ import { ActivityIndicator, View } from "react-native";
 import { APP_VERSION } from "../src/config";
 import { CACHE_STORAGE_KEY, MAX_AGE_MS, dehydrateOptions } from "../src/core/persist";
 import { installPluralRules } from "../src/core/plural-polyfill";
-import { createSignOutWatch } from "../src/core/sign-out-watch";
+import { createSignOutWatch, forgetEverything } from "../src/core/sign-out-watch";
 import { Intl } from "../src/i18n";
 import {
   api,
@@ -66,10 +66,7 @@ export default function RootLayout() {
     // the *transition* counts: the first load of a signed-out phone is not a sign-out, and wiping
     // then emptied the offline cache on every launch.
     return tokens.subscribe(
-      createSignOutWatch(() => {
-        queryClient.clear();
-        void forgetPersistedCache();
-      }),
+      createSignOutWatch(() => forgetEverything(queryClient, forgetPersistedCache)),
     );
   }, []);
 

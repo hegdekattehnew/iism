@@ -1,4 +1,7 @@
-import { createSignOutWatch } from "./sign-out-watch";
+import { QueryClient } from "@tanstack/react-query";
+
+import { meKeys } from "./me-keys";
+import { createSignOutWatch, forgetEverything } from "./sign-out-watch";
 import { createTokenStore, type SecretBackend } from "./token-store";
 
 const backendWith = (seed: Record<string, string> = {}): SecretBackend => {
@@ -54,5 +57,48 @@ describe("when the stored cache is wiped", () => {
     expect(wipes).toBe(0);
     await store.clear();
     expect(wipes).toBe(1);
+  });
+});
+
+
+describe("what signing out forgets", () => {
+  const client = () => new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+
+  it("every query about the person, so the next person to sign in is shown nothing of theirs", () => {
+    const qc = client();
+    qc.setQueryData(meKeys.profile, { full_name: "Asha" });
+    qc.setQueryData(meKeys.matches, { items: [] });
+    qc.setQueryData(meKeys.applications, [{ id: "a1", status_message: "Interview at 10" }]);
+    qc.setQueryData(meKeys.interests, []);
+    qc.setQueryData(meKeys.match("ward-assistant-1"), { score: 80 });
+    qc.setQueryData(meKeys.account, { memberships: [] });
+    forgetEverything(qc, () => undefined);
+    for (const key of [meKeys.profile, meKeys.matches, meKeys.applications, meKeys.interests, meKeys.match("ward-assistant-1"), meKeys.account]) {
+      expect(qc.getQueryData(key)).toBeUndefined();
+    }
+    expect(qc.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it("and the stored public cache too", () => {
+    let forgotten = 0;
+    forgetEverything(client(), () => void (forgotten += 1));
+    expect(forgotten).toBe(1);
+  });
+
+  it("wired to the real token store: signing out forgets, a signed-out launch does not", async () => {
+    const qc = client();
+    qc.setQueryData(meKeys.profile, { full_name: "Asha" });
+    const store = createTokenStore(backendWith());
+    let forgotten = 0;
+    const unsubscribe = store.subscribe(
+      createSignOutWatch(() => forgetEverything(qc, () => void (forgotten += 1))),
+    );
+    await store.load();
+    expect(forgotten).toBe(0);
+    await store.set({ access_token: "a", refresh_token: "r" });
+    await store.clear();
+    expect(forgotten).toBe(1);
+    expect(qc.getQueryData(meKeys.profile)).toBeUndefined();
+    unsubscribe();
   });
 });

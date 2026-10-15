@@ -1,4 +1,4 @@
-import { formatDate, formatInr } from "./format";
+import { formatInstantDate, formatDate, formatInr } from "./format";
 
 const months = (m: number, style: "short" | "long") =>
   (style === "short"
@@ -67,5 +67,37 @@ describe("a calendar date", () => {
 
   it("reads the date part of a timestamp without converting it", () => {
     expect(formatDate("2026-10-14T23:30:00Z", months)).toBe("14 Oct 2026");
+  });
+});
+
+
+describe("the day a moment happened, in India", () => {
+  const month = (m: number, style: string) => `${style}-m${m + 1}`;
+
+  it("moves a late-evening UTC moment to the next Indian day", () => {
+    expect(formatInstantDate("2026-10-14T20:00:00+00:00", month)).toBe("15 short-m10 2026");
+    expect(formatInstantDate("2026-10-14T18:29:00Z", month)).toBe("14 short-m10 2026");
+    expect(formatInstantDate("2026-10-14T18:30:00Z", month)).toBe("15 short-m10 2026");
+  });
+
+  it("honours an offset the API names, across a month and a year end", () => {
+    expect(formatInstantDate("2026-12-31T23:00:00-05:00", month)).toBe("1 short-m1 2027");
+    expect(formatInstantDate("2026-10-14T01:00:00+05:30", month)).toBe("14 short-m10 2026");
+  });
+
+  it("copes with the microseconds the API sends and with no offset at all", () => {
+    expect(formatInstantDate("2026-10-14T10:20:30.123456+00:00", month, "long")).toBe("14 long-m10 2026");
+    expect(formatInstantDate("2026-10-14T10:20:30.123456", month)).toBe("14 short-m10 2026");
+  });
+
+  it("knows a leap day", () => {
+    expect(formatInstantDate("2028-02-29T10:00:00Z", month)).toBe("29 short-m2 2028");
+    expect(formatInstantDate("2027-02-29T10:00:00Z", month)).toBeNull();
+  });
+
+  it("returns null, never a wrong day, for anything else", () => {
+    for (const bad of ["", "yesterday", "2026-13-01T00:00:00Z", "2026-10-14", "2026-10-14T25:00:00Z"]) {
+      expect(formatInstantDate(bad, month)).toBeNull();
+    }
   });
 });

@@ -28,3 +28,22 @@ GET /skills/search
 GET /skills/{slug}/jobs
 GET /skills/{slug}/courses
 GET /roles/search
+
+# The candidate's own side (M3, Sprint 64): profile and skills, matches, applying, saving a vacancy
+# and registering interest in a course.
+GET /me/profile
+PUT /me/profile
+POST /me/profile/skills/bulk
+DELETE /me/profile/skills/{skill_slug}
+GET /roles/{slug}/standards
+GET /me/matches
+GET /me/matches/{slug}
+GET /me/applications
+POST /me/applications
+POST /me/applications/{application_id}/withdraw
+GET /me/saved-jobs
+POST /me/saved-jobs
+DELETE /me/saved-jobs/{job_slug}
+GET /me/course-interests
+POST /me/course-interests
+POST /me/course-interests/{interest_id}/withdraw

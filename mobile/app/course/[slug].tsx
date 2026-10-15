@@ -6,6 +6,7 @@ import { feeLabel, intakeLabel, seatsLabel, whereLabel } from "../../src/core/la
 import { useCourse } from "../../src/lib/queries";
 import { useMonthName } from "../../src/lib/months";
 import { useSignedIn } from "../../src/runtime";
+import { InterestPanel } from "../../src/ui/InterestPanel";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
@@ -64,6 +65,8 @@ export default function CourseDetail() {
                 ))}
               </View>
             </Section>
+
+            <InterestPanel courseSlug={course.slug} organisation={course.tenant.name} />
 
             {signedIn ? null : <SignInToMatch onPress={() => router.push("/sign-in")} />}
           </>
