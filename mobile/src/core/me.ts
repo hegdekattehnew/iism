@@ -124,3 +124,42 @@ export async function withdrawInterest(api: Api, id: string) {
     }),
   );
 }
+
+// ------------------------------------------------------------------ notices
+
+export type NoticeCursor = { before: string; before_id: string };
+
+export async function listNotices(api: Api, cursor: NoticeCursor | null, limit = 30) {
+  return unwrap(
+    await api.GET("/me/notifications", { params: { query: { limit, ...(cursor ?? {}) } } }),
+  );
+}
+
+export async function unreadCount(api: Api): Promise<number> {
+  return unwrap(await api.GET("/me/notifications/unread-count")).unread ?? 0;
+}
+
+export async function markNoticeRead(api: Api, id: string): Promise<void> {
+  expectOk(
+    await api.POST("/me/notifications/{notification_id}/read", {
+      params: { path: { notification_id: id } },
+    }),
+  );
+}
+
+export async function markAllNoticesRead(api: Api): Promise<void> {
+  expectOk(await api.POST("/me/notifications/read"));
+}
+
+// ------------------------------------------------------------------ devices
+
+export async function registerDevice(
+  api: Api,
+  body: { token: string; platform: "android" | "ios"; locale: string },
+): Promise<void> {
+  expectOk(await api.POST("/me/devices", { body }));
+}
+
+export async function unregisterDevice(api: Api, token: string): Promise<void> {
+  expectOk(await api.POST("/me/devices/unregister", { body: { token } }));
+}

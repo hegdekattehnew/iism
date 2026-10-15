@@ -4,7 +4,9 @@ import { secureBackend } from "./auth/secure-backend";
 import { createApi } from "./core/api";
 import { DEFAULT_LOCALE, isLocale, resolveLocale, type Locale } from "./core/locale";
 import { wipePersistedCache } from "./core/persist";
+import { signOut } from "./core/sign-in";
 import { createTokenStore } from "./core/token-store";
+import { unregisterThisDevice } from "./push";
 import { API_BASE_URL, APP_VERSION, PLATFORM } from "./config";
 import { LOCALE_KEY, storage } from "./storage";
 
@@ -88,3 +90,9 @@ export const api = createApi({
     upgradeListeners.forEach((l) => l());
   },
 });
+
+/**
+ * Sign out. The phone is taken off the person's push list first, while the session still exists:
+ * a notification for the person who just left must not reach whoever holds the phone next.
+ */
+export const endSession = (): Promise<void> => signOut(api, tokens, () => unregisterThisDevice(api));

@@ -8,3 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const storage = AsyncStorage;
 
 export const LOCALE_KEY = "iism.locale";
+
+/** The person chose "not now" when asked about notifications: do not ask again. */
+export const PUSH_DECLINED_KEY = "iism.push-declined";

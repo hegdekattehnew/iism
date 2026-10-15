@@ -1,10 +1,10 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, focusManager } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { getLocales } from "expo-localization";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
 
 import { APP_VERSION } from "../src/config";
 import { CACHE_STORAGE_KEY, MAX_AGE_MS, dehydrateOptions } from "../src/core/persist";
@@ -58,6 +58,9 @@ export default function RootLayout() {
   const colours = useColours();
 
   useEffect(() => {
+    // TanStack Query learns "the app came to the front" from the browser; a phone says it through
+    // AppState. Without this nothing refetches on return, and the unread count would be stale.
+    const sub = AppState.addEventListener("change", (state) => focusManager.setFocused(state === "active"));
     void Promise.all([restoreLocale(getLocales().map((l) => l.languageTag)), tokens.load()]).finally(
       () => setReady(true),
     );
@@ -65,9 +68,13 @@ export default function RootLayout() {
     // cached may be shown to whoever uses the phone next: the web's `qc.clear()` on sign-out. Only
     // the *transition* counts: the first load of a signed-out phone is not a sign-out, and wiping
     // then emptied the offline cache on every launch.
-    return tokens.subscribe(
+    const unsubscribe = tokens.subscribe(
       createSignOutWatch(() => forgetEverything(queryClient, forgetPersistedCache)),
     );
+    return () => {
+      sub.remove();
+      unsubscribe();
+    };
   }, []);
 
   if (!ready) {

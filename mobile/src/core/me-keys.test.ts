@@ -10,6 +10,10 @@ const everyKey = (): (readonly unknown[])[] => [
   meKeys.applications,
   meKeys.saved,
   meKeys.interests,
+  meKeys.notices,
+  meKeys.unread,
+  meKeys.messages,
+  meKeys.deletion,
   meKeys.roles("ward boy"),
   meKeys.roleStandards("general-duty-assistant"),
 ];

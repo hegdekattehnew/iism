@@ -6,33 +6,47 @@ signs in on the website.
 
 ## Status
 
-**Sprint 64 (M3), completed: the candidate's own side.** Sign in, build a profile by naming a job and
-ticking the standards you hold, see ranked matches with the gap and the courses that close it, apply
-(behind a confirmation that names what is shared), withdraw, save a vacancy, register interest in a
-course, and see every application with what the employer said (ADR-074). Browsing without signing in
-(Sprint 63, ADR-073) is unchanged. Everything here is checked by `make mobile-check` (and by the
-`mobile` job in CI):
+**Sprint 65 (M4), completed: updates, push, links, account and a way in for store reviewers.** On top
+of M3 (the candidate's own side, ADR-074) a signed-in person now sees **their updates** (every notice,
+paged, in the website's own words, with the number that are new on the Me tab), can **take their data
+with them** through the share sheet and **delete their account** from inside the app, **write to the
+team** and see where each message stands, **report a vacancy or a course**, and **open links** into
+the app. Push notifications are built **except real delivery** (ADR-075), and a **store reviewer can
+sign in** behind an explicit production switch (ADR-076). Everything here is checked by
+`make mobile-check` (and by the `mobile` job in CI):
 
-- strict `tsc`, `eslint` (Expo's config) and **329 Jest tests**: the portable core (`src/core`) in
-  plain Node, and the screens rendered in a React Native test renderer against the real catalogues;
-- a **Metro bundle for Android and iOS** compiled to Hermes bytecode (`npx expo export`), which
-  catches a missing import or an unresolvable asset;
+- strict `tsc`, `eslint` and **Jest tests** for the portable core (`src/core`, in plain Node) and the
+  screens (rendered against the real catalogues);
+- a **Metro bundle for Android and iOS** compiled to Hermes bytecode;
 - Python guards in `tests/test_mobile_foundations.py` (generated files not stale, message keys exist,
-  one file per native module, no import cycle, **every write reports its failure**, **every personal
-  query is keyed `"me"`**).
+  **one file per native module** (`push.ts` is the only one that touches `expo-notifications`), no
+  import cycle, every write reports its failure, every personal query is keyed `"me"`).
 
-**Run for real in a browser, not on a phone.** The same screens were run through `react-native-web` at
-375x812 against the dev API as two seeded candidates, in English and Hindi. `expo-secure-store` has no
-web backend, so a page **reload signs the browser run out**: navigate by tapping, not by URL. The phone's
-Keychain and Keystore are unaffected.
+**Run for real in a browser, not on a phone** (two seeded candidates, English and Hindi). A page
+**reload signs the browser run out**, because `expo-secure-store` has no web backend: navigate by
+tapping. The phone's Keychain and Keystore are unaffected.
+
+**Notifications are best-effort until two owner-side things exist.** Registration is a **quiet no-op**
+on the web and in a build with **no EAS project id** (`expo.extra.eas.projectId`, created with the
+owner's Expo account: Expo needs it to issue a token); and the server's push provider is the console
+one, which **refuses production**, until a vendor account and credentials exist. The in-app updates
+need neither.
+
+**Links open by the `iism://` scheme only.** `iism://job/<slug>`, `/course/…`, `/skill/…`, `/match/…`,
+`/matches`, `/applications`, `/notices`, `/invite/<token>` and the website's own paths resolve to a
+screen; **anything else is ignored** (`src/core/links.ts` is the whole table, `app/+native-intent.ts`
+applies it). Links from the website's address (App Links, universal links) need a **domain** and its
+association files: that belongs to the deployment and to M5. An invitation link opens a screen that says
+the app is for job seekers and hands the invitation to the browser; it accepts nothing.
 
 **Not verified yet, and no automated check stands in for it:** a run on an emulator or a real phone;
-whether Hermes formats and scrolls as expected; TalkBack and VoiceOver; performance on a low-end Android.
-**On the website only, for now:** the work history, education, certificates and languages sections of the
-profile, the course budget, "why not me" and career paths.
+a real push, and the share sheet's behaviour on a real device; Hermes; TalkBack and VoiceOver;
+performance on a low-end Android. **On the website only, for now:** the profile's history sections,
+the course budget, "why not me" and career paths.
 
 **Personal data is held in memory only** and dropped at sign-out; only queries keyed `"public"` are ever
-written to the phone's storage (`src/core/me-keys.ts`, `src/core/persist.ts`).
+written to the phone's storage (`src/core/me-keys.ts`, `src/core/persist.ts`). A push token is held in
+memory too.
 
 ## Run it
 
@@ -71,11 +85,13 @@ app/                  Expo Router screens (one file, one route). No test files h
                       app/ is a route.
 src/core/             No React Native import: the API client, token store, sign-in flow, locale,
                       formatting, labels, the public reads, the cache rules, the candidate's reads and
-                      writes (me.ts), applying, the role picker and the profile rules. Put logic here, not in
+                      writes (me.ts), applying, the role picker, the profile rules, notices, links, push decisions, the account,
+                      messages and reports. Put logic here, not in
                       a screen.
 src/lib/              Query hooks: ["public", locale, ...] for a visitor, ["me", ...] for a person
                       (me-queries.ts is the only place a personal query is built)
 src/auth/             The one file that touches the Keychain / Keystore
+src/push.ts           The one file that touches expo-notifications (best effort, never shown)
 src/test/             Screen tests and the render harness
 src/api/schema.d.ts   GENERATED from the API: `make gen-api-mobile`
 src/messages/         en, hi, ms GENERATED from web/src/messages (`make sync-mobile-messages`);

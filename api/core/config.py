@@ -65,6 +65,17 @@ class Settings(BaseSettings):
     # exercised without an SMS provider. Must never be true outside development.
     otp_expose_in_response: bool = True
 
+    # --- store-reviewer sign-in (Sprint 65, BL-15.8, ADR-076) ---
+    # Both app stores reject an app their reviewer cannot sign in to, and a code sent to a phone the
+    # reviewer does not hold cannot reach them. This is a **named exception**, off by default: when
+    # the switch is on, a code request for one of the listed phones stores `reviewer_code` instead
+    # of a generated one and sends no SMS. Nothing else changes: every other number takes the normal
+    # path, the attempt cap and request budget still apply, `otp_expose_in_response` is still
+    # refused outside development, and a staff or organisation account is refused at verification.
+    reviewer_login_enabled: bool = False
+    reviewer_phones: str = ""  # comma-separated; normalised by identity, the owner of that rule
+    reviewer_code: str = ""  # a secret from the environment, `otp_length` digits
+
     # --- logging ---
     log_level: str = "INFO"
     # Defaults to `json` so a missing environment variable fails toward the
@@ -237,6 +248,28 @@ class Settings(BaseSettings):
             raise ValueError("DB_ECHO must be false outside development")
         return self
 
+    @model_validator(mode="after")
+    def _guard_reviewer_login(self) -> "Settings":
+        """A reviewer exception that is on must be a small, named, non-trivial one, in every
+        environment; outside development it must also not be a guessable code."""
+        if not self.reviewer_login_enabled:
+            return self
+        phones = [p for p in (x.strip() for x in self.reviewer_phones.split(",")) if p]
+        if not phones:
+            raise ValueError(
+                "REVIEWER_PHONES must name at least one phone when reviewer login is on"
+            )
+        if len(phones) > MAX_REVIEWER_PHONES:
+            raise ValueError(f"REVIEWER_PHONES may name at most {MAX_REVIEWER_PHONES} phones")
+        if any(sum(ch.isdigit() for ch in p) < 10 for p in phones):
+            raise ValueError("every REVIEWER_PHONES entry must be a phone number")
+        code = self.reviewer_code
+        if len(code) != self.otp_length or not code.isdigit():
+            raise ValueError(f"REVIEWER_CODE must be exactly {self.otp_length} digits")
+        if not self.is_local and _is_guessable(code):
+            raise ValueError("REVIEWER_CODE is too easy to guess; choose another")
+        return self
+
     @property
     def is_local(self) -> bool:
         return self.environment in LOCAL_ENVIRONMENTS
@@ -245,6 +278,17 @@ class Settings(BaseSettings):
     def expose_otp(self) -> bool:
         """Belt and braces: the flag alone cannot leak codes outside local envs."""
         return self.otp_expose_in_response and self.is_local
+
+
+MAX_REVIEWER_PHONES = 5
+
+
+def _is_guessable(code: str) -> bool:
+    """All one digit, or a straight run up or down: the first things anybody tries."""
+    if len(set(code)) == 1:
+        return True
+    steps = {int(b) - int(a) for a, b in zip(code, code[1:], strict=False)}
+    return steps in ({1}, {-1})
 
 
 @lru_cache

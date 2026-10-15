@@ -2,9 +2,8 @@ import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { signOut } from "../../src/core/sign-in";
-import { useProfile } from "../../src/lib/me-queries";
-import { api, tokens, useSignedIn } from "../../src/runtime";
+import { useProfile, useUnreadCount } from "../../src/lib/me-queries";
+import { endSession, useSignedIn } from "../../src/runtime";
 import { space } from "../../src/theme";
 import { SeekerGate } from "../../src/ui/gate";
 import { Card } from "../../src/ui/list";
@@ -26,7 +25,7 @@ export default function Me() {
         <Menu />
       </SeekerGate>
       {signedIn ? (
-        <Button variant="secondary" label={ta("signOut")} onPress={() => void signOut(api, tokens)} />
+        <Button variant="secondary" label={ta("signOut")} onPress={() => void endSession()} />
       ) : null}
     </Screen>
   );
@@ -37,8 +36,12 @@ function Menu() {
   const tp = useTranslations("profilePage");
   const ta = useTranslations("applications");
   const tc = useTranslations("courseInterest");
+  const tn = useTranslations("notificationsPage");
+  const ta2 = useTranslations("account");
+  const tct = useTranslations("contactPage");
   const router = useRouter();
   const profile = useProfile();
+  const unread = useUnreadCount().data ?? 0;
   const p = profile.data;
 
   return (
@@ -49,9 +52,17 @@ function Menu() {
         {p ? <Text tone="muted">{tp("completeness", { percent: p.completeness?.percent ?? 0 })}</Text> : null}
         <Text variant="small">{tp("title")}</Text>
       </Card>
+      <Button
+        variant="secondary"
+        label={unread > 0 ? `${tn("title")} (${unread})` : tn("title")}
+        accessibilityLabel={unread > 0 ? `${tn("title")}: ${t("me.updatesCount", { count: unread })}` : undefined}
+        onPress={() => router.push("/notices")}
+      />
       <Button variant="secondary" label={ta("pageTitle")} onPress={() => router.push("/applications")} />
       <Button variant="secondary" label={ta("savedPageTitle")} onPress={() => router.push("/saved")} />
       <Button variant="secondary" label={tc("pageTitle")} onPress={() => router.push("/interests")} />
+      <Button variant="secondary" label={ta2("title")} onPress={() => router.push("/account")} />
+      <Button variant="secondary" label={tct("title")} onPress={() => router.push("/contact")} />
     </View>
   );
 }

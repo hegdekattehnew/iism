@@ -7,6 +7,7 @@ import { useCourse } from "../../src/lib/queries";
 import { useMonthName } from "../../src/lib/months";
 import { useSignedIn } from "../../src/runtime";
 import { InterestPanel } from "../../src/ui/InterestPanel";
+import { ReportPanel } from "../../src/ui/ReportPanel";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
@@ -67,6 +68,7 @@ export default function CourseDetail() {
             </Section>
 
             <InterestPanel courseSlug={course.slug} organisation={course.tenant.name} />
+            <ReportPanel target="course" slug={course.slug} />
 
             {signedIn ? null : <SignInToMatch onPress={() => router.push("/sign-in")} />}
           </>

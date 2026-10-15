@@ -1,7 +1,7 @@
 import { createApi } from "./api";
 import { createTokenStore, type SecretBackend } from "./token-store";
 import { ApiError } from "./errors";
-import { needsConsent, requestCode, signOut, verifyCode } from "./sign-in";
+import { BEFORE_END_MS, needsConsent, requestCode, signOut, verifyCode } from "./sign-in";
 
 const nothing: SecretBackend = {
   read: async () => null,
@@ -110,5 +110,40 @@ describe("signing out", () => {
     await tokens.set({ access_token: "a", refresh_token: "r" });
     await signOut(api, tokens).catch(() => undefined);
     expect(tokens.access()).toBeNull();
+  });
+
+  it("runs what needs the session first, while it still exists, and then ends it", async () => {
+    const { api, tokens, calls } = harness(() => json(204, {}));
+    await tokens.set({ access_token: "a", refresh_token: "r" });
+    const order: string[] = [];
+    await signOut(api, tokens, async () => {
+      order.push(`before:${tokens.access()}`);
+    });
+    order.push(`after:${tokens.access()}`);
+    expect(order).toEqual(["before:a", "after:null"]);
+    expect(calls[0].path).toBe("/auth/logout");
+  });
+
+  it("ends the session even when what ran first failed", async () => {
+    const { api, tokens } = harness(() => json(204, {}));
+    await tokens.set({ access_token: "a", refresh_token: "r" });
+    await signOut(api, tokens, async () => {
+      throw new Error("could not reach the push service");
+    });
+    expect(tokens.access()).toBeNull();
+  });
+
+  it("does not wait for ever for what runs first: a slow network never holds sign-out up", async () => {
+    jest.useFakeTimers();
+    try {
+      const { api, tokens } = harness(() => json(204, {}));
+      await tokens.set({ access_token: "a", refresh_token: "r" });
+      const done = signOut(api, tokens, () => new Promise<void>(() => undefined));
+      await jest.advanceTimersByTimeAsync(BEFORE_END_MS + 10);
+      await done;
+      expect(tokens.access()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -1,6 +1,14 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 
+import { deleteAccount, exportFile, fetchDeletionPreview, fetchExport } from "../core/account";
 import { ApiError, readDetail } from "../core/errors";
+import { listMyMessages, sendMessage, type MessageDraft } from "../core/grievance";
 import {
   addSkillsBulk,
   applyTo,
@@ -9,12 +17,16 @@ import {
   listApplications,
   listInterests,
   listMatches,
+  listNotices,
+  markAllNoticesRead,
+  markNoticeRead,
   listSaved,
   registerInterest,
   removeSkill,
   roleStandards,
   saveJob,
   searchRoleHits,
+  unreadCount,
   unsaveJob,
   updateProfile,
   withdrawApplication,
@@ -22,6 +34,8 @@ import {
   type ProfileUpdate,
 } from "../core/me";
 import { ME_KEY, meKeys } from "../core/me-keys";
+import { NOTICE_PAGE_SIZE, nextCursor } from "../core/notices";
+import { reportListing, type Reason, type Target } from "../core/report";
 import type { BulkBody } from "../core/role-picker";
 import { api, useSignedIn } from "../runtime";
 
@@ -201,4 +215,107 @@ export function useRemoveSkill() {
       skillsChanged(qc);
     },
   });
+}
+
+// ---------------------------------------------------------------- notices
+
+/** Every notice, newest first, a page at a time; the cursor is the last one's time **and** id. */
+export function useNoticePages() {
+  const { enabled } = useSeeker();
+  return useInfiniteQuery({
+    queryKey: meKeys.notices,
+    enabled,
+    initialPageParam: null as { before: string; before_id: string } | null,
+    queryFn: ({ pageParam }) => listNotices(api, pageParam, NOTICE_PAGE_SIZE),
+    getNextPageParam: (last) => nextCursor(last),
+  });
+}
+
+/** How often the unread count is asked for while the app is in front. */
+export const UNREAD_POLL_MS = 60_000;
+
+/** What the Me tab's badge shows: one indexed count, cheap enough to ask on every launch. */
+export function useUnreadCount() {
+  const { enabled } = useSeeker();
+  return useQuery({
+    queryKey: meKeys.unread,
+    enabled,
+    queryFn: () => unreadCount(api),
+    // The tab is mounted for the whole session, so without these the number would be the one read
+    // at launch. A minute is cheap (a count, no body), and it does not run while the app is in the
+    // background: coming back to the foreground refetches at once (see the root layout).
+    refetchInterval: UNREAD_POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+function noticesChanged(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: meKeys.notices });
+  void qc.invalidateQueries({ queryKey: meKeys.unread });
+}
+
+export function useReadOne() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markNoticeRead(api, id),
+    onSuccess: () => noticesChanged(qc),
+  });
+}
+
+export function useReadAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => markAllNoticesRead(api),
+    onSuccess: () => noticesChanged(qc),
+  });
+}
+
+// ------------------------------------------------------- messages and reports
+
+/** What the signed-in person has sent the team, and where each stands. */
+export function useMyMessages() {
+  const { enabled } = useSeeker();
+  return useQuery({ queryKey: meKeys.messages, enabled, queryFn: () => listMyMessages(api) });
+}
+
+/** A message to the team. Open to a signed-out visitor too, so it is not gated on an account. */
+export function useSendMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (draft: MessageDraft) => sendMessage(api, draft),
+    onSuccess: () => qc.invalidateQueries({ queryKey: meKeys.messages }),
+  });
+}
+
+export function useReportListing(target: Target, slug: string) {
+  return useMutation({
+    mutationFn: (v: { reason: Reason; detail: string }) =>
+      reportListing(api, target, slug, v.reason, v.detail),
+  });
+}
+
+// ---------------------------------------------------------------- the account
+
+/** What deleting the account would take with it. Asked only once the person says they might. */
+export function useDeletionPreview(wanted: boolean) {
+  const { enabled } = useSeeker();
+  return useQuery({
+    queryKey: meKeys.deletion,
+    enabled: enabled && wanted,
+    // A preview is a fact about now: never served from a stale cache to somebody about to act on it.
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: () => fetchDeletionPreview(api),
+  });
+}
+
+/** The person's data as text for the share sheet, with the file name it would be saved under. */
+export function useExportData() {
+  return useMutation({
+    mutationFn: async (today: string) => exportFile(await fetchExport(api), today),
+  });
+}
+
+export function useDeleteAccount() {
+  return useMutation({ mutationFn: () => deleteAccount(api) });
 }

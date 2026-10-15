@@ -6,6 +6,11 @@ import { meKeys } from "../core/me-keys";
 import {
   useAddSkills,
   useApply,
+  useReadAll,
+  useReadOne,
+  useSendMessage,
+  useUnreadCount,
+  UNREAD_POLL_MS,
   useRegisterInterest,
   useRemoveSkill,
   useToggleSave,
@@ -13,7 +18,7 @@ import {
   useWithdraw,
   useWithdrawInterest,
 } from "../lib/me-queries";
-import { api, application, interest, ok, profile, resetWorld, serve, world } from "./mocks";
+import { account, api, application, interest, ok, profile, resetWorld, serve, world } from "./mocks";
 
 jest.mock("../runtime", () => require("./mocks").runtimeModule);
 jest.mock("expo-router", () => require("./mocks").routerModule);
@@ -26,7 +31,17 @@ beforeEach(() => {
 /** A client holding one answer under every personal key, so what a write refreshes can be seen. */
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { gcTime: Infinity } } });
-  for (const key of [meKeys.profile, meKeys.matches, meKeys.match("ward-assistant-1"), meKeys.applications, meKeys.saved, meKeys.interests]) {
+  for (const key of [
+    meKeys.profile,
+    meKeys.matches,
+    meKeys.match("ward-assistant-1"),
+    meKeys.applications,
+    meKeys.saved,
+    meKeys.interests,
+    meKeys.notices,
+    meKeys.unread,
+    meKeys.messages,
+  ]) {
     qc.setQueryData(key, []);
   }
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
@@ -107,5 +122,45 @@ describe("what a write refreshes", () => {
     const withdraw = await renderHook(() => useWithdrawInterest(), { wrapper });
     await run(() => withdraw.result.current.mutate("i1"));
     expect(stale(meKeys.applications)).toBe(false);
+  });
+
+  it("reading one notice or all refreshes the list and the count that the tab shows", async () => {
+    const { wrapper, stale } = setup();
+    serve(api.POST, {
+      "/me/notifications/{notification_id}/read": ok(undefined),
+      "/me/notifications/read": ok({ marked: 2 }),
+    });
+    const one = await renderHook(() => useReadOne(), { wrapper });
+    await run(() => one.result.current.mutate("n1"));
+    expect(stale(meKeys.notices)).toBe(true);
+    expect(stale(meKeys.unread)).toBe(true);
+    expect(stale(meKeys.applications)).toBe(false);
+    const all = await renderHook(() => useReadAll(), { wrapper });
+    await run(() => all.result.current.mutate());
+    expect(stale(meKeys.unread)).toBe(true);
+  });
+
+  it("sending a message refreshes what the person has sent", async () => {
+    const { wrapper, stale } = setup();
+    serve(api.POST, { "/grievances": ok({ reference: "G-1", kind: "contact", acknowledge_within_hours: 24, resolve_within_days: 15 }) });
+    const { result } = await renderHook(() => useSendMessage(), { wrapper });
+    await run(() =>
+      result.current.mutate({ kind: "contact", body: "a question about my data", replyTo: "", signedIn: true }),
+    );
+    expect(stale(meKeys.messages)).toBe(true);
+    expect(stale(meKeys.notices)).toBe(false);
+  });
+
+  it("asks for the unread count again while the app is in front, and when it returns: the tab is mounted all session", async () => {
+    world.signedIn = true;
+    serve(api.GET, { "/auth/me": ok(account()), "/me/notifications/unread-count": ok({ unread: 1 }) });
+    const { qc, wrapper } = setup();
+    qc.clear();
+    await renderHook(() => useUnreadCount(), { wrapper });
+    await run(() => undefined);
+    const query = qc.getQueryCache().find({ queryKey: meKeys.unread });
+    expect(query?.observers[0].options.refetchInterval).toBe(UNREAD_POLL_MS);
+    expect(query?.observers[0].options.refetchOnWindowFocus).toBe(true);
+    expect(UNREAD_POLL_MS).toBeGreaterThanOrEqual(30_000);
   });
 });

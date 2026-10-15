@@ -200,3 +200,59 @@ def render(template: str, locale: str, payload: dict[str, Any]) -> tuple[str, st
     catalogue = TEMPLATES.get(locale) or TEMPLATES[DEFAULT_LOCALE]
     subject, body = catalogue.get(template) or TEMPLATES[DEFAULT_LOCALE][template]
     return subject.format(**payload), body.format(**payload)
+
+
+# ------------------------------------------------------------------------------- push (ADR-075)
+
+# What a push says, per template and language: a fixed string, **never built from the payload**. A
+# push is shown on a lock screen and kept by the operating system, so it names no vacancy, no
+# organisation, no person and none of an employer's free text (ADR-070's reasoning: a regular
+# expression cannot promise to keep a phone number out of free text, so none reaches it). The
+# person opens the app to read the rest. A template with no entry here is never pushed.
+PUSH_TEXT: dict[str, dict[str, tuple[str, str]]] = {
+    "en": {
+        "application_status_changed": ("Update on your application", "Open IISM to see it."),
+        "application_status_message": ("A message about your application", "Open IISM to read it."),
+        "job_alert": ("A new vacancy matches you", "Open IISM to see it."),
+        "vacancy_closed": ("A vacancy you applied for has closed", "Open IISM for details."),
+        "course_interest_status_changed": (
+            "Update on a course you asked about",
+            "Open IISM to see it.",
+        ),
+        "sponsor_offer": ("An employer has an offer for you", "Open IISM to see it."),
+        "grievance_update": ("An update on your message to us", "Open IISM to see it."),
+    },
+    "hi": {
+        "application_status_changed": ("आपके आवेदन पर नई जानकारी", "देखने के लिए IISM खोलें।"),
+        "application_status_message": ("आपके आवेदन के बारे में संदेश", "पढ़ने के लिए IISM खोलें।"),
+        "job_alert": ("एक नई रिक्ति आपसे मेल खाती है", "देखने के लिए IISM खोलें।"),
+        "vacancy_closed": ("जिस रिक्ति में आपने आवेदन किया वह बंद हो गई", "विवरण के लिए IISM खोलें।"),
+        "course_interest_status_changed": ("आपके पूछे पाठ्यक्रम पर नई जानकारी", "देखने के लिए IISM खोलें।"),
+        "sponsor_offer": ("एक नियोक्ता के पास आपके लिए प्रस्ताव है", "देखने के लिए IISM खोलें।"),
+        "grievance_update": ("हमें भेजे आपके संदेश पर जानकारी", "देखने के लिए IISM खोलें।"),
+    },
+}
+
+
+def push_text(template: str, locale: str) -> tuple[str, str] | None:
+    """Title and body for a push, or `None` for a template that is never pushed. English fills a
+    missing language, like `render`."""
+    catalogue = PUSH_TEXT.get(locale) or PUSH_TEXT[DEFAULT_LOCALE]
+    return catalogue.get(template) or PUSH_TEXT[DEFAULT_LOCALE].get(template)
+
+
+def in_app_path(value: object) -> str | None:
+    """An in-app path from a payload, and nothing else: a push never links off-site (the web's
+    `linkOf`). Anything not starting with a single `/` is dropped."""
+    if isinstance(value, str) and value.startswith("/") and not value.startswith("//"):
+        return value
+    return None
+
+
+def push_data(template: str, payload: dict[str, Any]) -> dict[str, str]:
+    """What rides with a push beside its words: the template and an in-app path. Strings only."""
+    path = "/grievance" if template == "grievance_update" else in_app_path(payload.get("path"))
+    data = {"template": template}
+    if path:
+        data["path"] = path
+    return data

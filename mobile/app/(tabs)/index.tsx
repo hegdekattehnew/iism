@@ -4,9 +4,8 @@ import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
 import { OFFERED_LOCALES } from "../../src/core/locale";
-import { signOut } from "../../src/core/sign-in";
 import { useAccount } from "../../src/lib/me-queries";
-import { api, setLocale, tokens, useLocale } from "../../src/runtime";
+import { endSession, setLocale, useLocale } from "../../src/runtime";
 import { Button, Notice, Screen, SearchBox, Text } from "../../src/ui";
 
 /**
@@ -18,6 +17,7 @@ export default function Home() {
   const t = useTranslations("mobile");
   const ta = useTranslations("auth");
   const ts = useTranslations("searchPage");
+  const tct = useTranslations("contactPage");
   const router = useRouter();
   const { signedIn, isJobSeeker } = useAccount();
   const locale = useLocale();
@@ -40,13 +40,14 @@ export default function Home() {
         <Button variant="secondary" label={t("home.browseJobs")} onPress={() => router.navigate("/jobs")} />
         <Button variant="secondary" label={t("home.browseCourses")} onPress={() => router.navigate("/courses")} />
         <Button variant="secondary" label={t("home.browseStandards")} onPress={() => router.navigate("/skills")} />
+        <Button variant="secondary" label={tct("title")} onPress={() => router.push("/contact")} />
       </View>
 
       {signedIn ? (
         <>
           <Text>{t("home.signedIn")}</Text>
           {isJobSeeker === false ? <Notice tone="warning">{t("home.organisationNote")}</Notice> : null}
-          <Button variant="secondary" label={ta("signOut")} onPress={() => void signOut(api, tokens)} />
+          <Button variant="secondary" label={ta("signOut")} onPress={() => void endSession()} />
         </>
       ) : (
         <Button label={ta("signInTitle")} onPress={() => router.push("/sign-in")} />

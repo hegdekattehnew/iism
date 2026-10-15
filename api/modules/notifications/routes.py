@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.database import get_db_session
 from api.core.security import get_current_user
 from api.modules.identity import User
-from api.modules.notifications import service
-from api.modules.notifications.schemas import NotificationOut
+from api.modules.notifications import devices, service
+from api.modules.notifications.schemas import DeviceIn, DeviceRemoveIn, NotificationOut
 
 router = APIRouter(prefix="/me/notifications", tags=["notifications"])
+devices_router = APIRouter(prefix="/me/devices", tags=["notifications"])
 
 
 @router.get("", response_model=list[NotificationOut])
@@ -62,3 +63,27 @@ async def mark_one_read(
 ) -> None:
     if not await service.mark_read(db, user.id, notification_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found")
+
+
+@devices_router.post("", status_code=status.HTTP_204_NO_CONTENT)
+async def register_device(
+    payload: DeviceIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """The phone says: send my pushes here. Called when somebody signs in on the app; moves the
+    token if another account held it (ADR-075)."""
+    await devices.register(
+        db, user.id, token=payload.token, platform=payload.platform, locale=payload.locale
+    )
+
+
+@devices_router.post("/unregister", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister_device(
+    payload: DeviceRemoveIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Called while still signed in, as the person signs out. A POST with a body, not a DELETE
+    with the token in the path: an Expo token contains brackets. Idempotent."""
+    await devices.unregister(db, user.id, payload.token)

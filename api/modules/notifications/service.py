@@ -20,16 +20,28 @@ from sqlalchemy import delete, func, insert, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider
+from api.adapters.push import InvalidDeviceToken, get_push_provider
 from api.core.config import get_settings
 from api.modules.identity.models import Invitation, Membership, Tenant, User
-from api.modules.notifications.models import Notification
-from api.modules.notifications.templates import render
+from api.modules.notifications.models import DeviceToken, Notification
+from api.modules.notifications.templates import push_data, push_text, render
 
 log = structlog.get_logger("iism.notifications")
 
 # How many times a failure is worth retrying before it is somebody's problem
 # rather than the queue's.
 MAX_ATTEMPTS = 5
+
+# `IN (...)` lists are chunked: asyncpg refuses a statement with more than 32,767 bind parameters.
+_CHUNK = 5000
+
+# A notice older than this is not worth a lock-screen alert: the worker was down, or the person had
+# no phone then. The sweep stamps it as dealt with and sends nothing, so switching push on never
+# replays a backlog (the alert sweep's `alerted_at` lesson, Sprint 27).
+PUSH_WINDOW = timedelta(hours=24)
+# How many notices one tick looks at. Larger than the email batch because a notice for a person
+# with no phone costs one stamp: a hundred-candidate alert sweep must not queue phones behind them.
+PUSH_BATCH = 500
 
 
 async def enqueue(
@@ -177,9 +189,94 @@ async def drain(db: AsyncSession, *, limit: int = 50) -> dict[str, int]:
         notification.sent_at = datetime.now(UTC)
         counts["sent"] += 1
 
+    pushed = await _sweep_push(db, limit=PUSH_BATCH)
+
     await db.commit()
     if any(counts.values()):
         log.info("notification.drained", **counts)
+    if pushed["sent"] or pushed["failed"]:
+        log.info("notification.pushed", **pushed)
+    return counts
+
+
+async def _sweep_push(db: AsyncSession, *, limit: int) -> dict[str, int]:
+    """Send a push for each in-app notice to a person that has not been looked at yet (ADR-075).
+
+    **The sweep stamps every row it looks at** (`pushed_at`), whether or not there was anything to
+    send, so the partial index it reads holds only what is still owed and a person with no phone
+    costs one stamp, not a retry for ever. It is not part of the email counts: most in-app notices
+    go to people with no phone, and counting each as "skipped" would bury the email figures.
+
+    The tokens are resolved here and never stored on a row, for the reason an address is. The words
+    come from a fixed table keyed by template and language and **nothing in the payload reaches
+    the title, the body or the data** beyond an in-app path: a push is shown on a lock screen and
+    kept by the operating system. A token the provider says is dead is deleted, so a phone that
+    left is not held about for no purpose. A failure retries (`attempts`) and gives up after
+    `MAX_ATTEMPTS`.
+    """
+    pending = (
+        await db.scalars(
+            select(Notification)
+            .where(
+                Notification.channel == "in_app",
+                Notification.recipient_kind == "user",
+                Notification.pushed_at.is_(None),
+            )
+            .order_by(Notification.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+    ).all()
+    counts = {"sent": 0, "failed": 0}
+    if not pending:
+        return counts
+
+    devices: dict[uuid.UUID, list[DeviceToken]] = {}
+    for start in range(0, len(pending), _CHUNK):
+        chunk = pending[start : start + _CHUNK]
+        rows = await db.scalars(
+            select(DeviceToken).where(DeviceToken.user_id.in_({n.recipient_id for n in chunk}))
+        )
+        for device in rows.all():
+            devices.setdefault(device.user_id, []).append(device)
+
+    now = datetime.now(UTC)
+    provider = get_push_provider()
+    for notification in pending:
+        words = push_text(notification.template, notification.locale)
+        phones = devices.get(notification.recipient_id, [])
+        if words is None or not phones or now - notification.created_at > PUSH_WINDOW:
+            notification.pushed_at = now
+            continue
+
+        notification.attempts += 1
+        delivered, failure = 0, None
+        for device in phones:
+            try:
+                await provider.send_push(
+                    device.token,
+                    words[0],
+                    words[1],
+                    push_data(notification.template, notification.payload),
+                )
+                delivered += 1
+            except InvalidDeviceToken:
+                await db.delete(device)
+            except Exception as error:  # noqa: BLE001 - every provider failure is the same here
+                failure = str(error)[:500]
+        if delivered:
+            notification.pushed_at = now
+            counts["sent"] += 1
+        elif failure is not None:
+            notification.last_error = failure
+            counts["failed"] += 1
+            log.warning(
+                "push.send_failed", template=notification.template, attempts=notification.attempts
+            )
+            if notification.attempts >= MAX_ATTEMPTS:
+                notification.pushed_at = now  # gave up: the in-app notice is still there
+        else:
+            notification.pushed_at = now  # every phone was dead, and has been forgotten
     return counts
 
 

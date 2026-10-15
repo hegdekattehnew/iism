@@ -47,3 +47,20 @@ DELETE /me/saved-jobs/{job_slug}
 GET /me/course-interests
 POST /me/course-interests
 POST /me/course-interests/{interest_id}/withdraw
+
+# Notices, push, account and a way to complain (M4, Sprint 65): the updates a person is told, the
+# phones that may be sent a push, taking their data or leaving, a message to the team, and
+# reporting a listing.
+GET /me/notifications
+GET /me/notifications/unread-count
+POST /me/notifications/read
+POST /me/notifications/{notification_id}/read
+POST /me/devices
+POST /me/devices/unregister
+GET /me/account/export
+GET /me/account/deletion
+DELETE /me/account
+POST /grievances
+GET /me/grievances
+POST /jobs/{slug}/report
+POST /courses/{slug}/report
