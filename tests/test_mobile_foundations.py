@@ -265,3 +265,99 @@ def test_every_personal_query_key_starts_with_me() -> None:
         assert "useQuery(" not in path.read_text(encoding="utf-8"), (
             f"{path.name} builds its own query: personal reads belong in lib/me-queries.ts"
         )
+
+
+def _elements(source: str, tag: str) -> list[str]:
+    """The opening tag of every `<Tag ...>` (props can hold `=>`, so brackets are counted)."""
+    found = []
+    for match in re.finditer(rf"<{tag}\b", source):
+        depth, i = 0, match.end()
+        while i < len(source):
+            ch = source[i]
+            if ch in "{(":
+                depth += 1
+            elif ch in "})":
+                depth -= 1
+            elif ch == ">" and depth == 0 and source[i - 1] != "=":
+                break
+            i += 1
+        found.append(source[match.start() : i + 1])
+    return found
+
+
+def test_every_pressable_switch_and_input_has_a_role_or_a_name() -> None:
+    """Accessibility (Sprint 66, ADR-077).
+
+    A `Pressable` with no role is a "group" to a screen reader; a `Switch` or `TextInput` with no
+    label is "switch" or "edit box" with nothing to say what for."""
+    sources = [p for p in _hand_written() if ".test." not in p.name]
+    pressables = [
+        (p, e) for p in sources for e in _elements(p.read_text(encoding="utf-8"), "Pressable")
+    ]
+    assert len(pressables) >= 5, pressables  # found them before judging any
+    for path, element in pressables:
+        assert "accessibilityRole=" in element, (
+            f"{path.name}: a Pressable with no accessibilityRole"
+        )
+    controls = [
+        (p, e)
+        for p in sources
+        for tag in ("Switch", "TextInput")
+        for e in _elements(p.read_text(encoding="utf-8"), tag)
+    ]
+    assert len(controls) >= 3, controls
+    for path, element in controls:
+        assert "accessibilityLabel=" in element or "label}" in element, (
+            f"{path.name}: a control with no name"
+        )
+
+
+def test_text_is_capped_at_double_and_touch_targets_never_shrink() -> None:
+    """A person's system font size is honoured up to a cap that keeps the layout whole, and no touch
+    target is set below the 48 dp both platforms ask for."""
+    ui = list((MOBILE / "src" / "ui").glob("*.tsx"))
+    assert {p.name for p in ui} >= {"primitives.tsx", "list.tsx"}
+    for path in (MOBILE / "src" / "ui" / "primitives.tsx", MOBILE / "src" / "ui" / "list.tsx"):
+        text = path.read_text(encoding="utf-8")
+        for element in _elements(text, "NativeText") + _elements(text, "TextInput"):
+            assert "maxFontSizeMultiplier=" in element, (
+                f"{path.name}: text that ignores the font cap or grows without one"
+            )
+        assert "allowFontScaling={false}" not in text, (
+            f"{path.name}: turns the person's font setting off"
+        )
+    for path in _hand_written():
+        text = path.read_text(encoding="utf-8")
+        if ".test." in path.name:
+            continue
+        assert "MIN_TOUCH -" not in text, f"{path.name}: shrinks the minimum touch target"
+        for number in re.findall(r"minHeight:\s*(\d+)", text):
+            assert int(number) >= 48, (
+                f"{path.name}: minHeight {number} is below the 48 dp touch target"
+            )
+    assert re.search(
+        r"MAX_FONT_SCALE\s*=\s*2\b",
+        (MOBILE / "src" / "theme" / "index.tsx").read_text(encoding="utf-8"),
+    )
+
+
+def test_a_release_build_cannot_start_on_a_development_origin() -> None:
+    """ADR-077: `core/release.ts` decides, `config.ts` feeds it the build's own origins, and the
+    root layout refuses to render the router while there is a problem.
+
+    Each link is checked: a decision nobody consults protects nothing (no test covered the layout).
+    """
+    config = (MOBILE / "src" / "config.ts").read_text(encoding="utf-8")
+    assert "configProblems(" in config and "release: !__DEV__" in config
+    assert (
+        "process.env.EXPO_PUBLIC_API_BASE_URL" in config
+    )  # read statically, or Expo cannot inline it
+    layout = (MOBILE / "app" / "_layout.tsx").read_text(encoding="utf-8")
+    assert "{CONFIG_PROBLEMS.length > 0 ? (" in layout  # the render, not only the log line
+    # The misconfigured screen is chosen before the update gate and before the router.
+    assert (
+        layout.index("<Misconfigured />") < layout.index("<UpdateRequired") < layout.index("<Stack")
+    )
+    # The checker itself refuses a cleartext or local origin (its own tests prove the cases).
+    release = (MOBILE / "src" / "core" / "release.ts").read_text(encoding="utf-8")
+    assert 'protocol !== "https:"' in release and "LOCAL_HOST.test" in release

@@ -6,6 +6,27 @@ signs in on the website.
 
 ## Status
 
+**Sprint 66 (M5), completed on the code side: store readiness.** The mobile programme's last planned
+sprint adds no screen. It makes the app **impossible to release by accident** and leaves a runbook for
+the day the accounts exist (ADR-077): a **release build refuses to start** on a missing, `http://` or
+local origin (`src/core/release.ts`, a plain "not set up correctly" screen); **`eas.json`** (a `preview`
+and a `production` profile, origins and store links per profile, never a default), a hardened
+**`app.json`** (one Android permission, encryption declared, the splash, no Face ID string) checked by
+running `expo prebuild` into a scratch copy; **`make check-release`** reports every defect and every
+decision still open (`PROFILE=production` fails while any is, and **fails today on thirteen**: the
+bundle id, the Expo template's artwork, no EAS project id, placeholder origins and store links, the
+grievance officer); **`make check-mobile-budget`** (Android Hermes bundle 3.43 MB of a 3.8 MB ceiling);
+an accessibility pass held by tests (48 dp targets, roles and names, text capped at 200%; `ACCESSIBILITY.md`
+says what only a device can check); and **`docs/release/`**: the store listing in English and Hindi,
+the privacy and Data Safety answers (derived from the data export and checked against it), the notes
+for reviewers and the release runbook. **Not done, and not claimed:** an EAS build, a store submission, a
+run on a device or emulator, TalkBack/VoiceOver, Hermes `Intl`, low-end timing, real push.
+
+**A local release build needs `--clear`**: `EXPO_PUBLIC_*` values are inlined when a file is
+transformed, and Metro's cache keeps the old ones (`npx expo export --clear`). EAS builds start clean.
+
+Before it:
+
 **Sprint 65 (M4), completed: updates, push, links, account and a way in for store reviewers.** On top
 of M3 (the candidate's own side, ADR-074) a signed-in person now sees **their updates** (every notice,
 paged, in the website's own words, with the number that are new on the Me tab), can **take their data

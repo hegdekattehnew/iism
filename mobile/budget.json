@@ -1,0 +1,5 @@
+{
+  "note": "Ceilings, not targets (Sprint 66). Measured 2026-10-15: Android Hermes bundle 3,427,254 bytes, assets 512,654 bytes. Raise one only on purpose, in the change that grows it, and say why in the commit.",
+  "android_bundle_bytes": 3800000,
+  "assets_bytes": 650000
+}

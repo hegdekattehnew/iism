@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslations } from "use-intl";
 
 import { ApiError } from "../core/errors";
-import { MIN_TOUCH, radius, space, text, useColours } from "../theme";
+import { MAX_FONT_SCALE, MIN_TOUCH, radius, space, text, useColours } from "../theme";
 import { Button, Text } from "./primitives";
 
 /**
@@ -84,7 +84,12 @@ export function Badge({
         alignSelf: "flex-start",
       }}
     >
-      <NativeText style={{ color: palette[1], fontSize: text.small, fontWeight: "600" }}>{label}</NativeText>
+      <NativeText
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={{ color: palette[1], fontSize: text.small, fontWeight: "600" }}
+      >
+        {label}
+      </NativeText>
     </View>
   );
 }
@@ -110,7 +115,7 @@ export function Chip({
       accessibilityState={{ selected }}
       onPress={onPress}
       style={{
-        minHeight: MIN_TOUCH - 8,
+        minHeight: MIN_TOUCH,
         justifyContent: "center",
         borderRadius: radius.lg,
         paddingHorizontal: space.md,
@@ -119,7 +124,10 @@ export function Chip({
         backgroundColor: selected ? c.brand : c.surface,
       }}
     >
-      <NativeText style={{ color: selected ? c.brandContrast : c.foreground, fontSize: text.small, fontWeight: "600" }}>
+      <NativeText
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={{ color: selected ? c.brandContrast : c.foreground, fontSize: text.small, fontWeight: "600" }}
+      >
         {label}
       </NativeText>
     </Pressable>
@@ -149,6 +157,7 @@ export function SearchBox({
   return (
     <TextInput
       accessibilityLabel={placeholder}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       placeholder={placeholder}
       placeholderTextColor={c.muted}
       value={value}
