@@ -88,3 +88,79 @@ export function profileBody(form: BasicsForm): ProfileUpdate | null {
     education_level: form.education,
   };
 }
+
+// ------------------------------------------------------------- what they are looking for
+
+export type NoticePeriod = NonNullable<ProfileUpdate["notice_period"]>;
+export type EmploymentType = NonNullable<ProfileUpdate["preferred_employment_type"]>;
+
+const NOTICES: Record<NoticePeriod, true> = { immediate: true, within_15_days: true, within_30_days: true, over_30_days: true };
+export const NOTICE_PERIODS = Object.keys(NOTICES) as NoticePeriod[];
+const EMPLOYMENT: Record<EmploymentType, true> = { full_time: true, part_time: true, contract: true, apprenticeship: true, gig: true };
+export const EMPLOYMENT_TYPES = Object.keys(EMPLOYMENT) as EmploymentType[];
+
+/** The most a salary field takes: nine digits is more rupees than anybody earns and fits an `int`. */
+export const SALARY_DIGITS = 9;
+
+export type PreferencesForm = {
+  salaryMin: string;
+  salaryMax: string;
+  notice: NoticePeriod | null;
+  employment: EmploymentType | null;
+  relocate: boolean;
+  alerts: boolean;
+};
+
+export function preferencesFrom(profile: {
+  expected_salary_min_inr?: number | null;
+  expected_salary_max_inr?: number | null;
+  notice_period?: string | null;
+  preferred_employment_type?: string | null;
+  willing_to_relocate?: boolean | null;
+  job_alerts_enabled?: boolean | null;
+}): PreferencesForm {
+  return {
+    salaryMin: profile.expected_salary_min_inr == null ? "" : String(profile.expected_salary_min_inr),
+    salaryMax: profile.expected_salary_max_inr == null ? "" : String(profile.expected_salary_max_inr),
+    notice: NOTICE_PERIODS.find((n) => n === profile.notice_period) ?? null,
+    employment: EMPLOYMENT_TYPES.find((e) => e === profile.preferred_employment_type) ?? null,
+    relocate: profile.willing_to_relocate === true,
+    // The server's default is on; a profile that says nothing keeps the opt-in it has.
+    alerts: profile.job_alerts_enabled !== false,
+  };
+}
+
+/** Whole rupees: blank is `null` (not said), a number is that many, anything else is `undefined`. */
+export function rupees(text: string): number | null | undefined {
+  const trimmed = text.replace(/[\s,]/g, "");
+  if (trimmed === "") return null;
+  return new RegExp(`^\\d{1,${SALARY_DIGITS}}$`).test(trimmed) ? Number(trimmed) : undefined;
+}
+
+export type PreferencesProblem = "salaryMin" | "salaryMax" | "salaryOrder";
+
+/**
+ * The request, or what is wrong with the salary before a request is made (the server refuses a
+ * maximum below the minimum, and a negative or fractional figure). The date of birth and the gender
+ * the website also takes are **not** here, on purpose (ADR-078).
+ */
+export function preferencesBody(
+  form: PreferencesForm,
+): { ok: true; body: ProfileUpdate } | { ok: false; problem: PreferencesProblem } {
+  const min = rupees(form.salaryMin);
+  const max = rupees(form.salaryMax);
+  if (min === undefined) return { ok: false, problem: "salaryMin" };
+  if (max === undefined) return { ok: false, problem: "salaryMax" };
+  if (min !== null && max !== null && max < min) return { ok: false, problem: "salaryOrder" };
+  return {
+    ok: true,
+    body: {
+      expected_salary_min_inr: min,
+      expected_salary_max_inr: max,
+      notice_period: form.notice,
+      preferred_employment_type: form.employment,
+      willing_to_relocate: form.relocate,
+      job_alerts_enabled: form.alerts,
+    },
+  };
+}

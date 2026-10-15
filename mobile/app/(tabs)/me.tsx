@@ -39,6 +39,7 @@ function Menu() {
   const tn = useTranslations("notificationsPage");
   const ta2 = useTranslations("account");
   const tct = useTranslations("contactPage");
+  const tcp = useTranslations("careerPaths");
   const router = useRouter();
   const profile = useProfile();
   const unread = useUnreadCount().data ?? 0;
@@ -61,6 +62,7 @@ function Menu() {
       <Button variant="secondary" label={ta("pageTitle")} onPress={() => router.push("/applications")} />
       <Button variant="secondary" label={ta("savedPageTitle")} onPress={() => router.push("/saved")} />
       <Button variant="secondary" label={tc("pageTitle")} onPress={() => router.push("/interests")} />
+      <Button variant="secondary" label={tcp("title")} onPress={() => router.push("/careers")} />
       <Button variant="secondary" label={ta2("title")} onPress={() => router.push("/account")} />
       <Button variant="secondary" label={tct("title")} onPress={() => router.push("/contact")} />
     </View>

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import { secureBackend } from "./auth/secure-backend";
 import { createApi } from "./core/api";
+import { createBudgetStore } from "./core/course-budget";
 import { DEFAULT_LOCALE, isLocale, resolveLocale, type Locale } from "./core/locale";
 import { wipePersistedCache } from "./core/persist";
 import { signOut } from "./core/sign-in";
@@ -45,8 +46,23 @@ export async function restoreLocale(deviceLanguages: readonly string[]): Promise
   announceLocale();
 }
 
-/** Signing out: forget the public cache on disk too (the in-memory one is the query client's). */
-export const forgetPersistedCache = () => wipePersistedCache(storage);
+/**
+ * What the person would pay for a course (ADR-078): remembered on the phone, never on the profile,
+ * and **forgotten when the session ends**, so a shared phone does not carry the last person's figure.
+ */
+export const courseBudget = createBudgetStore(storage);
+export const setCourseBudget = courseBudget.set;
+export const restoreCourseBudget = courseBudget.restore;
+export const useCourseBudget = (): number | null =>
+  useSyncExternalStore(courseBudget.subscribe, courseBudget.get, courseBudget.get);
+
+/**
+ * Signing out: forget what was kept on disk (the in-memory cache is the query client's). The public
+ * cache, and the budget, which is personal in the only way that matters on a shared phone.
+ */
+export const forgetPersistedCache = async (): Promise<void> => {
+  await Promise.all([wipePersistedCache(storage), courseBudget.clear()]);
+};
 export const getLocale = () => locale;
 export const useLocale = () =>
   useSyncExternalStore(

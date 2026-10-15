@@ -6,6 +6,25 @@ signs in on the website.
 
 ## Status
 
+**Sprint 67 (M6), completed in a browser, not on a phone: candidate parity.** The four things the website's
+candidate had and the phone lacked (ADR-078): the **six history sections** of the profile (work history,
+education, certificates, languages, roles you want, places you would work), edited through **one table-driven
+editor** whose limits a test compares with the server's schema; **"why not me"** on a rejected application;
+**career paths**; and the **course budget** that reorders and labels suggested courses. The profile also gains
+salary, notice period, work type, willingness to move and the alert opt-out. **No new package, no native code,
+no migration, no endpoint:** five operations the website already calls joined the released surface (46 to 51,
+additive). **Date of birth and gender stay on the website**, on purpose. A date is a **month and a year** (two
+number fields, sent as the first of the month; an edit that does not change them sends the date the entry
+already had). The budget is remembered on the phone, sent only as `?budget_inr=`, and **forgotten at sign-out**.
+Run against the real API in a browser in both languages as a seeded candidate: add and remove an entry, open a
+form, set a budget and see the labels and the request, read career paths with a flagged guess, sign out and see
+the budget go. **Not done:** a device, TalkBack/VoiceOver, Hermes, the new screens at 200% font.
+
+**Still on the website only:** date of birth and gender, linking a certificate to a standard, the staff-side and
+organisation screens (the app is for job seekers).
+
+Before it:
+
 **Sprint 66 (M5), completed on the code side: store readiness.** The mobile programme's last planned
 sprint adds no screen. It makes the app **impossible to release by accident** and leaves a runbook for
 the day the accounts exist (ADR-077): a **release build refuses to start** on a missing, `http://` or

@@ -476,7 +476,7 @@ unaffected; only the single-sector constraint is withdrawn.
 
 ## ADR-019: Observability Strategy
 
-**Status:** Accepted
+**Status:** Accepted. **Superseded in part by ADR-040** (the tooling: structured JSON logs to stdout). OpenTelemetry, Prometheus and Grafana remain the destination and are deferred, not built.
 
 **Context:** Need production support
 
@@ -913,7 +913,7 @@ score; no LLM decides a match.
 
 ## ADR-032: Primary Credential by Actor Type
 
-**Status:** Accepted (September 2026)
+**Status:** Accepted (September 2026). **Superseded in part by ADR-038** (the organisation half: email one-time code, no password). The rule that a candidate signs up by phone still governs.
 
 **Context:** ADR-009 and ADR-011 describe an email-centric identity — email and password, Google
 OAuth, email verification, email password reset. This is a poor fit for the primary user cohort.
@@ -962,7 +962,7 @@ keyed on phone rather than email.
 
 ## ADR-033: Language Scope at Launch
 
-**Status:** Accepted (September 2026)
+**Status:** Accepted (September 2026). **Superseded in part by ADR-041** (the two-language assumption: a language is a messages file and rows). Hindi and English remain the launch pair.
 
 **Context:** The product is India-first with later global adaptation. The candidate cohort is
 substantially not English-first. ADR-021 specifies PostgreSQL full-text search, and ADR-004
@@ -1198,7 +1198,7 @@ and ADR-031 already fix the implementation and dimension.
 
 ## ADR-037: The Employer Console as a Labelled Demonstration
 
-**Status:** Accepted (September 2026)
+**Status:** Accepted (September 2026). **Superseded in part by ADR-038** (the authenticated employer console ships to production, behind a sign-in). The rule that no employer-facing payload identifies a candidate stands and is tested; only the unauthenticated demonstration console is local-only.
 
 **Context:** Everything the matching engine does is real, and none of it is visible to the side of
 the market ADR-025 expects to eventually carry revenue. There is no employer surface at all, so the
@@ -3794,3 +3794,36 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Not done and not claimed**: any EAS build, any submission, any device or emulator run (no TalkBack/VoiceOver, no Hermes `Intl` check for Hindi, no low-end timing, no real push). The privacy answers and the listing are drafts for the owner and a lawyer to confirm against each console's current form.
 - **`expo-splash-screen`** was added (the template shipped a splash image and nothing to display it) and **`expo-dev-client` was not**: a development profile in `eas.json` would need it, and it is a download nobody asked for.
 - Four patch-level Expo packages were brought level with SDK 57 (`expo-doctor` 21 of 21).
+
+## ADR-078: The Phone Holds No Data the Website Does Not, Edits a History Section Through One Table Checked Against the Schema, and Keeps a Course Budget Only on the Device and Only Until Sign-Out
+
+**Status:** Accepted (October 2026). Sprint 67 (BL-15.9 to BL-15.11, M6 of the mobile programme). Extends ADR-048, ADR-049, ADR-068, ADR-072 and ADR-074. No migration, no new endpoint: five operations that the website already calls join the released surface (46 to 51, additive only).
+
+**Context:** After M5 the phone still lacked what the website's candidate has: the six history sections of the profile (work, education, certificates, languages, preferred roles and places), "Why not me" on a rejected application, career paths, and the course budget that reorders suggested courses. All of it was already on the API. The questions were what the phone should and should not take on, and how to keep a screen that edits six differently shaped things from drifting from the server.
+
+**Decision:**
+
+- **A phone adds no data type the website does not hold.** The Data Safety and App Privacy answers (`docs/release/privacy-and-data-safety.md`) are unchanged. **Date of birth and gender stay web-only**: they are optional and sensitive, nothing on the phone needs them, and a phone is the device most likely to be shared. A person's salary range, notice period, work type, willingness to move and alert opt-out are the same fields the website edits.
+- **The six sections are one table** (`core/profile-sections.ts`: fields, limits, defaults, the rules that span fields) and one editor, as on the website. The server's routes take an **untyped body**, so no generated type carries a limit; instead `tests/test_mobile_section_limits.py` reads the table's literals and compares each with the schema the server validates against (lengths, required, ranges, enumerations, defaults, and that the routed collections are the edited ones). A changed server limit fails a build, not a person.
+- **A date is a month and a year**, typed into two small fields and sent as the first of the month: no picker package (native code nothing here can run). **An edit that leaves the month and year alone sends back the exact date the entry already had**, and an edit sends the whole entry (the server reads an absent field as "clear it"), so a start date the website recorded as the 15th, or a certificate's NSQF level the phone never shows, survive an edit made on the phone. A skill link is never sent, so the server leaves it alone.
+- **"Why not me" is offered on a rejection only**, computed at read time from the person's skills as they are, never stored, and says nothing about why an employer decided (the product does not know). **Career paths** say what they are derived from and flag a guessed starting role as a guess.
+- **The course budget is a device-held preference, not profile data** (ADR-068 kept it off the profile for the same reason). It is remembered on the phone, sent only as `?budget_inr=`, **forgotten when the session ends** (a shared phone must not carry the last person's figure), and is the **last** element of a query key so every existing prefix invalidation still reaches every variant of a match.
+
+**Options considered:**
+
+1. Edit the history sections on the website only
+2. **One table-driven editor, limits compared with the schema by a test** (chosen)
+3. A hand-written screen per section
+4. A date-picker package
+
+**Trade-offs:**
+
+- Option 1: ✅ nothing to build ❌ the sections feed the completeness meter, and a phone-first candidate is told to finish their profile on a laptop they may not have.
+- Option 3: ✅ each screen reads plainly ❌ six places for a limit to drift; the website already learned this (`constraints.test.ts`).
+- Option 4: ✅ a familiar control ❌ a native module that cannot be run or checked here, for a rule ("month and year") that two number fields meet.
+
+**Consequences:**
+
+- **Verified** by tests in Node and with the real screens rendered against the real catalogues, plus mutation checks and a browser run; **not** on a device. A date typed as a month and a year is a convention, not a picker, and the Hindi layout of the new screens is unchecked on a real phone.
+- The released contract grows by five operations and nothing is removed or retyped; the old 46 are byte-identical in the snapshot.
+- A new section, or a new field in one, is an entry in the table and a line in the schema guard, not a screen.

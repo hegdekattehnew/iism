@@ -1,4 +1,17 @@
-import { EDUCATION_LEVELS, LIMITS, basicsFrom, profileBody, yearsFrom, type BasicsForm } from "./profile";
+import {
+  EDUCATION_LEVELS,
+  EMPLOYMENT_TYPES,
+  LIMITS,
+  NOTICE_PERIODS,
+  basicsFrom,
+  preferencesBody,
+  preferencesFrom,
+  profileBody,
+  rupees,
+  yearsFrom,
+  type BasicsForm,
+  type PreferencesForm,
+} from "./profile";
 
 const form = (extra: Partial<BasicsForm> = {}): BasicsForm => ({
   fullName: "Asha Rao",
@@ -79,5 +92,67 @@ describe("the education levels", () => {
       "graduate",
       "postgraduate",
     ]);
+  });
+});
+
+
+describe("what the person is looking for", () => {
+  const prefs = (extra: Partial<PreferencesForm> = {}): PreferencesForm => ({
+    salaryMin: "12000",
+    salaryMax: "18000",
+    notice: "within_15_days",
+    employment: "full_time",
+    relocate: true,
+    alerts: true,
+    ...extra,
+  });
+
+  it("offers every notice period and work type the server accepts", () => {
+    expect(NOTICE_PERIODS).toHaveLength(4);
+    expect(EMPLOYMENT_TYPES).toHaveLength(5);
+  });
+
+  it("reads rupees: blank is not said, grouping is ignored, rubbish is refused", () => {
+    expect(rupees("")).toBeNull();
+    expect(rupees("12,000")).toBe(12000);
+    expect(rupees("0")).toBe(0);
+    for (const bad of ["-1", "1.5", "abc", "1e5", "1234567890"]) expect(rupees(bad)).toBeUndefined();
+  });
+
+  it("builds the request, with a cleared field sent as null so clearing works", () => {
+    expect(preferencesBody(prefs({ salaryMin: "", notice: null }))).toEqual({
+      ok: true,
+      body: {
+        expected_salary_min_inr: null,
+        expected_salary_max_inr: 18000,
+        notice_period: null,
+        preferred_employment_type: "full_time",
+        willing_to_relocate: true,
+        job_alerts_enabled: true,
+      },
+    });
+  });
+
+  it("refuses a maximum below the minimum, as the server does, and names which field", () => {
+    expect(preferencesBody(prefs({ salaryMin: "20000", salaryMax: "10000" }))).toEqual({ ok: false, problem: "salaryOrder" });
+    expect(preferencesBody(prefs({ salaryMin: "x" }))).toEqual({ ok: false, problem: "salaryMin" });
+    expect(preferencesBody(prefs({ salaryMax: "-5" }))).toEqual({ ok: false, problem: "salaryMax" });
+    expect(preferencesBody(prefs({ salaryMin: "5000", salaryMax: "5000" })).ok).toBe(true);
+  });
+
+  it("never carries the date of birth or the gender, which stay on the website", () => {
+    const built = preferencesBody(prefs());
+    expect(built.ok && Object.keys(built.body)).not.toEqual(expect.arrayContaining(["date_of_birth"]));
+    expect(built.ok && Object.keys(built.body)).not.toEqual(expect.arrayContaining(["gender"]));
+  });
+
+  it("starts from the profile as loaded, and keeps alerts on unless it says off", () => {
+    expect(preferencesFrom({ expected_salary_min_inr: 9000, notice_period: "immediate", job_alerts_enabled: false })).toMatchObject({
+      salaryMin: "9000",
+      notice: "immediate",
+      alerts: false,
+    });
+    expect(preferencesFrom({}).alerts).toBe(true);
+    expect(preferencesFrom({ notice_period: "soon" }).notice).toBeNull();
   });
 });

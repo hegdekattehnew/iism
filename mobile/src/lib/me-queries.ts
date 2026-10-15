@@ -10,8 +10,11 @@ import { deleteAccount, exportFile, fetchDeletionPreview, fetchExport } from "..
 import { ApiError, readDetail } from "../core/errors";
 import { listMyMessages, sendMessage, type MessageDraft } from "../core/grievance";
 import {
+  addEntry,
   addSkillsBulk,
   applyTo,
+  getApplicationGap,
+  getCareers,
   getMatch,
   getProfile,
   listApplications,
@@ -22,22 +25,25 @@ import {
   markNoticeRead,
   listSaved,
   registerInterest,
+  removeEntry,
   removeSkill,
   roleStandards,
   saveJob,
   searchRoleHits,
   unreadCount,
   unsaveJob,
+  updateEntry,
   updateProfile,
   withdrawApplication,
   withdrawInterest,
   type ProfileUpdate,
 } from "../core/me";
+import type { Collection } from "../core/profile-sections";
 import { ME_KEY, meKeys } from "../core/me-keys";
 import { NOTICE_PAGE_SIZE, nextCursor } from "../core/notices";
 import { reportListing, type Reason, type Target } from "../core/report";
 import type { BulkBody } from "../core/role-picker";
-import { api, useSignedIn } from "../runtime";
+import { api, useCourseBudget, useSignedIn } from "../runtime";
 
 /**
  * The queries and writes about the signed-in candidate. **Every key starts with `"me"`** (see
@@ -91,9 +97,37 @@ export function useMatches() {
   return useQuery({ queryKey: meKeys.matches, enabled, queryFn: () => listMatches(api) });
 }
 
+/** One match. The course budget is part of the key: another budget is another order of courses. */
 export function useMatch(slug: string) {
   const { enabled } = useSeeker();
-  return useQuery({ queryKey: meKeys.match(slug), enabled, queryFn: () => getMatch(api, slug) });
+  const budget = useCourseBudget();
+  return useQuery({
+    queryKey: meKeys.match(slug, budget),
+    enabled,
+    queryFn: () => getMatch(api, slug, budget),
+  });
+}
+
+/** "Why not me": what one of the person's own applications was missing, computed now. */
+export function useApplicationGap(applicationId: string) {
+  const { enabled } = useSeeker();
+  const budget = useCourseBudget();
+  return useQuery({
+    queryKey: meKeys.gap(applicationId, budget),
+    enabled: enabled && applicationId !== "",
+    queryFn: () => getApplicationGap(api, applicationId, budget),
+  });
+}
+
+/** The roles that build on the person's own. `role` is their choice; null lets the server guess once. */
+export function useCareers(role: string | null) {
+  const { enabled } = useSeeker();
+  const budget = useCourseBudget();
+  return useQuery({
+    queryKey: meKeys.careers(role, budget),
+    enabled,
+    queryFn: () => getCareers(api, role, budget),
+  });
 }
 
 export function useApplications() {
@@ -192,6 +226,42 @@ export function useUpdateProfile() {
       void qc.invalidateQueries({ queryKey: meKeys.matches });
       void qc.invalidateQueries({ queryKey: [ME_KEY, "match"] });
     },
+  });
+}
+
+/**
+ * A section entry changes what the profile says, and some of it (a preferred role or place) what
+ * the matches show, so a write refreshes the lot, as a skill does. The server answers with the whole
+ * profile, which replaces the cached one.
+ */
+function entryWritten(qc: QueryClient, profile: unknown) {
+  qc.setQueryData(meKeys.profile, profile);
+  void qc.invalidateQueries({ queryKey: meKeys.matches });
+  void qc.invalidateQueries({ queryKey: [ME_KEY, "match"] });
+  void qc.invalidateQueries({ queryKey: [ME_KEY, "careers"] });
+}
+
+export function useAddEntry(collection: Collection) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => addEntry(api, collection, body),
+    onSuccess: (profile) => entryWritten(qc, profile),
+  });
+}
+
+export function useUpdateEntry(collection: Collection) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) => updateEntry(api, collection, v.id, v.body),
+    onSuccess: (profile) => entryWritten(qc, profile),
+  });
+}
+
+export function useRemoveEntry(collection: Collection) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => removeEntry(api, collection, id),
+    onSuccess: (profile) => entryWritten(qc, profile),
   });
 }
 

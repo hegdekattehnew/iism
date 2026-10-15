@@ -64,3 +64,11 @@ POST /grievances
 GET /me/grievances
 POST /jobs/{slug}/report
 POST /courses/{slug}/report
+
+# Candidate parity (M6, Sprint 67): the six history sections of the profile (one generic route each
+# for add, change and remove), "why not me" for a rejected application, and career paths.
+POST /me/profile/{collection}
+PUT /me/profile/{collection}/{entry_id}
+DELETE /me/profile/{collection}/{entry_id}
+GET /me/applications/{application_id}/gap
+GET /me/careers

@@ -107,5 +107,51 @@
   "misconfigured": {
     "title": "This copy of the app is not set up correctly",
     "body": "It cannot reach our service safely, so it has not started. Please install the app again from the store. If this keeps happening, tell us at the website."
+  },
+  "profileSections": {
+    "title": "Your history",
+    "intro": "Work, education, certificates, languages and where you would like to work. The more you add, the more complete your profile.",
+    "count": "{count, plural, =0 {Nothing added} one {# entry} other {# entries}}",
+    "add": "Add",
+    "edit": "Edit",
+    "remove": "Remove",
+    "removeConfirm": "Remove this?",
+    "removeYes": "Yes, remove",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "empty": "Nothing added yet.",
+    "month": "Month (1 to 12)",
+    "year": "Year",
+    "back": "Back to your profile",
+    "notFound": "There is no such section.",
+    "names": {
+      "experiences": "Work history",
+      "educations": "Education",
+      "certifications": "Certificates",
+      "languages": "Languages",
+      "preferred_roles": "Roles you want",
+      "preferred_locations": "Places you would work"
+    },
+    "dateNote": "A date is the month and the year.",
+    "preferencesTitle": "What you are looking for",
+    "preferencesProblem": {
+      "salaryMin": "Enter rupees as a whole number.",
+      "salaryMax": "Enter rupees as a whole number.",
+      "salaryOrder": "The top of the range cannot be below the bottom."
+    }
+  },
+  "sectionProblem": {
+    "required": "This is needed.",
+    "short": "Too short.",
+    "long": "Too long.",
+    "year": "Enter a year between 1950 and 2100.",
+    "date": "Enter the month (1 to 12) and the year.",
+    "order": "This cannot be before the start."
+  },
+  "budget": {
+    "apply": "Show courses I can afford",
+    "invalid": "Enter a whole number of rupees.",
+    "note": "Kept on this phone only. It is forgotten when you sign out."
   }
 }

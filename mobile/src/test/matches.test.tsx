@@ -124,6 +124,29 @@ describe("one match opened", () => {
     });
   };
 
+  it("asks for no budget until there is one", async () => {
+    open();
+    await renderScreen(<MatchDetail />);
+    await screen.findByText("Ward assistant 1");
+    const asked = () => api.GET.mock.calls.find((c) => c[0] === "/me/matches/{slug}")?.[1] as { params: { query: unknown } };
+    expect(asked().params.query).toEqual({});
+  });
+
+  it("sends the budget the person has set", async () => {
+    open();
+    world.budget = 6000;
+    await renderScreen(<MatchDetail />);
+    await screen.findByText("Ward assistant 1");
+    const call = api.GET.mock.calls.find((c) => c[0] === "/me/matches/{slug}")?.[1] as { params: { query: unknown } };
+    expect(call.params.query).toEqual({ budget_inr: 6000 });
+  });
+
+  it("offers the budget field beside the courses", async () => {
+    open();
+    await renderScreen(<MatchDetail />);
+    expect(await screen.findByLabelText("What would you pay for a course? (₹)")).toBeTruthy();
+  });
+
   it("shows the score, the coverage, and what is needed with the required standards first", async () => {
     open();
     await renderScreen(<MatchDetail />);

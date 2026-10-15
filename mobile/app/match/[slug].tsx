@@ -13,6 +13,7 @@ import { FailureNotice, SkeletonRows } from "../../src/ui/list";
 import { GapLists, ScoreSummary } from "../../src/ui/match";
 import { SessionExpired } from "../../src/ui/session";
 import { SuggestedCourses } from "../../src/ui/SuggestedCourses";
+import { BudgetField } from "../../src/ui/BudgetField";
 import { Section } from "../../src/ui/detail";
 
 /**
@@ -64,6 +65,7 @@ function Body({ slug }: { slug: string }) {
       <GapLists match={m} />
 
       <Section title={t("coursesHeading")}>
+        <BudgetField />
         {courses.length > 0 ? <SuggestedCourses courses={courses} /> : <Text tone="muted">{t("noCourses")}</Text>}
       </Section>
 
