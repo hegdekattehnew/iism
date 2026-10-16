@@ -63,7 +63,8 @@ test("a new candidate signs up, names their job, sees a match with its gap, appl
   const match = page.getByRole("listitem").filter({ hasText: title });
   await expect(match).toBeVisible();
   await expect(match.getByText(/\d+% match/)).toBeVisible();
-  await expect(match.getByText("Collect blood samples")).toBeVisible();
+  // The standard they lack is named in the sentence (Sprint 70); the full list is behind Details.
+  await expect(match.getByText(/Missing: .*Collect blood samples/)).toBeVisible();
   await checkPage(page, "matches");
 
   // ---- apply: told first exactly who will see what

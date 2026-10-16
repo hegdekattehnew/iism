@@ -38,6 +38,20 @@ const me = (kinds: ("personal" | "employer")[]) => ({
   response: { status: 200, headers: new Headers() },
 });
 
+const reply = (data: unknown) => ({ data, error: undefined, response: { status: 200, headers: new Headers() } });
+
+/** What a job seeker with nothing yet answers on every personal route the home reads. */
+const quiet = (path: string) =>
+  reply(
+    path === "/me/matches"
+      ? { items: [], total: 0, has_skills: false }
+      : path === "/me/notifications/unread-count"
+        ? { unread: 0 }
+        : path === "/me/applications"
+          ? []
+          : { id: "p1", skills: [], completeness: { percent: 0, missing: [] } },
+  );
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockSignedIn = false;
@@ -58,8 +72,13 @@ describe("the home screen", () => {
 
   it("says a job seeker is signed in and offers to sign out", async () => {
     mockSignedIn = true;
+    mockApi.GET.mockImplementation(async (path: string) =>
+      path === "/auth/me" ? me(["personal"]) : quiet(path),
+    );
     await renderScreen(<Home />);
-    expect(await screen.findByText("You are signed in.")).toBeTruthy();
+    // The old "You are signed in." line is gone: a job seeker's home is theirs (SignedInHome tests).
+    expect(await screen.findByRole("button", { name: "Sign out" })).toBeTruthy();
+    expect(screen.queryByText("You are signed in.")).toBeNull();
     expect(screen.queryByText(/This app is for job seekers/)).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Sign out" }));
     // The phone leaves the push list first, then the session ends: one function does both.
@@ -76,9 +95,13 @@ describe("the home screen", () => {
 
   it("does not tell somebody who holds both a profile and an organisation to leave", async () => {
     mockSignedIn = true;
-    mockApi.GET.mockResolvedValue(me(["personal", "employer"]));
+    mockApi.GET.mockImplementation(async (path: string) =>
+      path === "/auth/me"
+        ? me(["personal", "employer"])
+        : quiet(path),
+    );
     await renderScreen(<Home />);
-    await screen.findByText("You are signed in.");
+    await screen.findByRole("button", { name: "Sign out" });
     expect(screen.queryByText(/This app is for job seekers/)).toBeNull();
   });
 

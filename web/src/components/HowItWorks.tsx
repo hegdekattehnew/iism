@@ -14,14 +14,16 @@ export async function HowItWorks() {
         {steps.map((n) => (
           <li
             key={n}
-            className="relative rounded-xl border border-border-token bg-surface p-6"
+            className="relative rounded-xl border border-border-token bg-surface p-5"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-contrast">
-              {n}
-            </span>
-            <h3 className="mt-4 text-base font-semibold">
-              {t(`step${n}Title`)}
-            </h3>
+            {/* The number beside the title, not above it: four stacked cards were 700px of a phone
+                screen for sixteen words (Sprint 70, UI-01). */}
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-contrast">
+                {n}
+              </span>
+              <h3 className="text-base font-semibold">{t(`step${n}Title`)}</h3>
+            </div>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               {t(`step${n}Body`)}
             </p>

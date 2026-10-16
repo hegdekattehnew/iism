@@ -258,19 +258,21 @@ async def requirements_for(
     return out
 
 
-async def match_jobs(
+async def match_jobs_with_total(
     db: AsyncSession,
     profile_id: uuid.UUID,
     *,
     limit: int | None = 20,
     state_id: uuid.UUID | None = None,
-) -> list[ScoredJob]:
-    """Rank published jobs for one candidate.
+) -> tuple[list[ScoredJob], int]:
+    """Rank published jobs for one candidate, and say how many there are in all.
 
     `limit=None` keeps every scored job. Scoring has already happened for all of
     them by the time the list is cut, so asking for all of them costs nothing
     more than the slice -- which is why a *count* of matches must not be taken
-    from the default page of twenty.
+    from the default page of twenty. The second value is that count (Sprint 70):
+    `/me/matches` used to answer `len(page)` as its `total`, so a screen that said
+    "14 matches" was reading a page of twenty.
     """
     held = await _held_skills(db, profile_id)
     facts = await candidate_facts(db, profile_id)
@@ -278,7 +280,7 @@ async def match_jobs(
         # No declared skills, no defensible ranking. An arbitrary order dressed
         # up as a match would be worse than an empty list with a prompt to add
         # skills, which is what the interface shows.
-        return []
+        return [], 0
 
     weights = weights_from_settings()
 
@@ -291,7 +293,7 @@ async def match_jobs(
         db, held, state_id=state_id, limit=retrieval_limit(), weights=weights
     )
     if not job_ids:
-        return []
+        return [], 0
 
     requirements = await requirements_for(db, job_ids)
     jobs = {j.id: j for j in (await db.scalars(select(Job).where(Job.id.in_(job_ids)))).all()}
@@ -318,7 +320,18 @@ async def match_jobs(
     # Score, then coverage, then locality, then title: a stable order, so the
     # same inputs always produce the same page. Locality only breaks ties.
     scored.sort(key=lambda s: (-s.result.score, -s.result.coverage, -s.locality, s.job.title))
-    return scored[:limit]
+    return scored[:limit], len(scored)
+
+
+async def match_jobs(
+    db: AsyncSession,
+    profile_id: uuid.UUID,
+    *,
+    limit: int | None = 20,
+    state_id: uuid.UUID | None = None,
+) -> list[ScoredJob]:
+    """Rank published jobs for one candidate. The golden set and the alert sweep call this."""
+    return (await match_jobs_with_total(db, profile_id, limit=limit, state_id=state_id))[0]
 
 
 def attained_level(held: list[HeldSkill], required: list[RequiredSkill]) -> Decimal | None:
@@ -745,6 +758,8 @@ class MatchPage:
 
     items: list[ScoredJob]
     has_skills: bool
+    # How many vacancies matched in all, before the page was cut (Sprint 70).
+    total: int = 0
 
 
 async def matches_for(
@@ -763,13 +778,13 @@ async def matches_for(
     their matches. The event belongs to *this* act, so it lives in the function
     that is only ever that act.
     """
-    scored = await match_jobs(db, profile_id, limit=limit, state_id=state_id)
+    scored, total = await match_jobs_with_total(db, profile_id, limit=limit, state_id=state_id)
     has_skills = await has_declared_skills(db, profile_id)
 
     from api.modules.analytics import record
 
     await record(db, "matches_viewed", user_id=user_id, payload={"returned": len(scored)})
-    return MatchPage(items=scored, has_skills=has_skills)
+    return MatchPage(items=scored, has_skills=has_skills, total=total)
 
 
 @dataclass(frozen=True)

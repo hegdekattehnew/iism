@@ -1,6 +1,5 @@
 import { setRequestLocale } from "next-intl/server";
 
-import { Audiences } from "@/components/Audiences";
 import { BrowsePanels } from "@/components/BrowsePanels";
 import { CtaBand } from "@/components/CtaBand";
 import { HowItWorks } from "@/components/HowItWorks";
@@ -20,7 +19,6 @@ export default async function HomePage({
       <Hero />
       <StatsBand />
       <HowItWorks />
-      <Audiences />
       <BrowsePanels />
       <CtaBand />
     </>

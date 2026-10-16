@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
 import { coveragePercent, localityKey } from "../core/matches";
 import { mandatoryFirst } from "../core/labels";
+import { matchSummary } from "../core/match-summary";
 import { space } from "../theme";
 import { Badge, BadgeRow } from "./list";
-import { Text } from "./primitives";
+import { Button, Text } from "./primitives";
 
 type Gap = {
   name: string;
@@ -26,6 +28,52 @@ type Shape = {
   locality?: number;
   job: { nsqf_level_min?: number | null };
 };
+
+/**
+ * Why this score, and what to do, in a sentence (Sprint 70, UI-13): the web's `Sentence`, the same
+ * words from the same catalogue. `matchSummary` counts the two lists the scorer returned and computes
+ * nothing else; it says "skills this job asks for", never "the score is", because the score counts the
+ * generic standards the sentence leaves out.
+ */
+export function MatchSentence({
+  match,
+  variant = "body",
+}: {
+  match: Pick<Shape, "matched" | "missing">;
+  variant?: "body" | "lead";
+}) {
+  const t = useTranslations("matchesPage");
+  const summary = matchSummary(match.matched ?? [], match.missing ?? []);
+  if (summary.kind === "all") return <Text variant={variant}>{t("sentenceAll")}</Text>;
+  const names = summary.names.join(", ");
+  const missing = summary.more > 0 ? t("missingAnd", { names, more: summary.more }) : names;
+  return (
+    <Text variant={variant}>
+      {t(summary.kind === "none" ? "sentenceNone" : "sentenceSome", {
+        have: summary.have,
+        total: summary.total,
+        missing,
+      })}
+    </Text>
+  );
+}
+
+/** The report behind the sentence, closed until asked for: what the person has and what they still need. */
+export function GapDetails({ match }: { match: Shape }) {
+  const t = useTranslations("mobile.detail");
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ gap: space.md }}>
+      <Button
+        variant="secondary"
+        label={t("gapToggle")}
+        expanded={open}
+        onPress={() => setOpen((v) => !v)}
+      />
+      {open ? <GapLists match={match} /> : null}
+    </View>
+  );
+}
 
 /**
  * The score and what is behind it, rendered from the scorer's own fields. **Nothing is derived

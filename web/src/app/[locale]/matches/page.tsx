@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { CandidateDashboard } from "@/components/CandidateDashboard";
 import { MatchBrowser } from "@/components/MatchBrowser";
+import { MatchesStrip } from "@/components/MatchesStrip";
 import { ReturningNotice } from "@/components/ReturningNotice";
 import { SeekerOnly } from "@/components/SeekerOnly";
 import { WorkspaceIdentity } from "@/components/WorkspaceIdentity";
@@ -25,9 +25,9 @@ export default async function MatchesPage({
           <p className="mt-2 text-base text-muted">{t("subtitle")}</p>
           <WorkspaceIdentity sibling="profile" />
           <div className="mt-6">
-            <CandidateDashboard />
+            <MatchesStrip />
           </div>
-          <div className="mt-8">
+          <div className="mt-4">
             <MatchBrowser />
           </div>
       </SeekerOnly>

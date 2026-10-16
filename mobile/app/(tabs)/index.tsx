@@ -7,11 +7,14 @@ import { OFFERED_LOCALES } from "../../src/core/locale";
 import { useAccount } from "../../src/lib/me-queries";
 import { endSession, setLocale, useLocale } from "../../src/runtime";
 import { Button, Notice, Screen, SearchBox, Text } from "../../src/ui";
+import { SignedInHome } from "../../src/ui/SignedInHome";
 
 /**
- * Home: where to start. A search box, three ways to browse, and sign-in. Signed in, it says so and,
- * for an account that holds no job-seeker profile (an organisation owner who signed in on a phone),
- * says where to go instead: v1 is the job seeker's app and an organisation works on the website.
+ * Home: where to start. A search box, three ways to browse, and sign-in. Signed in as a job seeker
+ * it is the person's own (their best match, their profile, their updates and the applications that
+ * moved: `SignedInHome`, Sprint 70), above the same search. For an account that holds no job-seeker
+ * profile (an organisation owner who signed in on a phone) it says where to go instead: v1 is the
+ * job seeker's app and an organisation works on the website.
  */
 export default function Home() {
   const t = useTranslations("mobile");
@@ -31,7 +34,10 @@ export default function Home() {
   return (
     <Screen>
       <Text variant="title">{t("home.title")}</Text>
-      <Text tone="muted">{t("home.subtitle")}</Text>
+      {signedIn ? null : <Text tone="muted">{t("home.subtitle")}</Text>}
+
+      {/* Only an account that holds a job-seeker profile: an organisation makes no personal request. */}
+      {signedIn && isJobSeeker === true ? <SignedInHome /> : null}
 
       <SearchBox value={q} onChangeText={setQ} placeholder={ts("placeholder")} onSubmit={search} />
       <Button label={ts("submit")} onPress={search} disabled={q.trim().length === 0} />
@@ -45,8 +51,12 @@ export default function Home() {
 
       {signedIn ? (
         <>
-          <Text>{t("home.signedIn")}</Text>
-          {isJobSeeker === false ? <Notice tone="warning">{t("home.organisationNote")}</Notice> : null}
+          {isJobSeeker === false ? (
+            <>
+              <Text>{t("home.signedIn")}</Text>
+              <Notice tone="warning">{t("home.organisationNote")}</Notice>
+            </>
+          ) : null}
           <Button variant="secondary" label={ta("signOut")} onPress={() => void endSession()} />
         </>
       ) : (

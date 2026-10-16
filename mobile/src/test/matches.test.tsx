@@ -64,6 +64,30 @@ describe("the matches tab for a job seeker", () => {
     expect(router.push).toHaveBeenCalledWith("/match/ward-assistant-2");
   });
 
+  it("says in each card what is missing, so a person need not open it to know (UI-13)", async () => {
+    serve(api.GET, {
+      "/auth/me": ok(account()),
+      "/me/matches": ok(
+        page([
+          matchItem(1),
+          matchItem(2, {
+            matched: [
+              ...matchItem(2).matched,
+              ...matchItem(2).missing.map((m) => ({ ...m, evidence: "self_declared", proficiency: 3 })),
+            ],
+            missing: [],
+            missing_mandatory: 0,
+          }),
+        ]),
+      ),
+    });
+    await renderScreen(<Matches />);
+    expect(
+      await screen.findByText("You have 1 of 3 skills this job asks for. Missing: Infection control, Bed making."),
+    ).toBeTruthy();
+    expect(screen.getByText("You have every skill this job asks for.")).toBeTruthy();
+  });
+
   it("says what limits a capped match in words, not a bare 'Required'", async () => {
     serve(api.GET, {
       "/auth/me": ok(account()),
@@ -156,14 +180,28 @@ describe("one match opened", () => {
     expect(await screen.findByLabelText("What would you pay for a course? (₹)")).toBeTruthy();
   });
 
-  it("shows the score, the coverage, and what is needed with the required standards first", async () => {
+  it("leads with a sentence: what the person has and lacks, required first", async () => {
     open();
     await renderScreen(<MatchDetail />);
     expect(await screen.findByText("79% match")).toBeTruthy();
+    expect(
+      screen.getByText("You have 1 of 3 skills this job asks for. Missing: Infection control, Bed making."),
+    ).toBeTruthy();
     expect(screen.getByText(/75% of what this role requires/)).toBeTruthy();
+  });
+
+  it("keeps the lists of standards behind a button, closed, and shows them required first when asked", async () => {
+    open();
+    await renderScreen(<MatchDetail />);
+    await screen.findByText("79% match");
+    expect(screen.queryByText("✓ Hand hygiene")).toBeNull();
+    const toggle = screen.getByRole("button", { name: "What you have and what you need" });
+    expect(toggle).toBeCollapsed();
+    await fireEvent.press(toggle);
     expect(screen.getByText("✓ Hand hygiene")).toBeTruthy();
     const needs = screen.getAllByText(/^(Bed making|Infection control)$/).map((n) => n.props.children);
     expect(needs).toEqual(["Infection control", "Bed making"]);
+    expect(screen.getByRole("button", { name: "What you have and what you need" })).toBeExpanded();
   });
 
   it("explains a cap, an experience shortfall and a level shortfall in the scorer's own fields", async () => {

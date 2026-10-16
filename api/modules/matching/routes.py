@@ -66,7 +66,7 @@ async def list_matches(
     page = await service.matches_for(db, profile.id, user.id, limit=limit, state_id=state_id)
     return schemas.MatchPage(
         items=[_to_match(s) for s in page.items],
-        total=len(page.items),
+        total=page.total,
         has_skills=page.has_skills,
     )
 

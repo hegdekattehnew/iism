@@ -9,6 +9,7 @@ import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, FailureNotice, SkeletonRows } from "../../src/ui/list";
 import { SeekerGate } from "../../src/ui/gate";
 import { Button, Screen, Text } from "../../src/ui/primitives";
+import { MatchSentence } from "../../src/ui/match";
 import { SessionExpired } from "../../src/ui/session";
 
 /**
@@ -72,6 +73,7 @@ function MatchList() {
                 {place}
               </Text>
             ) : null}
+            <MatchSentence match={m} />
           </Card>
         );
       })}

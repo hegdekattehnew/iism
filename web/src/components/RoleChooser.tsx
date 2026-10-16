@@ -18,9 +18,9 @@ import { Link } from "@/i18n/navigation";
  * want to do is both truer and asks for less commitment, and the footer note
  * carries the rest: it is one account, and a second role can be added later.
  *
- * **One card, not three.** `Audiences` further down the homepage is three peer
- * cards making three arguments; this is a single control presenting a single
- * decision, and the shapes have to differ or the page reads as repeating itself.
+ * **One card, not three.** A single control presenting a single decision. (A row of three peer
+ * "audience" cards used to sit further down the homepage restating these three destinations; it
+ * went in Sprint 70, and the employer and provider pages are linked from under this card.)
  *
  * Deliberately server-rendered with no state: three links do this with no
  * client bundle at all, and the target device is a low-end Android.
