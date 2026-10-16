@@ -1,0 +1,1776 @@
+{
+ "about": "Titles people type when they name their job (Sprint 71, BL-12.12), and the corpus roles that honestly fit each. Written BEFORE any alias was added and chosen by meaning from a keyword listing of the corpus, never from what the search answered. 'tune' titles were used to write aliases and to decide any ranking change; 'hold' titles were not: no hold-out query is an alias key (tests/test_role_titles.py), and the hold-out is read once, at the end. 'accept' is exact job_role names that fit and 'accept_like' is a list of case-insensitive patterns over corpus role names, written from the job's meaning (the first version listed exact names only and missed siblings such as a role literally called 'Beautician'; the labels were widened once, by meaning, after the first baseline and the baseline re-recorded before any alias was added; 'waiter' was first labelled a job with no role, from a docstring that predated the current corpus, and corrected from the corpus itself: Food and Beverage Service Assistant, THC/Q0307, is a general pack); 'none_ok' marks a job the corpus has no honest role for, where the right behaviour is to not lead with a wrong or disability-track one ('reject' lists roles that must not lead). Run against the real corpus with `make evaluate-roles`; CI holds only the shape of this file (the corpus is in MongoDB, as for `make evaluate`).",
+ "cases": [
+  {
+   "query": "ward boy",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "ward attendant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "hospital attendant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "ayah",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Baby Caregiver (Nanny)",
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "nanny",
+    "baby care",
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "nurse aide",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Nursing Assistant"
+   ],
+   "accept_like": [
+    "nursing assist",
+    "nursing care",
+    "nurse aide"
+   ]
+  },
+  {
+   "query": "nursing assistant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Nursing Assistant"
+   ],
+   "accept_like": [
+    "nursing assist",
+    "nursing care",
+    "nurse aide"
+   ]
+  },
+  {
+   "query": "compounder",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Certificate in Pharmacy Assistance",
+    "Chemist - Retail Pharmacy"
+   ],
+   "accept_like": [
+    "pharmacy assist",
+    "^chemist - retail",
+    "pharmacist",
+    "retail pharmacy"
+   ]
+  },
+  {
+   "query": "pharmacist",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Chemist - Retail Pharmacy",
+    "Certificate in Pharmacy Assistance"
+   ],
+   "accept_like": [
+    "pharmacy assist",
+    "^chemist - retail",
+    "pharmacist",
+    "retail pharmacy"
+   ]
+  },
+  {
+   "query": "phlebotomist",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Phlebotomy",
+    "Certificate in Phlebotomy Techniques"
+   ],
+   "accept_like": [
+    "phlebotom"
+   ]
+  },
+  {
+   "query": "x ray technician",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Certificate in X-Ray Technology"
+   ],
+   "accept_like": [
+    "x-?ray",
+    "radiograph(y|ic)? technolog"
+   ]
+  },
+  {
+   "query": "dialysis technician",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Dialysis Technology"
+   ],
+   "accept_like": [
+    "dialysis"
+   ]
+  },
+  {
+   "query": "ot technician",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Operation Theatre Technology"
+   ],
+   "accept_like": [
+    "operation theat?re"
+   ]
+  },
+  {
+   "query": "ambulance driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Ambulance Driver"
+   ],
+   "accept_like": [
+    "ambulance driver"
+   ]
+  },
+  {
+   "query": "paramedic",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Emergency Medical Technician-Basic"
+   ],
+   "accept_like": [
+    "emergency medical tech",
+    "paramedic"
+   ]
+  },
+  {
+   "query": "home nurse",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Home Health Aide"
+   ],
+   "accept_like": [
+    "home health",
+    "geriatric",
+    "elderly care"
+   ]
+  },
+  {
+   "query": "old age caretaker",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Elderly Caretaker (Non Clinical)",
+    "Geriatric Caregiver (Institutional & Home Care)",
+    "Elderly Care Companion"
+   ],
+   "accept_like": [
+    "geriatric",
+    "elderly"
+   ]
+  },
+  {
+   "query": "physiotherapy assistant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Physiotherapy Assistance"
+   ],
+   "accept_like": [
+    "physiotherapy assist"
+   ]
+  },
+  {
+   "query": "dental assistant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Dental Assisting"
+   ],
+   "accept_like": [
+    "dental assist"
+   ]
+  },
+  {
+   "query": "anganwadi worker",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Fundamentals of POSHAK Poshan Shiksha and Kaushal for Anganwadi Karyakarta",
+    "Basics of POSHAK Poshan Shiksha and kaushal for Anganwadi Sahayika"
+   ],
+   "accept_like": [
+    "anganwadi"
+   ]
+  },
+  {
+   "query": "asha worker",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Community Health (CCH)"
+   ],
+   "accept_like": [
+    "community health",
+    "health worker"
+   ]
+  },
+  {
+   "query": "nanny",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Baby Caregiver (Nanny)"
+   ],
+   "accept_like": [
+    "nanny",
+    "baby care"
+   ]
+  },
+  {
+   "query": "baby sitter",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Baby Caregiver (Nanny)"
+   ],
+   "accept_like": [
+    "nanny",
+    "baby care"
+   ]
+  },
+  {
+   "query": "आया",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Baby Caregiver (Nanny)",
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "nanny",
+    "baby care",
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "वार्ड बॉय",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "General Duty Assistant"
+   ],
+   "accept_like": [
+    "general duty assistant"
+   ]
+  },
+  {
+   "query": "security guard",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Security Guard",
+    "Armed Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "watchman",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "chowkidar",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "guard",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Security Guard",
+    "Armed Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "security supervisor",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Security Supervisor"
+   ],
+   "accept_like": [
+    "^security supervisor"
+   ]
+  },
+  {
+   "query": "सिक्योरिटी गार्ड",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "गार्ड",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Security Guard"
+   ],
+   "accept_like": [
+    "^(armed |unarmed )?security guard"
+   ]
+  },
+  {
+   "query": "cctv installer",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "CCTV Installation Technician"
+   ],
+   "accept_like": [
+    "cctv install"
+   ]
+  },
+  {
+   "query": "driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Light Motor Vehicle Driver"
+   ],
+   "accept_like": [
+    "^(light motor vehicle|commercial vehicle|taxi|auto rickshaw|e-rickshaw|cargo vehicle) driver"
+   ]
+  },
+  {
+   "query": "truck driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Commercial Vehicle Driver"
+   ],
+   "accept_like": [
+    "^(commercial vehicle|cargo vehicle|tank lorry|reefer vehicle).*driver"
+   ]
+  },
+  {
+   "query": "taxi driver",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Taxi Driver"
+   ],
+   "accept_like": [
+    "^(light motor vehicle|taxi) driver"
+   ]
+  },
+  {
+   "query": "car driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Light Motor Vehicle Driver"
+   ],
+   "accept_like": [
+    "^(light motor vehicle|taxi) driver"
+   ]
+  },
+  {
+   "query": "auto rickshaw driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Auto Rickshaw Driver"
+   ],
+   "accept_like": [
+    "rickshaw driver"
+   ]
+  },
+  {
+   "query": "e rickshaw",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "E-Rickshaw Driver"
+   ],
+   "accept_like": [
+    "rickshaw driver"
+   ]
+  },
+  {
+   "query": "ड्राइवर",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Light Motor Vehicle Driver"
+   ],
+   "accept_like": [
+    "^(light motor vehicle|commercial vehicle|taxi|auto rickshaw|e-rickshaw|cargo vehicle) driver"
+   ]
+  },
+  {
+   "query": "tractor driver",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Tractor Operator",
+    "Assistant Tractor Operator"
+   ],
+   "accept_like": [
+    "tractor operator"
+   ]
+  },
+  {
+   "query": "jcb operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Backhoe Loader Operator",
+    "Excavator Operator"
+   ],
+   "accept_like": [
+    "backhoe loader",
+    "excavator operator"
+   ]
+  },
+  {
+   "query": "crane operator",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "EOT Crane Operator",
+    "Crawler Crane Operator",
+    "EOT Overhead Crane Operator"
+   ],
+   "accept_like": [
+    "crane operator"
+   ]
+  },
+  {
+   "query": "forklift driver",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Forklift Operator/Driver"
+   ],
+   "accept_like": [
+    "forklift"
+   ]
+  },
+  {
+   "query": "electrician",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Assistant Electrician",
+    "Electrician - Domestic Solutions",
+    "Certificate in Electrician Skills"
+   ],
+   "accept_like": [
+    "^(?!.*(aerospace|automotive|foreman)).*electrician",
+    "^electrical install",
+    "bijli mist"
+   ]
+  },
+  {
+   "query": "house wiring",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Electrician - Domestic Solutions",
+    "Assistant Electrician (Domestic cum Industrial)",
+    "Electrical Installation & Repair"
+   ],
+   "accept_like": [
+    "^(?!.*(aerospace|automotive|foreman)).*electrician",
+    "^electrical install"
+   ]
+  },
+  {
+   "query": "बिजली मिस्त्री",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Assistant Electrician",
+    "Electrician - Domestic Solutions"
+   ],
+   "accept_like": [
+    "^(?!.*(aerospace|automotive|foreman)).*electrician",
+    "^electrical install",
+    "bijli mist"
+   ]
+  },
+  {
+   "query": "plumber",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Plumber - General",
+    "Assistant Plumber - General"
+   ],
+   "accept_like": [
+    "^(assistant |junior )?plumber",
+    "certificate in plumbing"
+   ]
+  },
+  {
+   "query": "carpenter",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Carpenter",
+    "Assistant Carpenter"
+   ],
+   "accept_like": [
+    "carpenter"
+   ]
+  },
+  {
+   "query": "badhai",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Carpenter",
+    "Assistant Carpenter"
+   ],
+   "accept_like": [
+    "carpenter"
+   ]
+  },
+  {
+   "query": "mason",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Brick Mason",
+    "Brick Mason -Basic",
+    "Assistant Mason",
+    "Plaster Mason - Basic"
+   ],
+   "accept_like": [
+    "mason"
+   ]
+  },
+  {
+   "query": "rajmistri",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Brick Mason",
+    "Brick Mason -Basic",
+    "Assistant Mason"
+   ],
+   "accept_like": [
+    "mason"
+   ]
+  },
+  {
+   "query": "painter",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Construction Painter & Decorator",
+    "Assistant Construction Painter & Decorator"
+   ],
+   "accept_like": [
+    "construction painter",
+    "decorative painter",
+    "painter & decorator"
+   ]
+  },
+  {
+   "query": "house painter",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Construction Painter & Decorator",
+    "Assistant Construction Painter & Decorator"
+   ],
+   "accept_like": [
+    "construction painter",
+    "painter & decorator"
+   ]
+  },
+  {
+   "query": "welder",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Construction Welder",
+    "Manual Metal Arc Welding/ Shielded Metal Arc Welding Welder",
+    "Assistant Manual Metal Arc Welding/ Shielded Metal Arc Welding Welder"
+   ],
+   "accept_like": [
+    "welder",
+    "certificate in welding"
+   ]
+  },
+  {
+   "query": "arc welder",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Manual Metal Arc Welding/ Shielded Metal Arc Welding Welder",
+    "Construction Welder"
+   ],
+   "accept_like": [
+    "welder",
+    "certificate in welding"
+   ]
+  },
+  {
+   "query": "fitter",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Fitter - Fabrication",
+    "Fitter - Mechanical Assembly",
+    "Fitter - Mechanical Maintenance"
+   ],
+   "accept_like": [
+    "^(assistant )?fitter"
+   ]
+  },
+  {
+   "query": "bar bender",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Bar Bender and Steel Fixer"
+   ],
+   "accept_like": [
+    "bar bender"
+   ]
+  },
+  {
+   "query": "scaffolder",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Scaffolder"
+   ],
+   "accept_like": [
+    "scaffolder"
+   ]
+  },
+  {
+   "query": "tile layer",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Mason Tiling"
+   ],
+   "accept_like": [
+    "tiling",
+    "^tile"
+   ]
+  },
+  {
+   "query": "false ceiling",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Assistant False Ceiling and Drywall Installer"
+   ],
+   "accept_like": [
+    "false ceiling",
+    "drywall"
+   ]
+  },
+  {
+   "query": "cnc operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "CNC Operator - Vertical Machining Centre",
+    "CNC Turning"
+   ],
+   "accept_like": [
+    "^cnc (operator|turning|milling)"
+   ]
+  },
+  {
+   "query": "car mechanic",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Four Wheeler Service Assistant",
+    "Four Wheeler Service Lead Technician",
+    "Four Wheeler Service Master Technician"
+   ],
+   "accept_like": [
+    "four wheeler service",
+    "^automobile jr\\. technician"
+   ]
+  },
+  {
+   "query": "bike mechanic",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Two Wheeler Service Technician",
+    "Two Wheeler Service Assistant"
+   ],
+   "accept_like": [
+    "two wheeler service"
+   ]
+  },
+  {
+   "query": "two wheeler mechanic",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Two Wheeler Service Technician",
+    "Two Wheeler Service Assistant"
+   ],
+   "accept_like": [
+    "two wheeler service"
+   ]
+  },
+  {
+   "query": "puncture repair",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Tyre Fitter-Servicing and Maintenance"
+   ],
+   "accept_like": [
+    "tyre fitter"
+   ]
+  },
+  {
+   "query": "car wash",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Entrepreneurship in Car Washing Service",
+    "Nano Entrepreneurship in Car Washing Service"
+   ],
+   "accept_like": [
+    "car wash"
+   ]
+  },
+  {
+   "query": "mobile repair",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Mobile Phone Hardware Repair Technician"
+   ],
+   "accept_like": [
+    "mobile phone (hardware )?repair"
+   ]
+  },
+  {
+   "query": "mobile technician",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Mobile Phone Hardware Repair Technician"
+   ],
+   "accept_like": [
+    "mobile phone (hardware )?repair"
+   ]
+  },
+  {
+   "query": "ac technician",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Field Technician - Air Conditioner",
+    "Certificate in Refrigeration & Air Conditioning Systems"
+   ],
+   "accept_like": [
+    "air conditioner",
+    "refrigeration",
+    "air conditioning"
+   ]
+  },
+  {
+   "query": "ac mechanic",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Field Technician - Air Conditioner",
+    "Certificate in Refrigeration & Air Conditioning Systems"
+   ],
+   "accept_like": [
+    "air conditioner",
+    "refrigeration",
+    "air conditioning"
+   ]
+  },
+  {
+   "query": "fridge repair",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Certificate in Refrigeration & Air Conditioning Systems",
+    "Service Technician - Home Appliances"
+   ],
+   "accept_like": [
+    "refrigerat",
+    "home appliance"
+   ]
+  },
+  {
+   "query": "washing machine repair",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Service Technician - Home Appliances",
+    "Certificate in Home Appliances Servicing",
+    "Multi-Skill Technician (Home Appliances)"
+   ],
+   "accept_like": [
+    "home appliance"
+   ]
+  },
+  {
+   "query": "dth installer",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "DTH Set Top Box Installation & Service Technician"
+   ],
+   "accept_like": [
+    "set top box"
+   ]
+  },
+  {
+   "query": "solar installer",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Rooftop Solar PV (Installation & Maintenance)",
+    "Certificate in Solar Panel Installation"
+   ],
+   "accept_like": [
+    "solar pv install",
+    "solar panel install",
+    "rooftop solar pv \\(install"
+   ]
+  },
+  {
+   "query": "solar panel technician",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Rooftop Solar PV (Installation & Maintenance)",
+    "Certificate in Solar Panel Installation"
+   ],
+   "accept_like": [
+    "solar pv install",
+    "solar panel install",
+    "rooftop solar pv \\(install"
+   ]
+  },
+  {
+   "query": "computer hardware",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Computer Hardware & Networking",
+    "Assistant Technician - Computer and Peripheral"
+   ],
+   "accept_like": [
+    "computer hardware",
+    "computer and peripheral"
+   ]
+  },
+  {
+   "query": "laptop repair",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Computer Hardware & Networking",
+    "Assistant Technician - Computer and Peripheral"
+   ],
+   "accept_like": [
+    "computer hardware",
+    "computer and peripheral"
+   ]
+  },
+  {
+   "query": "network technician",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Broadband Network Technician"
+   ],
+   "accept_like": [
+    "network technician",
+    "broadband network"
+   ]
+  },
+  {
+   "query": "salesman",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Retail Sales Assistant",
+    "Retail Sales Executive"
+   ],
+   "accept_like": [
+    "^retail sales (assistant|executive|associate)"
+   ]
+  },
+  {
+   "query": "shop assistant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Retail Sales Assistant"
+   ],
+   "accept_like": [
+    "^retail sales (assistant|executive|associate)"
+   ]
+  },
+  {
+   "query": "sales girl",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Retail Sales Assistant"
+   ],
+   "accept_like": [
+    "^retail sales (assistant|executive|associate)"
+   ]
+  },
+  {
+   "query": "cashier",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Retail Cashier"
+   ],
+   "accept_like": [
+    "cashier"
+   ]
+  },
+  {
+   "query": "store keeper",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Warehouse Associate",
+    "Warehouse Executive"
+   ],
+   "accept_like": [
+    "^warehouse (associate|executive)"
+   ]
+  },
+  {
+   "query": "godown worker",
+   "kind": "hinglish",
+   "split": "hold",
+   "accept": [
+    "Warehouse Associate"
+   ],
+   "accept_like": [
+    "^warehouse (associate|executive)"
+   ]
+  },
+  {
+   "query": "warehouse worker",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Warehouse Associate"
+   ],
+   "accept_like": [
+    "^warehouse (associate|executive)"
+   ]
+  },
+  {
+   "query": "loader",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Warehouse Associate"
+   ],
+   "accept_like": [
+    "^warehouse (associate|executive)"
+   ]
+  },
+  {
+   "query": "delivery boy",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "E-commerce Delivery Associate"
+   ],
+   "accept_like": [
+    "delivery associate",
+    "courier associate",
+    "last mile delivery"
+   ]
+  },
+  {
+   "query": "delivery executive",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "E-commerce Delivery Associate",
+    "Courier Associate - Operations"
+   ],
+   "accept_like": [
+    "delivery associate",
+    "courier associate",
+    "last mile delivery"
+   ]
+  },
+  {
+   "query": "courier boy",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Courier Associate - Operations"
+   ],
+   "accept_like": [
+    "courier associate",
+    "delivery associate"
+   ]
+  },
+  {
+   "query": "डिलीवरी बॉय",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "E-commerce Delivery Associate"
+   ],
+   "accept_like": [
+    "delivery associate",
+    "courier associate",
+    "last mile delivery"
+   ]
+  },
+  {
+   "query": "cook",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Cook (Multi-Cuisine)"
+   ],
+   "accept_like": [
+    "^cook",
+    "^chef",
+    "^commis"
+   ]
+  },
+  {
+   "query": "chef",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Cook (Multi-Cuisine)",
+    "Chef de Partie",
+    "Commis"
+   ],
+   "accept_like": [
+    "^cook",
+    "^chef",
+    "^commis",
+    "^demi chef"
+   ]
+  },
+  {
+   "query": "kitchen helper",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Kitchen Helper"
+   ],
+   "accept_like": [
+    "^kitchen (helper|steward|trainee)"
+   ]
+  },
+  {
+   "query": "waiter",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Food and Beverage Service Assistant"
+   ],
+   "accept_like": [
+    "^food and beverage service assistant"
+   ]
+  },
+  {
+   "query": "turner",
+   "kind": "english",
+   "split": "tune",
+   "none_ok": true
+  },
+  {
+   "query": "housekeeping",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Housekeeping Assistant"
+   ],
+   "accept_like": [
+    "^housekeeping (assistant|attendant)",
+    "^room attendant"
+   ]
+  },
+  {
+   "query": "room boy",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Housekeeping Assistant"
+   ],
+   "accept_like": [
+    "^housekeeping (assistant|attendant)",
+    "^room attendant"
+   ]
+  },
+  {
+   "query": "cleaner",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Housekeeping Assistant"
+   ],
+   "accept_like": [
+    "^housekeeping (assistant|attendant)"
+   ]
+  },
+  {
+   "query": "bartender",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Bartender"
+   ],
+   "accept_like": [
+    "bartender"
+   ]
+  },
+  {
+   "query": "receptionist",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Front Office Assistant"
+   ],
+   "accept_like": [
+    "front office assistant",
+    "receptionist",
+    "front desk"
+   ]
+  },
+  {
+   "query": "front desk executive",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Front Office Assistant"
+   ],
+   "accept_like": [
+    "front office assistant",
+    "receptionist",
+    "front desk"
+   ]
+  },
+  {
+   "query": "housemaid",
+   "kind": "english",
+   "split": "tune",
+   "none_ok": true
+  },
+  {
+   "query": "maid",
+   "kind": "english",
+   "split": "hold",
+   "none_ok": true
+  },
+  {
+   "query": "domestic help",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Assistant Home Manager(Household & Small Establishment)"
+   ],
+   "accept_like": [
+    "home manager"
+   ]
+  },
+  {
+   "query": "data entry operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Domestic Data Entry Operator",
+    "Certificate in Data Entry Operations - Domestic"
+   ],
+   "accept_like": [
+    "data entry"
+   ]
+  },
+  {
+   "query": "computer operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Domestic Data Entry Operator",
+    "Certificate in Data Entry Operations - Domestic"
+   ],
+   "accept_like": [
+    "data entry"
+   ]
+  },
+  {
+   "query": "typist",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Hindi Typist"
+   ],
+   "accept_like": [
+    "typist"
+   ]
+  },
+  {
+   "query": "accounts assistant",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Accounts Assistant"
+   ],
+   "accept_like": [
+    "^accounts assistant"
+   ]
+  },
+  {
+   "query": "accountant",
+   "kind": "english",
+   "split": "tune",
+   "none_ok": true,
+   "reject": [
+    "Professional Diploma in US Corporate Law for Company Secretaries and Chartered Accountants Skills"
+   ]
+  },
+  {
+   "query": "tally operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Tally Prime",
+    "Advance Certificate in Tally",
+    "Certificate In Tally Basics"
+   ],
+   "accept_like": [
+    "tally"
+   ]
+  },
+  {
+   "query": "call centre agent",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Call Center Executive"
+   ],
+   "accept_like": [
+    "call cent",
+    "bpo"
+   ]
+  },
+  {
+   "query": "telecaller",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Call Center Executive",
+    "Automotive Telecaller"
+   ],
+   "accept_like": [
+    "call cent",
+    "telecaller",
+    "bpo"
+   ]
+  },
+  {
+   "query": "customer care",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Customer Care Executive-Domestic- Non- Voice",
+    "Customer Care Sr. Executive (Voice and Non- Voice)",
+    "Call Center Executive"
+   ],
+   "accept_like": [
+    "call cent",
+    "customer care (sr\\. )?executive"
+   ]
+  },
+  {
+   "query": "bpo",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "ITeS BPO Executive Voice",
+    "Call Center Executive"
+   ],
+   "accept_like": [
+    "bpo",
+    "call cent"
+   ]
+  },
+  {
+   "query": "कॉल सेंटर",
+   "kind": "devanagari",
+   "split": "hold",
+   "accept": [
+    "Call Center Executive"
+   ],
+   "accept_like": [
+    "call cent",
+    "bpo"
+   ]
+  },
+  {
+   "query": "tailor",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Self Employed Tailor"
+   ],
+   "accept_like": [
+    "tailor",
+    "garment maker"
+   ]
+  },
+  {
+   "query": "darzi",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Self Employed Tailor"
+   ],
+   "accept_like": [
+    "tailor",
+    "garment maker"
+   ]
+  },
+  {
+   "query": "दर्जी",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Self Employed Tailor"
+   ],
+   "accept_like": [
+    "tailor",
+    "garment maker"
+   ]
+  },
+  {
+   "query": "sewing machine operator",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Sewing Machine Operator",
+    "Sewing Machine Operator - Knits"
+   ],
+   "accept_like": [
+    "sewing machine operator"
+   ]
+  },
+  {
+   "query": "garment worker",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Garment Maker",
+    "Sewing Machine Operator"
+   ],
+   "accept_like": [
+    "garment maker",
+    "sewing machine operator"
+   ]
+  },
+  {
+   "query": "embroidery",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Basics of Hand Embroidery",
+    "Certificate in Hand Embroidery",
+    "Certificate in Dress Making & Hand Embroidery"
+   ],
+   "accept_like": [
+    "embroider"
+   ]
+  },
+  {
+   "query": "beautician",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Beauty Therapist",
+    "Assistant Beauty Therapist"
+   ],
+   "accept_like": [
+    "^beautician",
+    "beauty therapist",
+    "beauty & wellness",
+    "assistant beauty"
+   ]
+  },
+  {
+   "query": "parlour work",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Beauty Therapist",
+    "Assistant Beauty Therapist"
+   ],
+   "accept_like": [
+    "^beautician",
+    "beauty therapist",
+    "beauty & wellness",
+    "assistant beauty"
+   ]
+  },
+  {
+   "query": "barber",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Assistant Barber-Salon Services"
+   ],
+   "accept_like": [
+    "barber",
+    "hair ?dress"
+   ]
+  },
+  {
+   "query": "hair stylist",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Hair Dresser & Stylist",
+    "Hairdresser"
+   ],
+   "accept_like": [
+    "hair ?dress",
+    "hair stylist",
+    "barber"
+   ]
+  },
+  {
+   "query": "makeup artist",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Make-Up Artist"
+   ],
+   "accept_like": [
+    "make-?up artist"
+   ]
+  },
+  {
+   "query": "nail art",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Nail Technician"
+   ],
+   "accept_like": [
+    "nail"
+   ]
+  },
+  {
+   "query": "loom operator",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Circular loom operator (Shuttle type)"
+   ],
+   "accept_like": [
+    "loom operator"
+   ]
+  },
+  {
+   "query": "bijli mistri",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Assistant Electrician",
+    "Electrician - Domestic Solutions"
+   ],
+   "accept_like": [
+    "^(?!.*(aerospace|automotive|foreman)).*electrician",
+    "^electrical install",
+    "bijli mist"
+   ]
+  },
+  {
+   "query": "nal mistri",
+   "kind": "hinglish",
+   "split": "hold",
+   "accept": [
+    "Plumber - General",
+    "Assistant Plumber - General"
+   ],
+   "accept_like": [
+    "^(assistant |junior )?plumber",
+    "certificate in plumbing"
+   ]
+  },
+  {
+   "query": "motor mechanic",
+   "kind": "hinglish",
+   "split": "tune",
+   "accept": [
+    "Four Wheeler Service Assistant",
+    "Two Wheeler Service Technician",
+    "Two Wheeler Service Assistant"
+   ],
+   "accept_like": [
+    "four wheeler service",
+    "two wheeler service"
+   ]
+  },
+  {
+   "query": "safai wali",
+   "kind": "hinglish",
+   "split": "hold",
+   "accept": [
+    "Housekeeping Assistant"
+   ],
+   "accept_like": [
+    "^housekeeping (assistant|attendant)"
+   ]
+  },
+  {
+   "query": "इलेक्ट्रीशियन",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Assistant Electrician",
+    "Electrician - Domestic Solutions"
+   ],
+   "accept_like": [
+    "^(?!.*(aerospace|automotive|foreman)).*electrician",
+    "^electrical install",
+    "bijli mist"
+   ]
+  },
+  {
+   "query": "प्लंबर",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Plumber - General",
+    "Assistant Plumber - General"
+   ],
+   "accept_like": [
+    "^(assistant |junior )?plumber",
+    "certificate in plumbing"
+   ]
+  },
+  {
+   "query": "कुक",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Cook (Multi-Cuisine)"
+   ],
+   "accept_like": [
+    "^cook",
+    "^chef",
+    "^commis"
+   ]
+  },
+  {
+   "query": "वेल्डर",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Construction Welder",
+    "Manual Metal Arc Welding/ Shielded Metal Arc Welding Welder"
+   ],
+   "accept_like": [
+    "welder",
+    "certificate in welding"
+   ]
+  },
+  {
+   "query": "सेल्समैन",
+   "kind": "devanagari",
+   "split": "hold",
+   "accept": [
+    "Retail Sales Assistant",
+    "Retail Sales Executive"
+   ],
+   "accept_like": [
+    "^retail sales (assistant|executive|associate)"
+   ]
+  },
+  {
+   "query": "ब्यूटीशियन",
+   "kind": "devanagari",
+   "split": "tune",
+   "accept": [
+    "Beauty Therapist",
+    "Assistant Beauty Therapist"
+   ],
+   "accept_like": [
+    "^beautician",
+    "beauty therapist",
+    "beauty & wellness",
+    "assistant beauty"
+   ]
+  },
+  {
+   "query": "टेलीकॉलर",
+   "kind": "devanagari",
+   "split": "hold",
+   "accept": [
+    "Call Center Executive"
+   ],
+   "accept_like": [
+    "call cent",
+    "telecaller",
+    "bpo"
+   ]
+  },
+  {
+   "query": "dairy worker",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Dairy Worker"
+   ],
+   "accept_like": [
+    "^dairy (worker|farmer)"
+   ]
+  },
+  {
+   "query": "gardener",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Assistant Gardener",
+    "Gardener cum Nursery Raiser"
+   ],
+   "accept_like": [
+    "gardener"
+   ]
+  },
+  {
+   "query": "mali",
+   "kind": "hinglish",
+   "split": "hold",
+   "accept": [
+    "Assistant Gardener",
+    "Gardener cum Nursery Raiser"
+   ],
+   "accept_like": [
+    "gardener"
+   ]
+  },
+  {
+   "query": "beekeeper",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Beekeeper"
+   ],
+   "accept_like": [
+    "beekeeper"
+   ]
+  },
+  {
+   "query": "poultry farm worker",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Poultry Farm Worker"
+   ],
+   "accept_like": [
+    "poultry"
+   ]
+  },
+  {
+   "query": "pre school teacher",
+   "kind": "english",
+   "split": "tune",
+   "accept": [
+    "Certificate in Early Childhood Care and Education",
+    "Certificate in Early Child Education"
+   ],
+   "accept_like": [
+    "early child"
+   ]
+  },
+  {
+   "query": "yoga instructor",
+   "kind": "english",
+   "split": "hold",
+   "accept": [
+    "Certificate in Advance Yoga Instruction"
+   ],
+   "accept_like": [
+    "yoga"
+   ]
+  }
+ ]
+}
