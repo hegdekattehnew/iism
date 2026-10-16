@@ -195,7 +195,7 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
                   key={i.href}
                   href={i.href}
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-surface-muted"
+                  className="block rounded-md px-3 py-3 text-sm hover:bg-surface-muted"
                 >
                   {i.label}
                 </Link>
@@ -205,14 +205,14 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
               <Link
                 href="/account"
                 onClick={() => setMenuOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm hover:bg-surface-muted"
+                className="block rounded-md px-3 py-3 text-sm hover:bg-surface-muted"
               >
                 {t("accountSettings")}
               </Link>
               <button
                 type="button"
                 onClick={() => void signOut()}
-                className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted"
+                className="block w-full rounded-md px-3 py-3 text-left text-sm hover:bg-surface-muted"
               >
                 {t("signOut")}
               </button>

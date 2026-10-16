@@ -38,7 +38,11 @@ describe("the public lists while they load", () => {
   }
 
   it("vacancies: the placeholders go away, and the count appears, once the list has arrived", async () => {
-    GET.mockResolvedValue({ data: { items: [] } });
+    GET.mockImplementation(async (path: string) =>
+      path === "/jobs/states"
+        ? { data: [] }
+        : { data: { items: [], total: 0, limit: 24, offset: 0 } },
+    );
     const { container } = renderUi(<JobBrowser />);
     expect(await screen.findByText("No jobs")).toBeTruthy();
     expect(container.querySelectorAll("[data-loading]")).toHaveLength(0);

@@ -36,14 +36,33 @@ import { SessionExpired } from "./session";
  * An organisation-only account is offered nothing: it cannot apply, and an affordance that always
  * fails is worse than none. While the account is still loading nothing shows either.
  */
+/**
+ * Whether the panel has anything to show (Sprint 69, UI-08). The vacancy screen puts it in a bar
+ * under the content, and an empty bar (an organisation-only account, or an account that is still
+ * loading) would be a bordered strip with nothing in it. One rule, read by the panel and by the
+ * screen, so the two cannot disagree about whether there is a panel.
+ */
+export function useApplyVisible(jobSlug: string, isOpen: boolean): boolean {
+  const { signedIn, isJobSeeker } = useAccount();
+  const applications = useApplications();
+  const mine = applications.data?.find((a) => a.job.slug === jobSlug);
+  const live = mine !== undefined && isLive(mine);
+  if (!isOpen && !live) return true;
+  if (!signedIn) return true;
+  return isJobSeeker === true;
+}
+
 export function ApplyPanel({
   jobSlug,
   organisation,
   isOpen,
+  compact = false,
 }: {
   jobSlug: string;
   organisation: string;
   isOpen: boolean;
+  /** Apply and Save side by side, for the bar under a vacancy: the bar must not take the screen. */
+  compact?: boolean;
 }) {
   const t = useTranslations("applications");
   const router = useRouter();
@@ -68,38 +87,45 @@ export function ApplyPanel({
   }
   if (isJobSeeker !== true) return null;
 
+  // Side by side only while there are two buttons: asking for confirmation hides Apply.
+  const row = compact && !confirming;
   const failure = apply.error ?? withdraw.error ?? toggleSave.error;
   const signedOut = failure !== null && isSignedOut(failure);
 
   return (
     <View style={{ gap: space.md }}>
-      {live && mine ? (
-        <View style={{ gap: space.sm }}>
-          <Badge
-            tone={mine.status === "rejected" ? "warning" : "success"}
-            // "Applied" for a live application, and the employer's own word once they have decided:
-            // a rejected candidate told "Applied" is misled.
-            label={mine.status === "applied" || mine.status === "shortlisted" ? t("appliedLabel") : t(`status.${mine.status}`)}
-          />
-          {canWithdraw(mine.status) ? (
-            <Button
-              variant="secondary"
-              label={withdraw.isPending ? t("withdrawing") : t("withdraw")}
-              busy={withdraw.isPending}
-              onPress={() => withdraw.mutate(mine.id)}
-            />
-          ) : null}
+      <View style={row ? { flexDirection: "row", gap: space.md, alignItems: "stretch" } : { gap: space.md }}>
+        <View style={row ? { flex: 1 } : undefined}>
+          {live && mine ? (
+            <View style={{ gap: space.sm }}>
+              <Badge
+                tone={mine.status === "rejected" ? "warning" : "success"}
+                // "Applied" for a live application, and the employer's own word once they have decided:
+                // a rejected candidate told "Applied" is misled.
+                label={mine.status === "applied" || mine.status === "shortlisted" ? t("appliedLabel") : t(`status.${mine.status}`)}
+              />
+              {canWithdraw(mine.status) ? (
+                <Button
+                  variant="secondary"
+                  label={withdraw.isPending ? t("withdrawing") : t("withdraw")}
+                  busy={withdraw.isPending}
+                  onPress={() => withdraw.mutate(mine.id)}
+                />
+              ) : null}
+            </View>
+          ) : confirming ? null : (
+            <Button label={t("apply")} onPress={() => setConfirming(true)} />
+          )}
         </View>
-      ) : confirming ? null : (
-        <Button label={t("apply")} onPress={() => setConfirming(true)} />
-      )}
-
-      <Button
-        variant="secondary"
-        label={isSaved ? t("savedLabel") : t("save")}
-        busy={toggleSave.isPending}
-        onPress={() => toggleSave.mutate({ slug: jobSlug, saved: isSaved })}
-      />
+        <View style={row ? { flex: 1 } : undefined}>
+          <Button
+            variant="secondary"
+            label={isSaved ? t("savedLabel") : t("save")}
+            busy={toggleSave.isPending}
+            onPress={() => toggleSave.mutate({ slug: jobSlug, saved: isSaved })}
+          />
+        </View>
+      </View>
 
       {confirming && !live ? (
         <View style={{ gap: space.md }}>

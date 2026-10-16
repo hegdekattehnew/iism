@@ -26,10 +26,12 @@ export const buttonVariants = cva(
           "hover:brightness-95 dark:hover:brightness-110",
       },
       size: {
-        sm: "px-3 py-1.5 text-sm",
-        md: "px-4 py-2.5 text-sm",
-        lg: "px-5 py-3 text-base",
-        icon: "h-10 w-10",
+        // 44 px is the floor for a touch target (Sprint 69, UI-11): the review found 15 or more
+        // controls under it on every page, most of them these two sizes at 32 and 40.
+        sm: "min-h-11 px-3 py-1.5 text-sm",
+        md: "min-h-11 px-4 py-2.5 text-sm",
+        lg: "min-h-12 px-5 py-3 text-base",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },

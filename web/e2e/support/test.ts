@@ -99,6 +99,8 @@ type Options = {
   light?: boolean;
   /** Skip the flush-border check on a page where a bordered box genuinely holds bare text. */
   flush?: boolean;
+  /** Skip the touch-target check (Sprint 69, UI-11) on a page with no header and footer. */
+  targets?: boolean;
 };
 
 /** Core Web Vitals call a layout-shift score up to 0.1 "good"; above 0.25 it is "poor". */
@@ -139,6 +141,10 @@ export async function checkPage(page: Page, label: string, options: Options = {}
 
   if (options.flush !== false) {
     expect.soft(await flushBorders(page), `${label}: text flush against a border`).toEqual([]);
+  }
+
+  if (options.targets !== false) {
+    expect.soft(await smallTargets(page), `${label}: header or footer control under 44 px`).toEqual([]);
   }
 
   // Colours fade (`transition-colors`), and axe samples the computed value: measured the instant
@@ -215,6 +221,42 @@ async function flushBorders(page: Page): Promise<string[]> {
       if (nearest < MIN) {
         const cls = (el.getAttribute("class") ?? "").split(/\s+/).slice(0, 6).join(".");
         found.push(`${el.tagName.toLowerCase()}.${cls} -- text "${sample}" starts ${nearest.toFixed(1)}px from the border`);
+      }
+    }
+    return found.slice(0, 8);
+  });
+}
+
+/**
+ * Controls in the header and the footer that are smaller than a thumb (Sprint 69, UI-11).
+ *
+ * The design review measured 15 or more controls under 44 px on every page, and the header and
+ * footer are on every page: a menu button at 38, nav links at 32, footer links at the height of their
+ * text. Those two regions are asserted, because they are the same markup everywhere and one fix
+ * clears them for the whole product; the rest of a page is a count in the review, not a failure
+ * here. An inline link inside a sentence is exempt (WCAG 2.5.8 exempts it too), so only `a`s that
+ * stand alone in a list or a nav are looked at, and controls that are not drawn are skipped.
+ */
+async function smallTargets(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const MIN = 44;
+    const found: string[] = [];
+    const controls = document.querySelectorAll(
+      "header a[href], header button, header select, header summary, header input, footer a[href], footer button, footer select, footer summary, footer input",
+    );
+    for (const el of controls) {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      // A skip link is off-screen until focused.
+      if (box.bottom < 0 || box.right < 0) continue;
+      // Inline in a sentence: the control sits inside a paragraph with other text.
+      const parent = el.parentElement;
+      if (el.tagName === "A" && parent && parent.tagName === "P" && (parent.textContent ?? "").trim() !== (el.textContent ?? "").trim()) continue;
+      if (box.height < MIN - 0.5 || box.width < MIN - 0.5) {
+        const label = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 24);
+        found.push(`${el.tagName.toLowerCase()} "${label}" ${Math.round(box.width)}x${Math.round(box.height)}`);
       }
     }
     return found.slice(0, 8);

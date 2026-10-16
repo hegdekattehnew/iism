@@ -132,11 +132,12 @@
   --shadow-soft: var(--shadow-soft);
   --shadow-raised: var(--shadow-raised);
 
-  /* The type scale. Sprint 26 found 34 arbitrary sizes -- `text-[11px]` thirty
-     -one times -- sitting beside the Tailwind steps. `2xs` exists because that
-     size is real and used (badges, eyebrow labels); it is named here so it
-     stops being spelled in pixels at each call site. */
-  --text-2xs: 0.6875rem;
+  /* The type scale. Sprint 26 found 34 arbitrary sizes sitting beside the Tailwind steps,
+     and `2xs` was named for the 11 px one. Sprint 69 (UI-07) raised the floor: nothing is
+     smaller than 12 px (0.75rem), because the review counted 296 nodes under it on one page and
+     a low-end phone in sunlight cannot read them. `src/lib/type-floor.test.ts` fails on a
+     new literal below it. The step keeps its name so no call site had to move. */
+  --text-2xs: 0.75rem;
   --text-2xs--line-height: 1rem;
 
   /* Latin only. The Devanagari face is added by `html[lang="hi"]` below and

@@ -46,13 +46,13 @@ export function StandardOrigin({ row, lookalike }: { row: Row; lookalike: boolea
   return (
     <>
       {row.nos_code && (
-        <p className="mt-1 font-mono text-[11px] text-muted">{row.nos_code}</p>
+        <p className="mt-1 font-mono text-xs text-muted">{row.nos_code}</p>
       )}
       {c?.qualification_name && (
         <p className="mt-1.5 text-xs text-muted">
           {t("partOf", { name: c.qualification_name })}
           {c.qualification_code && (
-            <span className="ml-1 font-mono text-[11px]">({c.qualification_code})</span>
+            <span className="ml-1 font-mono text-xs">({c.qualification_code})</span>
           )}
         </p>
       )}
@@ -89,7 +89,7 @@ function TypeChip({ type }: { type: Row["skill_type"] }) {
         ? "bg-warning-surface text-warning-text"
         : "bg-surface-muted text-foreground";
   return (
-    <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
+    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${tone}`}>
       {t(type)}
     </span>
   );
@@ -295,14 +295,14 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
               <div className="flex flex-wrap items-center gap-2">
                 <TypeChip type={r.skill_type} />
                 {r.nsqf_level != null && (
-                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                     {t("levelShort", { level: fmtLevel(r.nsqf_level) })}
                   </span>
                 )}
                 {/* Why this sorts where it does, and a real signal of how
                     central the unit is to the framework. */}
                 {(r.qp_count ?? 0) > 0 && (
-                  <span className="text-[11px] text-muted">
+                  <span className="text-xs text-muted">
                     {t("usedInQps", { count: r.qp_count ?? 0 })}
                   </span>
                 )}

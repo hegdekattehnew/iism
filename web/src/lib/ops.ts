@@ -1,13 +1,14 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
 import { ApiError, readDetail } from "./http";
 
-export type QueueRow =
-  paths["/ops/organisations"]["get"]["responses"]["200"]["content"]["application/json"][number];
+export type QueuePage =
+  paths["/ops/organisations"]["get"]["responses"]["200"]["content"]["application/json"];
+export type QueueRow = QueuePage["items"][number];
 export type VerificationDetail =
   paths["/ops/organisations/{org_slug}/verification"]["get"]["responses"]["200"]["content"]["application/json"];
 export type Decision = "granted" | "revoked";
@@ -38,14 +39,29 @@ export const NOTE_MAX = 500;
 const QUEUE = ["ops", "queue"] as const;
 const detailKey = (slug: string) => ["ops", "organisation", slug] as const;
 
+/** The queue's page size: the server's default, named so the screen and the test agree. */
+export const QUEUE_PAGE_SIZE = 100;
+
+/**
+ * Pages of the queue, each carrying the **queue's** size (`total`, counted in the database).
+ * The screen used to print the length of the one page it asked for as "waiting", which the cap
+ * of 100 turned into "100 waiting" beside an overview that said 162 (Sprint 69, UI-17).
+ */
 export function useVerificationQueue() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: QUEUE,
     retry: false,
-    queryFn: async () => {
-      const { data, error, response } = await api.GET("/ops/organisations", {});
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const { data, error, response } = await api.GET("/ops/organisations", {
+        params: { query: { limit: QUEUE_PAGE_SIZE, offset: pageParam } },
+      });
       if (error || !data) throw new ApiError(response.status, readDetail(error));
       return data;
+    },
+    getNextPageParam: (last) => {
+      const seen = last.offset + last.items.length;
+      return last.items.length > 0 && seen < last.total ? seen : undefined;
     },
   });
 }

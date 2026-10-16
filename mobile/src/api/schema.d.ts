@@ -208,6 +208,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Job States
+         * @description The states that have an open vacancy and how many. Declared before `/{slug}`, which would
+         *     otherwise capture it as a vacancy named "states".
+         */
+        get: operations["list_job_states_jobs_states_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{slug}": {
         parameters: {
             query?: never;
@@ -2406,7 +2427,7 @@ export interface paths {
         };
         /**
          * Verification Queue
-         * @description Organisations awaiting a verification decision, oldest first.
+         * @description Organisations awaiting a verification decision, oldest first, and how many wait in all.
          */
         get: operations["verification_queue_ops_organisations_get"];
         put?: never;
@@ -2480,7 +2501,8 @@ export interface paths {
         };
         /**
          * Certification Queue
-         * @description Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2).
+         * @description Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2), and how many
+         *     wait in all.
          */
         get: operations["certification_queue_ops_candidates_certifications_get"];
         put?: never;
@@ -3634,6 +3656,20 @@ export interface components {
             /** Nsqf Level */
             nsqf_level?: number | null;
             skill?: components["schemas"]["SkillOut"] | null;
+        };
+        /**
+         * CertificationQueue
+         * @description The certification queue with its true size, for the reason `OrganisationQueue` has one.
+         */
+        CertificationQueue: {
+            /** Items */
+            items: components["schemas"]["UnverifiedCertification"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /**
          * CertificationVerifyIn
@@ -5000,6 +5036,19 @@ export interface components {
             /** Is Mandatory */
             is_mandatory: boolean;
         };
+        /**
+         * JobStateOut
+         * @description A state that has at least one open vacancy, and how many (Sprint 69, UI-06).
+         *
+         *     The state filter used to be read off whatever page of vacancies was loaded, which is wrong
+         *     the moment the list pages. It is a fact about the catalogue, so the API says it.
+         */
+        JobStateOut: {
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
+        };
         /** JobSummary */
         JobSummary: {
             /** Slug */
@@ -5663,6 +5712,24 @@ export interface components {
             is_verified: boolean;
             /** Contact Email */
             contact_email?: string | null;
+        };
+        /**
+         * OrganisationQueue
+         * @description The verification queue with its true size (Sprint 69, UI-17).
+         *
+         *     `total` is every organisation waiting, counted in the database. `len(items)` is only the page:
+         *     the screen used to print that as the queue's size, and the cap of 100 made it read "100
+         *     waiting" beside an overview that said 162.
+         */
+        OrganisationQueue: {
+            /** Items */
+            items: components["schemas"]["UnverifiedOrganisation"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** OrganisationRefOut */
         OrganisationRefOut: {
@@ -7129,6 +7196,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_job_states_jobs_states_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStateOut"][];
                 };
             };
         };
@@ -11065,6 +11152,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -11078,7 +11166,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnverifiedOrganisation"][];
+                    "application/json": components["schemas"]["OrganisationQueue"];
                 };
             };
             /** @description Validation Error */
@@ -11182,6 +11270,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -11195,7 +11284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnverifiedCertification"][];
+                    "application/json": components["schemas"]["CertificationQueue"];
                 };
             };
             /** @description Validation Error */

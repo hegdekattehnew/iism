@@ -84,7 +84,9 @@ beforeEach(() => {
 describe("SearchResults", () => {
   it("answers a job title with jobs first, then roles, then standards", async () => {
     const { container } = renderUi(<SearchResults query="General Duty Assistant" />);
-    await screen.findByText("Apollo Care Hospitals · Chennai, Tamil Nadu");
+    await screen.findByText("Chennai, Tamil Nadu");
+    // The same card as the jobs list, and pay as people say it: a month, not a year (UI-05).
+    expect(screen.getByText("About ₹14,000–18,000 a month")).toBeTruthy();
     const text = container.textContent ?? "";
     const at = (s: string) => text.indexOf(s);
     expect(at("Open jobs")).toBeGreaterThanOrEqual(0);

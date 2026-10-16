@@ -1,54 +1,17 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
+import { JobCard } from "@/components/JobCard";
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import type { JobCardData } from "@/lib/job-text";
 import { EMPLOYMENT_TYPES as TYPES } from "@/lib/profile";
 
-type Job = {
-  slug: string;
-  title: string;
-  description?: string | null;
-  location_state?: string | null;
-  location_district?: string | null;
-  employment_type: (typeof TYPES)[number];
-  experience_min_years: number;
-  experience_max_years?: number | null;
-  salary_min_inr?: number | null;
-  salary_max_inr?: number | null;
-  nsqf_level_min?: number | null;
-  tenant: { name: string; city?: string | null };
-};
-
-const inr = (n: number) => new Intl.NumberFormat("en-IN").format(n);
-
-export function experienceLabel(
-  j: Job,
-  t: ReturnType<typeof useTranslations<"jobsPage">>,
-) {
-  if (j.experience_min_years === 0 && !j.experience_max_years)
-    return t("experienceNone");
-  if (j.experience_max_years)
-    return t("experienceRange", {
-      min: j.experience_min_years,
-      max: j.experience_max_years,
-    });
-  return t("experience", { min: j.experience_min_years });
-}
-
-export function salaryLabel(
-  j: Job,
-  t: ReturnType<typeof useTranslations<"jobsPage">>,
-) {
-  if (j.salary_min_inr && j.salary_max_inr)
-    return t("salary", { min: inr(j.salary_min_inr), max: inr(j.salary_max_inr) });
-  if (j.salary_min_inr) return t("salaryFrom", { min: inr(j.salary_min_inr) });
-  return t("salaryUndisclosed");
-}
+/** A page. Small enough to arrive quickly on mobile data; the total says how many more there are. */
+export const JOBS_PAGE_SIZE = 24;
 
 export function JobBrowser({
   initialSkill = "",
@@ -65,14 +28,16 @@ export function JobBrowser({
   const [state, setState] = useState("");
   const deferred = useDeferredValue(query.trim());
 
-  const results = useQuery({
+  const results = useInfiniteQuery({
     queryKey: ["jobs", { q: deferred, type, state, skill: initialSkill }],
     placeholderData: keepPreviousData,
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const { data } = await api.GET("/jobs", {
         params: {
           query: {
-            limit: 200,
+            limit: JOBS_PAGE_SIZE,
+            offset: pageParam,
             ...(deferred ? { q: deferred } : {}),
             ...(type ? { employment_type: type as (typeof TYPES)[number] } : {}),
             ...(state ? { location_state: state } : {}),
@@ -80,17 +45,32 @@ export function JobBrowser({
           },
         },
       });
-      return (data?.items ?? []) as Job[];
+      // openapi-fetch resolves on a non-2xx; an answer with no body is a failure, not "no jobs".
+      if (!data) throw new Error("jobs");
+      return data;
+    },
+    getNextPageParam: (last) => {
+      const seen = last.offset + last.items.length;
+      return last.items.length > 0 && seen < last.total ? seen : undefined;
     },
   });
 
-  const rows = results.data ?? [];
-  // Derived from the current result set rather than a separate endpoint —
-  // there is no facet API yet and this stays correct for the data on screen.
-  const states = [...new Set(rows.map((r) => r.location_state).filter(Boolean))].sort();
-  const title = (j: Job) => (j.title);
-  const desc = (j: Job) =>
-    j.description;
+  // The states that have an open vacancy and how many: a fact about the whole catalogue, not about
+  // whichever page happens to be on screen (it used to be read off the first 200 rows).
+  const facet = useQuery({
+    queryKey: ["job-states"],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await api.GET("/jobs/states");
+      return data ?? [];
+    },
+  });
+
+  const rows = (results.data?.pages ?? []).flatMap((p) => p.items) as JobCardData[];
+  // The server's figure. `rows.length` is the length of what has loaded, which is a page.
+  const total = results.data?.pages[0]?.total ?? 0;
+  const left = Math.max(0, total - rows.length);
+  const states = facet.data ?? [];
 
   return (
     <div>
@@ -124,8 +104,8 @@ export function JobBrowser({
         >
           <option value="">{t("allStates")}</option>
           {states.map((s) => (
-            <option key={s} value={s as string}>
-              {s}
+            <option key={s.name} value={s.name}>
+              {s.name} ({s.count})
             </option>
           ))}
         </select>
@@ -147,7 +127,7 @@ export function JobBrowser({
         <Skeleton className="mt-4 h-5 w-32" />
       ) : (
         <p className="mt-4 text-sm text-muted" aria-live="polite">
-          {t("resultsCount", { count: rows.length })}
+          {t("resultsCount", { count: total })}
         </p>
       )}
 
@@ -165,35 +145,29 @@ export function JobBrowser({
       <ul className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {rows.map((j) => (
           <li key={j.slug}>
-            <Link
-              href={`/jobs/${j.slug}`}
-              className="block h-full rounded-xl border border-border-token bg-surface p-5 transition-colors hover:border-brand"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-                  {t(`employmentType.${j.employment_type}`)}
-                </span>
-                {j.nsqf_level_min != null && (
-                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
-                    {t("minLevel", { level: j.nsqf_level_min })}
-                  </span>
-                )}
-              </div>
-              <h2 className="mt-2.5 text-base font-semibold">{title(j)}</h2>
-              <p className="text-sm text-muted">
-                {j.tenant.name}
-                {j.location_district ? ` · ${j.location_district}` : ""}
-              </p>
-              {desc(j) && (
-                <p className="mt-2 line-clamp-2 text-sm text-muted">{desc(j)}</p>
-              )}
-              <p className="mt-3 text-xs text-muted">
-                {experienceLabel(j, t)} · {salaryLabel(j, t)}
-              </p>
-            </Link>
+            <JobCard job={j} />
           </li>
         ))}
       </ul>
+
+      {results.isFetchNextPageError && (
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
+          {t("loadMoreError")}
+        </p>
+      )}
+      {results.hasNextPage && (
+        <div className="mt-6 flex justify-center">
+          <Button
+            variant="secondary"
+            disabled={results.isFetchingNextPage}
+            onClick={() => void results.fetchNextPage()}
+          >
+            {results.isFetchNextPageError
+              ? t("retry")
+              : t("showMore", { left: left })}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -180,7 +180,7 @@ class TestTheQueue:
         awaiting verification. `ORGANISATION_TYPES`' lesson, one query over."""
         await _candidate(client)
         headers = await _operator(client, db)
-        body = (await client.get("/ops/organisations", headers=headers)).json()
+        body = (await client.get("/ops/organisations", headers=headers)).json()["items"]
         assert all(row["tenant_type"] != "personal" for row in body)
 
     async def test_it_carries_enough_to_decide_on(
@@ -190,7 +190,7 @@ class TestTheQueue:
         is verifying an intention."""
         await _register_org(client, "Countable Ltd")
         headers = await _operator(client, db)
-        body = (await client.get("/ops/organisations", headers=headers)).json()
+        body = (await client.get("/ops/organisations", headers=headers)).json()["items"]
         row = next(r for r in body if r["name"] == "Countable Ltd")
         assert row["members"] == 1
         assert row["jobs"] == 0 and row["courses"] == 0
@@ -205,8 +205,40 @@ class TestTheQueue:
             headers=headers,
             json={"decision": "granted", "note": NOTE},
         )
-        body = (await client.get("/ops/organisations", headers=headers)).json()
+        body = (await client.get("/ops/organisations", headers=headers)).json()["items"]
         assert slug not in [r["slug"] for r in body]
+
+    async def test_the_total_is_every_organisation_waiting_not_the_length_of_the_page(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Sprint 69, UI-17. The screen printed `len(rows)` as the queue's size and the cap of 100
+        made it read "100 waiting" beside an overview that said 162. A page of two over a queue of
+        three must still say three, and the next page must hold the rest."""
+        headers = await _operator(client, db)
+        before = (await client.get("/ops/organisations", headers=headers)).json()["total"]
+        for name in ("Queue One Ltd", "Queue Two Ltd", "Queue Three Ltd"):
+            await _register_org(client, name)
+
+        first = (await client.get("/ops/organisations?limit=2", headers=headers)).json()
+        assert len(first["items"]) == 2
+        assert first["total"] == before + 3
+        assert (first["limit"], first["offset"]) == (2, 0)
+
+        rest = (await client.get("/ops/organisations?limit=2&offset=2", headers=headers)).json()
+        assert rest["total"] == before + 3
+        assert len(rest["items"]) == min(2, before + 3 - 2)
+        # No row on both pages: the order is total (created_at, then id).
+        slugs = [r["slug"] for r in first["items"] + rest["items"]]
+        assert len(slugs) == len(set(slugs))
+
+    async def test_the_dashboard_tile_and_the_queue_total_are_one_number(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _operator(client, db)
+        await _register_org(client, "Tile Ltd")
+        queue = (await client.get("/ops/organisations?limit=1", headers=headers)).json()
+        tile = (await client.get("/ops/dashboard", headers=headers)).json()
+        assert queue["total"] == tile["unverified_organisations"] >= 1
 
 
 class TestDeciding:
@@ -941,7 +973,28 @@ class TestCertificationVerification:
         )
         headers = await _operator(client, db)
         body = (await client.get("/ops/candidates/certifications", headers=headers)).json()
-        assert body == []
+        assert body["items"] == [] and body["total"] == 0
+
+    async def test_the_total_counts_the_queue_not_the_page(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Sprint 69, UI-17, for the certification queue."""
+        await _skill(db, "phlebotomy")
+        candidate = await _candidate(client)
+        for n in range(3):
+            await client.post(
+                "/me/profile/certifications",
+                headers=candidate,
+                json={"name": f"Certificate {n}", "skill_slug": "phlebotomy"},
+            )
+        headers = await _operator(client, db)
+        page = (await client.get("/ops/candidates/certifications?limit=2", headers=headers)).json()
+        assert len(page["items"]) == 2
+        assert page["total"] == 3
+        tail = (
+            await client.get("/ops/candidates/certifications?limit=2&offset=2", headers=headers)
+        ).json()
+        assert len(tail["items"]) == 1 and tail["total"] == 3
 
     async def test_the_queue_carries_enough_to_decide_on(
         self, client: AsyncClient, db: AsyncSession
@@ -958,7 +1011,7 @@ class TestCertificationVerification:
             },
         )
         headers = await _operator(client, db)
-        body = (await client.get("/ops/candidates/certifications", headers=headers)).json()
+        body = (await client.get("/ops/candidates/certifications", headers=headers)).json()["items"]
         assert len(body) == 1
         assert body[0]["name"] == "Phlebotomy Technician Certificate"
         assert body[0]["skill_slug"] == "phlebotomy"
@@ -994,7 +1047,9 @@ class TestCertificationVerification:
         assert row.source == "certified"
 
         # Left the queue: it is now verified.
-        queue = (await client.get("/ops/candidates/certifications", headers=headers)).json()
+        queue = (await client.get("/ops/candidates/certifications", headers=headers)).json()[
+            "items"
+        ]
         assert cert_id not in [row["id"] for row in queue]
 
     async def test_editing_a_certification_does_not_unlink_its_standard(
@@ -1079,7 +1134,9 @@ class TestCertificationVerification:
         assert row.verification_note is None
 
         # ...and it is back in the queue for somebody to check against the new one.
-        queue = (await client.get("/ops/candidates/certifications", headers=operator)).json()
+        queue = (await client.get("/ops/candidates/certifications", headers=operator)).json()[
+            "items"
+        ]
         assert cert_id in [r["id"] for r in queue]
 
     async def test_a_certification_naming_no_standard_cannot_be_verified(

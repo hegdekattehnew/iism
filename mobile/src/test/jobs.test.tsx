@@ -33,8 +33,11 @@ describe("the vacancies list", () => {
     expect(await screen.findByText("Ward assistant 1")).toBeTruthy();
     expect(screen.getAllByText("Apollo Care")).toHaveLength(2);
     expect(screen.getAllByText("Pune, Maharashtra")).toHaveLength(2);
-    // Indian grouping, from the shared words: not 240,000.
-    expect(screen.getAllByText(/₹2,40,000–3,60,000 per year/)).toHaveLength(2);
+    // A month, in Indian grouping, from the shared words: not 240,000 a year (UI-05).
+    expect(screen.getAllByText("About ₹20,000–30,000 a month")).toHaveLength(2);
+    expect(screen.queryByText(/per year/)).toBeNull();
+    // The NSQF level is for the vacancy's own screen, not a card (UI-04).
+    expect(screen.queryByText(/NSQF/)).toBeNull();
     expect(screen.getByText("2 jobs")).toBeTruthy();
   });
 

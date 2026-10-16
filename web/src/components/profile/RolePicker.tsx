@@ -110,7 +110,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-semibold">{role.job_role}</p>
-            <p className="mt-0.5 font-mono text-[11px] text-muted">
+            <p className="mt-0.5 font-mono text-xs text-muted">
               {role.qp_code}
               {role.nsqf_level != null && ` · ${t("level", { level: role.nsqf_level })}`}
             </p>
@@ -156,7 +156,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
                       <span className="min-w-0 flex-1">
                         {s.name}
                         {s.nos_code && (
-                          <span className="ml-2 font-mono text-[11px] text-muted">
+                          <span className="ml-2 font-mono text-xs text-muted">
                             {s.nos_code}
                           </span>
                         )}
@@ -245,7 +245,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
                   <span className="text-sm font-medium">{hit.job_role}</span>
                   <Badge>{t("standardsCount", { count: hit.standards_count })}</Badge>
                 </span>
-                <span className="mt-0.5 block font-mono text-[11px] text-muted">
+                <span className="mt-0.5 block font-mono text-xs text-muted">
                   {hit.qp_code}
                   {hit.nsqf_level != null && ` · ${t("level", { level: hit.nsqf_level })}`}
                 </span>

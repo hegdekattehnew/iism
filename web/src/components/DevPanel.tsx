@@ -29,7 +29,7 @@ export function DevPanel() {
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="inline-flex items-center rounded-md border border-border-token bg-surface px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <p className="inline-flex items-center rounded-md border border-border-token bg-surface px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-muted">
               {t("title")}
             </p>
             <h2 className="mt-2 text-xl font-bold tracking-tight">

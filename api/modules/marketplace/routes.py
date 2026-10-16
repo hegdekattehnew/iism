@@ -73,6 +73,15 @@ async def list_jobs(
     )
 
 
+@jobs_router.get("/states", response_model=list[schemas.JobStateOut])
+async def list_job_states(db: AsyncSession = Depends(get_db_session)) -> list[schemas.JobStateOut]:
+    """The states that have an open vacancy and how many. Declared before `/{slug}`, which would
+    otherwise capture it as a vacancy named "states"."""
+    return [
+        schemas.JobStateOut(name=name, count=count) for name, count in await service.job_states(db)
+    ]
+
+
 @jobs_router.get("/{slug}", response_model=schemas.JobDetail)
 async def get_job(
     slug: str,

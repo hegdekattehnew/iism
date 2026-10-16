@@ -66,7 +66,7 @@ export function InterestList() {
                     <p className="mt-0.5 text-sm text-muted">{interest.course.tenant.name}</p>
                   </div>
                   <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${TONE[status]}`}
+                    className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${TONE[status]}`}
                   >
                     {t(`status.${status}`)}
                   </span>

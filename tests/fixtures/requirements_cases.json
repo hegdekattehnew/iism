@@ -1,0 +1,254 @@
+{
+  "about": "Shared by web/src/lib/requirements.test.ts and mobile/src/test/requirements.test.ts. presentRequirements(list) takes [{slug, name, mandatory, importance}] and returns {main, also}: identical names (case and spaces ignored) collapse to one keeping the strongest flag and the highest importance; a name with no lowercase letter is sentence-cased; generic entries (Employability skills, OJT, on-the-job training) move to 'also'. Order within each group: mandatory first, then importance, then the order given.",
+  "cases": [
+    {
+      "name": "duplicates collapse and keep the strongest flag",
+      "input": [
+        {
+          "slug": "a",
+          "name": "Maintain hygiene",
+          "mandatory": false,
+          "importance": 2
+        },
+        {
+          "slug": "b",
+          "name": "maintain  hygiene",
+          "mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "b",
+            "name": "maintain  hygiene",
+            "mandatory": true,
+            "importance": 3
+          }
+        ],
+        "also": []
+      }
+    },
+    {
+      "name": "the stronger duplicate may come first: it is kept, with the highest importance of the two",
+      "input": [
+        {
+          "slug": "a",
+          "name": "Maintain hygiene",
+          "mandatory": true,
+          "importance": 2
+        },
+        {
+          "slug": "b",
+          "name": "MAINTAIN HYGIENE",
+          "mandatory": false,
+          "importance": 5
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "a",
+            "name": "Maintain hygiene",
+            "mandatory": true,
+            "importance": 5
+          }
+        ],
+        "also": []
+      }
+    },
+    {
+      "name": "an all-capital name is sentence-cased, a mixed one is left alone",
+      "input": [
+        {
+          "slug": "a",
+          "name": "FOLLOW INFECTION CONTROL POLICIES",
+          "mandatory": true,
+          "importance": 5
+        },
+        {
+          "slug": "b",
+          "name": "Operate a CNC lathe",
+          "mandatory": true,
+          "importance": 4
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "a",
+            "name": "Follow infection control policies",
+            "mandatory": true,
+            "importance": 5
+          },
+          {
+            "slug": "b",
+            "name": "Operate a CNC lathe",
+            "mandatory": true,
+            "importance": 4
+          }
+        ],
+        "also": []
+      }
+    },
+    {
+      "name": "generic entries move to also",
+      "input": [
+        {
+          "slug": "a",
+          "name": "Employability Skills (60 Hours)",
+          "mandatory": true,
+          "importance": 3
+        },
+        {
+          "slug": "b",
+          "name": "OJT 150 hours",
+          "mandatory": false,
+          "importance": 1
+        },
+        {
+          "slug": "c",
+          "name": "On-the-job training",
+          "mandatory": false,
+          "importance": 1
+        },
+        {
+          "slug": "d",
+          "name": "Drive a forklift",
+          "mandatory": true,
+          "importance": 5
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "d",
+            "name": "Drive a forklift",
+            "mandatory": true,
+            "importance": 5
+          }
+        ],
+        "also": [
+          {
+            "slug": "a",
+            "name": "Employability Skills (60 Hours)",
+            "mandatory": true,
+            "importance": 3
+          },
+          {
+            "slug": "b",
+            "name": "OJT 150 hours",
+            "mandatory": false,
+            "importance": 1
+          },
+          {
+            "slug": "c",
+            "name": "On-the-job training",
+            "mandatory": false,
+            "importance": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "mandatory first, then importance, then given order",
+      "input": [
+        {
+          "slug": "a",
+          "name": "Pack goods",
+          "mandatory": false,
+          "importance": 5
+        },
+        {
+          "slug": "b",
+          "name": "Label goods",
+          "mandatory": true,
+          "importance": 2
+        },
+        {
+          "slug": "c",
+          "name": "Count stock",
+          "mandatory": true,
+          "importance": 4
+        },
+        {
+          "slug": "d",
+          "name": "Sweep floor",
+          "mandatory": false,
+          "importance": 5
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "c",
+            "name": "Count stock",
+            "mandatory": true,
+            "importance": 4
+          },
+          {
+            "slug": "b",
+            "name": "Label goods",
+            "mandatory": true,
+            "importance": 2
+          },
+          {
+            "slug": "a",
+            "name": "Pack goods",
+            "mandatory": false,
+            "importance": 5
+          },
+          {
+            "slug": "d",
+            "name": "Sweep floor",
+            "mandatory": false,
+            "importance": 5
+          }
+        ],
+        "also": []
+      }
+    },
+    {
+      "name": "nothing in, nothing out",
+      "input": [],
+      "expect": {
+        "main": [],
+        "also": []
+      }
+    },
+    {
+      "name": "a word that merely contains a generic stem is not generic",
+      "input": [
+        {
+          "slug": "a",
+          "name": "Handle objects with care",
+          "mandatory": true,
+          "importance": 3
+        },
+        {
+          "slug": "b",
+          "name": "Explain job-site safety",
+          "mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "main": [
+          {
+            "slug": "a",
+            "name": "Handle objects with care",
+            "mandatory": true,
+            "importance": 3
+          },
+          {
+            "slug": "b",
+            "name": "Explain job-site safety",
+            "mandatory": true,
+            "importance": 3
+          }
+        ],
+        "also": []
+      }
+    }
+  ]
+}

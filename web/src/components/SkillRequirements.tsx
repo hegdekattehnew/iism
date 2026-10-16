@@ -45,7 +45,7 @@ export async function SkillRequirements({ slug }: { slug: string }) {
                     {element.name}
                   </h3>
                   {element.total_marks != null && (
-                    <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                    <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                       {t("marks", { marks: element.total_marks })}
                     </span>
                   )}
@@ -55,7 +55,7 @@ export async function SkillRequirements({ slug }: { slug: string }) {
                   {(element.criteria ?? []).map((c, j) => (
                     <li key={j} className="flex gap-2 text-sm">
                       {c.pc_ref && (
-                        <span className="shrink-0 font-mono text-[11px] text-muted">
+                        <span className="shrink-0 font-mono text-xs text-muted">
                           {c.pc_ref}
                         </span>
                       )}

@@ -247,7 +247,21 @@
     "backToJobs": "All jobs",
     "minLevel": "NSQF level {level} and above",
     "experienceLabel": "Experience",
-    "salaryLabel": "Salary"
+    "salaryLabel": "Salary",
+    "salaryMonthly": "About ₹{min}–{max} a month",
+    "salaryMonthlyFrom": "From about ₹{min} a month",
+    "salaryMonthlyExact": "About ₹{min} a month",
+    "salaryPosted": "₹{min}–{max} as posted",
+    "salaryPostedFrom": "From ₹{min} as posted",
+    "closesIn": "{days, plural, one {Closes in # day} other {Closes in # days}}",
+    "verifiedEmployer": "Verified employer",
+    "notVerifiedYet": "Not yet verified",
+    "neverPay": "Never pay to apply for a job.",
+    "reportThis": "Report this vacancy if it asks you for money.",
+    "alsoCovered": "Also covered ({count})",
+    "showMore": "Show more ({left} left)",
+    "loadMoreError": "Could not load more. Check your connection and try again.",
+    "retry": "Try again"
   },
   "coursesPage": {
     "title": "Courses",
@@ -288,7 +302,10 @@
     "intakeLabel": "Next intake",
     "seatsLabel": "Places",
     "seatsLeft": "{count, plural, one {# seat left} other {# seats left}}",
-    "full": "Full"
+    "full": "Full",
+    "showMore": "Show more ({left} left)",
+    "loadMoreError": "Could not load more. Check your connection and try again.",
+    "retry": "Try again"
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -1591,7 +1608,10 @@
       "failed": "That district could not be loaded.",
       "empty": "No open vacancy in this district asks for a standard yet.",
       "note": "A count of fewer than {min} residents is not shown, so a small district describes nobody. Shortfall is per standard: one resident holds several."
-    }
+    },
+    "queueShowing": "Showing {shown} of {total} organisations waiting.",
+    "queueMore": "Show more ({left} left)",
+    "queueMoreFailed": "The next page of the queue could not be loaded. Try again."
   },
   "reviews": {
     "ratingLabel": "Rating out of 5",

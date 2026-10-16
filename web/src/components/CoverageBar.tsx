@@ -80,7 +80,7 @@ export function LevelScale({
           return (
             <span
               key={step}
-              className={`h-6 flex-1 rounded-sm text-center text-[10px] leading-6 ${
+              className={`h-6 flex-1 rounded-sm text-center text-xs leading-6 ${
                 held
                   ? "bg-brand text-[var(--brand-contrast)]"
                   : beyond
