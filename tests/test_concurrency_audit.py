@@ -29,11 +29,14 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 
 import pytest
 from httpx import AsyncClient, Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
+from api.core.config import PRIVACY_NOTICE_VERSION as CONSENT
 from api.core.database import get_sessionmaker
+from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications import Application, SavedJob
 from api.modules.interests.models import CourseInterest
+from api.modules.marketplace.models import CandidateProfile
 from api.modules.notifications.models import Notification
 from tests.concurrency import (
     World,
@@ -291,3 +294,52 @@ class TestWithdrawingAgainstADecision:
             else:
                 assert mark.status_code == 409
                 assert row.status == "withdrawn"
+
+
+class TestFirstVisit:
+    """Sprint 72: a new candidate's first page asks for matches and a dashboard at once.
+
+    Both found no profile and both inserted; the unique constraint refused the second, which was an
+    unhandled 500 (no CORS header, so the browser said "Could not load your matches"). It surfaced
+    only when a browser journey used a candidate with no profile yet -- every other test creates
+    the profile first, on purpose (`tests/concurrency.candidate`). The constraint is the arbiter;
+    the loser takes the winner's row.
+    """
+
+    async def test_two_first_requests_both_get_the_one_profile_never_a_500(
+        self, world: tuple[AsyncClient, World], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from api.modules.marketplace import profile_service
+
+        client, built = world
+        headers = await _bare_candidate(client)
+        built.candidates.append(headers)
+        _slow(profile_service, "_profile_of", monkeypatch)
+
+        user_id = uuid.UUID((await client.get("/auth/me", headers=headers)).json()["id"])
+        try:
+            matches, dashboard = await asyncio.gather(
+                client.get("/me/matches", headers=headers),
+                client.get("/me/dashboard", headers=headers),
+            )
+            assert (matches.status_code, dashboard.status_code) == (200, 200)
+            assert await _count(CandidateProfile, user_id=user_id) == 1
+        finally:
+            # The two reads record `matches_viewed` and **commit** it, and erasure only anonymises
+            # an event, so it would stay behind and break every later test that counts them
+            # (`test_matching`'s "exactly one"). Delete this person's before the world is torn down.
+            async with get_sessionmaker()() as db:
+                await db.execute(delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id))
+                await db.commit()
+
+
+async def _bare_candidate(client: AsyncClient) -> dict[str, str]:
+    """Signed in with **no profile yet**: what `tests/concurrency.candidate` deliberately avoids."""
+    phone = "9" + str(uuid.uuid4().int)[:9]
+    code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
+    body = (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": CONSENT}
+        )
+    ).json()
+    return {"authorization": f"Bearer {body['access_token']}"}

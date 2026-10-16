@@ -30,6 +30,7 @@ export const meKeys = {
   unread: [ME_KEY, "unread"] as const,
   messages: [ME_KEY, "messages"] as const,
   deletion: [ME_KEY, "deletion"] as const,
+  consent: [ME_KEY, "consent"] as const,
   roles: (q: string) => [ME_KEY, "roles", q] as const,
   roleStandards: (slug: string) => [ME_KEY, "role-standards", slug] as const,
 };

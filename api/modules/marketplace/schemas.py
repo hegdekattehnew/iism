@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from api.core.clock import today_ist
 from api.modules.identity import TenantOut
@@ -482,9 +482,33 @@ class CandidateProfileFull(BaseModel):
     completeness: ProfileCompleteness = Field(default_factory=ProfileCompleteness)
 
 
+MINIMUM_AGE = 18
+
+
+def years_between(born: date, today: date) -> int:
+    """Whole years from `born` to `today`: the birthday has to have passed this year."""
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
 class CandidateProfileUpdateFull(BaseModel):
     """Every field optional: sections save independently, so a partial payload
     must not blank out fields the user was not editing."""
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _adult(cls, value: date | None) -> date | None:
+        """The privacy notice says 18 and over, and nothing checked it (Sprint 72, ADR-082).
+
+        Refused on write, in words the form can show. Existing profiles are not rewritten; a
+        stored date is only looked at when somebody saves one. Whether and how a minor may ever
+        use the product is the owner's decision, not this rule's.
+        """
+        if value is not None and years_between(value, today_ist()) < MINIMUM_AGE:
+            raise ValueError(
+                f"You must be {MINIMUM_AGE} or over to use this service. "
+                "Check the date of birth you entered."
+            )
+        return value
 
     full_name: str | None = Field(default=None, max_length=120)
     headline: str | None = Field(default=None, max_length=160)

@@ -24,7 +24,7 @@ from api.modules.interests.models import (
 )
 from api.modules.interests.provider_routes import router as provider_router
 from api.modules.interests.routes import router
-from api.modules.interests.service import enrolled_counts
+from api.modules.interests.service import enrolled_counts, live_interests, withdraw_all_live
 
 __all__ = [
     "INTEREST_STATUSES",
@@ -32,6 +32,8 @@ __all__ = [
     "PROVIDER_STATUSES",
     "CourseInterest",
     "enrolled_counts",
+    "live_interests",
+    "withdraw_all_live",
     "provider_router",
     "router",
 ]

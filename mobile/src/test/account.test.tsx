@@ -24,8 +24,24 @@ const me = (extra: Record<string, unknown> = {}) => ({
   consented_at: "2026-10-01T10:00:00+00:00",
   ...extra,
 });
-const served = (more: Record<string, unknown> = {}) =>
-  serve(api.GET, { "/auth/me": ok(me()), ...more });
+/** What `GET /me/account/consent` says (Sprint 72): agreed to the notice in force, nothing withdrawn. */
+const consentState = (extra: Record<string, unknown> = {}) => ({
+  consent_version: "2026-10-17",
+  consented_at: "2026-10-01T10:00:00+00:00",
+  notice_version: "2026-10-17",
+  current: true,
+  withdrawn: false,
+  consent_withdrawn_at: null,
+  live_applications: 0,
+  live_interests: 0,
+  ...extra,
+});
+const served = (more: Record<string, unknown> = {}, consent: Record<string, unknown> = {}) =>
+  serve(api.GET, {
+    "/auth/me": ok(me()),
+    "/me/account/consent": ok(consentState(consent)),
+    ...more,
+  });
 /**
  * The button's own state. `toBeDisabled` also passes for anything inside a `Card`, which is itself a
  * disabled `Pressable` when it has no `onPress`, so on its own it cannot tell this button's state.
@@ -50,16 +66,89 @@ describe("what you agreed to", () => {
   it("names the notice and the day, and opens the privacy notice on the website", async () => {
     served();
     await renderScreen(<Account />);
-    expect(await screen.findByText("You agreed to the privacy notice of 2026-09-11 on 1 Oct 2026.")).toBeTruthy();
+    expect(await screen.findByText("You agreed to the privacy notice of 2026-10-17 on 1 Oct 2026.")).toBeTruthy();
     await press("Read the privacy notice");
     expect(open).toHaveBeenCalledWith("http://localhost:3000/en/privacy");
   });
 
   it("says no consent is recorded rather than inventing one", async () => {
-    served();
-    serve(api.GET, { "/auth/me": ok(me({ consent_version: null, consented_at: null })) });
+    served({}, { consent_version: null, consented_at: null });
     await renderScreen(<Account />);
     expect(await screen.findByText(/No consent is recorded for this account/)).toBeTruthy();
+  });
+});
+
+describe("withdrawing consent, and coming back (Sprint 72)", () => {
+  const withdrawn = { withdrawn: true, consent_withdrawn_at: "2026-10-05T08:00:00+00:00" };
+
+  it("shows who holds the person's details before the button that ends it, and changes nothing by looking", async () => {
+    served({}, { live_applications: 2, live_interests: 1 });
+    await renderScreen(<Account />);
+    expect(await screen.findByText(/This is a pause, not an erasure/)).toBeTruthy();
+    await press("Withdraw my consent…");
+    expect(await screen.findByText(/takes back 2 applications and 1 course interest/)).toBeTruthy();
+    expect(api.POST).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when nobody holds them", async () => {
+    served();
+    await renderScreen(<Account />);
+    await press("Withdraw my consent…");
+    expect(await screen.findByText(/No employer or training provider holds your contact/)).toBeTruthy();
+  });
+
+  it("withdraws on confirmation, and the screen then offers to come back instead", async () => {
+    served();
+    serve(api.POST, { "/me/account/consent/withdraw": ok(consentState(withdrawn)) });
+    await renderScreen(<Account />);
+    await press("Withdraw my consent…");
+    serve(api.GET, {
+      "/auth/me": ok(me()),
+      "/me/account/consent": ok(consentState(withdrawn)),
+    });
+    await press("Withdraw my consent");
+    await settle();
+    expect(api.POST.mock.calls.map((c) => c[0])).toEqual(["/me/account/consent/withdraw"]);
+    expect(await screen.findByText(/You withdrew your consent on 5 Oct 2026/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Withdraw my consent…" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Confirm and switch my account back on" })).toBeTruthy();
+  });
+
+  it("restores by confirming the notice this build shows, and sends that version", async () => {
+    served({}, withdrawn);
+    serve(api.POST, { "/me/account/consent": ok(consentState()) });
+    await renderScreen(<Account />);
+    await press("Confirm and switch my account back on");
+    await settle();
+    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-17" } });
+  });
+
+  it("asks a person whose notice changed to read and confirm, and blocks nothing", async () => {
+    served({}, { current: false, consent_version: "2026-09-11" });
+    await renderScreen(<Account />);
+    expect(await screen.findByText("The privacy notice has changed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Withdraw my consent…" })).toBeTruthy();
+    await press("I have read it and I am 18 or over");
+    await settle();
+    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-17" } });
+  });
+
+  it("shows the server's sentence when withdrawing is refused, and that the session ended on a 401", async () => {
+    served();
+    serve(api.POST, { "/me/account/consent/withdraw": failed(401) });
+    await renderScreen(<Account />);
+    await press("Withdraw my consent…");
+    await press("Withdraw my consent");
+    expect(await screen.findByText(/Your session has expired/)).toBeTruthy();
+  });
+
+  it("reads a refusal to withdraw and says nothing changed", async () => {
+    served();
+    serve(api.POST, { "/me/account/consent/withdraw": failed(500, "boom") });
+    await renderScreen(<Account />);
+    await press("Withdraw my consent…");
+    await press("Withdraw my consent");
+    expect(await screen.findByText(/boom|could not be withdrawn/)).toBeTruthy();
   });
 });
 

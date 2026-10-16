@@ -1,15 +1,14 @@
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
-import { Linking, Share, View } from "react-native";
+import { Share, View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { WEB_BASE_URL } from "../src/config";
-import { canDelete, consentOf } from "../src/core/account";
+import { canDelete } from "../src/core/account";
 import { ApiError, isSignedOut } from "../src/core/errors";
 import { useAccount, useDeleteAccount, useDeletionPreview, useExportData } from "../src/lib/me-queries";
-import { useInstantDate } from "../src/lib/months";
-import { tokens, useLocale } from "../src/runtime";
+import { tokens } from "../src/runtime";
 import { space } from "../src/theme";
+import { ConsentCard } from "../src/ui/ConsentCard";
 import { Card } from "../src/ui/list";
 import { Button, Notice, Screen, Text } from "../src/ui/primitives";
 import { SessionExpired } from "../src/ui/session";
@@ -28,9 +27,7 @@ export default function Account() {
   const t = useTranslations("account");
   const tm = useTranslations("mobile.account");
   const router = useRouter();
-  const locale = useLocale();
-  const day = useInstantDate();
-  const { signedIn, query } = useAccount();
+  const { signedIn } = useAccount();
   const [confirming, setConfirming] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
   const exportData = useExportData();
@@ -48,8 +45,6 @@ export default function Account() {
     );
   }
 
-  const consent = query.data ? consentOf(query.data) : null;
-  const when = consent ? day(consent.at) : null;
   const blocked = preview.data?.blocked_by ?? [];
   const going = preview.data?.organisations_deleted ?? [];
   const deleteFailure =
@@ -84,17 +79,7 @@ export default function Account() {
       <Text variant="title">{t("title")}</Text>
       <Text tone="muted">{t("subtitle")}</Text>
 
-      <Card>
-        <Text variant="lead">{t("consentTitle")}</Text>
-        <Text tone="muted">
-          {consent && when ? t("consentGiven", { version: consent.version, date: when }) : t("consentMissing")}
-        </Text>
-        <Button
-          variant="secondary"
-          label={tm("readNotice")}
-          onPress={() => void Linking.openURL(`${WEB_BASE_URL}/${locale}/privacy`)}
-        />
-      </Card>
+      <ConsentCard />
 
       <Card>
         <Text variant="lead">{t("exportTitle")}</Text>

@@ -20,7 +20,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import InstrumentedAttribute, Mapped, aliased, mapped_column, relationship
 from sqlalchemy.sql.elements import ColumnElement
 
 from api.adapters.embeddings.base import EMBEDDING_DIMENSIONS
@@ -31,6 +31,7 @@ from api.core.database import Base, one_of
 # unless the geography models are registered on the same metadata. Without this,
 # any script importing marketplace models alone fails at mapper configuration.
 from api.modules.geography.models import District, State  # noqa: F401
+from api.modules.identity.models import User
 from api.modules.skills.models import Skill
 
 # "gig" (Sprint 37, Epic B8): a temporary job assignment, treated as a `Job`
@@ -336,6 +337,30 @@ def skilled_profile() -> ColumnElement[bool]:
     """
     return (
         select(CandidateSkill.id).where(CandidateSkill.profile_id == CandidateProfile.id).exists()
+    ) & ~paused_profile(CandidateProfile.id)
+
+
+def paused_profile(
+    profile_id: ColumnElement[uuid.UUID] | InstrumentedAttribute[uuid.UUID],
+) -> ColumnElement[bool]:
+    """`profile_id IN (the profiles of people who withdrew consent)` (Sprint 72, ADR-082).
+
+    One definition for every query that offers a person to somebody else -- the employer pool and
+    alert sweep (`matching.retrieval.candidate_pair_facts`) and the people figures
+    (`skilled_profile`) -- so a paused person cannot be in one and out of another.
+
+    **An uncorrelated `IN`, not a correlated `EXISTS`.** The first version probed the user row once
+    per candidate who shared a standard (15,000 to 18,000 for a popular vacancy) and cost the
+    employer shortlist about 100 ms at p95 on the scale harness. Withdrawals are rare, so this
+    subquery is a handful of rows, read once through the partial index `ix_users_consent_withdrawn`
+    and hashed. Aliased, so it does not correlate with the `CandidateProfile` an outer query
+    (`skilled_profile`'s callers) selects from.
+    """
+    paused = aliased(CandidateProfile)
+    return profile_id.in_(
+        select(paused.id)
+        .join(User, User.id == paused.user_id)
+        .where(User.consent_withdrawn_at.is_not(None))
     )
 
 

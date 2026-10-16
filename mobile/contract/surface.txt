@@ -60,6 +60,9 @@ POST /me/devices/unregister
 GET /me/account/export
 GET /me/account/deletion
 DELETE /me/account
+GET /me/account/consent
+POST /me/account/consent
+POST /me/account/consent/withdraw
 POST /grievances
 GET /me/grievances
 POST /jobs/{slug}/report

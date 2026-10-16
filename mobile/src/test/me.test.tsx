@@ -41,6 +41,39 @@ describe("my page", () => {
     }
   });
 
+  it("asks, below everything else, when the notice changed, and says nothing when it did not (Sprint 72)", async () => {
+    world.signedIn = true;
+    serve(api.GET, {
+      "/auth/me": ok({ ...account(), consent_version: "2026-09-11", consent_current: false, consent_withdrawn: false }),
+      "/me/profile": ok(profile()),
+    });
+    await renderScreen(<Me />);
+    expect(await screen.findByText(/We updated what the notice says/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Your account" })).toBeTruthy(); // nothing is blocked
+  });
+
+  it("says the account is paused after a withdrawal of consent", async () => {
+    world.signedIn = true;
+    serve(api.GET, {
+      "/auth/me": ok({ ...account(), consent_version: "2026-10-17", consent_current: true, consent_withdrawn: true }),
+      "/me/profile": ok(profile()),
+    });
+    await renderScreen(<Me />);
+    expect(await screen.findByText(/You withdrew your consent, so employers cannot see you/)).toBeTruthy();
+  });
+
+  it("says nothing about consent when the notice is the one in force", async () => {
+    world.signedIn = true;
+    serve(api.GET, {
+      "/auth/me": ok({ ...account(), consent_version: "2026-10-17", consent_current: true, consent_withdrawn: false }),
+      "/me/profile": ok(profile()),
+    });
+    await renderScreen(<Me />);
+    await screen.findByText("Asha Rao");
+    expect(screen.queryByText(/We updated what the notice says/)).toBeNull();
+    expect(screen.queryByText(/You withdrew your consent/)).toBeNull();
+  });
+
   it("lets an organisation owner who signed in on a phone sign out, and says where to go instead", async () => {
     world.signedIn = true;
     serve(api.GET, { "/auth/me": ok(account("organisation")) });

@@ -119,7 +119,7 @@ describe("InvitePanel — no account yet", () => {
     await waitFor(() => expect(POST).toHaveBeenCalledTimes(2));
     const [path, init] = POST.mock.calls[1] as [string, { body: Record<string, unknown> }];
     expect(path).toBe("/invitations/{token}/verify");
-    expect(init.body).toEqual({ code: "123456", consent_version: "2026-09-11" });
+    expect(init.body).toEqual({ code: "123456", consent_version: "2026-10-17" });
     expect(init.body).not.toHaveProperty("email");
   });
 });

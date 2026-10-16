@@ -160,6 +160,13 @@ class User(Base):
     # would fabricate a record of something that did not happen.
     consent_version: Mapped[str | None] = mapped_column(default=None)
     consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When this person withdrew consent (Sprint 72, ADR-082), keeping the account. Null means they
+    # have not. A paused person is out of every employer pool and alert sweep, cannot apply or
+    # register interest, and is not tracked; they can still sign in, export, correct, delete and
+    # restore. Cleared only by confirming the notice in force (`restore_consent`).
+    consent_withdrawn_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     is_active: Mapped[bool] = mapped_column(default=True)
 

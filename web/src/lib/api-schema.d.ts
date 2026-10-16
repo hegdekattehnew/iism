@@ -2358,6 +2358,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/account/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Consent
+         * @description Where this person stands on consent, and what withdrawing would take back.
+         */
+        get: operations["my_consent_me_account_consent_get"];
+        put?: never;
+        /**
+         * Confirm Consent
+         * @description Confirm the privacy notice in force: re-consent, or restore after a withdrawal.
+         */
+        post: operations["confirm_consent_me_account_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/account/consent/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Consent
+         * @description Withdraw consent and keep the account (a pause, not an erasure).
+         *
+         *     Ends every disclosure that exists and stops new ones; the person can still sign in, export,
+         *     correct, delete and confirm the notice again to restore. Idempotent.
+         */
+        post: operations["withdraw_consent_me_account_consent_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/account/deletion": {
         parameters: {
             query?: never;
@@ -3694,6 +3741,41 @@ export interface components {
             latency_ms?: number | null;
             /** Detail */
             detail?: string | null;
+        };
+        /**
+         * ConsentAccept
+         * @description The notice the person has just read. Must be the one in force: a stale version is refused.
+         */
+        ConsentAccept: {
+            /** Consent Version */
+            consent_version: string;
+        };
+        /**
+         * ConsentState
+         * @description Where this person stands on consent, and what withdrawing would end (Sprint 72, ADR-082).
+         *
+         *     `live_applications` and `live_interests` are what withdrawing takes back at once: the employers
+         *     and providers who can currently see this person's contact. Shown *before* confirming, like
+         *     `DeletionPreview`, and for the same reason: the part nobody thinks of is the people already
+         *     holding the details.
+         */
+        ConsentState: {
+            /** Consent Version */
+            consent_version: string | null;
+            /** Consented At */
+            consented_at: string | null;
+            /** Notice Version */
+            notice_version: string;
+            /** Current */
+            current: boolean;
+            /** Withdrawn */
+            withdrawn: boolean;
+            /** Consent Withdrawn At */
+            consent_withdrawn_at: string | null;
+            /** Live Applications */
+            live_applications: number;
+            /** Live Interests */
+            live_interests: number;
         };
         /**
          * ContactOut
@@ -6755,8 +6837,18 @@ export interface components {
             is_staff: boolean;
             /** Staff Tier */
             staff_tier?: string | null;
+            /** Consent Withdrawn At */
+            consent_withdrawn_at?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipOut"][];
+            /**
+             * Consent Current
+             * @description Is the notice this person agreed to the one in force? Never blocks anything: a stale
+             *     version shows a prompt to read and confirm (Sprint 72).
+             */
+            readonly consent_current: boolean;
+            /** Consent Withdrawn */
+            readonly consent_withdrawn: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -11075,6 +11167,79 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    my_consent_me_account_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentState"];
+                };
+            };
+        };
+    };
+    confirm_consent_me_account_consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_consent_me_account_consent_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentState"];
                 };
             };
         };

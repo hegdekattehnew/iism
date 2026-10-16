@@ -8,7 +8,12 @@ from api.core.database import get_db_session
 from api.core.security import get_current_user
 from api.modules.identity import User
 from api.modules.privacy import service
-from api.modules.privacy.schemas import DeletionPreview, OrganisationDeletionPreview
+from api.modules.privacy.schemas import (
+    ConsentAccept,
+    ConsentState,
+    DeletionPreview,
+    OrganisationDeletionPreview,
+)
 
 # `get_current_user`, not `get_current_candidate`: an organisation-only account
 # has exactly the same rights over its own data as a job seeker.
@@ -22,6 +27,38 @@ async def export_my_data(
 ) -> dict[str, Any]:
     """Everything held about the caller, as one JSON document (DPDP Act 2023)."""
     return await service.export_account(db, user)
+
+
+@router.get("/consent", response_model=ConsentState)
+async def my_consent(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ConsentState:
+    """Where this person stands on consent, and what withdrawing would take back."""
+    return await service.consent_state(db, user)
+
+
+@router.post("/consent", response_model=ConsentState)
+async def confirm_consent(
+    payload: ConsentAccept,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ConsentState:
+    """Confirm the privacy notice in force: re-consent, or restore after a withdrawal."""
+    return await service.confirm_consent(db, user, payload.consent_version)
+
+
+@router.post("/consent/withdraw", response_model=ConsentState)
+async def withdraw_consent(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ConsentState:
+    """Withdraw consent and keep the account (a pause, not an erasure).
+
+    Ends every disclosure that exists and stops new ones; the person can still sign in, export,
+    correct, delete and confirm the notice again to restore. Idempotent.
+    """
+    return await service.withdraw_my_consent(db, user)
 
 
 @router.get("/deletion", response_model=DeletionPreview)

@@ -1,3 +1,4 @@
+import { ConsentBanner } from "@/components/ConsentBanner";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { ProfileEditor } from "@/components/ProfileEditor";
@@ -26,6 +27,8 @@ export default async function ProfilePage({
           <div className="mt-8">
             <ProfileEditor />
           </div>
+          {/* Fixed to the window, so it can never move the page (ADR-065, ADR-082). */}
+          <ConsentBanner />
       </SeekerOnly>
     </div>
   );

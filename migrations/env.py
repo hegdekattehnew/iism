@@ -45,6 +45,8 @@ target_metadata = Base.metadata
 # DROPping them. Accepting that silently breaks search. Anything created by
 # op.execute() in a migration must be listed here.
 MANUALLY_MANAGED_INDEXES = {
+    # Partial (WHERE consent_withdrawn_at IS NOT NULL), created with op.execute() in 0056.
+    "ix_users_consent_withdrawn",
     "ix_skills_search_vector",
     # Renamed by 0022, which dropped `ix_skills_name_en_trgm` and created this.
     # The set kept the old name for a sprint, so the next autogenerate would have

@@ -232,11 +232,20 @@ async def _sweep_push(db: AsyncSession, *, limit: int) -> dict[str, int]:
         return counts
 
     devices: dict[uuid.UUID, list[DeviceToken]] = {}
+    # A person who withdrew consent (Sprint 72) is not pushed to. Their notice is stamped like any
+    # other that has nothing to send, and stays in the app for when they come back.
+    paused: set[uuid.UUID] = set()
     for start in range(0, len(pending), _CHUNK):
         chunk = pending[start : start + _CHUNK]
-        rows = await db.scalars(
-            select(DeviceToken).where(DeviceToken.user_id.in_({n.recipient_id for n in chunk}))
+        ids = {n.recipient_id for n in chunk}
+        paused.update(
+            (
+                await db.scalars(
+                    select(User.id).where(User.id.in_(ids), User.consent_withdrawn_at.is_not(None))
+                )
+            ).all()
         )
+        rows = await db.scalars(select(DeviceToken).where(DeviceToken.user_id.in_(ids)))
         for device in rows.all():
             devices.setdefault(device.user_id, []).append(device)
 
@@ -245,7 +254,12 @@ async def _sweep_push(db: AsyncSession, *, limit: int) -> dict[str, int]:
     for notification in pending:
         words = push_text(notification.template, notification.locale)
         phones = devices.get(notification.recipient_id, [])
-        if words is None or not phones or now - notification.created_at > PUSH_WINDOW:
+        if (
+            words is None
+            or not phones
+            or notification.recipient_id in paused
+            or now - notification.created_at > PUSH_WINDOW
+        ):
             notification.pushed_at = now
             continue
 

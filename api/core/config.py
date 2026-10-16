@@ -12,7 +12,7 @@ LOCAL_ENVIRONMENTS = frozenset({"development", "test"})
 # The privacy notice and terms a new account agrees to. Bump it whenever either
 # text changes: consent is recorded against a version, and consent to a notice
 # nobody can identify later is consent nobody can prove (DPDP Act 2023).
-PRIVACY_NOTICE_VERSION = "2026-09-11"
+PRIVACY_NOTICE_VERSION = "2026-10-17"
 
 
 class Settings(BaseSettings):

@@ -108,7 +108,7 @@ describe("the sign-in screen", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Verify and continue" }));
     await waitFor(() => expect(mockReplace).toHaveBeenCalled());
     const second = mockApi.POST.mock.calls.find((c) => c[0] === "/auth/otp/verify")![1];
-    expect(second.body).toEqual({ phone: "9810000001", code: "123456", consent_version: "2026-09-11" });
+    expect(second.body).toEqual({ phone: "9810000001", code: "123456", consent_version: "2026-10-17" });
   });
 
   it("says what to do when the number has no account yet, and stores nothing", async () => {

@@ -2,12 +2,13 @@ import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { useProfile, useUnreadCount } from "../../src/lib/me-queries";
+import { consentPrompt } from "../../src/core/account";
+import { useAccount, useProfile, useUnreadCount } from "../../src/lib/me-queries";
 import { endSession, useSignedIn } from "../../src/runtime";
 import { space } from "../../src/theme";
 import { SeekerGate } from "../../src/ui/gate";
 import { Card } from "../../src/ui/list";
-import { Button, Screen, Text } from "../../src/ui/primitives";
+import { Button, Notice, Screen, Text } from "../../src/ui/primitives";
 
 /**
  * Where a signed-in person's own things are: their profile and how complete it is, their
@@ -43,6 +44,8 @@ function Menu() {
   const router = useRouter();
   const profile = useProfile();
   const unread = useUnreadCount().data ?? 0;
+  const account = useAccount().query.data;
+  const prompt = account ? consentPrompt(account) : null;
   const p = profile.data;
 
   return (
@@ -65,6 +68,13 @@ function Menu() {
       <Button variant="secondary" label={tcp("title")} onPress={() => router.push("/careers")} />
       <Button variant="secondary" label={ta2("title")} onPress={() => router.push("/account")} />
       <Button variant="secondary" label={tct("title")} onPress={() => router.push("/contact")} />
+      {/* After everything else, never above it: it arrives when the account does (Sprint 72). A stale
+          notice asks and blocks nothing; a withdrawal says the account is paused. */}
+      {prompt ? (
+        <Notice tone={prompt === "paused" ? "warning" : "info"}>
+          {prompt === "paused" ? ta2("bannerPausedBody") : ta2("bannerStaleBody")}
+        </Notice>
+      ) : null}
     </View>
   );
 }

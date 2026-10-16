@@ -22,6 +22,7 @@ from api.modules.applications.models import (
     SavedJob,
 )
 from api.modules.applications.routes import public_router, router
+from api.modules.applications.service import live_applications, withdraw_all_live
 
 __all__ = [
     "APPLICATION_STATUSES",
@@ -29,6 +30,8 @@ __all__ = [
     "LIVE_STATUSES",
     "Application",
     "SavedJob",
+    "live_applications",
+    "withdraw_all_live",
     "router",
     "public_router",
     "employer_router",

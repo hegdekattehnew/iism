@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class OrganisationFate(BaseModel):
@@ -45,3 +47,28 @@ class OrganisationDeletionPreview(BaseModel):
     # Other members who lose their access. Deleting is still allowed -- it is
     # the owner's organisation -- but not without being told.
     other_members: int
+
+
+class ConsentState(BaseModel):
+    """Where this person stands on consent, and what withdrawing would end (Sprint 72, ADR-082).
+
+    `live_applications` and `live_interests` are what withdrawing takes back at once: the employers
+    and providers who can currently see this person's contact. Shown *before* confirming, like
+    `DeletionPreview`, and for the same reason: the part nobody thinks of is the people already
+    holding the details.
+    """
+
+    consent_version: str | None
+    consented_at: datetime | None
+    notice_version: str
+    current: bool
+    withdrawn: bool
+    consent_withdrawn_at: datetime | None
+    live_applications: int
+    live_interests: int
+
+
+class ConsentAccept(BaseModel):
+    """The notice the person has just read. Must be the one in force: a stale version is refused."""
+
+    consent_version: str = Field(min_length=1, max_length=64)

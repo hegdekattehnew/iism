@@ -30,7 +30,7 @@ from api.modules.applications.models import (
     SavedJob,
 )
 from api.modules.applications.reputation import Reputation, worker_reputation
-from api.modules.identity import User
+from api.modules.identity import User, require_not_paused
 from api.modules.identity.models import Tenant
 from api.modules.marketplace import (
     compute_completeness,
@@ -98,6 +98,9 @@ async def apply(
     something they took back.
     """
     profile = await ensure_profile(db, user.id)
+    # Applying discloses the person's contact, so it is the one thing a withdrawal of consent
+    # must stop outright (Sprint 72). Under a shared row lock: see `identity.consent`.
+    await require_not_paused(db, user)
     job = await _open_job(db, job_slug)
     await _within_daily_cap(db, profile.id)
 
@@ -327,6 +330,36 @@ async def withdraw(db: AsyncSession, user: User, application_id: uuid.UUID) -> A
         subject_id=application.job_id,
     )
     return await _reload(db, application.id)
+
+
+async def live_applications(db: AsyncSession, user: User) -> list[Application]:
+    """The caller's applications that can still be taken back (contact is shown to the employer)."""
+    profile = await ensure_profile(db, user.id)
+    rows = await db.scalars(
+        select(Application).where(
+            Application.profile_id == profile.id,
+            Application.status.in_(WITHDRAWABLE_STATUSES),
+        )
+    )
+    return list(rows.all())
+
+
+async def withdraw_all_live(db: AsyncSession, user: User) -> int:
+    """Take back every application that can still be taken back; returns how many.
+
+    Through `withdraw`, one at a time, so each keeps its row lock and its re-check: an employer who
+    decided on one at this instant has that decision kept, not overwritten (ADR-052). One that is
+    refused for that reason is skipped, not fatal: the employer's decision stands and the person
+    was told before they confirmed.
+    """
+    done = 0
+    for application in await live_applications(db, user):
+        try:
+            await withdraw(db, user, application.id)
+        except HTTPException:
+            continue
+        done += 1
+    return done
 
 
 async def save_job(db: AsyncSession, user: User, job_slug: str) -> SavedJob:

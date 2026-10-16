@@ -922,7 +922,7 @@
       "employer": "Hire",
       "provider": "Offer training"
     },
-    "consent": "I have read the <privacy>privacy notice</privacy> and agree to the <terms>terms of use</terms>.",
+    "consent": "I am 18 or over, I have read the <privacy>privacy notice</privacy> and I agree to the <terms>terms of use</terms>.",
     "errorConsent": "Our privacy notice has changed since this page loaded. Reload the page, read it, and agree again."
   },
   "providerWorkspace": {
@@ -1048,7 +1048,36 @@
     "confirmButton": "Delete permanently",
     "deleting": "Deleting…",
     "cancel": "Cancel",
-    "deleteError": "Your account could not be deleted. Nothing was changed. Try again."
+    "deleteError": "Your account could not be deleted. Nothing was changed. Try again.",
+    "consentStatusPaused": "You withdrew your consent on {date}. Your account is paused.",
+    "consentUpToDate": "This is the notice currently in force.",
+    "withdrawTitle": "Withdraw your consent",
+    "withdrawBody": "Stop us using your data for matching, alerts and sharing, without deleting your account. You stay signed up and can come back whenever you like. This is a pause, not an erasure: to have your data removed, delete your account below.",
+    "withdrawButton": "Withdraw my consent…",
+    "withdrawPreviewTitle": "Before you confirm",
+    "withdrawLoading": "Checking who holds your details…",
+    "withdrawHolders": "Withdrawing takes back {applications, plural, =0 {no applications} one {# application} other {# applications}} and {interests, plural, =0 {no course interests} one {# course interest} other {# course interests}}. Those employers and training providers stop seeing your name and contact details.",
+    "withdrawNoHolders": "No employer or training provider holds your contact details right now.",
+    "withdrawEffectPool": "Employers no longer see you in their candidates, and you get no job alerts.",
+    "withdrawEffectApply": "You cannot apply or register interest until you confirm the notice again.",
+    "withdrawEffectTrack": "Nothing is tracked and no push notifications are sent.",
+    "withdrawEffectStill": "You can still sign in, download your data, correct your profile, delete your account, and come back.",
+    "withdrawConfirm": "Withdraw my consent",
+    "withdrawing": "Withdrawing…",
+    "withdrawError": "Your consent could not be withdrawn. Nothing was changed. Try again.",
+    "restoreTitle": "Come back",
+    "restoreBody": "Confirm the privacy notice in force and your account is switched back on.",
+    "restoreButton": "Confirm and switch my account back on",
+    "bannerStaleTitle": "The privacy notice has changed",
+    "bannerStaleBody": "We updated what the notice says about the data we hold and who can see it. Read it, then confirm. Nothing is switched off while you decide.",
+    "bannerPausedTitle": "Your account is paused",
+    "bannerPausedBody": "You withdrew your consent, so employers cannot see you and you cannot apply. Confirm the notice to switch it back on.",
+    "bannerRead": "Read the notice",
+    "bannerConfirm": "I have read it and I am 18 or over",
+    "bannerRestore": "Confirm and switch back on",
+    "bannerConfirming": "Confirming…",
+    "bannerError": "We could not record that. Nothing was changed. Try again.",
+    "bannerNotNow": "Not now"
   },
   "errors": {
     "badge": "Unavailable",
@@ -1086,11 +1115,15 @@
         {
           "title": "What we hold",
           "body": [
-            "Your account: the mobile number or email address you sign up with, and your name if you add one.",
-            "If you look for work: the profile you build — skills, experience, education, certifications, languages, and the roles and places you prefer.",
+            "Your account: the mobile number or email address you sign up with, your name if you add one, your language, which version of this notice you agreed to and when, and when you withdrew consent if you did.",
+            "If you look for work: the profile you build — a headline, where you are (state and district), skills, experience, education, certifications, languages, and the roles and places you prefer. You may also add your date of birth, your gender, the salary you expect, your notice period, the kind of work you want and whether you would relocate. Date of birth and gender are optional; gender is used only for equal-opportunity reporting. We also keep a numeric summary of your skills, which is how matching compares you with a vacancy.",
+            "If an agency programme signed you up on your behalf, a record of which programme did, and of the notice it attested was read to you.",
+            "Your applications and course interests, including any message you write, and what the employer or training provider replies. An employer may keep a private note about an application; it is included in the data you download.",
+            "Updates and alerts we send you, and the offers an employer makes you. If you use the phone app, the code your phone gives us so an update can reach it.",
+            "Messages you send through the contact and grievance forms, and reports you make about a vacancy or course.",
+            "Activity: which matches, gaps and courses you open. These records are linked to your account and carry no name, number or email, and no list of your skills.",
             "If you represent an organisation: its name, contact email and public profile, and the vacancies or courses it publishes.",
-            "Activity: which matches, gaps and courses you open. These records carry no name, number or email.",
-            "We do not collect Aadhaar numbers, résumé files or assessment results today. If that changes, this notice changes first."
+            "We do not collect Aadhaar numbers or résumé files. A certification or assessment can add a mark to a skill (that you hold it, and how it was shown), never a score or a transcript. If this changes, this notice changes first."
           ]
         },
         {
@@ -1098,7 +1131,9 @@
           "body": [
             "To sign you in with a one-time code — there are no passwords.",
             "To match job seekers with vacancies and courses against the National Occupational Standards, and to show each person the gap between them and a role.",
-            "To let employers see who could fill a vacancy. Employers see a reference, headline, district, years of experience and skill gap — never your name, number or email.",
+            "To let employers see who could fill a vacancy. In an employer's candidate list you appear as a reference, headline, district, years of experience and skill gap — never your name, number or email.",
+            "When you apply for a vacancy, your name, phone number, email and any message you write are shared with that employer, for that vacancy. When you register interest in a course, they are shared with that training provider. You are asked to confirm before either happens. Withdrawing the application or interest takes the details off their screen; they may already have used or noted them.",
+            "To tell you about vacancies that match your skills, by an in-app notice and email. You can turn these off in your profile.",
             "To measure, in aggregate, whether the marketplace is working."
           ]
         },
@@ -1106,14 +1141,17 @@
           "title": "Who else sees it",
           "body": [
             "We do not sell personal data.",
-            "Service providers process it on our behalf and under contract: cloud hosting in India, and the SMS and email services that deliver sign-in codes."
+            "Service providers process it on our behalf and under contract: cloud hosting in India, and the SMS and email services that deliver sign-in codes. If you use the phone app, a push service delivers short notifications that carry fixed words and none of your details."
           ]
         },
         {
           "title": "How long we keep it",
           "body": [
-            "Your account and profile: until you delete your account.",
-            "Activity records: 12 months, then deleted automatically.",
+            "Your account and profile, your applications and course interests: until you delete your account.",
+            "Activity records and reports you made: 12 months, then deleted automatically.",
+            "Updates sent to you: 90 days once read or sent, 180 if never opened.",
+            "Messages you sent through the contact and grievance forms: one year after they are closed; open ones are kept until resolved.",
+            "The code your phone gave us for updates: until you sign out or delete your account.",
             "Encrypted backups: replaced on a rolling schedule, so deleted data leaves them within that cycle."
           ]
         },
@@ -1122,7 +1160,8 @@
           "body": [
             "Access: download everything we hold about you, as one file, from your Account page.",
             "Correction: edit your profile at any time.",
-            "Erasure and withdrawing consent: delete your account from your Account page. It is as easy as signing up, and it removes your profile and any organisation only you belong to.",
+            "Withdrawing consent: from your Account page you can withdraw consent without deleting anything. Your account is paused: employers stop seeing you in their candidate lists, you receive no job alerts, nothing is tracked, no push notifications are sent, and you cannot apply or register interest. Applications and course interests that still show your details are withdrawn, and you are told how many before you confirm. You can still sign in, download your data, correct your profile and delete your account, and you come back by confirming this notice again. This is a pause, not an erasure.",
+            "Erasure: delete your account from your Account page. It is as easy as signing up, and it removes your profile and any organisation only you belong to.",
             "Grievance: raise a complaint with our grievance officer; if it is not resolved, you may approach the Data Protection Board of India.",
             "Nomination: you may nominate someone to exercise these rights for you in the event of death or incapacity — use the form on the grievance page."
           ]
@@ -1130,13 +1169,19 @@
         {
           "title": "Children",
           "body": [
-            "The marketplace is for people aged 18 and over. We do not knowingly create accounts for children."
+            "The marketplace is for people aged 18 and over. When you sign up we ask you to confirm that you are, and we do not accept a date of birth that would make you younger. We do not knowingly create accounts for children."
+          ]
+        },
+        {
+          "title": "If something goes wrong",
+          "body": [
+            "If personal data we hold is breached, we will tell the people affected and the Data Protection Board of India, as the law requires."
           ]
         },
         {
           "title": "Changes to this notice",
           "body": [
-            "Each version is dated. When the notice changes in a way that matters, we ask you to agree again before you continue."
+            "Each version is dated. When the notice changes in a way that matters, we ask you to read it and confirm. Nothing is switched off while you decide."
           ]
         }
       ]
@@ -1499,7 +1544,7 @@
     "verify": "Create my account and join",
     "verifying": "Joining…",
     "signedInAs": "You are signed in. Accepting adds this organisation to your account.",
-    "consent": "By joining you agree to the privacy notice and terms.",
+    "consent": "By joining you confirm you are 18 or over and agree to the privacy notice and terms.",
     "goneTitle": "This invitation is no longer open",
     "goneBody": "It may have been accepted, withdrawn, or run out. Ask whoever invited you to send another.",
     "notFoundTitle": "We could not find that invitation",

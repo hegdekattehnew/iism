@@ -29,12 +29,32 @@ from typing import Any
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import column, delete, func, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.modules.analytics.models import EVENT_NAMES, AnalyticsEvent
 
 log = structlog.get_logger(__name__)
+
+# A lightweight table construct, not `identity.models.User`: identity records events, so importing
+# its model here would be a cycle at boot. Only the two columns the consent rule reads.
+_USERS = table("users", column("id"), column("consent_withdrawn_at"))
+
+
+async def _paused(db: AsyncSession, user_ids: "Sequence[uuid.UUID | None]") -> set[uuid.UUID]:
+    """Which of these people have withdrawn consent (Sprint 72, ADR-082).
+
+    A person who withdrew is not tracked: nothing is recorded against their account while they are
+    paused. One primary-key lookup, inside the caller's try, so the rule can never be the reason a
+    page fails.
+    """
+    ids = {i for i in user_ids if i is not None}
+    if not ids:
+        return set()
+    rows = await db.scalars(
+        select(_USERS.c.id).where(_USERS.c.id.in_(ids), _USERS.c.consent_withdrawn_at.is_not(None))
+    )
+    return set(rows.all())
 
 
 async def record(
@@ -56,6 +76,8 @@ async def record(
         log.warning("analytics.unknown_event", event_name=name)
         return
     try:
+        if user_id is not None and user_id in await _paused(db, [user_id]):
+            return
         db.add(
             AnalyticsEvent(
                 name=name,
@@ -100,6 +122,10 @@ async def record_many(
     if not rows:
         return
     try:
+        paused = await _paused(db, [r.user_id for r in rows])
+        rows = [r for r in rows if r.user_id not in paused]
+        if not rows:
+            return
         db.add_all(rows)
         await db.commit()
     except Exception:  # pragma: no cover - defensive by design

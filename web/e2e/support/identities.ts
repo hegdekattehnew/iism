@@ -4,8 +4,14 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { E2E } from "../../playwright.config";
 
-/** The privacy notice a new account agrees to; `api/core/config.py` holds the same string. */
-export const CONSENT_VERSION = "2026-09-11";
+import { PRIVACY_NOTICE_VERSION } from "../../src/lib/legal";
+
+/**
+ * The privacy notice a new account agrees to. Read from the web's own constant (a test holds it
+ * equal to `api/core/config.py`'s), so a version bump cannot leave a journey signing up against
+ * a notice that is no longer in force.
+ */
+export const CONSENT_VERSION = PRIVACY_NOTICE_VERSION;
 
 const ACCESS = "iism.access_token";
 const REFRESH = "iism.refresh_token";

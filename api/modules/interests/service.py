@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import get_settings
 from api.modules.analytics import record
-from api.modules.identity import User
+from api.modules.identity import User, require_not_paused
 from api.modules.identity.models import Tenant
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace import ensure_profile, get_course_by_slug
@@ -83,6 +83,9 @@ async def register(
     something they took back.
     """
     profile = await ensure_profile(db, user.id)
+    # Registering shares contact with the provider: stopped outright by a withdrawal of consent
+    # (Sprint 72), under a shared row lock -- see `identity.consent`.
+    await require_not_paused(db, user)
     course = await _published_course(db, course_slug)
     await _within_daily_cap(db, profile.id)
 
@@ -239,3 +242,23 @@ async def withdraw(db: AsyncSession, user: User, interest_id: uuid.UUID) -> Cour
         subject_id=interest.course_id,
     )
     return await _reload(db, interest.id)
+
+
+async def live_interests(db: AsyncSession, user: User) -> list[CourseInterest]:
+    """The caller's interests whose contact a provider can still see."""
+    profile = await ensure_profile(db, user.id)
+    rows = await db.scalars(
+        select(CourseInterest).where(
+            CourseInterest.profile_id == profile.id, CourseInterest.status != "withdrawn"
+        )
+    )
+    return list(rows.all())
+
+
+async def withdraw_all_live(db: AsyncSession, user: User) -> int:
+    """Take back every interest still shown to a provider; returns how many."""
+    done = 0
+    for interest in await live_interests(db, user):
+        await withdraw(db, user, interest.id)
+        done += 1
+    return done

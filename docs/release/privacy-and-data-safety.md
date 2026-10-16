@@ -25,7 +25,7 @@ account, which erases it (`DELETE /me/account`, in the app).
 
 | Export key | What it holds | Purpose | Linked to the person | Retention |
 |---|---|---|---|---|
-| `account` | Phone, email (optional), name, language, when consent was given and to which notice | Sign in, contact, consent record | Yes | Account life |
+| `account` | Phone, email (optional), name, language, when consent was given and to which notice, and when it was withdrawn | Sign in, contact, consent record | Yes | Account life |
 | `memberships` | Organisations the person belongs to (the app is candidate-only; a person who also runs an organisation on the website appears here) | Authorisation | Yes | Account life |
 | `candidate_profile` | Name, headline, state and district, years of experience, education, date of birth, gender, salary expectation, notice period, skills, experience, education, certificates, languages, preferred roles and places | Matching, the gap, applying | Yes | Account life |
 | `agency_enrolment` | Whether an agency programme enrolled the person, the programme and the notice version it attested | Consent record for an assisted sign-up | Yes | Account life |
@@ -41,6 +41,18 @@ account, which erases it (`DELETE /me/account`, in the app).
 | `listing_reports_made` | Reports the person made about a vacancy or course | Moderation | Yes | 365 days |
 | `notices` | The updates addressed to the person | The updates screen and push | Yes | 90 days once read or sent; 180 if never opened |
 | `devices` | Platform, language and dates of each phone registered for push (the token itself is not exported) | Push delivery | Yes | Until sign-out or erasure |
+
+## Consent: giving it, confirming it again, and withdrawing it (Sprint 72, ADR-082)
+
+Signing up records the notice version and the moment (`users.consent_version`, `consented_at`); the
+sentence agreed to also confirms the person is **18 or over**. When the notice changes, a signed-in
+person is asked to read and confirm it (a banner; **nothing is switched off while they decide**).
+Withdrawing consent is its own act and **keeps the account**: the person is **paused**, so
+employers stop seeing them in candidate lists, no alert or push is sent, nothing is tracked, they cannot
+apply or register interest, and applications and course interests that still show their details are
+withdrawn. They can sign in, export, correct, delete, and restore by confirming the notice again.
+**This is a pause, not an erasure**; whether it satisfies DPDP s.6(4) is a question for counsel, and
+deletion sits beside it. The export says when consent was withdrawn (`account.consent_withdrawn_at`).
 
 ## Apple: App Privacy ("nutrition label")
 
@@ -91,7 +103,7 @@ declare name, phone and email as shared with "employers and training providers" 
    token and the fixed notice text; add its handling here and in the privacy notice before launch.
 2. **An analytics or crash SDK is added** to the app. Today there is none.
 3. **A new section appears in the export** (the test above).
-4. **The privacy notice's version changes** (`PRIVACY_NOTICE_VERSION`).
+4. **The privacy notice's version changes** (`PRIVACY_NOTICE_VERSION`; last bumped 2026-10-17 for the 18-and-over sentence). `tests/test_notice_covers_inventory.py` fails when a stored personal column is neither in the notice nor excused.
 5. **Real SMS** (DLT) is switched on: the SMS provider processes the phone number.
 
 ## What is not here
