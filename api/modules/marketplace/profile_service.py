@@ -29,6 +29,7 @@ from api.modules.marketplace.models import (
     CandidateProfile,
     CandidateSkill,
 )
+from api.modules.skills import roles_above
 from api.modules.skills.models import Skill
 
 MAX_SKILLS_PER_PROFILE = 60
@@ -135,6 +136,14 @@ async def update_profile(db: AsyncSession, user: User, **fields: object) -> Cand
     """
     if "full_name" in fields:
         user.full_name = cast(str | None, fields.pop("full_name"))
+    role_slug = cast(str | None, fields.get("current_role_slug"))
+    if role_slug is not None and await roles_above(db, role_slug) is None:
+        # Checked before anything is written. A slug that names no current role would only ever fall
+        # back to the guess, so the person is told now instead of finding it ignored later.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "We could not find that role. Search for it again and pick one from the list.",
+        )
     profile = await get_or_create_profile(db, user.id)
     for key, value in fields.items():
         setattr(profile, key, value)

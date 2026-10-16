@@ -81,9 +81,12 @@ def parse_credits(value: object) -> Decimal | None:
     if not text or text.upper() in {"TBD", "NA", "N/A", "-"}:
         return None
     try:
-        return Decimal(text)
+        number = Decimal(text)
     except (InvalidOperation, ArithmeticError):
         return None
+    # `Decimal` accepts "NaN" and "Infinity", and Postgres stores them: five packs held NaN
+    # credits (Sprint 74). A value that is not a number is unknown, never a number.
+    return number if number.is_finite() else None
 
 
 def parse_decimal(value: object) -> Decimal | None:
@@ -98,9 +101,10 @@ def parse_decimal(value: object) -> Decimal | None:
     if not text:
         return None
     try:
-        return Decimal(text)
+        number = Decimal(text)
     except (InvalidOperation, ArithmeticError):
         return None
+    return number if number.is_finite() else None
 
 
 # An NCO-2015 occupation code: four digits, a dot, then three or four more.

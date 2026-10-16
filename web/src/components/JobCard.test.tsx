@@ -94,6 +94,30 @@ describe("JobCard", () => {
   });
 });
 
+describe("how long ago it was posted (Sprint 74)", () => {
+  it("says so in the words of the elapsed days", () => {
+    const today = renderUi(
+      <JobCard job={{ ...JOB, published_at: new Date(NOW - 3_600_000).toISOString() }} now={NOW} />,
+    );
+    expect(screen.getByText("Posted today")).toBeTruthy();
+    today.unmount();
+    const three = renderUi(
+      <JobCard job={{ ...JOB, published_at: new Date(NOW - 3 * DAY - 1000).toISOString() }} now={NOW} />,
+    );
+    expect(screen.getByText("Posted 3 days ago")).toBeTruthy();
+    three.unmount();
+    renderUi(
+      <JobCard job={{ ...JOB, published_at: new Date(NOW - 90 * DAY).toISOString() }} now={NOW} />,
+    );
+    expect(screen.getByText("Posted over a month ago")).toBeTruthy();
+  });
+
+  it("says nothing for a vacancy with no date, rather than something made up", () => {
+    renderUi(<JobCard job={{ ...JOB, published_at: null }} now={NOW} />);
+    expect(screen.queryByText(/Posted/)).toBeNull();
+  });
+});
+
 describe("daysToClose", () => {
   it("is null for no date, a past date, a date beyond 30 days or one that is not a date", () => {
     expect(daysToClose(null, NOW)).toBeNull();

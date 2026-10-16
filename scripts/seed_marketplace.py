@@ -14,6 +14,7 @@ import asyncio
 import secrets
 import sys
 import uuid
+import zlib
 from datetime import UTC, datetime, timedelta
 
 # Sibling import: `scripts/` is not an installed package, but Python puts a
@@ -1670,6 +1671,16 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _posted_at(slug: str) -> datetime:
+    """A seeded vacancy's posted date: 0 to 21 days ago, fixed by its slug (Sprint 74, ADR-084).
+
+    Demonstration data is invented by nature (and the database says it is `demo`); spreading the
+    dates is what lets a card show "today", "3 days ago" and "2 weeks ago" side by side. Stable per
+    slug, so a re-run of the seed does not move a vacancy's date.
+    """
+    return _now() - timedelta(days=zlib.crc32(slug.encode()) % 22)
+
+
 async def _translate(db, entity_type: str, row, fields: dict[str, str | None]) -> None:  # type: ignore[no-untyped-def]
     """Write this row's Hindi as translations (ADR-041).
 
@@ -1805,6 +1816,7 @@ async def seed() -> dict[str, int]:
             job.salary_min_inr, job.salary_max_inr = smin, smax
             job.nsqf_level_min = nsqf
             job.status = "published"
+            job.published_at = job.published_at or _posted_at(slug)
             # Seeded as already-swept. Without this the first alert run after a
             # fresh seed treats all twenty vacancies as new and mails every
             # matched candidate about every one of them -- the same reason

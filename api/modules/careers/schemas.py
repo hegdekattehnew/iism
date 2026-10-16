@@ -100,6 +100,9 @@ class CareerLadderOut(BaseModel):
     needs_choice: bool
     has_skills: bool
     steps: list[CareerStepOut] = Field(default_factory=list)
+    anchor_confirmed: bool = False
+    """The anchor is the role the person saved as the work they do now (Sprint 74, BL-6.5).
+    `anchor_source` stays `chosen` for it: widening that closed set would break the released app."""
 
     @classmethod
     def from_ladder(cls, c: CareerLadder) -> "CareerLadderOut":
@@ -109,4 +112,5 @@ class CareerLadderOut(BaseModel):
             needs_choice=c.needs_choice,
             has_skills=c.has_skills,
             steps=[CareerStepOut.from_step(s) for s in c.steps],
+            anchor_confirmed=c.confirmed,
         )

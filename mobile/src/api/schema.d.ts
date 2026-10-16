@@ -3550,6 +3550,8 @@ export interface components {
              * @default true
              */
             job_alerts_enabled: boolean;
+            /** Current Role Slug */
+            current_role_slug?: string | null;
             /** Onboarding Completed At */
             onboarding_completed_at?: string | null;
             /** Skills */
@@ -3602,6 +3604,8 @@ export interface components {
             notice_period?: ("immediate" | "within_15_days" | "within_30_days" | "over_30_days") | null;
             /** Job Alerts Enabled */
             job_alerts_enabled?: boolean | null;
+            /** Current Role Slug */
+            current_role_slug?: string | null;
         };
         /** CandidateRanking */
         CandidateRanking: {
@@ -3660,6 +3664,11 @@ export interface components {
             has_skills: boolean;
             /** Steps */
             steps?: components["schemas"]["CareerStepOut"][];
+            /**
+             * Anchor Confirmed
+             * @default false
+             */
+            anchor_confirmed: boolean;
         };
         /** CareerStepOut */
         CareerStepOut: {
@@ -4940,6 +4949,8 @@ export interface components {
             closes_at?: string | null;
             /** Closed At */
             closed_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
             /** Close Reason */
             close_reason?: string | null;
             /** Skills */
@@ -5039,6 +5050,8 @@ export interface components {
             closes_at?: string | null;
             /** Closed At */
             closed_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
             /** Close Reason */
             close_reason?: string | null;
         };
@@ -5637,6 +5650,8 @@ export interface components {
             closes_at?: string | null;
             /** Closed At */
             closed_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
             /** Close Reason */
             close_reason?: string | null;
             /** Skills */

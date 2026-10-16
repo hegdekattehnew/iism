@@ -48,6 +48,7 @@ COVERED: dict[type, dict[str, str]] = {
         "expected_salary_min_inr": "salary you expect",
         "expected_salary_max_inr": "salary you expect",
         "notice_period": "your notice period",
+        "current_role_slug": "the role you say you do now",
         "enrolled_via_programme": "agency programme",
         "embedding": "numeric summary of your skills",
     },

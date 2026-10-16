@@ -76,6 +76,43 @@ export function daysToClose(closesAt: string | null | undefined, now: number): n
   return days <= 30 ? days : null;
 }
 
+/** How long a vacancy has been live (Sprint 74): the rule in `web/src/lib/job-text.ts`, over the same
+ *  `tests/fixtures/posted_cases.json`. */
+export type Posted =
+  | { kind: "today" }
+  | { kind: "yesterday" }
+  | { kind: "days"; days: number }
+  | { kind: "month" };
+
+export function postedAgo(postedAt: string | null | undefined, now: number): Posted | null {
+  if (!postedAt) return null;
+  const ms = now - new Date(postedAt).getTime();
+  if (Number.isNaN(ms)) return null;
+  const days = Math.floor(ms / DAY_MS);
+  if (days < 1) return { kind: "today" };
+  if (days === 1) return { kind: "yesterday" };
+  return days < 30 ? { kind: "days", days } : { kind: "month" };
+}
+
+export function postedText(
+  postedAt: string | null | undefined,
+  t: Translate,
+  now: number,
+): string | null {
+  const posted = postedAgo(postedAt, now);
+  if (posted === null) return null;
+  switch (posted.kind) {
+    case "today":
+      return t("postedToday");
+    case "yesterday":
+      return t("postedYesterday");
+    case "days":
+      return t("postedDays", { days: posted.days });
+    case "month":
+      return t("postedOverMonth");
+  }
+}
+
 export type CourseTerms = {
   mode: "online" | "offline" | "hybrid";
   fee_inr?: number | null;

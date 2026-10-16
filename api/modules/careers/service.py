@@ -24,6 +24,7 @@ from api.modules.analytics import record
 from api.modules.marketplace.models import (
     CandidateExperience,
     CandidatePreferredRole,
+    CandidateProfile,
     CandidateSkill,
 )
 from api.modules.matching import (
@@ -58,6 +59,9 @@ class CareerLadder:
     source: AnchorSource
     has_skills: bool
     steps: list[CareerStep]
+    confirmed: bool = False
+    """The anchor is the role the person saved as the work they do now (BL-6.5), not a pick for this
+    visit and not a guess. Only a button press ever writes that role."""
 
     @property
     def needs_choice(self) -> bool:
@@ -121,21 +125,32 @@ async def career_ladder(
 ) -> CareerLadder:
     """The roles that build on the person's, with their fit for each.
 
-    `role_slug` is the person's own choice and wins. Without one the service
-    guesses once, from their profile, and says it guessed. An unknown role is a
+    `role_slug` is the person's own choice for this visit and wins. Without one the role they
+    **saved** as the work they do now is used (Sprint 74, BL-6.5; it vanishing from the taxonomy
+    falls through to the guess, it does not fail). Without either the service guesses once, from
+    their profile, and says it guessed; **the guess is never saved**. An unknown role is a
     404; a role with no step above it is an empty list -- different answers,
     because "our data shows no further step from here" is something the page can
     say and "that role does not exist" is not.
     """
     source: AnchorSource
+    saved_slug = await db.scalar(
+        select(CandidateProfile.current_role_slug).where(CandidateProfile.id == profile_id)
+    )
+    ladder: RoleLadder | None
     if role_slug is not None:
         ladder = await roles_above(db, role_slug)
         if ladder is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Role not found")
         source = "chosen"
     else:
-        ladder = await _guess_anchor(db, profile_id)
-        source = "guessed" if ladder is not None else "none"
+        ladder = await roles_above(db, saved_slug) if saved_slug is not None else None
+        if ladder is not None:
+            source = "chosen"
+        else:
+            ladder = await _guess_anchor(db, profile_id)
+            source = "guessed" if ladder is not None else "none"
+    confirmed = ladder is not None and saved_slug is not None and ladder.anchor.slug == saved_slug
 
     has_skills = (
         await db.scalar(
@@ -169,4 +184,6 @@ async def career_ladder(
         subject_id=ladder.anchor.qp_id,
         payload={"steps": len(steps), "guessed": source == "guessed"},
     )
-    return CareerLadder(ladder=ladder, source=source, has_skills=has_skills, steps=steps)
+    return CareerLadder(
+        ladder=ladder, source=source, has_skills=has_skills, steps=steps, confirmed=confirmed
+    )

@@ -3,7 +3,13 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { daysToClose, experienceLabel, salaryLabel, yearlyLabel } from "../../src/core/labels";
+import {
+  daysToClose,
+  experienceLabel,
+  postedText,
+  salaryLabel,
+  yearlyLabel,
+} from "../../src/core/labels";
 import { presentRequirements } from "../../src/core/requirements";
 import { useJob } from "../../src/lib/queries";
 import { useSignedIn } from "../../src/runtime";
@@ -38,6 +44,7 @@ export default function JobDetail() {
   );
   const days = job ? daysToClose(job.closes_at, openedAt) : null;
   const yearly = job ? yearlyLabel(job, say) : null;
+  const posted = job ? postedText(job.published_at, say, openedAt) : null;
 
   return (
     <Screen
@@ -62,6 +69,11 @@ export default function JobDetail() {
               {job.location_district ? ` · ${job.location_district}` : ""}
               {job.location_state ? `, ${job.location_state}` : ""}
             </Text>
+            {posted !== null ? (
+              <Text tone="muted" variant="small">
+                {posted}
+              </Text>
+            ) : null}
 
             <Facts>
               <Fact label={t("salaryLabel")} value={salaryLabel(job, say)} />

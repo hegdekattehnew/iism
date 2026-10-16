@@ -25,7 +25,7 @@ import uuid
 # Sibling import, same mechanism seed_marketplace.py itself uses for legacy_skill_map --
 # scripts/ is not an installed package, but Python puts a script's own directory on
 # sys.path.
-from seed_marketplace import _now, _owner_for, _translate  # noqa: E402
+from seed_marketplace import _now, _owner_for, _posted_at, _translate  # noqa: E402
 from sqlalchemy import delete, select
 
 from api.core import localisation
@@ -7783,6 +7783,7 @@ async def seed() -> dict[str, int]:
             job.salary_min_inr, job.salary_max_inr = smin, smax
             job.nsqf_level_min = nsqf
             job.status = "published"
+            job.published_at = job.published_at or _posted_at(slug)
             job.alerted_at = job.alerted_at or _now()
             await db.flush()
 

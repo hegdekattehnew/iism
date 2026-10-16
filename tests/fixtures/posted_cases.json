@@ -1,0 +1,20 @@
+{
+  "about": "Shared by web/src/lib/posted.test.ts and mobile/src/test/posted.test.ts (read by tests/test_scannable_listing.py too). postedAgo(published_at, now) says how long a vacancy has been live, in whole elapsed days (floor of the hours, so the answer does not depend on a time zone): under one day or a stamp in the future (clock skew) is 'today', 1 is 'yesterday', 2 to 29 is 'days', 30 or more is 'month' and never a precise old number. Nothing, or something unreadable, is null: a card says nothing rather than something made up. 'now' is fixed at 2026-10-20T12:00:00Z.",
+  "now": "2026-10-20T12:00:00Z",
+  "cases": [
+    {"name": "no date at all", "posted_at": null, "expect": null},
+    {"name": "an empty string", "posted_at": "", "expect": null},
+    {"name": "something unreadable", "posted_at": "last tuesday", "expect": null},
+    {"name": "this very moment", "posted_at": "2026-10-20T12:00:00Z", "expect": {"kind": "today"}},
+    {"name": "this morning", "posted_at": "2026-10-20T01:00:00Z", "expect": {"kind": "today"}},
+    {"name": "just under a day", "posted_at": "2026-10-19T12:00:01Z", "expect": {"kind": "today"}},
+    {"name": "a stamp in the future is today, not negative", "posted_at": "2026-10-22T12:00:00Z", "expect": {"kind": "today"}},
+    {"name": "exactly a day", "posted_at": "2026-10-19T12:00:00Z", "expect": {"kind": "yesterday"}},
+    {"name": "just under two days", "posted_at": "2026-10-18T12:00:01Z", "expect": {"kind": "yesterday"}},
+    {"name": "exactly two days", "posted_at": "2026-10-18T12:00:00Z", "expect": {"kind": "days", "days": 2}},
+    {"name": "a week", "posted_at": "2026-10-13T12:00:00Z", "expect": {"kind": "days", "days": 7}},
+    {"name": "just under thirty days", "posted_at": "2026-09-20T12:00:01Z", "expect": {"kind": "days", "days": 29}},
+    {"name": "exactly thirty days", "posted_at": "2026-09-20T12:00:00Z", "expect": {"kind": "month"}},
+    {"name": "more than a year", "posted_at": "2025-01-05T09:30:00Z", "expect": {"kind": "month"}}
+  ]
+}

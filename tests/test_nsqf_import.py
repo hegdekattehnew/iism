@@ -95,6 +95,13 @@ class TestNormalisation:
         assert parse_credits("TBD") is None
         assert parse_credits("2.0") == Decimal("2.0")
 
+    def test_a_credit_that_is_not_a_number_is_unknown(self) -> None:
+        """`Decimal("NaN")` parses, and Postgres stores it: five qualification packs held NaN
+        credits until Sprint 74. Zero stays a real answer."""
+        for bad in ("NaN", "nan", "Infinity", "-Infinity", "inf"):
+            assert parse_credits(bad) is None, bad
+        assert parse_credits("0") == Decimal("0")
+
     def test_qp_slug_keeps_the_code_when_the_name_is_long(self) -> None:
         """Truncating name-code once cut the code off and collided slugs."""
         a = make_qp_slug("A very long qualification name " * 8, "SSC/Q1111", "1.0")

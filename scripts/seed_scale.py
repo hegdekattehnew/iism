@@ -251,14 +251,14 @@ async def _run(
             sys.exit("No employer exists in this database; seed it first.")
         await go(
             "INSERT INTO jobs (id, slug, tenant_id, title, employment_type, experience_min_years, "
-            "                  nsqf_level_min, status, positions) "
+            "                  nsqf_level_min, status, positions, published_at) "
             "SELECT md5('scale-job-' || i)::uuid, :sp || i, "
             f"       (SELECT id FROM scale_emp WHERE rn = 1 + (i % {employers})), "
             "       'Scale Job ' || i, 'full_time', "
             f"       floor({salted('jy', 'i')} * 6)::int, "
             f"       CASE WHEN {salted('jl', 'i')} < 0.25 THEN NULL "
             f"            ELSE 3 + floor({salted('jl2', 'i')} * 4)::int END, "
-            "       'published', 1 "
+            "       'published', 1, now() - (i % 22) * interval '1 day' "
             "FROM generate_series(1, :n) i",
             sp=SLUG_PREFIX,
             n=vacancies,

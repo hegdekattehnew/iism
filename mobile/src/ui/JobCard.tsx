@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Text as NativeText } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { daysToClose, experienceLabel, salaryLabel } from "../core/labels";
+import { daysToClose, experienceLabel, postedText, salaryLabel } from "../core/labels";
 import { MAX_FONT_SCALE, useColours } from "../theme";
 import { Badge, BadgeRow, Card } from "./list";
 import { Text } from "./primitives";
@@ -28,6 +28,7 @@ export type JobCardJob = {
   salary_min_inr?: number | null;
   salary_max_inr?: number | null;
   closes_at?: string | null;
+  published_at?: string | null;
   tenant: { name: string; is_verified?: boolean };
 };
 
@@ -49,6 +50,7 @@ export function JobCard({
   const say = (k: string, v?: Record<string, string | number>) => t(k, v);
   const place = [job.location_district, job.location_state].filter(Boolean).join(", ");
   const days = daysToClose(job.closes_at, now ?? shownAt);
+  const posted = postedText(job.published_at, say, now ?? shownAt);
   const ordinary = job.employment_type === "full_time";
 
   return (
@@ -65,6 +67,11 @@ export function JobCard({
       <Text tone="muted" variant="small">
         {experienceLabel(job, say)}
       </Text>
+      {posted !== null ? (
+        <Text tone="muted" variant="small">
+          {posted}
+        </Text>
+      ) : null}
       {!ordinary || days !== null ? (
         <BadgeRow>
           {ordinary ? null : <Badge tone="brand" label={t(`employmentType.${job.employment_type}`)} />}

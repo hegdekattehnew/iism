@@ -425,3 +425,167 @@ async def test_the_cost_is_linear_in_the_steps_shown_and_nothing_else(
 
     per_step = (four - one) / 3
     assert per_step <= 6, f"{per_step} statements per extra step ({one} -> {four})"
+
+
+# ------------------------------------------------- the role you say you do now (Sprint 74, BL-6.5)
+
+
+async def _save_role(client: AsyncClient, headers: dict[str, str], slug: str | None):
+    return await client.put("/me/profile", headers=headers, json={"current_role_slug": slug})
+
+
+async def test_a_saved_role_is_the_anchor_on_the_next_visit_and_is_confirmed(
+    client: AsyncClient, world: dict
+) -> None:
+    headers, _ = await _candidate(client, [world["skills"][0]])
+    saved = await _save_role(client, headers, world["anchor"].slug)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["current_role_slug"] == world["anchor"].slug
+
+    body = (await client.get("/me/careers", headers=headers)).json()  # no ?role= at all
+
+    assert body["anchor"]["slug"] == world["anchor"].slug
+    # `anchor_source` stays inside the released set; the new fact is a separate flag.
+    assert (body["anchor_source"], body["anchor_confirmed"]) == ("chosen", True)
+    assert body["steps"]
+
+
+async def test_a_role_picked_for_this_visit_beats_the_saved_one_and_is_not_confirmed(
+    client: AsyncClient, world: dict
+) -> None:
+    headers, _ = await _candidate(client, [world["skills"][0]])
+    await _save_role(client, headers, world["anchor"].slug)
+
+    other = (
+        await client.get("/me/careers", headers=headers, params={"role": world["step"].slug})
+    ).json()
+    same = (
+        await client.get("/me/careers", headers=headers, params={"role": world["anchor"].slug})
+    ).json()
+
+    assert (other["anchor"]["slug"], other["anchor_confirmed"]) == (world["step"].slug, False)
+    assert (same["anchor"]["slug"], same["anchor_confirmed"]) == (world["anchor"].slug, True)
+
+
+async def test_the_saved_role_beats_a_guess(
+    client: AsyncClient, db: AsyncSession, world: dict
+) -> None:
+    headers, phone = await _candidate(client, [world["skills"][0]])
+    profile = await _profile(db, phone)
+    db.add(CandidatePreferredRole(profile_id=profile.id, title="Senior Ward Assistant"))
+    await db.commit()
+    await _save_role(client, headers, world["anchor"].slug)
+
+    body = (await client.get("/me/careers", headers=headers)).json()
+
+    assert (body["anchor"]["slug"], body["anchor_source"]) == (world["anchor"].slug, "chosen")
+
+
+async def test_a_guess_is_never_saved(client: AsyncClient, db: AsyncSession, world: dict) -> None:
+    """Only the person's button writes the column. Looking at the page, however many times and
+    however confident the guess, stores nothing."""
+    headers, phone = await _candidate(client, [world["skills"][0]])
+    profile = await _profile(db, phone)
+    db.add(CandidatePreferredRole(profile_id=profile.id, title="Ward Assistant"))
+    await db.commit()
+
+    for _ in range(2):
+        body = (await client.get("/me/careers", headers=headers)).json()
+        assert (body["anchor_source"], body["anchor_confirmed"]) == ("guessed", False)
+
+    await db.refresh(profile)
+    assert profile.current_role_slug is None
+    assert (await client.get("/me/profile", headers=headers)).json()["current_role_slug"] is None
+
+
+async def test_an_unknown_role_is_refused_in_words_and_nothing_is_saved(
+    client: AsyncClient, db: AsyncSession, world: dict
+) -> None:
+    headers, phone = await _candidate(client, [])
+    await client.get("/me/profile", headers=headers)  # a profile exists to be written to
+
+    refused = await _save_role(client, headers, "no-such-role")
+
+    assert refused.status_code == 422
+    assert "could not find that role" in refused.json()["detail"]
+    assert (await _profile(db, phone)).current_role_slug is None
+
+
+async def test_a_retired_role_cannot_be_saved(
+    client: AsyncClient, db: AsyncSession, world: dict
+) -> None:
+    sector = world["sector"]
+    retired = await _pack(db, sector, "Retired Role", "3", [world["skills"][0]], current=False)
+    await db.commit()
+    headers, _ = await _candidate(client, [])
+
+    assert (await _save_role(client, headers, retired.slug)).status_code == 422
+
+
+async def test_saving_nothing_clears_it_and_saving_other_fields_leaves_it(
+    client: AsyncClient, world: dict
+) -> None:
+    headers, _ = await _candidate(client, [world["skills"][0]])
+    await _save_role(client, headers, world["anchor"].slug)
+
+    # A section save that does not mention the role must not blank it (`exclude_unset`).
+    other = await client.put("/me/profile", headers=headers, json={"headline": "Ward helper"})
+    assert other.json()["current_role_slug"] == world["anchor"].slug
+
+    cleared = await _save_role(client, headers, None)
+    assert cleared.json()["current_role_slug"] is None
+    body = (await client.get("/me/careers", headers=headers)).json()
+    assert (body["anchor"], body["anchor_confirmed"], body["needs_choice"]) == (None, False, True)
+
+
+async def test_a_saved_role_that_leaves_the_taxonomy_falls_back_instead_of_failing(
+    client: AsyncClient, db: AsyncSession, world: dict
+) -> None:
+    """The column is a slug, not a foreign key, because the importer rewrites the taxonomy."""
+    headers, _ = await _candidate(client, [world["skills"][0]])
+    await _save_role(client, headers, world["anchor"].slug)
+    world["anchor"].is_current = False
+    await db.commit()
+
+    response = await client.get("/me/careers", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["anchor"], body["anchor_confirmed"], body["needs_choice"]) == (None, False, True)
+
+
+async def test_the_role_reaches_the_persons_data_export(client: AsyncClient, world: dict) -> None:
+    headers, _ = await _candidate(client, [])
+    await _save_role(client, headers, world["anchor"].slug)
+
+    export = (await client.get("/me/account/export", headers=headers)).json()
+
+    assert export["candidate_profile"]["current_role_slug"] == world["anchor"].slug
+
+
+def test_no_employer_facing_payload_can_carry_the_role() -> None:
+    """ADR-037: `candidate_card` builds from an allow-list, so what it can say is its schema's
+    fields. The stored role is the person's own claim about themselves and not for an employer."""
+    import inspect
+
+    from api.modules.matching.employer_routes import candidate_card
+    from api.modules.matching.schemas import CandidateCardOut
+
+    assert {"reference", "headline", "score", "matched", "missing"} <= set(
+        CandidateCardOut.model_fields
+    )  # found the schema before judging it
+    assert not [f for f in CandidateCardOut.model_fields if "role" in f]
+    assert "current_role" not in inspect.getsource(candidate_card)
+
+
+def test_the_anchor_source_set_is_the_one_the_released_app_knows() -> None:
+    """The saved role is reported as `chosen` plus `anchor_confirmed`, not as a fourth source.
+
+    The contract check only *reports* a widened response enum (it cannot know whether an installed
+    app's code is exhaustive over it), so this is what holds the set closed.
+    """
+    from api.modules.careers.schemas import CareerLadderOut
+
+    field = CareerLadderOut.model_json_schema()["properties"]["anchor_source"]
+    assert set(field["enum"]) == {"chosen", "guessed", "none"}
+    assert "anchor_confirmed" in CareerLadderOut.model_fields

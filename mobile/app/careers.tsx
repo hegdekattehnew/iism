@@ -3,9 +3,9 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { isSignedOut } from "../src/core/errors";
+import { ApiError, isSignedOut } from "../src/core/errors";
 import { mandatoryFirst } from "../src/core/labels";
-import { useCareers, useRoleHits } from "../src/lib/me-queries";
+import { useCareers, useRoleHits, useUpdateProfile } from "../src/lib/me-queries";
 import { space } from "../src/theme";
 import { BudgetField } from "../src/ui/BudgetField";
 import { SeekerGate } from "../src/ui/gate";
@@ -40,6 +40,8 @@ function Body() {
   const [role, setRole] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
   const query = useCareers(role);
+  // Saving the role is the person's own act (BL-6.5); a guess is never saved for them.
+  const save = useUpdateProfile();
 
   if (query.isPending) return <SkeletonRows count={3} />;
   if (query.isError) {
@@ -65,6 +67,40 @@ function Body() {
             {[t("level", { level: ladder.anchor.nsqf_level }), ladder.anchor.sector_name].filter(Boolean).join(" · ")}
           </Text>
           {ladder.anchor_source === "guessed" ? <Notice tone="warning">{t("guessed")}</Notice> : null}
+          {ladder.anchor_confirmed ? (
+            <Text tone="muted" variant="small">
+              {t("confirmedRole")}
+            </Text>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                label={t("confirmRole")}
+                busy={save.isPending}
+                onPress={() => save.mutate({ current_role_slug: ladder.anchor?.slug ?? null })}
+              />
+              <Text tone="muted" variant="small">
+                {t("confirmHint")}
+              </Text>
+            </>
+          )}
+          {ladder.anchor_confirmed ? (
+            <Button
+              variant="secondary"
+              label={t("clearRole")}
+              busy={save.isPending}
+              onPress={() => save.mutate({ current_role_slug: null })}
+            />
+          ) : null}
+          {save.isError ? (
+            isSignedOut(save.error) ? (
+              <SessionExpired />
+            ) : (
+              <Notice tone="danger">
+                {save.error instanceof ApiError && save.error.detail ? save.error.detail : t("saveFailed")}
+              </Notice>
+            )
+          ) : null}
         </View>
       ) : (
         <Text>{t("chooseIntro")}</Text>

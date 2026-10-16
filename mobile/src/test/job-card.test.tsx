@@ -41,6 +41,16 @@ describe("a vacancy card", () => {
     expect(screen.queryByText(/verified/i)).toBeNull();
   });
 
+  it("says how long ago it was posted, and nothing when it has no date", async () => {
+    await card({ published_at: new Date(NOW - 3 * DAY - 1000).toISOString() });
+    expect(screen.getByText("Posted 3 days ago")).toBeTruthy();
+  });
+
+  it("says nothing about posting for a vacancy with no date", async () => {
+    await card({ published_at: null });
+    expect(screen.queryByText(/Posted/)).toBeNull();
+  });
+
   it("shows the employment type only when it is not the ordinary one", async () => {
     await card();
     expect(screen.queryByText("Full time")).toBeNull();
