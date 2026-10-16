@@ -1,3 +1,4 @@
+import { ConsentBanner } from "@/components/ConsentBanner";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { MatchBrowser } from "@/components/MatchBrowser";
@@ -30,6 +31,8 @@ export default async function MatchesPage({
           <div className="mt-4">
             <MatchBrowser />
           </div>
+          {/* Fixed to the window, so it can never move the page (ADR-065, ADR-082). */}
+          <ConsentBanner />
       </SeekerOnly>
     </div>
   );

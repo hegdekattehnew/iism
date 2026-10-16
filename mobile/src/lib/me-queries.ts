@@ -6,7 +6,15 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { deleteAccount, exportFile, fetchDeletionPreview, fetchExport } from "../core/account";
+import {
+  confirmConsent,
+  deleteAccount,
+  exportFile,
+  fetchConsent,
+  fetchDeletionPreview,
+  fetchExport,
+  withdrawConsent,
+} from "../core/account";
 import { ApiError, readDetail } from "../core/errors";
 import { listMyMessages, sendMessage, type MessageDraft } from "../core/grievance";
 import {
@@ -43,6 +51,7 @@ import { ME_KEY, meKeys } from "../core/me-keys";
 import { NOTICE_PAGE_SIZE, nextCursor } from "../core/notices";
 import { reportListing, type Reason, type Target } from "../core/report";
 import type { BulkBody } from "../core/role-picker";
+import { PRIVACY_NOTICE_VERSION } from "../core/sign-in";
 import { api, useCourseBudget, useSignedIn } from "../runtime";
 
 /**
@@ -388,4 +397,41 @@ export function useExportData() {
 
 export function useDeleteAccount() {
   return useMutation({ mutationFn: () => deleteAccount(api) });
+}
+
+/** Where the person stands on consent, and what withdrawing would take back. */
+export function useConsent() {
+  const { signedIn } = useAccount();
+  return useQuery({
+    queryKey: meKeys.consent,
+    enabled: signedIn,
+    // A preview of what a withdrawal would end is a fact about now: never a stale cache.
+    staleTime: 0,
+    queryFn: () => fetchConsent(api),
+  });
+}
+
+/** What changes with consent: the account (`consent_*`), the preview, and every disclosure it ends. */
+function consentChanged(qc: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: meKeys.account }),
+    qc.invalidateQueries({ queryKey: meKeys.consent }),
+    qc.invalidateQueries({ queryKey: meKeys.applications }),
+    qc.invalidateQueries({ queryKey: meKeys.interests }),
+  ]);
+}
+
+/** Withdraw consent and keep the account: a pause, not an erasure. */
+export function useWithdrawConsent() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => withdrawConsent(api), onSuccess: () => consentChanged(qc) });
+}
+
+/** Confirm the notice in force, with this build's own version. */
+export function useConfirmConsent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => confirmConsent(api, PRIVACY_NOTICE_VERSION),
+    onSuccess: () => consentChanged(qc),
+  });
 }

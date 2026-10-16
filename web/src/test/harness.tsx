@@ -45,6 +45,10 @@ export const world = {
     email: null as string | null,
     phone_verified_at: "2026-01-01T00:00:00Z" as string | null,
     email_verified_at: null as string | null,
+    // Consent (Sprint 72): by default somebody who agreed to the notice in force.
+    consent_version: "2026-10-17" as string | null,
+    consent_current: true,
+    consent_withdrawn: false,
   },
   push: vi.fn(),
 };
@@ -62,6 +66,9 @@ export function resetWorld(): void {
     email: null,
     phone_verified_at: "2026-01-01T00:00:00Z",
     email_verified_at: null,
+    consent_version: "2026-10-17",
+    consent_current: true,
+    consent_withdrawn: false,
   };
   world.push = vi.fn();
 }

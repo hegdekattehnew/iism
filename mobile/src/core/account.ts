@@ -53,3 +53,51 @@ export function consentOf(me: { consent_version?: string | null; consented_at?: 
 } | null {
   return me.consent_version && me.consented_at ? { version: me.consent_version, at: me.consented_at } : null;
 }
+
+// ----------------------------------------------------------------------------- consent (Sprint 72)
+
+/** Where the person stands on consent, and what withdrawing would take back (ADR-082). */
+export type ConsentState = {
+  consent_version: string | null;
+  consented_at: string | null;
+  notice_version: string;
+  current: boolean;
+  withdrawn: boolean;
+  consent_withdrawn_at: string | null;
+  live_applications: number;
+  live_interests: number;
+};
+
+export async function fetchConsent(api: Api): Promise<ConsentState> {
+  return unwrap(await api.GET("/me/account/consent")) as ConsentState;
+}
+
+/** Pause the account, keeping it. The server ends every disclosure that exists and stops new ones. */
+export async function withdrawConsent(api: Api): Promise<ConsentState> {
+  return unwrap(await api.POST("/me/account/consent/withdraw")) as ConsentState;
+}
+
+/**
+ * Confirm the notice in force: re-consent for a stale version, restore after a withdrawal. The
+ * version sent is this build's own, and the server refuses any other (a test holds the two equal).
+ */
+export async function confirmConsent(api: Api, version: string): Promise<ConsentState> {
+  return unwrap(
+    await api.POST("/me/account/consent", { body: { consent_version: version } }),
+  ) as ConsentState;
+}
+
+/**
+ * What the Me tab and the account screen say about consent, from `/auth/me`. A stale notice **asks**
+ * and never blocks; a withdrawal says the account is paused. An account created before consent was
+ * recorded has no version at all, and that is the account screen's own sentence, not a prompt.
+ */
+export function consentPrompt(me: {
+  consent_version?: string | null;
+  consent_current?: boolean;
+  consent_withdrawn?: boolean;
+}): "paused" | "stale" | null {
+  if (me.consent_withdrawn) return "paused";
+  if (me.consent_current === false && me.consent_version) return "stale";
+  return null;
+}

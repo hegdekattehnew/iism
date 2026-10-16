@@ -86,12 +86,33 @@ async def ensure_profile(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfi
     Returns the bare row. Callers wanting the profile *and* its skills want
     `get_or_create_profile` instead.
     """
-    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
+    profile = await _profile_of(db, user_id)
     if profile is None:
-        profile = CandidateProfile(user_id=user_id)
-        db.add(profile)
+        # A brand-new candidate's first page asks for matches *and* a dashboard at once, and both
+        # find no row. Each used to insert, and `uq_candidate_profiles_user` refused the second
+        # with a 500 -- which carries no CORS header, so the browser showed "Could not load your
+        # matches" for a person who had done nothing wrong (found by Sprint 72's browser journey).
+        # The constraint is the arbiter: insert in a savepoint, and the loser takes the winner's row
+        # (ADR-052, `add_with_unique_slug`'s move).
+        try:
+            async with db.begin_nested():
+                db.add(CandidateProfile(user_id=user_id))
+                await db.flush()
+        except IntegrityError:
+            profile = await _profile_of(db, user_id)
+            if profile is None:  # pragma: no cover - the other insert rolled back too
+                raise
+        else:
+            profile = await _profile_of(db, user_id)
         await db.commit()
+    assert profile is not None  # noqa: S101 - found, or inserted, or the winner's
     return profile
+
+
+async def _profile_of(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfile | None:
+    """The profile row if there is one. Its own function so a race test can widen the gap between
+    this check and the insert that follows it."""
+    return await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
 
 
 async def get_or_create_profile(db: AsyncSession, user_id: uuid.UUID) -> CandidateProfile:

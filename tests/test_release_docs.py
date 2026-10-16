@@ -145,3 +145,33 @@ def test_the_runbook_keeps_the_steps_that_must_not_be_forgotten() -> None:
         "Rollback",
     ):
         assert needle in text, needle
+
+
+def test_the_incident_runbook_keeps_its_stages_and_holds_no_secret() -> None:
+    """Sprint 72: a breach procedure that exists, names the controls the code has, and leaves the
+    law's timings to counsel instead of asserting them."""
+    text = (RELEASE / "incident-response.md").read_text(encoding="utf-8")
+    headings = text.splitlines()  # whole lines: "## Containment" must not pass for "## Contain"
+    for heading in (
+        "## Detect",
+        "## Triage",
+        "## Contain",
+        "## Preserve",
+        "## Notify",
+        "## Recover",
+        "## Review",
+    ):
+        assert heading in headings, heading
+    for needle in (
+        "revoke_all_for_user",
+        "JWT_SECRET_KEY",
+        "REVIEWER_CODE",
+        "redacted=True",
+        "Data Protection Board",
+        "counsel",
+        "make restore-drill",
+    ):
+        assert needle in text, needle
+    assert re.search(r"\b\d{6}\b", text) is None, "a six-digit code in the runbook"
+    assert re.search(r"\+?\d[\d ]{9,}", text) is None, "a phone number in the runbook"
+    assert "@" not in text.replace("`@", ""), "an address in the runbook"

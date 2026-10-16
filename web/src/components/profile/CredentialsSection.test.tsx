@@ -56,6 +56,7 @@ afterEach(() => vi.useRealTimers());
 
 const bothVerified = () => {
   world.account = {
+    ...world.account,
     phone: "+919812349999",
     email: "owner@clinic.example",
     phone_verified_at: "2026-01-01T00:00:00Z",

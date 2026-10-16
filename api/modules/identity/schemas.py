@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+
+from api.core.config import get_settings
 
 TenantType = Literal["employer", "course_provider", "personal"]
 MembershipRole = Literal["owner", "admin", "member"]
@@ -307,7 +309,22 @@ class UserOut(BaseModel):
     # Same rule as `is_staff`, one tier down (ADR-044, Sprint 37, BL-7.3):
     # read-only for ever, no request shape may carry this name.
     staff_tier: str | None = None
+    # The raw stamp, so a client can say when; the two derived facts below are what screens
+    # branch on.
+    consent_withdrawn_at: datetime | None = None
     memberships: list[MembershipOut] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def consent_current(self) -> bool:
+        """Is the notice this person agreed to the one in force? Never blocks anything: a stale
+        version shows a prompt to read and confirm (Sprint 72)."""
+        return self.consent_version == get_settings().privacy_notice_version
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def consent_withdrawn(self) -> bool:
+        return self.consent_withdrawn_at is not None
 
 
 # ------------------------------------------------------------ the team (S25)

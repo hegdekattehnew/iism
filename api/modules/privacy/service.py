@@ -20,11 +20,19 @@ from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
-from api.modules import grievances, moderation, operations
+from api.modules import applications, grievances, interests, moderation, operations
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, ApplicationReview, SavedJob
-from api.modules.identity import Invitation, Membership, Tenant, User, lock_ownership_of
+from api.modules.identity import (
+    Invitation,
+    Membership,
+    Tenant,
+    User,
+    lock_ownership_of,
+    restore_consent,
+    withdraw_consent,
+)
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import (
     CandidateProfile,
@@ -38,6 +46,7 @@ from api.modules.marketplace.schemas import CandidateProfileFull
 from api.modules.notifications.models import DeviceToken, Notification
 from api.modules.operations.models import TenantVerificationEvent
 from api.modules.privacy.schemas import (
+    ConsentState,
     DeletionPreview,
     OrganisationDeletionPreview,
     OrganisationFate,
@@ -97,6 +106,62 @@ async def _listings_by_tenant(
         for tenant_id, count in rows.all():
             counts[tenant_id] += count
     return counts
+
+
+async def consent_state(db: AsyncSession, user: User) -> ConsentState:
+    """Consent as it stands, and what withdrawing would take back. Changes nothing.
+
+    Read-only for a candidate without a profile too: `live_*` count through the modules'
+    own readers, which create the lazy profile, so an organisation-only account would get one by
+    asking. They are skipped for an account that holds no job-seeker membership.
+    """
+    settings = get_settings()
+    has_profile = (
+        await db.scalar(
+            select(func.count())
+            .select_from(CandidateProfile)
+            .where(CandidateProfile.user_id == user.id)
+        )
+    ) or 0
+    live_applications = len(await applications.live_applications(db, user)) if has_profile else 0
+    live_interests = len(await interests.live_interests(db, user)) if has_profile else 0
+    return ConsentState(
+        consent_version=user.consent_version,
+        consented_at=user.consented_at,
+        notice_version=settings.privacy_notice_version,
+        current=user.consent_version == settings.privacy_notice_version,
+        withdrawn=user.consent_withdrawn_at is not None,
+        consent_withdrawn_at=user.consent_withdrawn_at,
+        live_applications=live_applications,
+        live_interests=live_interests,
+    )
+
+
+async def withdraw_my_consent(db: AsyncSession, user: User) -> ConsentState:
+    """Pause the account: stamp first, then end the disclosures that already exist.
+
+    The stamp is committed before anything is taken back, so nothing new can be shared while the
+    sweep runs. Idempotent: calling it again finishes a sweep a crash interrupted. An account
+    with no job-seeker profile has nothing to take back, and gets none created.
+    """
+    await withdraw_consent(db, user)
+    has_profile = (
+        await db.scalar(
+            select(func.count())
+            .select_from(CandidateProfile)
+            .where(CandidateProfile.user_id == user.id)
+        )
+    ) or 0
+    if has_profile:
+        await applications.withdraw_all_live(db, user)
+        await interests.withdraw_all_live(db, user)
+    return await consent_state(db, user)
+
+
+async def confirm_consent(db: AsyncSession, user: User, version: str) -> ConsentState:
+    """Accept the notice in force: re-consent for a stale version, restore for a withdrawn one."""
+    await restore_consent(db, user, version)
+    return await consent_state(db, user)
 
 
 async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
@@ -586,6 +651,7 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
             "created_at": _iso(user.created_at),
             "consent_version": user.consent_version,
             "consented_at": _iso(user.consented_at),
+            "consent_withdrawn_at": _iso(user.consent_withdrawn_at),
         },
         "memberships": [
             {

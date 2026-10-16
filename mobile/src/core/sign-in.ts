@@ -14,7 +14,7 @@ import { ApiError, readDetail, retryAfterSeconds } from "./errors";
 import type { TokenStore } from "./token-store";
 
 /** `api/core/config.py`'s `PRIVACY_NOTICE_VERSION`; `tests/test_mobile_foundations.py` compares them. */
-export const PRIVACY_NOTICE_VERSION = "2026-09-11";
+export const PRIVACY_NOTICE_VERSION = "2026-10-17";
 
 export type CodeRequested = {
   /** Seconds until another code may be asked for (the server's cooldown). */

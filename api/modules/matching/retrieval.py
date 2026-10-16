@@ -37,7 +37,13 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from api.core.config import get_settings
-from api.modules.marketplace.models import CandidateSkill, Job, JobSkill, open_job
+from api.modules.marketplace.models import (
+    CandidateSkill,
+    Job,
+    JobSkill,
+    open_job,
+    paused_profile,
+)
 from api.modules.matching.scoring import HeldSkill, ScoreWeights
 from api.modules.skills.models import Skill
 
@@ -208,13 +214,19 @@ def candidate_pair_facts(job_ids: Sequence[uuid.UUID]) -> Select[Any]:
         .group_by(pairs.c.job_id, pairs.c.profile_id)
         .cte("matched")
     )
-    return select(
-        matched.c.job_id,
-        matched.c.profile_id,
-        matched.c.earned,
-        totals.c.total,
-        (totals.c.mandatory_total - matched.c.mandatory_held).label("mandatory_missing"),
-    ).join(totals, totals.c.job_id == matched.c.job_id)
+    return (
+        select(
+            matched.c.job_id,
+            matched.c.profile_id,
+            matched.c.earned,
+            totals.c.total,
+            (totals.c.mandatory_total - matched.c.mandatory_held).label("mandatory_missing"),
+        )
+        .join(totals, totals.c.job_id == matched.c.job_id)
+        # Somebody who withdrew consent is not offered to an employer or alerted (Sprint 72).
+        # Here, because this is the one source of the pool, its counts and the alert sweep.
+        .where(~paused_profile(matched.c.profile_id))
+    )
 
 
 def bounded_candidates(job_ids: Sequence[uuid.UUID], weights: ScoreWeights) -> Select[Any]:

@@ -3513,6 +3513,80 @@
       }
     }
   },
+  "GET /me/account/consent": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "consent_version": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consent_withdrawn_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consented_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "current": {
+                  "type": "boolean"
+                },
+                "live_applications": {
+                  "type": "integer"
+                },
+                "live_interests": {
+                  "type": "integer"
+                },
+                "notice_version": {
+                  "type": "string"
+                },
+                "withdrawn": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "consent_version",
+                "consented_at",
+                "notice_version",
+                "current",
+                "withdrawn",
+                "consent_withdrawn_at",
+                "live_applications",
+                "live_interests"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "GET /me/account/deletion": {
     "parameters": [],
     "requestBody": null,
@@ -9318,6 +9392,220 @@
                   "type": "array"
                 }
               },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/account/consent": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "consent_version": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "consent_version"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "consent_version": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consent_withdrawn_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consented_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "current": {
+                  "type": "boolean"
+                },
+                "live_applications": {
+                  "type": "integer"
+                },
+                "live_interests": {
+                  "type": "integer"
+                },
+                "notice_version": {
+                  "type": "string"
+                },
+                "withdrawn": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "consent_version",
+                "consented_at",
+                "notice_version",
+                "current",
+                "withdrawn",
+                "consent_withdrawn_at",
+                "live_applications",
+                "live_interests"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/account/consent/withdraw": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "consent_version": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consent_withdrawn_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "consented_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "current": {
+                  "type": "boolean"
+                },
+                "live_applications": {
+                  "type": "integer"
+                },
+                "live_interests": {
+                  "type": "integer"
+                },
+                "notice_version": {
+                  "type": "string"
+                },
+                "withdrawn": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "consent_version",
+                "consented_at",
+                "notice_version",
+                "current",
+                "withdrawn",
+                "consent_withdrawn_at",
+                "live_applications",
+                "live_interests"
+              ],
               "type": "object"
             }
           }
