@@ -1,0 +1,339 @@
+{
+  "about": "Shared by web/src/lib/match-summary.test.ts and mobile/src/test/match-summary.test.ts (and held by tests/test_first_minute.py). matchSummary(matched, missing) says, in counts and names, what a match has and lacks: identical standard names (case and spacing ignored) count once, a standard held under any code is held, generic entries (Employability skills, OJT, On-the-job training) are left out of the counts, and missing names come required first then by importance, at most two, with the rest counted. kind is all (nothing missing), none (nothing held) or some. The sentence is about skills the job asks for; the score still counts the generic ones.",
+  "cases": [
+    {
+      "name": "every skill held",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Make a bed",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Take a pulse",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [],
+      "expect": {
+        "kind": "all",
+        "have": 3,
+        "total": 3,
+        "names": [],
+        "more": 0
+      }
+    },
+    {
+      "name": "a job with nothing listed is not a gap",
+      "matched": [],
+      "missing": [],
+      "expect": {
+        "kind": "all",
+        "have": 0,
+        "total": 0,
+        "names": [],
+        "more": 0
+      }
+    },
+    {
+      "name": "four of five, one named",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Make a bed",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Take a pulse",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Lift a patient",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 4,
+        "total": 5,
+        "names": [
+          "Control infection"
+        ],
+        "more": 0
+      }
+    },
+    {
+      "name": "three missing: the first two are named and the rest counted",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Manage waste",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Record vitals",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 1,
+        "total": 4,
+        "names": [
+          "Control infection",
+          "Manage waste"
+        ],
+        "more": 1
+      }
+    },
+    {
+      "name": "required missing skills are named before optional ones, then by importance",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Greet visitors",
+          "is_mandatory": false,
+          "importance": 5
+        },
+        {
+          "name": "Manage waste",
+          "is_mandatory": true,
+          "importance": 2
+        },
+        {
+          "name": "Record vitals",
+          "is_mandatory": true,
+          "importance": 4
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 1,
+        "total": 4,
+        "names": [
+          "Record vitals",
+          "Manage waste"
+        ],
+        "more": 1
+      }
+    },
+    {
+      "name": "one standard listed under two codes is counted once",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "WASH HANDS",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Make a bed",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 2,
+        "total": 3,
+        "names": [
+          "Control infection"
+        ],
+        "more": 0
+      }
+    },
+    {
+      "name": "a standard held under one code and missing under another is held",
+      "matched": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "control  infection",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Manage waste",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 1,
+        "total": 2,
+        "names": [
+          "Manage waste"
+        ],
+        "more": 0
+      }
+    },
+    {
+      "name": "a generic standard that is missing is not a reason to say something is missing",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Employability Skills (60 Hours)",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "all",
+        "have": 1,
+        "total": 1,
+        "names": [],
+        "more": 0
+      }
+    },
+    {
+      "name": "a generic standard that is held is not counted as a skill held",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "OJT 150 hours",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Employability skills 09",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 1,
+        "total": 2,
+        "names": [
+          "Control infection"
+        ],
+        "more": 0
+      }
+    },
+    {
+      "name": "nothing held",
+      "matched": [],
+      "missing": [
+        {
+          "name": "Control infection",
+          "is_mandatory": true,
+          "importance": 3
+        },
+        {
+          "name": "Manage waste",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "none",
+        "have": 0,
+        "total": 2,
+        "names": [
+          "Control infection",
+          "Manage waste"
+        ],
+        "more": 0
+      }
+    },
+    {
+      "name": "a shouted name is sentence-cased in the sentence",
+      "matched": [
+        {
+          "name": "Wash hands",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "missing": [
+        {
+          "name": "FOLLOW INFECTION CONTROL POLICIES",
+          "is_mandatory": true,
+          "importance": 3
+        }
+      ],
+      "expect": {
+        "kind": "some",
+        "have": 1,
+        "total": 2,
+        "names": [
+          "Follow infection control policies"
+        ],
+        "more": 0
+      }
+    }
+  ]
+}

@@ -427,6 +427,11 @@ FIXED = {
     "UI-10": "Fixed in Sprint 69 for vacancies: 'Verified employer' or 'Not yet verified' and 'Never pay to apply' with a way to report; the slug line is gone (also from the course page). A course page has no strip yet.",
     "UI-11": "Fixed in Sprint 69 (web): a 44 px floor on buttons, the header and the footer, checked on every page of the browser sweep (header and footer only; the rest of a page is still a count).",
     "UI-17": "Fixed in Sprint 69: both operator queues return their true size; the screen says 'Showing 100 of 162' and offers the rest.",
+    "UI-01": "Fixed in Sprint 70 (web): the search first with five one-tap example jobs, the chooser under it, two small links for employers and providers. The 'three sides' cards and the framework band are off the homepage (the framework band is on About). The live people figures and the browse counts stay, by the owner's choice.",
+    "UI-02": "Fixed in Sprint 70 (web, and the phone home's words): the hero, how it works and the browse panels no longer say NSQF, framework or taxonomy, held by a test in English, Hindi and Malay. The Hindi was written by the engineer and needs a native reader.",
+    "UI-12": "Fixed in Sprint 70 (web): a one-line strip ('14 matches, best 87, profile 100% complete'), the charts one tap behind 'Your numbers', five cards then 'Show more'. Also fixed on the way: /me/matches answered total as the length of the page.",
+    "UI-13": "Fixed in Sprint 70 (web and phone): each match says in a sentence what the person has and lacks, with one main action; the lists, codes and level scale are behind Details. The sentence leaves out the generic standards the score still counts, and says so.",
+    "UI-19": "Fixed in Sprint 70 (phone): a signed-in seeker's home shows the best match with its sentence, profile completeness and the next step, new updates, and the applications an employer acted on in the last 14 days. Applying is not offered there: the match summary has no employer name for the consent step to name.",
 }
 
 GOOD = [
@@ -444,9 +449,9 @@ def _metrics() -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"results": []}
 
 
-def _after() -> dict:
-    """The Sprint 69 re-measurement, if it has been made (`measurements.sprint69.json`)."""
-    path = SCREENS / "measurements.sprint69.json"
+def _after(sprint: int = 69) -> dict:
+    """A re-measurement, if it has been made (`measurements.sprint69.json`, `measurements.sprint70.json`)."""
+    path = SCREENS / f"measurements.sprint{sprint}.json"
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -492,8 +497,8 @@ def build_markdown() -> str:
         "3. **Three lists silently cap what they show** (UI-06 jobs and courses at 200; UI-17 the operator's verification queue at 100, printed as '100 waiting' against 162): a correctness defect that is also a design one.",
         "4. **The brand is missing** (UI-03, UI-23): no imagery anywhere, one blue, and the app's own icon is still Expo's. That is the owner's decision, and everything else waits less on it than it seems.",
         "5. **The back office and employer screens are tidy but long**: the operator's page is one 31-screen scroll (UI-16).\n",
-        "## Recommended first build\n",
-        f"**Sprint 69, 'scannable jobs', is done** ({len(FIXED)} of {len(F)} findings fixed; the Status column says how far each went): UI-04 (job card v2), UI-05 (monthly pay), UI-06 (paging with a total), UI-07 (12 px floor), UI-08 (sticky apply), UI-09 (clean the skills list), UI-10 (trust strip), UI-11 (44 px targets) and UI-17 (the operator's totals). **Next, Sprint 70, 'a candidate's first minute':** UI-01, UI-02, UI-12, UI-13, UI-19. **After the owner's brand decision:** UI-03, UI-18, UI-20, UI-23, UI-24, UI-27 (the icon set and illustration).\n",
+        "## Built so far, and what is next\n",
+        f"**Sprints 69 ('scannable jobs') and 70 ('a candidate's first minute') are done** ({len(FIXED)} of {len(F)} findings fixed; the Status column says how far each went). Sprint 69: UI-04 to 11 and UI-17 (job cards, monthly pay, paging with a total, the 12 px and 44 px floors, the apply bar, the standards list, the trust strip, the operator's totals). Sprint 70: UI-01, 02, 12, 13, 19 (the homepage, plain words, the matches page, a match said in a sentence, the signed-in phone home). **Still open:** {', '.join(i for i in (f[0] for f in F) if i not in FIXED)}; of these UI-03, 18, 20, 23, 24 and 27 wait on the owner's brand decision, and BL-16.4 (a five-person usability check) would settle which of the rest matter most.\n",
         "## Findings\n",
         "| " + " | ".join(HEAD[:6] + ["Finding", "Evidence", "Proposed fix", "Status"]) + " |",
         "|" + "---|" * 10,
@@ -526,6 +531,20 @@ def build_markdown() -> str:
         for (pid, variant, loc), r in sorted(after.items()):
             b = metrics.get((pid, variant, loc))
             if variant == "light" and loc == "en" and b:
+                out.append(
+                    f"| {pid} | {b['screens']} | {r['screens']} | {b['smallTargets']} | {r['smallTargets']} | {b['textUnder12px']} | {r['textUnder12px']} |"
+                )
+    after70 = _after(70)
+    if after70:
+        out += [
+            "\n## After Sprint 70 (the homepage, About and matches; same method, phone width, English, light)\n",
+            "Re-measured after the homepage lost its framework band and its three audience cards and the matches page opened on the matches. The baseline is the Sprint 68 capture. Sprint 69's 44 px footer made every page about 0.2 of a screen taller (the homepage was 7.9 just before this sprint), so the saving is a little more than shown.\n",
+            "| Page | Screens before | after | Under 44 px before | after | Text under 12 px before | after |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for pid in ("home", "about", "matches"):
+            b, r = metrics.get((pid, "light", "en")), after70.get((pid, "light", "en"))
+            if b and r:
                 out.append(
                     f"| {pid} | {b['screens']} | {r['screens']} | {b['smallTargets']} | {r['smallTargets']} | {b['textUnder12px']} | {r['textUnder12px']} |"
                 )
@@ -570,7 +589,7 @@ def build_workbook() -> None:
         ["Severity", ", ".join(f"{counts.get(s, 0)} {s}" for s in SEVERITIES)],
         [
             "Recommended first build",
-            f"Sprint 69, 'scannable jobs', is done ({len(FIXED)} findings; see the Status column). Next, Sprint 70, 'a candidate's first minute': UI-01, 02, 12, 13, 19. Brand-dependent: UI-03, 18, 20, 23, 24, 27.",
+            f"Sprints 69 ('scannable jobs') and 70 ('a candidate's first minute') are done ({len(FIXED)} findings; see the Status column). Brand-dependent and open: UI-03, 18, 20, 23, 24, 27.",
         ],
         [
             "Owner decisions",

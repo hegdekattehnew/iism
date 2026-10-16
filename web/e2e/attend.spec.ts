@@ -68,7 +68,7 @@ test("the course you can take comes first, and each says where, when and what it
   await page.goto("/en/matches");
   const match = page.getByRole("listitem").filter({ hasText: jobTitle });
   await expect(match).toBeVisible();
-  await match.getByRole("button", { name: "Courses that close this gap" }).click();
+  await match.getByRole("button", { name: "See courses that close this" }).click();
 
   const courseTitles = () =>
     match.getByRole("link", { name: /^Sterile field,/ }).allInnerTexts();

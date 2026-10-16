@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { RoleChooser } from "@/components/RoleChooser";
 import { buttonVariants } from "@/components/ui";
 import { Link, getPathname } from "@/i18n/navigation";
+import { EXAMPLE_JOBS } from "@/lib/example-jobs";
 
 export async function Hero() {
   const t = await getTranslations("hero");
@@ -76,6 +77,25 @@ export async function Hero() {
               </button>
             </form>
 
+            {/* One-tap examples, **below** the search button: the Hindi fold budget above is
+                binding and nothing may be added over it. Plain links, so they work without
+                JavaScript and a thumb can land on them (44 px). */}
+            <div className="mt-5">
+              <p className="text-xs font-medium text-muted">{t("chipsLabel")}</p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {EXAMPLE_JOBS.map(({ key, query }) => (
+                  <li key={key}>
+                    <Link
+                      href={`/search?q=${encodeURIComponent(query)}`}
+                      className="inline-flex min-h-11 items-center rounded-full border border-border-token bg-surface px-4 text-sm font-medium text-foreground transition-colors hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    >
+                      {t(`chip.${key}`)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             {/* Was a `size="lg"` secondary button. Kept, because it is the
                 hero's only no-signup escape hatch and `BrowsePanels` is four
                 sections down -- but demoted, because a large secondary button
@@ -97,7 +117,26 @@ export async function Hero() {
 
           {/* `max-w-md` while stacked, or at tablet this is a 728px-wide card
               holding three short labels. */}
-          <RoleChooser className="w-full max-w-md lg:max-w-none" />
+          <div className="w-full max-w-md lg:max-w-none">
+            <RoleChooser />
+            {/* The other two audiences, one line each, where the three "audience" cards used to be a
+                whole section. Hiring and training have their own pages; the chooser above is how
+                either starts an account. */}
+            <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              <Link
+                href="/employers"
+                className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                {t("hiringLink")}
+              </Link>
+              <Link
+                href="/providers"
+                className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                {t("trainingLink")}
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </section>

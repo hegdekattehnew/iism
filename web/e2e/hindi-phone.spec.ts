@@ -25,10 +25,23 @@ test("the Hindi homepage fits a 360x640 phone: search above the fold, nothing cl
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "no horizontal scroll").toBeLessThanOrEqual(0);
 
+  // The example searches (Sprint 70): Hindi labels, none clipped, none off the right edge, each a
+  // search the corpus can answer (the query is English, the label is Hindi).
+  const chips = page.getByRole("list").filter({ has: page.getByRole("link", { name: hi.hero.chip.wardBoy }) }).getByRole("link");
+  await expect(chips).toHaveCount(5);
+  for (const chip of await chips.all()) {
+    const b = await chip.boundingBox();
+    expect(b!.x + b!.width, "an example search must not run off the right edge").toBeLessThanOrEqual(360);
+    expect(b!.height, "an example search is a 44px target").toBeGreaterThanOrEqual(43.5);
+    expect(await chip.getAttribute("href")).toMatch(/\/search\?q=[a-z%0-9]+$/);
+  }
+
   // The band the owner asked to be three across: two across on a phone, six tiles, none clipped.
+  // One band now: the framework figures moved to About (Sprint 70).
   await expect(page.getByRole("heading", { name: hi.stats.peopleHeading })).toBeVisible();
+  await expect(page.getByRole("heading", { name: hi.stats.heading })).toHaveCount(0);
   const grids = page.locator("dl");
-  await expect(grids).toHaveCount(2);
+  await expect(grids).toHaveCount(1);
   for (const grid of await grids.all()) {
     await expect(grid.locator("dt")).toHaveCount(6);
     for (const dd of await grid.locator("dd").all()) {

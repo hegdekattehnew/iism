@@ -1,35 +1,23 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 
-import { Skeleton } from "@/components/ui";
-import { api } from "@/lib/api";
-import { CORPUS_STATS } from "@/lib/counts";
+import { StatGrid, useCorpusStats, type Cell } from "@/components/stats-shared";
 import { useFormatCount } from "@/lib/format";
 
-type Cell = {
-  key: string;
-  value: string | null;
-  /** A narrower figure named underneath, only when it differs from the one above. */
-  under?: { key: string; count: string } | null;
-  /** This tile may grow a line underneath once the figures arrive: keep the room for it from the start. */
-  reserve?: boolean;
-};
-
-/** What the platform holds, and what has been done on it, counted live.
+/** Who is here and what has been done on the platform, counted live.
  *
  * Fetched client-side, like `LiveCount`, so a static build never depends on the
  * API being reachable — and if it is unreachable the band renders skeletons
  * rather than zeros. A zero here would be a lie about the corpus.
  *
- * **Two rows of six, three across (Sprint 51).** Six tiles on a four-column grid left a row of four and a row of two, so the numbers did not line up; the master-list
+ * **Six tiles, three across (Sprint 51).** Six tiles on a four-column grid left a row of four and a row of two, so the numbers did not line up; the master-list
  * "states and districts" tile went because "districts with an open vacancy" says what is actually here.
  *
- * **Two rows (Sprint 50.5).** "People and work" leads, because the first question a
- * buyer asks is who is here and what has happened, and "what the platform holds" follows.
- * Where a broad and a narrow figure differ, the narrow one is named underneath -- the
- * pattern `LiveCount` set for "posted" and "open right now" -- so the number and its
+ * **Who is here comes first (Sprint 50.5), and since Sprint 70 it is the only band.** The first question a
+ * buyer asks is who is here and what has happened; "what the platform holds" (the framework figures) moved
+ * to About (`FrameworkBand`). Where a broad and a narrow figure differ, the narrow one is named underneath --
+ * the pattern `LiveCount` set for "posted" and "open right now" -- so the number and its
  * definition arrive together. **A true zero renders `0`**, never a hidden tile: the owner
  * chose to always show the real count, and a figure that vanished when it was small would
  * read as a regression on the day it came back.
@@ -40,18 +28,7 @@ type Cell = {
 export function StatsBand() {
   const t = useTranslations("stats");
   const fmt = useFormatCount();
-
-  const stats = useQuery({
-    queryKey: CORPUS_STATS,
-    // No `staleTime`: these move when somebody applies or signs up, and a figure older than
-    // the thing it counts is the page saying something untrue (`lib/counts.ts`).
-    queryFn: async () => {
-      const { data, error } = await api.GET("/marketplace/stats", {});
-      if (error || !data) throw new Error("stats unavailable");
-      return data;
-    },
-    retry: false,
-  });
+  const stats = useCorpusStats();
 
   const d = stats.data;
   const wider = (broad: number | undefined, narrow: number | undefined) =>
@@ -89,60 +66,14 @@ export function StatsBand() {
     { key: "districtsWithVacancy", value: d ? fmt(d.districts_with_vacancy) : null },
   ];
 
-  const holds: Cell[] = [
-    { key: "standards", value: d ? fmt(d.standards) : null },
-    { key: "qualifications", value: d ? fmt(d.qualifications) : null },
-    { key: "criteria", value: d ? fmt(d.criteria) : null },
-    { key: "entryRoutes", value: d ? fmt(d.entry_routes) : null },
-    { key: "awardingBodies", value: d ? fmt(d.awarding_bodies) : null },
-    { key: "sectors", value: d ? fmt(d.sectors) : null },
-  ];
-
-  const grid = (cells: Cell[]) => (
-    <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
-      {cells.map(({ key, value, under, reserve }) => (
-        <div key={key}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted">{t(key)}</dt>
-          <dd className="mt-1 text-2xl font-bold tabular-nums sm:text-3xl">
-            {value ?? <Skeleton className="h-8 w-24" />}
-          </dd>
-          {(under || reserve) && (
-            // Pre-formatted, not handed over as a number: next-intl would format it with the
-            // page locale (`en`), and this page's rule is `en-IN` (`lib/format.ts`).
-            // A `<dd>`, not a `<p>`: a `<dl>` may hold only `dt`/`dd` groups, and axe fails the
-            // whole list otherwise. It appears only when a secondary figure exists, so an
-            // empty database never showed it (Sprint 52's browser run did).
-            // `min-h-4` is the room the line takes, held while the figures load and when a tile has no
-            // narrower figure: without it every tile below the first row dropped 16px when they
-            // arrived (Sprint 54: the homepage scored 0.11 of layout shift on a phone, in Hindi).
-            <dd className="mt-0.5 min-h-4 text-xs text-muted tabular-nums">
-              {under ? t(under.key, { count: under.count }) : null}
-            </dd>
-          )}
-        </div>
-      ))}
-    </dl>
-  );
-
   return (
-    <>
-      <section className="bg-background">
-        <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:py-16">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("peopleHeading")}</h2>
-          <p className="mt-2 max-w-2xl text-base text-muted">{t("peopleSub")}</p>
-          {grid(people)}
-          {d?.demo && <p className="mt-6 text-xs font-medium text-warning-text">{t("demoNote")}</p>}
-        </div>
-      </section>
-
-      <section className="border-y border-border-token bg-surface-muted">
-        <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:py-16">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("heading")}</h2>
-          <p className="mt-2 max-w-2xl text-base text-muted">{t("sub")}</p>
-          {grid(holds)}
-          <p className="mt-8 text-xs text-muted">{t("footnote")}</p>
-        </div>
-      </section>
-    </>
+    <section className="bg-background">
+      <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:py-16">
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("peopleHeading")}</h2>
+        <p className="mt-2 max-w-2xl text-base text-muted">{t("peopleSub")}</p>
+        <StatGrid cells={people} />
+        {d?.demo && <p className="mt-6 text-xs font-medium text-warning-text">{t("demoNote")}</p>}
+      </div>
+    </section>
   );
 }

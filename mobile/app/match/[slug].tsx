@@ -10,7 +10,7 @@ import { ApplyPanel } from "../../src/ui/ApplyPanel";
 import { SeekerGate } from "../../src/ui/gate";
 import { Button, Screen, Text } from "../../src/ui/primitives";
 import { FailureNotice, SkeletonRows } from "../../src/ui/list";
-import { GapLists, ScoreSummary } from "../../src/ui/match";
+import { GapDetails, MatchSentence, ScoreSummary } from "../../src/ui/match";
 import { SessionExpired } from "../../src/ui/session";
 import { SuggestedCourses } from "../../src/ui/SuggestedCourses";
 import { BudgetField } from "../../src/ui/BudgetField";
@@ -61,8 +61,10 @@ function Body({ slug }: { slug: string }) {
         </Text>
       ) : null}
 
+      {/* The answer first, in a sentence (UI-13): then the score behind it, then what to do. The
+          lists of standards and their codes are one tap away, not the first thing read. */}
+      <MatchSentence match={m} variant="lead" />
       <ScoreSummary match={m} />
-      <GapLists match={m} />
 
       {/* Courses close a gap: with nothing missing there is nothing to close, and "no course covers
           this gap" about a 100% match was wrong (found by the Sprint 68 review). */}
@@ -89,6 +91,8 @@ function Body({ slug }: { slug: string }) {
           ) : null}
         </Section>
       ) : null}
+
+      <GapDetails match={m} />
 
       <ApplyPanel
         jobSlug={m.job.slug}

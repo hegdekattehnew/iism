@@ -95,6 +95,7 @@ export function Button({
   disabled = false,
   busy = false,
   variant = "primary",
+  expanded,
 }: {
   label: string;
   /** What a screen reader says when it needs more than the visible words ("Remove: Hand hygiene"); it must contain `label`. */
@@ -103,6 +104,8 @@ export function Button({
   disabled?: boolean;
   busy?: boolean;
   variant?: "primary" | "secondary";
+  /** Set on a button that shows or hides something: a screen reader says "expanded" or "collapsed". */
+  expanded?: boolean;
 }) {
   const c = useColours();
   const inactive = disabled || busy;
@@ -111,7 +114,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: inactive, busy }}
+      accessibilityState={{ disabled: inactive, busy, ...(expanded === undefined ? {} : { expanded }) }}
       disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => ({

@@ -6,7 +6,11 @@
     "organisationNote": "This app is for job seekers. To post vacancies or courses, sign in on the website.",
     "browseJobs": "Browse jobs",
     "browseCourses": "Browse courses",
-    "browseStandards": "Browse standards"
+    "browseStandards": "Browse standards",
+    "topMatch": "Your best match",
+    "openMatch": "Open this match",
+    "applicationsNews": "{count, plural, one {# application has news} other {# applications have news}}",
+    "noTopMatch": "No match yet. Add what you can do and we will find jobs that fit."
   },
   "signIn": {
     "phoneLabel": "Mobile number",
@@ -43,7 +47,8 @@
   "detail": {
     "signInToMatch": "Sign in to see how well you match this.",
     "signInAction": "Sign in",
-    "otherwise": "Not what you were looking for?"
+    "otherwise": "Not what you were looking for?",
+    "gapToggle": "What you have and what you need"
   },
   "months": {
     "short": {

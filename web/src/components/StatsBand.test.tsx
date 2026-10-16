@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 describe("StatsBand: who is here and what has been done", () => {
-  it("shows both rows, people and work first", async () => {
+  it("shows who is here and what has been done, and nothing of the framework", async () => {
     answer();
     renderUi(<StatsBand />);
 
@@ -73,13 +73,11 @@ describe("StatsBand: who is here and what has been done", () => {
       await screen.findByText("Who is here, and what has been done"),
     ).toBeTruthy();
     await screen.findByText("22");
-    const people = screen.getByText("Who is here, and what has been done");
-    const holds = screen.getByText(
-      "Built on the national framework, not a guess",
-    );
+    // The framework band moved to About (Sprint 70): it is not on the homepage's band any more.
     expect(
-      people.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+      screen.queryByText("Built on the national framework, not a guess"),
+    ).toBeNull();
+    expect(screen.queryByText("National Occupational Standards")).toBeNull();
 
     expect(within(figure("Job seekers")).getByText("22")).toBeTruthy();
     expect(within(figure("Employers")).getByText("102")).toBeTruthy();
@@ -173,12 +171,12 @@ describe("StatsBand: who is here and what has been done", () => {
     expect(screen.queryByText("36 · 766")).toBeNull();
   });
 
-  it("lays each section out as six tiles, three across, so the rows line up", async () => {
+  it("lays the band out as six tiles, three across, so the rows line up", async () => {
     answer();
     const { container } = renderUi(<StatsBand />);
     await screen.findByText("22");
     const grids = container.querySelectorAll("dl");
-    expect(grids).toHaveLength(2);
+    expect(grids).toHaveLength(1);
     for (const grid of grids) {
       expect(grid.children).toHaveLength(6);
       // Three from tablet width up. A fourth column (`lg:grid-cols-4`) made six tiles a

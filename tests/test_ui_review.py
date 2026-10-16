@@ -105,20 +105,20 @@ def test_the_measurement_can_fail() -> None:
 
 
 def test_every_finding_marked_fixed_is_a_finding_and_says_what_was_done() -> None:
-    """Sprint 69 closed nine findings; the review says which, and how far each went."""
+    """Sprints 69 and 70 closed fourteen findings; the review says which, and how far each went."""
     m = _builder()
     ids = {f[0] for f in m.F}
     assert m.FIXED, "no finding is marked fixed"
     assert set(m.FIXED) <= ids, f"marked fixed but not a finding: {sorted(set(m.FIXED) - ids)}"
     for fid, what in m.FIXED.items():
-        assert what.startswith("Fixed in Sprint 69"), fid
+        assert what.startswith(("Fixed in Sprint 69", "Fixed in Sprint 70")), fid
         assert len(what) > 60, fid  # says what was done, not just that something was
     # And the markdown shows it: the status column is not dropped on the way to the reader.
     markdown = (DESIGN / "ui-review.md").read_text(encoding="utf-8")
     for fid in m.FIXED:
         row = next(line for line in markdown.splitlines() if line.startswith(f"| **{fid}**"))
-        assert "Fixed in Sprint 69" in row, fid
-    open_row = next(line for line in markdown.splitlines() if line.startswith("| **UI-01**"))
+        assert "Fixed in Sprint 6" in row or "Fixed in Sprint 7" in row, fid
+    open_row = next(line for line in markdown.splitlines() if line.startswith("| **UI-03**"))
     assert open_row.rstrip().endswith("| Open |")
 
 
@@ -164,5 +164,38 @@ def test_the_sprint_69_remeasurement_is_the_same_captures_and_shows_the_fix() ->
         "sprint69.jobs.hi.hi.jpg",
         "sprint69.job-detail.light.en.jpg",
         "sprint69.job-detail.hi.hi.jpg",
+    ):
+        assert (SCREENS / pictured).is_file(), pictured
+
+
+def test_the_sprint_70_remeasurement_is_the_same_captures_and_shows_the_fix() -> None:
+    """The homepage lost its framework band and its audience cards, the matches page opens on the
+    matches (Sprint 70), and the numbers the review quotes for it are the file's."""
+    before = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.json").read_text(encoding="utf-8"))["results"]
+    }
+    after = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.sprint70.json").read_text(encoding="utf-8"))[
+            "results"
+        ]
+    }
+    assert set(after) == set(before) and len(after) >= 50, "not the same captures"
+    assert all(r.get("status") == 200 or r["id"] in {"employer-applicants"} for r in after.values())
+    home, matches = ("home", "light", "en"), ("matches", "light", "en")
+    assert before[home]["screens"] > 7 and after[home]["screens"] < before[home]["screens"] - 1
+    assert before[matches]["screens"] > 14 and after[matches]["screens"] < 6
+    # The framework band moved to About, which got longer by about that much.
+    assert after[("about", "light", "en")]["screens"] > before[("about", "light", "en")]["screens"]
+    assert all(r["textUnder12px"] == 0 for r in after.values())
+    for pictured in (
+        "sprint70.home.light.en.jpg",
+        "sprint70.home.hi.hi.jpg",
+        "sprint70.matches.light.en.jpg",
+        "sprint70.matches.hi.hi.jpg",
+        "sprint70.about.light.en.jpg",
+        "sprint70.app-home-signed-in.light.en.jpg",
+        "sprint70.app-matches.light.en.jpg",
     ):
         assert (SCREENS / pictured).is_file(), pictured

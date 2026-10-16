@@ -22,14 +22,24 @@
     "team": "Team"
   },
   "hero": {
-    "eyebrow": "NSQF-aligned skill intelligence",
+    "eyebrow": "For people looking for work",
     "title": "Find the work you want, and the training that gets you there",
-    "subtitle": "Tell us the job you want. We show you the skills you are missing, and the courses that close the gap.",
+    "subtitle": "Tell us the job you want. See what you are missing. Find the course that closes the gap.",
     "searchLabel": "Search for a job role or skill",
     "searchPlaceholder": "e.g. General Duty Assistant, welding, retail sales",
     "searchButton": "Search",
-    "trust": "Free to use · Aligned to the National Skills Qualifications Framework · Hindi and English",
-    "browseLink": "Browse all courses"
+    "trust": "Free to use · Hindi and English",
+    "browseLink": "Browse all courses",
+    "chipsLabel": "Popular searches",
+    "chip": {
+      "wardBoy": "Ward boy",
+      "electrician": "Electrician",
+      "securityGuard": "Security guard",
+      "driver": "Driver",
+      "retailSales": "Retail sales"
+    },
+    "hiringLink": "Hiring? For employers",
+    "trainingLink": "Run training? For providers"
   },
   "how": {
     "title": "How it works",
@@ -37,25 +47,12 @@
     "step1Title": "Tell us your target",
     "step1Body": "A job you hold now, a job you want, or simply the kind of work you are looking for.",
     "step2Title": "See your skill gap",
-    "step2Body": "We compare your skills against what that role actually requires, and show you precisely what is missing.",
+    "step2Body": "We compare your skills with what the job asks for, and show you exactly what is missing.",
     "step3Title": "Close the gap",
-    "step3Body": "We recommend the courses that cover those specific missing skills, ranked by cost, duration and language.",
+    "step3Body": "We suggest the courses that teach those missing skills, by cost, length and language.",
     "step4Title": "Get matched",
-    "step4Body": "As your skills grow, better-matched jobs surface automatically.",
-    "note": "Every score is computed deterministically and can be explained, skill by skill."
-  },
-  "audiences": {
-    "title": "Three sides, one set of standards",
-    "candidateTitle": "For candidates",
-    "candidateBody": "Understand what you are missing, and what to do about it. Free, in your language.",
-    "candidateCta": "See how it works",
-    "employerTitle": "For employers",
-    "employerBody": "Post roles as skills, not keywords. Find candidates who genuinely match.",
-    "employerCta": "How hiring works here",
-    "providerTitle": "For course providers",
-    "providerBody": "Publish courses anchored to Qualification Packs, and see which skills the market is short of.",
-    "providerCta": "How publishing works here",
-    "subtitle": "Every vacancy, every course and every candidate is described against the same national framework. That is what makes a match here mean something."
+    "step4Body": "As your skills grow, better-matched jobs show up on their own.",
+    "note": "Every score can be explained, skill by skill."
   },
   "browse": {
     "title": "Explore the marketplace",
@@ -68,7 +65,7 @@
     "coursesBody": "Training mapped to national qualification standards.",
     "coursesCountLabel": "in the catalogue",
     "skillsTitle": "Skills",
-    "skillsBody": "The NSQF-aligned taxonomy everything is built on.",
+    "skillsBody": "What each job asks you to be able to do, in plain words.",
     "skillsCountLabel": "in the catalogue",
     "browseCta": "Browse",
     "empty": "Nothing here yet"
@@ -562,6 +559,20 @@
       "topMatches": "Your top matches",
       "noMatches": "No matches yet.",
       "careerPaths": "See where you could move next"
+    },
+    "sentenceAll": "You have every skill this job asks for.",
+    "sentenceSome": "You have {have} of {total} skills this job asks for. Missing: {missing}.",
+    "sentenceNone": "You have none of the {total} skills this job asks for. Missing: {missing}.",
+    "missingAnd": "{names} and {more} more",
+    "seeCourses": "See courses that close this",
+    "details": "Details",
+    "showMore": "Show more ({left} left)",
+    "bestOf": "These are your best {shown} of {total} matches.",
+    "strip": {
+      "matches": "{count, plural, =0 {No matches} one {# match} other {# matches}}",
+      "best": "best {score}",
+      "profile": "profile {percent}% complete",
+      "numbers": "Your numbers"
     }
   },
   "stats": {
