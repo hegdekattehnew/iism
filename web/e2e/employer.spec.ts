@@ -41,13 +41,13 @@ test("an employer posts, publishes, and meets candidates only by reference until
 
   // ---- a draft: on the employer's list, not on the public one
   const card = page.getByRole("listitem").filter({ hasText: title });
-  await expect(card.getByText("Draft")).toBeVisible();
+  await expect(card.getByText("Draft", { exact: true })).toBeVisible();
   const publicBefore = await request.get(`http://localhost:8100/jobs?q=${encodeURIComponent(title)}`);
   expect((await publicBefore.json()).total).toBe(0);
 
   // ---- publish: now it is public
   await card.getByRole("button", { name: "Publish" }).click();
-  await expect(card.getByText("Published")).toBeVisible();
+  await expect(card.getByText("Published", { exact: true })).toBeVisible();
   const publicAfter = await request.get(`http://localhost:8100/jobs?q=${encodeURIComponent(title)}`);
   expect((await publicAfter.json()).total).toBe(1);
   await checkPage(page, "employer workspace");

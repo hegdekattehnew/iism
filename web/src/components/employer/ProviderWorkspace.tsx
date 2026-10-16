@@ -6,9 +6,9 @@ import { useState } from "react";
 import { CourseEditor } from "@/components/employer/CourseEditor";
 import { ProviderDashboard } from "@/components/employer/ProviderDashboard";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
 import { detailOf, isSignedOut } from "@/lib/http";
-import { Link } from "@/i18n/navigation";
 import {
   type CoursePayload,
   type OrgCourse,
@@ -100,6 +100,22 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   }
 
   const items: OrgCourse[] = courses.data ?? [];
+
+  const publish = (slug: string, published: boolean) => {
+    setActionFailed(null);
+    setPublished.mutate(
+      { slug, published },
+      {
+        onError: (e) => {
+          if (isSignedOut(e)) {
+            setSignedOut(true);
+            return;
+          }
+          setActionFailed(detailOf(e) ?? true);
+        },
+      },
+    );
+  };
   const current =
     editing && editing !== "new" ? items.find((c) => c.slug === editing) : null;
 
@@ -224,60 +240,71 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                   </Alert>
                 )}
 
-                <div className="mt-4 flex flex-wrap items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setEditing(course.slug)}
-                    className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    {te("edit")}
-                  </button>
-                  {!course.taken_down_at && (
-                  <button
-                    type="button"
-                    disabled={setPublished.isPending}
-                    onClick={() => {
-                      setActionFailed(null);
-                      setPublished.mutate(
-                        {
-                          slug: course.slug,
-                          published: course.status !== "published",
-                        },
-                        {
-                          onError: (e) => {
-                            if (isSignedOut(e)) {
-                              setSignedOut(true);
-                              return;
-                            }
-                            setActionFailed(detailOf(e) ?? true);
-                          },
-                        },
-                      );
-                    }}
-                    className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    {course.status === "published"
-                      ? te("unpublish")
-                      : te("publish")}
-                  </button>
-                  )}
-                  <Link
-                    href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
-                    className="text-sm font-medium text-brand underline-offset-4 hover:underline"
-                  >
-                    {t("interestedLearners", {
-                      count: interestBySlug.get(course.slug) ?? 0,
-                    })}
-                  </Link>
-                  {course.status === "published" && (
-                    <Link
-                      href={`/courses/${course.slug}`}
-                      className="text-sm text-muted underline-offset-4 hover:underline"
-                    >
-                      {te("viewPublic")}
-                    </Link>
-                  )}
-                </div>
+                <RowActions
+                  moreLabel={te("more")}
+                  // A live course's reason to be opened is the learners who asked about it; a draft's
+                  // is putting it live. Nothing for a course an operator took down.
+                  primary={
+                    course.taken_down_at ? null : course.status === "published" ? (
+                      <ButtonLink
+                        size="sm"
+                        href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
+                      >
+                        {t("interestedLearners", {
+                          count: interestBySlug.get(course.slug) ?? 0,
+                        })}
+                      </ButtonLink>
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled={setPublished.isPending}
+                        onClick={() => publish(course.slug, true)}
+                      >
+                        {te("publish")}
+                      </Button>
+                    )
+                  }
+                  secondary={
+                    <Button size="sm" variant="secondary" onClick={() => setEditing(course.slug)}>
+                      {te("edit")}
+                    </Button>
+                  }
+                  more={[
+                    course.status === "published" && !course.taken_down_at && (
+                      <Button
+                        key="unpublish"
+                        size="sm"
+                        variant="ghost"
+                        disabled={setPublished.isPending}
+                        onClick={() => publish(course.slug, false)}
+                      >
+                        {te("unpublish")}
+                      </Button>
+                    ),
+                    course.status !== "published" && (
+                      <ButtonLink
+                        key="learners"
+                        size="sm"
+                        variant="ghost"
+                        href={`/employer/${orgSlug}/courses/${course.slug}/interests`}
+                      >
+                        {t("interestedLearners", {
+                          count: interestBySlug.get(course.slug) ?? 0,
+                        })}
+                      </ButtonLink>
+                    ),
+                    course.status === "published" && (
+                      <ButtonLink
+                        key="public"
+                        size="sm"
+                        variant="ghost"
+                        href={`/courses/${course.slug}`}
+                      >
+                        {te("viewPublic")}
+                      </ButtonLink>
+                    ),
+                  ]}
+                />
               </CardBody>
             </Card>
           </li>

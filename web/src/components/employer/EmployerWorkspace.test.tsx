@@ -279,3 +279,60 @@ describe("EmployerWorkspace -- a vacancy an operator removed (Sprint 59)", () =>
   });
 });
 
+/**
+ * Sprint 73, UI-15: one primary action per row, Edit beside it, the rest behind "More". The row used
+ * to end in five loose text links about 20 px tall.
+ */
+describe("EmployerWorkspace: a row's actions", () => {
+  const row = async () => (await screen.findByText("Cashier")).closest("li")!;
+
+  it("puts the candidates first for a live vacancy and Edit beside them, both outside More", async () => {
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const li = await row();
+    const more = li.querySelector("details")!;
+    expect(more.hasAttribute("open")).toBe(false); // closed until asked
+    const seeCandidates = screen.getByRole("link", { name: "See candidates" });
+    const edit = screen.getByRole("button", { name: "Edit" });
+    expect(more.contains(seeCandidates)).toBe(false);
+    expect(more.contains(edit)).toBe(false);
+    expect(seeCandidates.getAttribute("href")).toBe("/employer/acme/candidates/cashier");
+  });
+
+  it("keeps unpublish, close and the public page under More, not beside the primary", async () => {
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const more = (await row()).querySelector("details")!;
+    for (const name of ["Unpublish", "Close vacancy"]) {
+      expect(more.contains(screen.getByRole("button", { name }))).toBe(true);
+    }
+    expect(more.contains(screen.getByRole("link", { name: "View the public posting" }))).toBe(true);
+  });
+
+  it("makes Publish the primary action of a draft, and offers no candidates link", async () => {
+    world_([job({ status: "draft", is_open: false })]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const li = await row();
+    const publish = screen.getByRole("button", { name: "Publish" });
+    expect(li.querySelector("details")?.contains(publish) ?? false).toBe(false);
+    expect(screen.queryByRole("link", { name: "See candidates" })).toBeNull();
+  });
+
+  it("offers a vacancy an operator removed no primary action, only Edit", async () => {
+    world_([
+      job({ status: "draft", is_open: false, taken_down_at: "2026-10-01T00:00:00Z", takedown_reason: "Asks for a fee." }),
+    ]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    await row();
+    expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "See candidates" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  });
+
+  it("holds every action to the 44 px floor by using the button sizes", async () => {
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const li = await row();
+    for (const control of li.querySelectorAll("button, a[href]")) {
+      expect(control.className, control.textContent ?? "").toMatch(/min-h-11/);
+    }
+    expect(li.querySelector("summary")!.className).toMatch(/min-h-11/);
+  });
+});

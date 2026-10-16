@@ -94,3 +94,27 @@ describe("EmployerDashboard", () => {
     expect(container.textContent).toBe("");
   });
 });
+
+/** Sprint 73, UI-14: the colour of a pool bar is explained once, in words, and the counts lead the funnel. */
+describe("EmployerDashboard: reading the charts", () => {
+  const withJob = (over: Record<string, number> = {}) =>
+    GET.mockResolvedValue({
+      data: { posted_jobs: 1, open_jobs: 1, applied: 2, shortlisted: 2, hired: 2, jobs: [{ ...JOB, ...over }] },
+      error: undefined,
+      response: { status: 200 },
+    });
+
+  it("says what the amber and the blue bars mean, once, above the list", async () => {
+    withJob();
+    renderUi(<EmployerDashboard orgSlug="acme" />);
+    expect(await screen.findByText("Amber: new applications waiting. Blue: none waiting.")).toBeTruthy();
+  });
+
+  it("gives the funnel's counts more weight than its bars, so equal bars still say something", async () => {
+    withJob();
+    const { container } = renderUi(<EmployerDashboard orgSlug="acme" />);
+    await screen.findByText("Applied");
+    const counts = [...container.querySelectorAll("span.tabular-nums")].filter((e) => e.className.includes("font-semibold"));
+    expect(counts.length).toBeGreaterThanOrEqual(3);
+  });
+});

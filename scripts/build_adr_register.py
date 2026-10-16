@@ -249,6 +249,8 @@ for a in adrs:
         note = "Sprint 71 (BL-12.12). Role-alias coverage 41 to 88 roles, measured against titles written first; the hold-out did not move (37.5%) and is reported. Unreviewed draft, flagged."
     if n == 82:
         note = "Sprint 72. Consent withdrawn without deleting (a pause), re-consent that never blocks, an 18+ rule, a notice checked against the data, an incident runbook. Pause is not erasure: a question for counsel."
+    if n == 83:
+        note = "Sprint 73 (UI-14, 15, 16, 26). A jump nav and folded, lazily loaded panels on /admin, one primary action per row, an overview that keeps its shape. UI-26 was mis-stated: it was the seed. Expert judgement, not user research."
     a.update(standing=stg, relevance=rel, built=built, note=note, by=by, basis=basis)
     rows.append(a)
 

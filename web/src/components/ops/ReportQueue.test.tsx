@@ -209,4 +209,9 @@ describe("the report queue", () => {
       "/ops/listings/{target_type}/{target_id}/restore",
     );
   });
+
+  it("keeps its filter at the 44 px floor (Sprint 73)", async () => {
+    const { container } = renderUi(<ReportQueue />);
+    expect(container.querySelector("#report-view")!.className).toMatch(/min-h-11/);
+  });
 });

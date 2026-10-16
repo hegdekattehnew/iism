@@ -61,7 +61,7 @@ export function VerificationQueue() {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <Link
                     href={`/admin/${row.slug}`}
-                    className="text-lg font-semibold underline-offset-4 hover:underline"
+                    className="inline-flex min-h-11 items-center text-lg font-semibold underline-offset-4 hover:underline"
                   >
                     {row.name}
                   </Link>

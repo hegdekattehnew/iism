@@ -1988,3 +1988,110 @@ class TestACoursePlaceAndIntake:
         header = text.splitlines()[0].split(",")
         assert {"state", "district", "starts_on", "seats"} <= set(header)
         assert tuple(header) == bulk.COLUMNS["courses"]
+
+
+LONG = "Draws blood from patients in a hospital ward and labels the samples for the lab."
+
+
+class TestDescriptionNotes:
+    """Sprint 73, UI-26: a file says once what it does with descriptions, and never refuses one.
+
+    The review thought bulk upload inherited a generated sentence for a blank description. It does
+    not (nothing in the API generates one); the generic text was the demonstration seed. What an
+    upload *can* do is leave a vacancy with nothing to say about the work, so the check says so.
+    """
+
+    async def _notes(self, client: AsyncClient, org: str, headers: dict, text: str, **kw) -> dict:
+        path = f"/org/{org}/jobs/bulk/check{kw.get('suffix', '')}"
+        return (await _post(client, path, text, headers)).json()
+
+    async def test_blank_and_short_descriptions_are_counted_once_for_the_file(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Thin Hospital")
+        body = await self._notes(
+            client,
+            org,
+            headers,
+            _csv(
+                f",Cook,{LONG},,,,HC/N0001,",
+                ",Cook2,,,,,HC/N0001,",  # blank
+                ",Cook3,Short one,,,,HC/N0001,",  # under 30
+            ),
+        )
+        assert [n for n in body["notes"] if "description" in n] == [
+            "2 of 3 rows have no description or one under 30 characters: the page will list the "
+            "standards and say nothing about the work or the day. A sentence or two helps people "
+            "decide."
+        ]
+
+    async def test_it_changes_no_row_and_blocks_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Still Fine Hospital")
+        body = await self._notes(client, org, headers, _csv(",Cook,,,,,HC/N0001,"))
+        assert [r["status"] for r in body["rows"]] == ["ok"]  # a note, not a warning, not an error
+        assert body["rows"][0]["messages"] == []
+
+    async def test_a_file_of_real_descriptions_says_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Fine Hospital")
+        body = await self._notes(
+            client, org, headers, _csv(f",Cook,{LONG},,,,HC/N0001,", f",Cook2,{LONG},,,,HC/N0001,")
+        )
+        assert [n for n in body["notes"] if "description" in n] == []
+
+    async def test_a_file_without_the_column_is_not_asked_about_it(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "No Column Hospital")
+        body = await self._notes(
+            client, org, headers, _csv("Cook,HC/N0001", header="title,standards")
+        )
+        assert [n for n in body["notes"] if "description" in n] == []
+
+    async def test_a_row_that_will_not_be_saved_is_not_counted(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Error Row Hospital")
+        body = await self._notes(
+            client,
+            org,
+            headers,
+            _csv(f",Cook,{LONG},,,,HC/N0001,", ",Broken,,,,,NO/SUCH,"),  # the second is an error
+        )
+        assert [r["status"] for r in body["rows"]][1] == "error"
+        assert [n for n in body["notes"] if "description" in n] == []
+
+    async def test_an_update_that_would_clear_a_description_says_so(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Clearing Hospital")
+        await _seed(client, headers, org)
+        body = await self._notes(
+            client,
+            org,
+            headers,
+            _csv("R1,Phlebotomist,,Tamil Nadu,Chennai,full_time,HC/N0001:4:M,"),
+            suffix=UPDATE,
+        )
+        assert body["rows"][0]["status"] == "update"
+        assert (
+            "1 row clears a description the listing has now (a blank cell clears)." in body["notes"]
+        )
+
+    async def test_an_update_that_leaves_the_column_out_clears_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Leaves Hospital")
+        await _seed(client, headers, org)
+        body = await self._notes(
+            client,
+            org,
+            headers,
+            "external_ref,title\nR1,Senior phlebotomist\n",
+            suffix=UPDATE,
+        )
+        assert body["rows"][0]["status"] == "update"
+        assert [n for n in body["notes"] if "description" in n] == []

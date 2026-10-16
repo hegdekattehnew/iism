@@ -780,13 +780,16 @@
       "pool": "Pool",
       "ready": "Ready",
       "nearly": "Nearly ready",
-      "newApplications": "New applications"
+      "newApplications": "New applications",
+      "poolLegend": "Amber: new applications waiting. Blue: none waiting."
     },
     "uploadJobs": "Upload a spreadsheet",
     "removed": "Removed",
     "removedOn": "Removed by our team on {date}",
     "removedExplain": "It cannot be published until we restore it. You can still edit it. If you think this is a mistake, contact us.",
-    "closed_taken_down": "Removed"
+    "closed_taken_down": "Removed",
+    "more": "More",
+    "descriptionHint": "Say what the work is and what a day involves, in a sentence or two. The page already lists the standards; this is what they do not say."
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -992,7 +995,8 @@
     "startsOn": "Next intake starts",
     "startsOnHint": "Leave blank if you admit people all the time.",
     "seats": "Seats in the next intake",
-    "seatsHint": "Seats left is worked out from the learners you mark as enrolled."
+    "seatsHint": "Seats left is worked out from the learners you mark as enrolled.",
+    "descriptionHint": "Say who the course is for and what a learner can do afterwards, in a sentence or two. The page already lists the standards it teaches."
   },
   "chooser": {
     "title": "I'm here to…",
@@ -1667,7 +1671,19 @@
     },
     "queueShowing": "Showing {shown} of {total} organisations waiting.",
     "queueMore": "Show more ({left} left)",
-    "queueMoreFailed": "The next page of the queue could not be loaded. Try again."
+    "queueMoreFailed": "The next page of the queue could not be loaded. Try again.",
+    "nav": {
+      "label": "Back office sections",
+      "overview": "Overview",
+      "verification": "Verification",
+      "grievances": "Grievances",
+      "reports": "Reports",
+      "programmes": "Programmes",
+      "districts": "Skill gap",
+      "aliases": "Aliases",
+      "enrolment": "Enrolment"
+    },
+    "verifyAdminOnly": "Only an admin-tier operator can verify or revoke an organisation. Ask an admin to act on this one."
   },
   "reviews": {
     "ratingLabel": "Rating out of 5",

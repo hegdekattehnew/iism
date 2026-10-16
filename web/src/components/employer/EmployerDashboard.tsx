@@ -67,6 +67,9 @@ export function EmployerDashboard({ orgSlug }: { orgSlug: string }) {
       <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
         {t("byVacancy")}
       </h3>
+      {/* The bar's colour is a fact, so it is said once in words (UI-14): amber is "somebody applied
+          and nobody has looked", which is what a recruiter opens this card to find. */}
+      <p className="mt-1 text-xs text-muted">{t("poolLegend")}</p>
       <RankedBarList
         className="mt-3"
         selectedKey={expanded}

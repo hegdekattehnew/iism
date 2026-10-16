@@ -11,7 +11,9 @@ export interface FunnelStage {
 }
 
 /**
- * Applied -> shortlisted -> hired, as proportionally-widthed segments.
+ * Applied -> shortlisted -> hired, as proportionally-widthed segments. **The number leads and the
+ * bar supports it** (Sprint 73, UI-14): three equal bars read as "no information" when a
+ * vacancy's counts really are equal, so the count is the weightier of the two.
  *
  * The first stage is always the total, so each later segment's width
  * (`value / stages[0].value`) is a true "how much survived" -- an identity,
@@ -39,7 +41,7 @@ export function StatusFunnel({
           <>
             <div className="flex items-baseline justify-between gap-2 text-sm">
               <span className="font-medium">{stage.label}</span>
-              <span className="tabular-nums text-muted">{fmt(stage.value)}</span>
+              <span className="text-base font-semibold tabular-nums">{fmt(stage.value)}</span>
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-muted">
               <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />

@@ -20,34 +20,41 @@ export function OperatorDashboard() {
   const t = useTranslations("ops.dashboard");
   const dashboard = useOperatorDashboard();
 
-  if (dashboard.isPending) {
-    return <Skeleton className="h-20 w-full" />;
-  }
-
   if (dashboard.isError) {
     return <p className="text-sm text-danger-text">{t("failed")}</p>;
   }
 
+  // **The same shape while it loads and after.** Sprint 73 put the verification queue straight under
+  // this block (it used to sit two panels below, off screen), so a placeholder of a different height
+  // moved a visible queue by 0.2 to 0.3 of the layout-shift budget. The heading and the tile labels
+  // are static, a tile with no value draws its dash (`StatTile`), and the one variable-length part,
+  // the scarce-skills list, is behind a row of fixed height that is there before and after.
   const data = dashboard.data;
-  const scarce = data.scarce_skills ?? [];
+  const scarce = data?.scarce_skills ?? [];
+  const tile = (value: number | undefined, label: string) => (
+    <StatTile value={value ?? null} label={label} />
+  );
 
   return (
     <div>
       <h2 className="text-lg font-semibold">{t("title")}</h2>
       <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
-        <StatTile value={data.unverified_organisations} label={t("unverifiedOrganisations")} />
-        <StatTile value={data.unverified_certifications} label={t("unverifiedCertifications")} />
-        <StatTile value={data.organisations} label={t("organisations")} />
-        <StatTile value={data.candidates} label={t("candidates")} />
-        <StatTile value={data.published_jobs} label={t("publishedJobs")} />
-        <StatTile value={data.published_courses} label={t("publishedCourses")} />
+        {tile(data?.unverified_organisations, t("unverifiedOrganisations"))}
+        {tile(data?.unverified_certifications, t("unverifiedCertifications"))}
+        {tile(data?.organisations, t("organisations"))}
+        {tile(data?.candidates, t("candidates"))}
+        {tile(data?.published_jobs, t("publishedJobs"))}
+        {tile(data?.published_courses, t("publishedCourses"))}
       </div>
 
-      {scarce.length > 0 && (
-        <>
-          <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
+      {data ? (
+        <details className="group mt-6">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-muted uppercase [&::-webkit-details-marker]:hidden">
             {t("scarceSkills")}
-          </h3>
+            <span aria-hidden className="transition-transform group-open:rotate-90">
+              ›
+            </span>
+          </summary>
           <RankedBarList
             className="mt-3"
             emptyLabel={t("noScarceSkills")}
@@ -59,7 +66,9 @@ export function OperatorDashboard() {
               tone: s.held_by === 0 ? "danger" : "warning",
             }))}
           />
-        </>
+        </details>
+      ) : (
+        <Skeleton className="mt-6 h-11 w-full" />
       )}
     </div>
   );

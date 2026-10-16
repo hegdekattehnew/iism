@@ -82,6 +82,8 @@ test("an operator enrols an agency's file; the people can sign in; nothing is wr
 
   await signInAs(page, admin.tokens);
   await page.goto("/en/admin");
+  // A reference panel: folded until opened (Sprint 73), so its row is clicked first.
+  await page.locator("summary", { hasText: "Enrol an agency's file" }).click();
   await expect(
     page.getByRole("heading", { name: "Enrol an agency's file" }),
   ).toBeVisible();

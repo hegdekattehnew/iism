@@ -705,6 +705,9 @@ class _Plan:
     # in `_plans`: a *new* gig needs a district from the file, an *update* may take the district
     # from the listing it changes (and is checked on the merged payload).
     gig_place_problem: str | None = None
+    # An update whose blank description cell would wipe the one the listing has now (ADR-064 makes a
+    # blank cell in a present column clear). The review says so once, for the whole file.
+    clears_description: bool = False
 
 
 async def _standards_for_row(
@@ -1115,6 +1118,9 @@ async def _merge_updates(db: AsyncSession, kind: Kind, tenant_id: Any, plans: li
             for column, field_ in columns.items()
             if column in cells and not _same(getattr(item, field_), getattr(payload, field_))
         ]
+        plan.clears_description = (
+            "description" in changes and bool(item.description) and not payload.description
+        )
         if district_cleared:
             changes.append("district")
         if carries_standards:
@@ -1277,6 +1283,41 @@ def _once(messages: Sequence[str]) -> list[str]:
     return list(dict.fromkeys(messages))
 
 
+# A description shorter than this says nothing the title does not. Not a rule (a short one is
+# saved): a prompt to say what the work is (Sprint 73, UI-26).
+MIN_DESCRIPTION_CHARS = 30
+
+
+def _description_notes(plans: Sequence[_Plan], reports: Sequence[RowReport]) -> list[str]:
+    """What a whole file says about its descriptions, in one or two sentences (Sprint 73, UI-26).
+
+    **Once for the file, never once per row**: a spreadsheet of two hundred vacancies with the
+    column left blank would otherwise carry two hundred identical warnings and bury the real ones.
+    Only rows that will create or change something are counted, and only when the column is **in the
+    file**: a file without it has not engaged with the question, and on an update an absent column
+    leaves the field alone (ADR-064). Never a refusal: an empty description renders nothing on the
+    public page, which is honest, and what people decide on is the requirements.
+    """
+    live = [
+        plan
+        for plan, report in zip(plans, reports, strict=True)
+        if report.status in ("ok", "warning", "update") and "description" in plan.raw.cells
+    ]
+    thin = sum(1 for p in live if len(p.raw.cells["description"].strip()) < MIN_DESCRIPTION_CHARS)
+    clears = sum(1 for p in live if p.clears_description)
+    notes: list[str] = []
+    if thin:
+        notes.append(
+            f"{thin} of {len(live)} rows have no description or one under {MIN_DESCRIPTION_CHARS} "
+            "characters: the page will list the standards and say nothing about the work or the "
+            "day. A sentence or two helps people decide."
+        )
+    if clears:
+        noun = "row clears" if clears == 1 else "rows clear"
+        notes.append(f"{clears} {noun} a description the listing has now (a blank cell clears).")
+    return notes
+
+
 def _report_row(plan: _Plan) -> RowReport:
     if plan.problems:
         return RowReport(
@@ -1407,7 +1448,7 @@ async def run(
     report_out = BulkReport(
         kind=kind,
         rows=reports,
-        notes=notes,
+        notes=[*notes, *_description_notes(plans, reports)],
         daily_limit=limit,
         remaining_today=max(0, remaining - sum(1 for r in reports if r.created)),
         applied=apply,

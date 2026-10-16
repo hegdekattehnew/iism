@@ -117,3 +117,38 @@ describe("ProviderWorkspace — saying why publishing failed", () => {
     expect(await screen.findByText(/Your session has expired/)).toBeTruthy();
   });
 });
+
+/** Sprint 73, UI-15: a course row has one primary action, Edit beside it, and the rest behind "More". */
+describe("ProviderWorkspace: a row's actions", () => {
+  const row = async () => (await screen.findByText("Phlebotomy")).closest("li")!;
+
+  it("makes the interested learners the primary action of a live course", async () => {
+    serving(null, [course({ status: "published" })]);
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    const li = await row();
+    const more = li.querySelector("details")!;
+    expect(more.hasAttribute("open")).toBe(false);
+    const learners = screen.getByRole("link", { name: /Interested learners/ });
+    expect(more.contains(learners)).toBe(false);
+    expect(learners.getAttribute("href")).toBe("/employer/inst/courses/phlebotomy/interests");
+    expect(more.contains(screen.getByRole("button", { name: "Unpublish" }))).toBe(true);
+    expect(more.contains(screen.getByRole("link", { name: "View the public posting" }))).toBe(true);
+  });
+
+  it("makes Publish the primary action of a draft and moves the learners under More", async () => {
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    const li = await row();
+    const more = li.querySelector("details")!;
+    expect(more.contains(screen.getByRole("button", { name: "Publish" }))).toBe(false);
+    expect(more.contains(screen.getByRole("link", { name: /Interested learners/ }))).toBe(true);
+  });
+
+  it("holds every action to the 44 px floor by using the button sizes", async () => {
+    serving(null, [course({ status: "published" })]);
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    const li = await row();
+    for (const control of li.querySelectorAll("button, a[href]")) {
+      expect(control.className, control.textContent ?? "").toMatch(/min-h-11/);
+    }
+  });
+});

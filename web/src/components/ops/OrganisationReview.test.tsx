@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OrganisationReview } from "@/components/ops/OrganisationReview";
-import { renderUi, resetWorld } from "@/test/harness";
+import { renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
 vi.mock("@/lib/org", async () => (await import("@/test/harness")).orgMock);
@@ -156,5 +156,28 @@ describe("the history", () => {
     detail(null, 404);
     renderUi(<OrganisationReview slug="nope" />);
     expect(await screen.findByText(/No organisation with that address/)).toBeTruthy();
+  });
+});
+
+/** Sprint 73: verifying is the admin tier's alone (OPS_ORG_VERIFY), so the control is not offered to support. */
+describe("who may decide", () => {
+  it("offers the note and both buttons to the admin tier", async () => {
+    world.staffTier = "admin";
+    detail(VERIFIED);
+    renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    expect(await screen.findByRole("button", { name: "Verify this organisation" })).toBeTruthy();
+    expect(screen.getByLabelText("What you verified")).toBeTruthy();
+  });
+
+  it("offers a support-tier operator no button that would answer 403, and says why", async () => {
+    world.staffTier = "support";
+    detail(VERIFIED);
+    renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    expect(await screen.findByText(/Only an admin-tier operator can verify or revoke/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Verify this organisation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Withdraw verification" })).toBeNull();
+    expect(screen.queryByLabelText("What you verified")).toBeNull();
+    // Reading is still theirs: the history and the badge are shown.
+    expect(screen.getAllByText(/NABH accreditation confirmed/).length).toBeTruthy();
   });
 });

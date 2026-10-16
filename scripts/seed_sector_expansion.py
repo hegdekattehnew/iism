@@ -18,6 +18,7 @@ Sectors with no current QualificationPack carrying at least 3 real standards
 """
 
 import asyncio
+import re
 import sys
 import uuid
 
@@ -27,6 +28,7 @@ import uuid
 from seed_marketplace import _now, _owner_for, _translate  # noqa: E402
 from sqlalchemy import delete, select
 
+from api.core import localisation
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.geography import resolve_location
 from api.modules.identity.models import Tenant
@@ -1093,6 +1095,45 @@ TENANTS = [
         "admin1@tourism-hospitality-provider.example",
     ),
 ]
+
+
+# The six sentences every generated description was one of (Sprint 73, UI-26). Each is the title and
+# the sector poured into a template, so it says nothing the page does not already say -- and it led
+# the vacancy and course pages of the demonstration, which the Sprint 68 review read as "boilerplate".
+# (The review thought bulk upload inherited it. It does not: nothing in the API generates a
+# description. It is only these rows.) A row whose description is one of these is seeded with **none**,
+# and an empty description renders nothing, which is honest. A static test holds the patterns against
+# every tuple below, so a seventh template cannot slip in.
+TEMPLATE_DESCRIPTIONS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"^In the .+ sector: .+, working to the standards a real National Occupational Standard for this role sets out\.$",
+        r"^Day-to-day responsibilities of the .+ role, anchored to the qualification pack that defines it in the .+ sector\.$",
+        r"^An entry point into the .+ sector: .+, covering the core tasks this qualification defines\.$",
+        r"^A training programme preparing learners for the .+ qualification in the .+ sector\.$",
+        r"^Covers the standards behind .+, for a learner aiming to enter the .+ sector\.$",
+        r"^A skilling course built directly on the qualification pack for .+, .+ sector\.$",
+    )
+)
+
+
+def is_template_description(text: str | None) -> bool:
+    return bool(text) and any(p.match(text or "") for p in TEMPLATE_DESCRIPTIONS)
+
+
+async def _forget_description_translation(db, entity_type: str, row) -> None:  # type: ignore[no-untyped-def]
+    """Drop a Hindi description a previous run wrote for what is now an empty English one.
+
+    Translations are applied at serialisation, so a stale Hindi sentence would still show on a row
+    whose base description is gone: Hindi readers would see text English readers do not.
+    """
+    await db.execute(
+        delete(localisation.ContentTranslation).where(
+            localisation.ContentTranslation.entity_type == entity_type,
+            localisation.ContentTranslation.entity_id == row.id,
+            localisation.ContentTranslation.field == "description",
+        )
+    )
 
 
 # slug, tenant, title, title_hi, desc_en, desc_hi, state, district,
@@ -7727,8 +7768,13 @@ async def seed() -> dict[str, int]:
                 db.add(job)
                 stats["jobs"] += 1
             job.tenant_id = tenants[tslug].id
-            job.title, job.description = t_en, d_en
-            await _translate(db, "job", job, {"title": t_hi, "description": d_hi})
+            generic = is_template_description(d_en)
+            job.title, job.description = t_en, None if generic else d_en
+            await _translate(
+                db, "job", job, {"title": t_hi, "description": None if generic else d_hi}
+            )
+            if generic:
+                await _forget_description_translation(db, "job", job)
             job.location_state, job.location_district = state, district
             located = await resolve_location(db, state, district)
             job.state_id, job.district_id = located.state_id, located.district_id
@@ -7774,8 +7820,13 @@ async def seed() -> dict[str, int]:
                 db.add(course)
                 stats["courses"] += 1
             course.tenant_id = tenants[tslug].id
-            course.title, course.description = t_en, d_en
-            await _translate(db, "course", course, {"title": t_hi, "description": d_hi})
+            generic = is_template_description(d_en)
+            course.title, course.description = t_en, None if generic else d_en
+            await _translate(
+                db, "course", course, {"title": t_hi, "description": None if generic else d_hi}
+            )
+            if generic:
+                await _forget_description_translation(db, "course", course)
             course.mode, course.language = mode, lang
             course.duration_hours, course.fee_inr = hours, fee
             course.nsqf_level = nsqf
