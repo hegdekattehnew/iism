@@ -35,10 +35,13 @@ Rules for editing it:
   pack has one (Sprint 43, ADR-050; fourteen keys had been pointing at three). A candidate who
   types "waiter" and is offered *Food & Beverage Service Associate (Divyangjan)*
   has been told something untrue about the route open to them.
-* **Leave a term out rather than guess.** Deliberately absent: "waiter" (only
-  disability-track or manager-level packs exist) and "mason" (no general
-  masonry pack). Unmapped terms fall through to fuzzy search and then to the
-  free-text standard search.
+* **Leave a term out rather than guess.** Deliberately absent (Sprint 71): words that name
+  no single role ("helper", "mechanic", "machine operator", "nurse", "loader", "packer") and
+  jobs the national list has no role for ("housemaid", "maid", "accountant", "turner",
+  "lathe operator"). Earlier versions of this note said "waiter" and "mason" had no general
+  pack; both do (*Food and Beverage Service Assistant*, *Brick Mason*), which was found by
+  reading the corpus for the Sprint 71 title set, and both are keys now. Unmapped terms fall
+  through to fuzzy search and then to the free-text standard search.
 * **Partial words count** (`MIN_ALIAS_PREFIX`), because this is a typeahead. So
   "nurse" has no entry of its own -- a registered nurse is a GNM/B.Sc. route,
   not an NSQF pack -- yet still reaches the nursing-assistant certificate as a
@@ -46,9 +49,11 @@ Rules for editing it:
   better than what fuzzy search finds for "nurse" alone: *Plant Nursery
   Assistant*. Check the prefixes of any key you add, not only the key.
 
-This is a starter list, authored in Sprint 23 and **awaiting review by someone
-who knows the labour market** -- it is a claim about how people describe their
-work, and that claim should be checked by a person, not only by a test.
+This is a starter list, authored in Sprint 23 and extended in Sprint 71, and **awaiting
+review by someone who knows the labour market** -- it is a claim about how people
+describe their work, and that claim should be checked by a person, not only by a test.
+`docs/IISM-Role-Aliases-for-Review.xlsx` (built by `scripts/build_role_alias_review.py`) is
+that person's copy, and `make evaluate-roles` measures it against titles written before it.
 """
 
 ROLE_ALIASES: dict[str, str] = {
@@ -89,14 +94,12 @@ ROLE_ALIASES: dict[str, str] = {
     "xray technician": "Certificate in X-Ray Technology",
     "dialysis technician": "Certificate in Dialysis Technology",
     # ----------------------------------------------------------------- retail
-    # No entry for salesman, saleswoman, sales boy, sales girl, shop assistant,
-    # counter salesman or सेल्समैन (Sprint 43, ADR-050). They all pointed at
-    # "Retail Sales Associate", which exists only as a disability-track pack
-    # (PWD/RAS/Q0104) -- the very thing the rule above forbids, and invisible to
-    # the checker until it learned to look at the code. The nearest general role,
-    # "Retail Sales Executive", is a different qualification at NSQF 4, not the
-    # same entry-level work at 3. A labour-market reviewer should decide whether it
-    # stands in; until then these fall through to literal search.
+    # Salesman, saleswoman, sales boy, shop assistant and counter salesman had no entry from
+    # Sprint 43 (ADR-050): they all pointed at "Retail Sales Associate", which exists only as a
+    # disability-track pack (PWD/RAS/Q0104). Sprint 71 found a general pack that fits the same
+    # work, "Retail Sales Assistant", and they are keys again (see the Sprint 71 batch below);
+    # "sales girl" and सेल्समैन are held out of the keys on purpose, to measure whether the
+    # others generalise. A labour-market reviewer should still confirm the target.
     "cashier": "Retail Cashier",
     "billing clerk": "Retail Cashier",
     "billing staff": "Retail Cashier",
@@ -201,6 +204,220 @@ ROLE_ALIASES: dict[str, str] = {
     "ai developer": "AI - Machine learning Developer",
     "ethical hacking": "Certificate in Cyber Security & Ethical Hacking",
     # No entry for "security analyst" either: SSC/Q0901 is titled exactly that.
+    # =====================================================================================
+    # Sprint 71 batch (BL-12.12): coverage. Drafted by engineering from public knowledge of
+    # how entry-level work is named in India, **not reviewed by anyone who works in these
+    # labour markets**. Every row is `source='seed'`, so an admin-tier operator can retire or
+    # change it on /admin, and `docs/IISM-Role-Aliases-for-Review.xlsx` lists them for a
+    # reviewer. It is scored by `make evaluate-roles` against `tests/fixtures/role_titles.json`
+    # (written first; its hold-out titles are deliberately *not* keys here).
+    # Left out on purpose, because there is no honest single target or a wrong one would be
+    # worse than none: helper, mechanic, machine operator, accountant, turner, lathe operator,
+    # housemaid, maid, nurse (a registered nurse is not an NSQF pack), anganwadi worker,
+    # bouncer, loader, packer.
+    # =====================================================================================
+    # ------------------------------------------------------------ healthcare (batch)
+    "hospital helper": "General Duty Assistant",
+    "patient care assistant": "General Duty Assistant",
+    "patient care": "General Duty Assistant",
+    "nursing orderly": "General Duty Assistant",
+    "gda": "General Duty Assistant",
+    "आया": "General Duty Assistant",
+    "वार्ड गर्ल": "General Duty Assistant",
+    "अस्पताल सहायक": "General Duty Assistant",
+    "nanny": "Baby Caregiver (Nanny)",
+    "child care": "Baby Caregiver (Nanny)",
+    "child minder": "Baby Caregiver (Nanny)",
+    "creche attendant": "Baby Caregiver (Nanny)",
+    "baby caretaker": "Baby Caregiver (Nanny)",
+    "nurse assistant": "Certificate in Nursing Assistant",
+    "nursing attendant": "Certificate in Nursing Assistant",
+    "नर्सिंग असिस्टेंट": "Certificate in Nursing Assistant",
+    "pharmacy assistant": "Certificate in Pharmacy Assistance",
+    "medical store assistant": "Certificate in Pharmacy Assistance",
+    "medical shop helper": "Certificate in Pharmacy Assistance",
+    "कंपाउंडर": "Certificate in Pharmacy Assistance",
+    "dialysis assistant": "Certificate in Dialysis Technology",
+    "physiotherapy assistant": "Certificate in Physiotherapy Assistance",
+    "physio assistant": "Certificate in Physiotherapy Assistance",
+    "physiotherapy helper": "Certificate in Physiotherapy Assistance",
+    "dentist assistant": "Certificate in Dental Assisting",
+    "dental helper": "Certificate in Dental Assisting",
+    "emergency medical technician": "Emergency Medical Technician-Basic",
+    "asha worker": "Certificate in Community Health (CCH)",
+    "community health worker": "Certificate in Community Health (CCH)",
+    "आशा कार्यकर्ता": "Certificate in Community Health (CCH)",
+    "elder care": "Geriatric Caregiver (Institutional & Home Care)",
+    "senior citizen care": "Geriatric Caregiver (Institutional & Home Care)",
+    # ------------------------------------------------------------ security (batch)
+    "सिक्योरिटी गार्ड": "Security Guard",
+    "सुरक्षा गार्ड": "Security Guard",
+    "सुरक्षाकर्मी": "Security Guard",
+    "darban": "Security Guard",
+    "gate keeper": "Security Guard",
+    "gatekeeper": "Security Guard",
+    "night watchman": "Security Guard",
+    "night guard": "Security Guard",
+    "gunman": "Armed Security Guard",
+    "cctv installer": "CCTV Installation Technician",
+    "cctv technician": "CCTV Installation Technician",
+    "cctv camera installer": "CCTV Installation Technician",
+    # ------------------------------------------------- driving and machines (batch)
+    "private driver": "Light Motor Vehicle Driver",
+    "personal driver": "Light Motor Vehicle Driver",
+    "कार ड्राइवर": "Light Motor Vehicle Driver",
+    "cab driver": "Taxi Driver",
+    "ट्रक ड्राइवर": "Commercial Vehicle Driver",
+    "heavy vehicle driver": "Commercial Vehicle Driver",
+    "hmv driver": "Commercial Vehicle Driver",
+    "tanker driver": "Tank Lorry Driver-Petroleum Products",
+    "e rickshaw": "E-Rickshaw Driver",
+    "e-rickshaw": "E-Rickshaw Driver",
+    "battery rickshaw": "E-Rickshaw Driver",
+    "auto driver": "Auto Rickshaw Driver",
+    "jcb operator": "Backhoe Loader Operator",
+    "jcb driver": "Backhoe Loader Operator",
+    "backhoe operator": "Backhoe Loader Operator",
+    "excavator driver": "Excavator Operator",
+    "forklift operator": "Forklift Operator/Driver",
+    # ------------------------------------------------------------------ trades (batch)
+    "wireman": "Assistant House Wireman and Motor Winder",
+    "house wireman": "Assistant House Wireman and Motor Winder",
+    "bijli mistri": "Bijli Mistry",
+    "bijli mistry": "Bijli Mistry",
+    "इलेक्ट्रीशियन": "Assistant Electrician",
+    "woodworker": "Carpenter",
+    "wood worker": "Carpenter",
+    "mason": "Brick Mason",
+    "rajmistri": "Brick Mason",
+    "raj mistri": "Brick Mason",
+    "राजमिस्त्री": "Brick Mason",
+    "bricklayer": "Brick Mason",
+    "brick layer": "Brick Mason",
+    "plasterer": "Plaster Mason - Basic",
+    "mason helper": "Assistant Mason",
+    "painter": "Construction Painter & Decorator",
+    "wall painter": "Construction Painter & Decorator",
+    "paint mistri": "Construction Painter & Decorator",
+    "पेंटर": "Construction Painter & Decorator",
+    "वेल्डर": "Welder (Manual Metal Arc Welding and Gas Cutting)",
+    "tig welder": "Welder - (GTAW)",
+    # ------------------------------------------------------ repair and install (batch)
+    "refrigerator mechanic": "Certificate in Refrigeration & Air Conditioning Systems",
+    "refrigerator repair": "Certificate in Refrigeration & Air Conditioning Systems",
+    "ac fitter": "Field Technician - Air Conditioner",
+    "ac installer": "Field Technician - Air Conditioner",
+    "air conditioner technician": "Field Technician - Air Conditioner",
+    "washing machine mechanic": "Service Technician - Home Appliances",
+    "washing machine repair": "Service Technician - Home Appliances",
+    "home appliance repair": "Service Technician - Home Appliances",
+    "home appliances technician": "Service Technician - Home Appliances",
+    "phone repair": "Mobile Phone Hardware Repair Technician",
+    "mobile phone repair": "Mobile Phone Hardware Repair Technician",
+    "car mechanic": "Four Wheeler Service Technician",
+    "auto mechanic": "Four Wheeler Service Technician",
+    "motor mechanic": "Four Wheeler Service Technician",
+    "garage mechanic": "Four Wheeler Service Technician",
+    "bike mechanic": "Two Wheeler Service Technician",
+    "scooter mechanic": "Two Wheeler Service Technician",
+    "motorcycle mechanic": "Two Wheeler Service Technician",
+    "bike repair": "Two Wheeler Service Technician",
+    "solar installer": "Rooftop Solar PV (Installation & Maintenance)",
+    "solar technician": "Rooftop Solar PV (Installation & Maintenance)",
+    "solar panel installer": "Rooftop Solar PV (Installation & Maintenance)",
+    "suryamitra": "Solar PV Installer (Suryamitra)",
+    "computer repair": "Certificate in Computer Hardware & Networking",
+    "laptop repair": "Certificate in Computer Hardware & Networking",
+    "puncture repair": "Tyre Fitter-Servicing and Maintenance",
+    "laptop technician": "Certificate in Computer Hardware & Networking",
+    "pc technician": "Certificate in Computer Hardware & Networking",
+    "computer mechanic": "Certificate in Computer Hardware & Networking",
+    "lan technician": "Broadband Network Technician",
+    "internet technician": "Broadband Network Technician",
+    "set top box installer": "DTH Set Top Box Installation & Service Technician",
+    # ---------------------------------------------------- retail and logistics (batch)
+    "salesman": "Retail Sales Assistant",
+    "saleswoman": "Retail Sales Assistant",
+    "sales boy": "Retail Sales Assistant",
+    "shop assistant": "Retail Sales Assistant",
+    "shop helper": "Retail Sales Assistant",
+    "shop boy": "Retail Sales Assistant",
+    "counter salesman": "Retail Sales Assistant",
+    "counter sales": "Retail Sales Assistant",
+    "retail assistant": "Retail Sales Assistant",
+    "शॉप असिस्टेंट": "Retail Sales Assistant",
+    "store keeper": "Warehouse Associate",
+    "storekeeper": "Warehouse Associate",
+    "store boy": "Warehouse Associate",
+    "stock keeper": "Warehouse Associate",
+    "warehouse worker": "Warehouse Associate",
+    "warehouse staff": "Warehouse Associate",
+    "warehouse boy": "Warehouse Associate",
+    "godown keeper": "Warehouse Associate",
+    "delivery person": "E-commerce Delivery Associate",
+    "delivery partner": "E-commerce Delivery Associate",
+    "delivery agent": "E-commerce Delivery Associate",
+    "courier": "Courier Associate - Operations",
+    "parcel delivery": "Courier Associate - Operations",
+    # ------------------------------------------------------ hospitality, office (batch)
+    "कुक": "Cook (Multi-Cuisine)",
+    "cook helper": "Kitchen Helper",
+    "kitchen assistant": "Kitchen Steward",
+    "dishwasher": "Kitchen Steward",
+    "dish washer": "Kitchen Steward",
+    "utensil washer": "Kitchen Steward",
+    "waiter": "Food and Beverage Service Assistant",
+    "waitress": "Food and Beverage Service Assistant",
+    "restaurant waiter": "Food and Beverage Service Assistant",
+    "वेटर": "Food and Beverage Service Assistant",
+    "housekeeping boy": "Housekeeping Assistant",
+    "house keeping": "Housekeeping Assistant",
+    "safai karmachari": "Housekeeping Assistant",
+    "सफाई कर्मचारी": "Housekeeping Assistant",
+    "room attendant": "Housekeeping Assistant",
+    "hotel housekeeping": "Housekeeping Assistant",
+    "front office": "Front Office Assistant",
+    "front desk": "Front Office Assistant",
+    "hotel receptionist": "Front Office Assistant",
+    "रिसेप्शनिस्ट": "Front Office Assistant",
+    "डेटा एंट्री": "Certificate in Data Entry Operations - Domestic",
+    "tally": "Certificate in Tally Prime",
+    "tally operator": "Certificate in Tally Prime",
+    "tally clerk": "Accounts Assistant",
+    "accounts clerk": "Accounts Assistant",
+    "call centre agent": "Call Center Executive",
+    "call center agent": "Call Center Executive",
+    "call centre executive": "Call Center Executive",
+    "customer care": "Customer Care Executive-Domestic- Non- Voice",
+    "customer service executive": "Customer Care Executive-Domestic- Non- Voice",
+    "customer support": "Customer Care Executive-Domestic- Non- Voice",
+    "कस्टमर केयर": "Customer Care Executive-Domestic- Non- Voice",
+    # ------------------------------------------------- textiles, beauty, crafts (batch)
+    "tailor master": "Self Employed Tailor",
+    "ladies tailor": "Self Employed Tailor",
+    "सिलाई": "Sewing Machine Operator",
+    "garment stitcher": "Sewing Machine Operator",
+    "stitcher": "Sewing Machine Operator",
+    "ब्यूटीशियन": "Beautician",
+    "parlour girl": "Beautician",
+    "नाई": "Assistant Barber-Salon Services",
+    "hair cutter": "Assistant Barber-Salon Services",
+    "makeup artist": "Make-Up Artist",
+    "make up artist": "Make-Up Artist",
+    "bridal makeup": "Bridal, Fashion and Portfolio Makeup Artist",
+    "manicurist": "Nail Technician",
+    "pedicurist": "Nail Technician",
+    # ---------------------------------------------- agriculture, education, other (batch)
+    "माली": "Assistant Gardener",
+    "poultry worker": "Poultry Farm Worker",
+    "poultry farm helper": "Poultry Farm Worker",
+    "fish farm worker": "Aquaculture Worker",
+    "pre school teacher": "Certificate in Early Childhood Care and Education",
+    "preschool teacher": "Certificate in Early Childhood Care and Education",
+    "nursery teacher": "Certificate in Early Childhood Care and Education",
+    "play school teacher": "Certificate in Early Childhood Care and Education",
+    "kindergarten teacher": "Certificate in Early Childhood Care and Education",
+    "yoga teacher": "Certificate in Yoga Teacher Training",
 }
 
 # How short a partial alias may be and still count. "wa" should not claim

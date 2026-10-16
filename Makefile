@@ -125,6 +125,10 @@ e2e: seed-e2e ## Run the browser journeys against a production build (needs Chro
 drop-e2e: ## Drop the browser-test database
 	@docker exec $(PG) psql -U iism -d postgres -c "DROP DATABASE IF EXISTS $(E2E_DB)"
 
+.PHONY: evaluate-roles
+evaluate-roles: ## Score role search against the titles people type (needs the real corpus)
+	$(NO_TIMEOUT) $(PY) scripts/evaluate_role_search.py
+
 .PHONY: check-role-aliases
 check-role-aliases: ## Verify every role_aliases.py target names a real, current qualification
 	$(NO_TIMEOUT) $(PY) scripts/check_role_aliases.py
