@@ -123,7 +123,19 @@ class TestSharedVectors:
             assert {"name", "input", "expect"} <= set(c)
             assert set(c["expect"]) == {"main", "also"}
 
-    def test_both_clients_read_both_files(self) -> None:
+    def test_the_posted_cases_exist_and_cover_every_answer_and_boundary(self) -> None:
+        data = json.loads((FIXTURES / "posted_cases.json").read_text())
+        cases = data["cases"]
+        assert data["now"] and len(cases) >= 12
+        kinds = {c["expect"]["kind"] if c["expect"] else None for c in cases}
+        assert kinds == {None, "today", "yesterday", "days", "month"}
+        # The two edges that an off-by-one would cross: 1 -> 2 days and 29 -> 30 days.
+        days = {c["expect"]["days"] for c in cases if c["expect"] and c["expect"]["kind"] == "days"}
+        assert {2, 29} <= days
+        names = {c["name"] for c in cases}
+        assert {"exactly a day", "exactly thirty days"} <= names
+
+    def test_both_clients_read_all_the_files(self) -> None:
         """If a client stopped reading the shared file it would pass on cases of its own."""
         readers = {
             "pay_cases.json": [
@@ -133,6 +145,10 @@ class TestSharedVectors:
             "requirements_cases.json": [
                 "web/src/lib/requirements.test.ts",
                 "mobile/src/test/requirements.test.ts",
+            ],
+            "posted_cases.json": [
+                "web/src/lib/posted.test.ts",
+                "mobile/src/test/posted.test.ts",
             ],
         }
         for fixture, tests in readers.items():

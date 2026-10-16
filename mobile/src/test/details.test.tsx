@@ -105,6 +105,13 @@ describe("a vacancy", () => {
     expect(await screen.findByText("Closes in 3 days")).toBeTruthy();
   });
 
+  it("says how long ago the vacancy was posted, and nothing when it has no date", async () => {
+    world.params = { slug: "ward-assistant-1" };
+    api.GET.mockResolvedValue(ok(job(1, { published_at: new Date(Date.now() - 5 * 86_400_000 - 1000).toISOString() })));
+    await renderScreen(<JobDetail />);
+    expect(await screen.findByText("Posted 5 days ago")).toBeTruthy();
+  });
+
   it("keeps Apply in a bar under the content, not inside the scrolling part (UI-08)", async () => {
     world.params = { slug: "ward-assistant-1" };
     world.signedIn = false;

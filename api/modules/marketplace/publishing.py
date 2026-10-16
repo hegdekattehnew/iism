@@ -48,7 +48,7 @@ from api.modules.marketplace.models import (
     JobSkill,
 )
 from api.modules.marketplace.schemas import JobIn, JobSkillIn
-from api.modules.marketplace.takedown import refuse_while_taken_down
+from api.modules.marketplace.takedown import refuse_while_taken_down, stamp_publication
 
 log = structlog.get_logger("iism.marketplace")
 
@@ -256,6 +256,7 @@ async def set_published(db: AsyncSession, tenant_id: uuid.UUID, slug: str, publi
                 "Add at least one required standard before publishing",
             )
 
+    stamp_publication(job, published)  # before `status` changes: it reads the old one
     job.status = "published" if published else "draft"
     await db.commit()
     log.info(

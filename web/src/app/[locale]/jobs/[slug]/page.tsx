@@ -6,7 +6,13 @@ import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-import { daysToClose, experienceText, payText, type Translate } from "@/lib/job-text";
+import {
+  daysToClose,
+  experienceText,
+  payText,
+  postedText,
+  type Translate,
+} from "@/lib/job-text";
 import { payLine, yearlyLine } from "@/lib/pay";
 import { presentRequirements } from "@/lib/requirements";
 
@@ -67,6 +73,7 @@ export default async function JobDetailPage({
       ? payText(yearlyLine(data.salary_min_inr, data.salary_max_inr), say, locale)
       : null;
   const days = daysToClose(data.closes_at);
+  const posted = postedText(data.published_at, say);
 
   return (
     // A column so the apply bar can come second in the document and last on a phone (`order-last`
@@ -98,6 +105,7 @@ export default async function JobDetailPage({
         {data.location_district ? ` · ${data.location_district}` : ""}
         {data.location_state ? `, ${data.location_state}` : ""}
       </p>
+      {posted !== null && <p className="mt-1 text-sm text-muted">{posted}</p>}
       {rated && (
         <p className="mt-1 text-sm text-muted">
           {tr("ofPoster")}:{" "}

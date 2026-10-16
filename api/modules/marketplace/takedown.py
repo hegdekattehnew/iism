@@ -5,7 +5,9 @@ is an invariant of the listing, and `moderation/` only decides *that* one should
 the writes here means every writer of "published" can be listed in one place (the convention
 Sprint 53 wrote down): `publishing.set_published`, `course_publishing.set_published` (and so
 `bulk.publish_many`, which goes through them) and `publishing.reopen_job`, each of which calls
-`refuse_while_taken_down`.
+`refuse_while_taken_down`. A vacancy's posted date (Sprint 74, ADR-084) is kept by
+`stamp_publication`, called wherever a job's `status` changes: `publishing.set_published` and the
+takedown below. `reopen_job` does not call it, because reopening is not a repost.
 
 **Not a status.** A takedown sets `status="draft"` and stamps `taken_down_at`/`takedown_reason`.
 `status == "published"` is compared in about thirty-four places (browse, matching, counts, alerts),
@@ -41,6 +43,19 @@ def refuse_while_taken_down(listing: Job | Course) -> None:
     )
 
 
+def stamp_publication(job: Job, published: bool) -> None:
+    """Keep `Job.published_at` true to `status` (Sprint 74, ADR-084). Call it where `status` is set.
+
+    Going live from not-live stamps now; going not-live clears it; publishing a vacancy that is
+    already live leaves its date alone (saving twice is not a repost). Reopening a closed vacancy
+    never comes here: it was published all along.
+    """
+    if published and job.status != "published":
+        job.published_at = datetime.now(UTC)
+    elif not published:
+        job.published_at = None
+
+
 async def _locked(db: AsyncSession, target_type: TargetType, target_id: uuid.UUID) -> Job | Course:
     model: type[Job] | type[Course] = Job if target_type == "job" else Course
     # The row lock: two operators acting on one listing must queue, and the second finds it
@@ -69,6 +84,8 @@ async def take_down(
         raise HTTPException(status.HTTP_409_CONFLICT, "This listing is already taken down")
 
     now = datetime.now(UTC)
+    if isinstance(listing, Job):
+        stamp_publication(listing, False)
     listing.status = "draft"
     listing.taken_down_at = now
     listing.takedown_reason = reason

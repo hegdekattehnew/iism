@@ -12,11 +12,12 @@ vi.mock(
 );
 
 const GET = vi.fn();
+const PUT = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: {
     GET: (...a: unknown[]) => GET(...a),
     POST: vi.fn(),
-    PUT: vi.fn(),
+    PUT: (...a: unknown[]) => PUT(...a),
     DELETE: vi.fn(),
   },
 }));
@@ -79,6 +80,7 @@ const STEP = {
 const LADDER = {
   anchor: ANCHOR,
   anchor_source: "chosen",
+  anchor_confirmed: false,
   needs_choice: false,
   has_skills: true,
   steps: [STEP],
@@ -89,6 +91,7 @@ const ok = (data: unknown) => ({ data, error: undefined, response: { status: 200
 beforeEach(() => {
   resetWorld();
   GET.mockReset();
+  PUT.mockReset();
 });
 
 describe("CareerLadder", () => {
@@ -231,5 +234,71 @@ describe("CareerLadder", () => {
     });
     renderUi(<CareerLadder />);
     expect(await screen.findByText("Role not found")).toBeTruthy();
+  });
+});
+
+describe("the role you say you do now (BL-6.5)", () => {
+  it("offers to save a role that is not saved yet, and saves exactly that role when pressed", async () => {
+    GET.mockResolvedValue(ok(LADDER));
+    PUT.mockResolvedValue(ok({ current_role_slug: "ward-assistant" }));
+    renderUi(<CareerLadder />);
+
+    // Looking at the page, however long, saves nothing.
+    await screen.findByText("Senior Ward Assistant");
+    expect(PUT).not.toHaveBeenCalled();
+    expect(screen.queryByText("Saved as the role you do now.")).toBeNull();
+    expect(screen.getByText(/Employers never see it/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "This is my role" }));
+    await waitFor(() => expect(PUT).toHaveBeenCalledTimes(1));
+    expect(PUT).toHaveBeenCalledWith("/me/profile", {
+      body: { current_role_slug: "ward-assistant" },
+    });
+  });
+
+  it("shows a saved role as saved, with no button to save it again, and forgets it on request", async () => {
+    GET.mockResolvedValue(ok({ ...LADDER, anchor_confirmed: true }));
+    PUT.mockResolvedValue(ok({ current_role_slug: null }));
+    renderUi(<CareerLadder />);
+
+    expect(await screen.findByText("Saved as the role you do now.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "This is my role" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Forget it" }));
+    await waitFor(() =>
+      expect(PUT).toHaveBeenCalledWith("/me/profile", { body: { current_role_slug: null } }),
+    );
+  });
+
+  it("a guess is offered the same way and is still labelled a guess", async () => {
+    GET.mockResolvedValue(ok({ ...LADDER, anchor_source: "guessed" }));
+    renderUi(<CareerLadder />);
+
+    expect(await screen.findByText(/We picked this from your profile/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "This is my role" })).toBeTruthy();
+    expect(PUT).not.toHaveBeenCalled();
+  });
+
+  it("says what the server said when saving is refused, and the generic line only when it said nothing", async () => {
+    GET.mockResolvedValue(ok(LADDER));
+    PUT.mockResolvedValue({
+      data: undefined,
+      error: { detail: "We could not find that role. Search for it again and pick one from the list." },
+      response: { status: 422 },
+    });
+    renderUi(<CareerLadder />);
+    fireEvent.click(await screen.findByRole("button", { name: "This is my role" }));
+
+    expect(await screen.findByText(/We could not find that role/)).toBeTruthy();
+    expect(screen.queryByText("Could not save your role. Try again.")).toBeNull();
+  });
+
+  it("falls back to the generic line when the failure carried nothing", async () => {
+    GET.mockResolvedValue(ok(LADDER));
+    PUT.mockResolvedValue({ data: undefined, error: undefined, response: { status: 500 } });
+    renderUi(<CareerLadder />);
+    fireEvent.click(await screen.findByRole("button", { name: "This is my role" }));
+
+    expect(await screen.findByText("Could not save your role. Try again.")).toBeTruthy();
   });
 });

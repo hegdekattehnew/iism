@@ -234,6 +234,8 @@ export function useUpdateProfile() {
       qc.setQueryData(meKeys.profile, profile);
       void qc.invalidateQueries({ queryKey: meKeys.matches });
       void qc.invalidateQueries({ queryKey: [ME_KEY, "match"] });
+      // The role a person says they do now starts the career page (BL-6.5).
+      void qc.invalidateQueries({ queryKey: [ME_KEY, "careers"] });
     },
   });
 }

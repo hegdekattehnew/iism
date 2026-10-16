@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
@@ -37,6 +37,7 @@ export function CareerLadder() {
   const t = useTranslations("careerPaths");
   const [role, setRole] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
+  const queryClient = useQueryClient();
 
   const budget = useCourseBudget();
   const ladder = useQuery({
@@ -51,6 +52,23 @@ export function CareerLadder() {
       return data;
     },
     retry: false,
+  });
+
+  // Saving the role is the person's own act (BL-6.5): the guess is never saved for them. A null
+  // forgets it. The ladder is re-read, and the profile, which now holds the slug.
+  const saveRole = useMutation({
+    mutationFn: async (slug: string | null) => {
+      const { data, error, response } = await api.PUT("/me/profile", {
+        body: { current_role_slug: slug },
+      });
+      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      return data;
+    },
+    onSuccess: (_data, slug) => {
+      if (slug !== null) setRole(null); // the saved role is the anchor now; the pick has done its job
+      void queryClient.invalidateQueries({ queryKey: ["me", "careers"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
 
   if (ladder.isPending) return <Skeleton className="h-48 w-full rounded-xl" />;
@@ -78,15 +96,45 @@ export function CareerLadder() {
           {data.anchor_source === "guessed" && (
             <p className="mt-2 text-xs text-muted">{t("guessed")}</p>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2"
-            aria-expanded={changing}
-            onClick={() => setChanging((v) => !v)}
-          >
-            {changing ? t("keepRole") : t("changeRole")}
-          </Button>
+          {data.anchor_confirmed && <p className="mt-2 text-xs text-muted">{t("confirmedRole")}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-x-2">
+            {!data.anchor_confirmed && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={saveRole.isPending}
+                onClick={() => saveRole.mutate(data.anchor?.slug ?? null)}
+              >
+                {t("confirmRole")}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={changing}
+              onClick={() => setChanging((v) => !v)}
+            >
+              {changing ? t("keepRole") : t("changeRole")}
+            </Button>
+            {data.anchor_confirmed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={saveRole.isPending}
+                onClick={() => saveRole.mutate(null)}
+              >
+                {t("clearRole")}
+              </Button>
+            )}
+          </div>
+          {!data.anchor_confirmed && !saveRole.isError && (
+            <p className="mt-1 text-xs text-muted">{t("confirmHint")}</p>
+          )}
+          {saveRole.isError && (
+            <p role="alert" className="mt-2 text-sm text-danger-text">
+              {detailOf(saveRole.error) ?? t("saveFailed")}
+            </p>
+          )}
         </div>
       )}
 

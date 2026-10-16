@@ -7,6 +7,7 @@ import {
   daysToClose,
   experienceText,
   payText,
+  postedText,
   type JobCardData,
   type Translate,
 } from "@/lib/job-text";
@@ -31,6 +32,7 @@ export function JobCard({ job, now }: { job: JobCardData; now?: number }) {
   const locale = useLocale();
   const pay = payText(payLine(job.salary_min_inr, job.salary_max_inr, job.employment_type), t, locale);
   const days = daysToClose(job.closes_at, now);
+  const posted = postedText(job.published_at, t, now);
   const place = [job.location_district, job.location_state].filter(Boolean).join(", ");
 
   return (
@@ -54,6 +56,7 @@ export function JobCard({ job, now }: { job: JobCardData; now?: number }) {
       <p className="mt-3 text-base font-semibold">{pay}</p>
       <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <span>{experienceText(job, t)}</span>
+        {posted !== null && <span>{posted}</span>}
         {job.employment_type !== "full_time" && (
           <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-brand">
             {tj(`employmentType.${job.employment_type as "part_time"}`)}

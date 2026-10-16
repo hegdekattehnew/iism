@@ -217,6 +217,12 @@ class Job(_EmbeddingColumns, Base):
 
     status: Mapped[str] = mapped_column(default="published")
 
+    # When it last went live (Sprint 74, ADR-084). Stamped by `takedown.stamp_publication`, which
+    # every writer of "published" calls, cleared when it stops being published, and **NULL for a
+    # vacancy published before this column existed**: `created_at` is the draft's date and an
+    # invented date is worse than none.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
     # The employer's own reference, written only by a bulk upload (`marketplace.bulk`). Optional,
     # and unique within one organisation; never shown to a visitor.
     external_ref: Mapped[str | None] = mapped_column(default=None)
@@ -582,6 +588,11 @@ class CandidateProfile(_EmbeddingColumns, Base):
     expected_salary_min_inr: Mapped[int | None] = mapped_column(default=None)
     expected_salary_max_inr: Mapped[int | None] = mapped_column(default=None)
     notice_period: Mapped[str | None] = mapped_column(default=None)
+    # The qualification the person confirmed as the work they do now (Sprint 74, BL-6.5, ADR-084).
+    # A slug and not a foreign key: the NSQF importer rewrites the taxonomy, and a role that goes
+    # away should fall back to the guess instead of breaking a profile. Written only by the
+    # person's own act, never from a guess; matching and every employer-facing payload ignore it.
+    current_role_slug: Mapped[str | None] = mapped_column(Text, default=None)
 
     # Set when the guided first-run wizard is finished, so returning users get
     # the sectioned editor instead.

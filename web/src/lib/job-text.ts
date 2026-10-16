@@ -20,6 +20,7 @@ export type JobCardData = {
   salary_min_inr?: number | null;
   salary_max_inr?: number | null;
   closes_at?: string | null;
+  published_at?: string | null;
   tenant: { name: string; is_verified?: boolean };
 };
 
@@ -54,6 +55,49 @@ export function daysToClose(closesAt: string | null | undefined, now = Date.now(
   if (Number.isNaN(ms) || ms <= 0) return null;
   const days = Math.ceil(ms / 86_400_000);
   return days <= 30 ? days : null;
+}
+
+/** How long a vacancy has been live (Sprint 74), as a fact the clients phrase in their own language. */
+export type Posted =
+  | { kind: "today" }
+  | { kind: "yesterday" }
+  | { kind: "days"; days: number }
+  | { kind: "month" };
+
+/**
+ * Whole elapsed days since `published_at`, never a calendar guess: under a day (or a stamp in the
+ * future, which is clock skew) is today, 1 is yesterday, 2 to 29 is a number, 30 or more is "over a
+ * month" and never a precise old figure. `null` when there is no date or it cannot be read: a vacancy
+ * published before the column existed says nothing rather than something made up. The same rule runs
+ * on the phone (`mobile/src/core/labels.ts`) over `tests/fixtures/posted_cases.json`.
+ */
+export function postedAgo(postedAt: string | null | undefined, now = Date.now()): Posted | null {
+  if (!postedAt) return null;
+  const ms = now - new Date(postedAt).getTime();
+  if (Number.isNaN(ms)) return null;
+  const days = Math.floor(ms / 86_400_000);
+  if (days < 1) return { kind: "today" };
+  if (days === 1) return { kind: "yesterday" };
+  return days < 30 ? { kind: "days", days } : { kind: "month" };
+}
+
+export function postedText(
+  postedAt: string | null | undefined,
+  t: Translate,
+  now = Date.now(),
+): string | null {
+  const posted = postedAgo(postedAt, now);
+  if (posted === null) return null;
+  switch (posted.kind) {
+    case "today":
+      return t("postedToday");
+    case "yesterday":
+      return t("postedYesterday");
+    case "days":
+      return t("postedDays", { days: posted.days });
+    case "month":
+      return t("postedOverMonth");
+  }
 }
 
 export function experienceText(

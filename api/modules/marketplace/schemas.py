@@ -70,6 +70,9 @@ class JobOut(BaseModel):
     positions: int = 1
     closes_at: datetime | None = None
     closed_at: datetime | None = None
+    # When it last went live (Sprint 74, ADR-084). Null for a vacancy published before the column
+    # existed, and a client renders nothing for null: `created_at` would be the draft's date.
+    published_at: datetime | None = None
     # Permissive `str`, not a Literal: this is an output model, and a closed
     # reason the schema has not heard of should render oddly rather than 500
     # the whole listing. The CHECK on the column is what keeps it closed.
@@ -467,6 +470,9 @@ class CandidateProfileFull(BaseModel):
     # message they did not ask for in the moment -- so it is on the profile
     # where they can find it, not buried in an account screen.
     job_alerts_enabled: bool = True
+    # The role the person confirmed as the work they do now (Sprint 74, BL-6.5). Theirs to set and
+    # to clear; read by the career page only, never by matching or an employer.
+    current_role_slug: str | None = None
     onboarding_completed_at: datetime | None = None
 
     skills: list[CandidateSkillOut] = Field(default_factory=list)
@@ -524,6 +530,8 @@ class CandidateProfileUpdateFull(BaseModel):
     expected_salary_max_inr: int | None = Field(default=None, ge=0)
     notice_period: NoticePeriod | None = None
     job_alerts_enabled: bool | None = None
+    # An explicit null clears it. Checked against the taxonomy on write (`update_profile`).
+    current_role_slug: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def _check_salary_range(self) -> "CandidateProfileUpdateFull":

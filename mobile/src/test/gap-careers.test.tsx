@@ -150,6 +150,7 @@ const step = (n: number, extra: Record<string, unknown> = {}) => ({
 const ladder = (extra: Record<string, unknown> = {}) => ({
   anchor: roleRef("general-duty-assistant", "General Duty Assistant"),
   anchor_source: "chosen",
+  anchor_confirmed: false,
   needs_choice: false,
   has_skills: true,
   steps: [step(1), step(2)],
@@ -229,5 +230,44 @@ describe("career paths", () => {
     serve(api.GET, { "/auth/me": ok(account()), "/me/careers": failed(401) });
     await renderScreen(<Careers />);
     expect(await screen.findByText(/Your session has expired/)).toBeTruthy();
+  });
+});
+
+describe("the role you say you do now", () => {
+  it("saves nothing by looking, and saves exactly the shown role when the button is pressed", async () => {
+    serve(api.GET, { "/auth/me": ok(account()), "/me/careers": ok(ladder({ anchor_source: "guessed" })) });
+    serve(api.PUT, { "/me/profile": ok({ current_role_slug: "general-duty-assistant" }) });
+    await renderScreen(<Careers />);
+    await screen.findByText("General Duty Assistant");
+    expect(api.PUT).not.toHaveBeenCalled();
+    expect(screen.getByText(/Employers never see it/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("button", { name: "This is my role" }));
+    await settle();
+    expect(api.PUT).toHaveBeenCalledTimes(1);
+    expect(api.PUT.mock.calls[0][0]).toBe("/me/profile");
+    expect((api.PUT.mock.calls[0][1] as { body: unknown }).body).toEqual({
+      current_role_slug: "general-duty-assistant",
+    });
+  });
+
+  it("shows a saved role as saved, and forgets it when asked", async () => {
+    serve(api.GET, { "/auth/me": ok(account()), "/me/careers": ok(ladder({ anchor_confirmed: true })) });
+    serve(api.PUT, { "/me/profile": ok({ current_role_slug: null }) });
+    await renderScreen(<Careers />);
+    expect(await screen.findByText("Saved as the role you do now.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "This is my role" })).toBeNull();
+
+    await fireEvent.press(screen.getByRole("button", { name: "Forget it" }));
+    await settle();
+    expect((api.PUT.mock.calls[0][1] as { body: unknown }).body).toEqual({ current_role_slug: null });
+  });
+
+  it("says what the server said when it refuses the role", async () => {
+    serve(api.GET, { "/auth/me": ok(account()), "/me/careers": ok(ladder()) });
+    serve(api.PUT, { "/me/profile": failed(422, "We could not find that role. Search for it again.") });
+    await renderScreen(<Careers />);
+    await fireEvent.press(await screen.findByRole("button", { name: "This is my role" }));
+    expect(await screen.findByText("We could not find that role. Search for it again.")).toBeTruthy();
   });
 });
