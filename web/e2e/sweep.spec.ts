@@ -193,6 +193,37 @@ test.describe("signed out", () => {
     });
   }
 
+  test("a vacancy keeps its Apply bar under the thumb on a phone, and beside the content on a desktop (UI-08)", async ({ page }) => {
+    // A short phone, so the page is certainly longer than the screen: on a tall one a short page
+    // fits whole and any position would pass.
+    await page.setViewportSize({ width: 375, height: 480 });
+    await visit(page, `/en/jobs/${world.jobSlug}`);
+    const bar = page.getByTestId("apply-bar");
+    await expect(bar).toBeVisible();
+    const longer = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 40);
+    expect(longer, "the page must overflow the screen or this proves nothing").toBe(true);
+
+    const bottom = async () => {
+      const box = await bar.boundingBox();
+      return box ? box.y + box.height : Number.NaN;
+    };
+    // At the top of the page the bar is already on screen, though its place in the page is the end:
+    // it is stuck to the bottom edge of the screen.
+    expect(Math.abs((await bottom()) - 480)).toBeLessThanOrEqual(1);
+    // And it follows the person through the content. It rests where the content ends (above the
+    // footer), so "half way" is half way through the content, not through the whole document.
+    const contentEnd = await bar.evaluate((el) => el.parentElement!.getBoundingClientRect().bottom + window.scrollY);
+    expect(contentEnd, "the content must be longer than the screen or this proves nothing").toBeGreaterThan(480 + 100);
+    for (const share of [0.25, 0.5, 0.9]) {
+      await page.evaluate((y) => window.scrollTo(0, y), Math.max(0, (contentEnd - 480) * share));
+      expect(Math.abs((await bottom()) - 480), `at ${share * 100}% of the content`).toBeLessThanOrEqual(1);
+    }
+
+    // On a desktop it is an ordinary block beside the content, not a bar.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe("static");
+  });
+
   test("the Content Security Policy is enforced, and it blocks a foreign script", async ({ page }) => {
     // Sprint 54 (ADR-065): the header used to be report-only, which blocks nothing. Both halves
     // are asserted, because a header can be present and a policy still wrong.

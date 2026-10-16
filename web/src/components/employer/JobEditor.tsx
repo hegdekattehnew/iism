@@ -265,7 +265,7 @@ export function JobEditor({
                       <span className="min-w-0 flex-1 text-sm">
                         {r.name}
                         {r.nos_code && (
-                          <span className="ml-2 font-mono text-[11px] text-muted">
+                          <span className="ml-2 font-mono text-xs text-muted">
                             {r.nos_code}
                           </span>
                         )}

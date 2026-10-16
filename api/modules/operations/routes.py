@@ -24,15 +24,16 @@ CanEditAliases = Depends(require_operator(Permission.OPS_ALIAS_EDIT))
 CanEnrol = Depends(require_operator(Permission.OPS_ENROL))
 
 
-@router.get("/organisations", response_model=list[schemas.UnverifiedOrganisation])
+@router.get("/organisations", response_model=schemas.OrganisationQueue)
 async def verification_queue(
     limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
     context: OperatorContext = CanReadOrgs,
-) -> list[schemas.UnverifiedOrganisation]:
-    """Organisations awaiting a verification decision, oldest first."""
-    rows = await service.unverified_organisations(db, limit=limit)
-    return [
+) -> schemas.OrganisationQueue:
+    """Organisations awaiting a verification decision, oldest first, and how many wait in all."""
+    rows, total = await service.unverified_organisations(db, limit=limit, offset=offset)
+    items = [
         schemas.UnverifiedOrganisation(
             slug=tenant.slug,
             name=tenant.name,
@@ -46,6 +47,7 @@ async def verification_queue(
         )
         for tenant, jobs, courses, members in rows
     ]
+    return schemas.OrganisationQueue(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/dashboard", response_model=schemas.PlatformDashboardOut)
@@ -113,15 +115,17 @@ async def decide_verification(
     return _detail(tenant, await service.verification_history(db, tenant.id))
 
 
-@router.get("/candidates/certifications", response_model=list[schemas.UnverifiedCertification])
+@router.get("/candidates/certifications", response_model=schemas.CertificationQueue)
 async def certification_queue(
     limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
     context: OperatorContext = CanVerifyCandidates,
-) -> list[schemas.UnverifiedCertification]:
-    """Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2)."""
-    rows = await service.unverified_certifications(db, limit=limit)
-    return [
+) -> schemas.CertificationQueue:
+    """Certifications naming a standard, awaiting a decision (Sprint 35, BL-3.2), and how many
+    wait in all."""
+    rows, total = await service.unverified_certifications(db, limit=limit, offset=offset)
+    items = [
         schemas.UnverifiedCertification(
             id=cert.id,
             candidate_name=candidate_name,
@@ -135,6 +139,7 @@ async def certification_queue(
         )
         for cert, candidate_name in rows
     ]
+    return schemas.CertificationQueue(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.post(

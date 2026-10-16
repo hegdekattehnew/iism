@@ -218,7 +218,7 @@ export function CourseEditor({
                     <span className="block text-sm">
                       {s.name}
                       {s.nos_code && (
-                        <span className="ml-2 font-mono text-[11px] text-muted">
+                        <span className="ml-2 font-mono text-xs text-muted">
                           {s.nos_code}
                         </span>
                       )}

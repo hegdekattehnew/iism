@@ -66,15 +66,16 @@ export async function Footer() {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 {tf(col.heading)}
               </h3>
-              {/* Padding on the link, not margin on the list: WCAG 2.2
-                  Target Size (Minimum) wants 24px, and a 17px-tall text link
-                  with space around it still presents a 17px target. */}
-              <ul className="mt-2 space-y-0.5">
+              {/* Padding on the link, not margin on the list: a 17px-tall text link
+                  with space around it still presents a 17px target. 44px is the
+                  floor for a touch target (Sprint 69, UI-11), and the footer is
+                  where a thumb lands at the end of every page. */}
+              <ul className="mt-2">
                 {col.links.map((l) => (
                   <li key={l.key}>
                     <Link
                       href={l.href}
-                      className="-mx-1 block rounded px-1 py-1.5 text-sm text-foreground/80 hover:text-brand hover:underline"
+                      className="-mx-1 flex min-h-11 items-center rounded px-1 py-1.5 text-sm text-foreground/80 hover:text-brand hover:underline"
                     >
                       {label(l.ns, l.key)}
                     </Link>

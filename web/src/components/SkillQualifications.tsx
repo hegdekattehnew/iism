@@ -50,18 +50,18 @@ export async function SkillQualifications({ slug }: { slug: string }) {
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                    className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
                       TONE[q.requirement] ?? TONE.optional
                     }`}
                   >
                     {t(`requirement.${q.requirement}`)}
                   </span>
                   {q.nsqf_level != null && (
-                    <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                    <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                       {t("levelShort", { level: fmtLevel(q.nsqf_level) })}
                     </span>
                   )}
-                  <span className="font-mono text-[11px] text-muted">
+                  <span className="font-mono text-xs text-muted">
                     {q.qp_code} v{q.version}
                   </span>
                 </div>

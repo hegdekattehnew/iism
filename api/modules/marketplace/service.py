@@ -131,6 +131,21 @@ async def list_jobs(
     return await _paged(db, stmt, Job.title, limit, offset)
 
 
+async def job_states(db: AsyncSession) -> list[tuple[str, int]]:
+    """Each state named by an open vacancy, with its count, in name order (Sprint 69, UI-06).
+
+    The same `open_job()` predicate as the listing, so an option here always has a result behind
+    it, and the figure beside it is the figure `/jobs?location_state=` will total.
+    """
+    rows = await db.execute(
+        select(Job.location_state, func.count())
+        .where(open_job(), Job.location_state.is_not(None), Job.location_state != "")
+        .group_by(Job.location_state)
+        .order_by(Job.location_state)
+    )
+    return [(name, count) for name, count in rows.all()]
+
+
 async def get_job_by_slug(db: AsyncSession, slug: str) -> Job | None:
     """The **public** detail view: published only.
 

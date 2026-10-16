@@ -267,6 +267,17 @@ class JobPage(BaseModel):
     offset: int
 
 
+class JobStateOut(BaseModel):
+    """A state that has at least one open vacancy, and how many (Sprint 69, UI-06).
+
+    The state filter used to be read off whatever page of vacancies was loaded, which is wrong
+    the moment the list pages. It is a fact about the catalogue, so the API says it.
+    """
+
+    name: str
+    count: int
+
+
 class CoursePage(BaseModel):
     items: list[CourseOut]
     total: int

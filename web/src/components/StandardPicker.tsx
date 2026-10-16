@@ -79,7 +79,7 @@ export function StandardPicker({
               <span className="min-w-0 flex-1 text-sm">
                 <span>{s.name}</span>
                 {s.nos_code && (
-                  <span className="ml-2 font-mono text-[11px] text-muted">
+                  <span className="ml-2 font-mono text-xs text-muted">
                     {s.nos_code}
                   </span>
                 )}

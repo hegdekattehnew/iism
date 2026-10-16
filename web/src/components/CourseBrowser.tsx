@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
@@ -28,6 +28,9 @@ type Course = {
   tenant: { name: string; city?: string | null };
 };
 
+/** A page. The total says how many more there are; the list used to ask for 200 and stop. */
+export const COURSES_PAGE_SIZE = 24;
+
 const inr = (n: number) => new Intl.NumberFormat("en-IN").format(n);
 
 export function feeLabel(
@@ -48,14 +51,16 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
   const [maxFee, setMaxFee] = useState("");
   const deferred = useDeferredValue(query.trim());
 
-  const results = useQuery({
+  const results = useInfiniteQuery({
     queryKey: ["courses", { q: deferred, mode, language, maxFee, skill: initialSkill }],
     placeholderData: keepPreviousData,
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const { data } = await api.GET("/courses", {
         params: {
           query: {
-            limit: 200,
+            limit: COURSES_PAGE_SIZE,
+            offset: pageParam,
             ...(deferred ? { q: deferred } : {}),
             ...(mode ? { mode: mode as (typeof MODES)[number] } : {}),
             ...(language ? { language: language as (typeof LANGS)[number] } : {}),
@@ -64,11 +69,20 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
           },
         },
       });
-      return (data?.items ?? []) as Course[];
+      // openapi-fetch resolves on a non-2xx; an answer with no body is a failure, not "no courses".
+      if (!data) throw new Error("courses");
+      return data;
+    },
+    getNextPageParam: (last) => {
+      const seen = last.offset + last.items.length;
+      return last.items.length > 0 && seen < last.total ? seen : undefined;
     },
   });
 
-  const rows = results.data ?? [];
+  const rows = (results.data?.pages ?? []).flatMap((p) => p.items) as Course[];
+  // The server's figure; `rows.length` is only what has loaded so far.
+  const total = results.data?.pages[0]?.total ?? 0;
+  const left = Math.max(0, total - rows.length);
   const title = (c: Course) => (c.title);
   const desc = (c: Course) =>
     c.description;
@@ -142,7 +156,7 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
         <Skeleton className="mt-4 h-5 w-32" />
       ) : (
         <p className="mt-4 text-sm text-muted" aria-live="polite">
-          {t("resultsCount", { count: rows.length })}
+          {t("resultsCount", { count: total })}
         </p>
       )}
 
@@ -165,14 +179,14 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
               className="block h-full rounded-xl border border-border-token bg-surface p-5 transition-colors hover:border-brand"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+                <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-brand">
                   {t(`mode.${c.mode}`)}
                 </span>
-                <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                   {t(`language.${c.language}`)}
                 </span>
                 {c.nsqf_level != null && (
-                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                     {t("level", { level: c.nsqf_level })}
                   </span>
                 )}
@@ -214,6 +228,23 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
           </li>
         ))}
       </ul>
+
+      {results.isFetchNextPageError && (
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
+          {t("loadMoreError")}
+        </p>
+      )}
+      {results.hasNextPage && (
+        <div className="mt-6 flex justify-center">
+          <Button
+            variant="secondary"
+            disabled={results.isFetchingNextPage}
+            onClick={() => void results.fetchNextPage()}
+          >
+            {results.isFetchNextPageError ? t("retry") : t("showMore", { left })}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

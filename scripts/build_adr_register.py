@@ -241,6 +241,8 @@ for a in adrs:
         )
     if n == 78:
         note = "Sprint 67 (M6). Candidate parity on the phone: history sections, why-not-me, careers, budget. Tested and browser-run; not run on a device."
+    if n == 79:
+        note = "Sprint 69 (BL-16.1). Scannable listings: monthly pay, card v2, server totals, a shared fixture for rules both clients need, 12 px and 44 px floors held by tests."
     a.update(standing=stg, relevance=rel, built=built, note=note, by=by, basis=basis)
     rows.append(a)
 

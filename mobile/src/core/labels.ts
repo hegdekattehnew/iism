@@ -9,6 +9,7 @@
  */
 
 import { formatDate, formatInr, type MonthStyle } from "./format";
+import { payLine, yearlyLine, type PayLine } from "./pay";
 
 export type Translate = (key: string, values?: Record<string, string | number>) => string;
 export type MonthName = (month: number, style: MonthStyle) => string;
@@ -18,6 +19,7 @@ export type JobTerms = {
   experience_max_years?: number | null;
   salary_min_inr?: number | null;
   salary_max_inr?: number | null;
+  employment_type?: string;
 };
 
 export function experienceLabel(job: JobTerms, t: Translate): string {
@@ -28,12 +30,50 @@ export function experienceLabel(job: JobTerms, t: Translate): string {
   return t("experience", { min: job.experience_min_years });
 }
 
-export function salaryLabel(job: JobTerms, t: Translate): string {
-  if (job.salary_min_inr && job.salary_max_inr) {
-    return t("salary", { min: formatInr(job.salary_min_inr), max: formatInr(job.salary_max_inr) });
+/** The posted figure as words, in the unit `payLine` chose (Sprint 69, UI-05). */
+export function payText(line: PayLine, t: Translate): string {
+  switch (line.unit) {
+    case "none":
+      return t("salaryUndisclosed");
+    case "month":
+      if (line.shape === "range") {
+        return t("salaryMonthly", { min: formatInr(line.min), max: formatInr(line.max) });
+      }
+      if (line.shape === "exact") return t("salaryMonthlyExact", { min: formatInr(line.min) });
+      return t("salaryMonthlyFrom", { min: formatInr(line.min) });
+    case "posted":
+      return line.shape === "range"
+        ? t("salaryPosted", { min: formatInr(line.min), max: formatInr(line.max) })
+        : t("salaryPostedFrom", { min: formatInr(line.min) });
+    case "year":
+      return line.shape === "range"
+        ? t("salary", { min: formatInr(line.min), max: formatInr(line.max) })
+        : t("salaryFrom", { min: formatInr(line.min) });
   }
-  if (job.salary_min_inr) return t("salaryFrom", { min: formatInr(job.salary_min_inr) });
-  return t("salaryUndisclosed");
+}
+
+/** What a vacancy pays, the way people say it: about so much **a month** (a gig keeps its posted figure). */
+export function salaryLabel(job: JobTerms, t: Translate): string {
+  return payText(payLine(job.salary_min_inr, job.salary_max_inr, job.employment_type ?? ""), t);
+}
+
+/** The posted annual figure, for the line beneath the monthly one on a vacancy's own screen. `null` when
+ *  the monthly line already is the posted figure (a gig, a tiny amount) or nothing was posted. */
+export function yearlyLabel(job: JobTerms, t: Translate): string | null {
+  const line = payLine(job.salary_min_inr, job.salary_max_inr, job.employment_type ?? "");
+  if (line.unit !== "month") return null;
+  return payText(yearlyLine(job.salary_min_inr, job.salary_max_inr), t);
+}
+
+const DAY_MS = 86_400_000;
+
+/** Whole days until `closes_at`, only when it is near enough to matter (30 days) and still ahead. */
+export function daysToClose(closesAt: string | null | undefined, now: number): number | null {
+  if (!closesAt) return null;
+  const ms = new Date(closesAt).getTime() - now;
+  if (Number.isNaN(ms) || ms <= 0) return null;
+  const days = Math.ceil(ms / DAY_MS);
+  return days <= 30 ? days : null;
 }
 
 export type CourseTerms = {

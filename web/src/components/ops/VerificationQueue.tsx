@@ -2,7 +2,7 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Badge, Card, CardBody, Skeleton } from "@/components/ui";
+import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { useVerificationQueue } from "@/lib/ops";
 
@@ -37,8 +37,10 @@ export function VerificationQueue() {
     );
   }
 
-  const rows = queue.data ?? [];
-  if (rows.length === 0) {
+  const rows = (queue.data?.pages ?? []).flatMap((page) => page.items);
+  // The queue's size, from the server. `rows.length` is only the pages loaded so far.
+  const total = queue.data?.pages[0]?.total ?? 0;
+  if (total === 0) {
     // An empty list and an answered queue look identical without this, and the
     // second is the one worth telling somebody about.
     return <p className="mt-8 text-muted">{t("queueEmpty")}</p>;
@@ -46,7 +48,11 @@ export function VerificationQueue() {
 
   return (
     <>
-      <p className="mt-2 text-muted">{t("queueCount", { count: rows.length })}</p>
+      <p className="mt-2 text-muted">
+        {rows.length < total
+          ? t("queueShowing", { shown: rows.length, total })
+          : t("queueCount", { count: total })}
+      </p>
       <ul className="mt-8 space-y-3">
         {rows.map((row) => (
           <li key={row.slug}>
@@ -93,6 +99,22 @@ export function VerificationQueue() {
           </li>
         ))}
       </ul>
+      {queue.isFetchNextPageError && (
+        <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
+          {t("queueMoreFailed")}
+        </p>
+      )}
+      {queue.hasNextPage && (
+        <div className="mt-6 flex justify-center">
+          <Button
+            variant="secondary"
+            disabled={queue.isFetchingNextPage}
+            onClick={() => void queue.fetchNextPage()}
+          >
+            {t("queueMore", { left: total - rows.length })}
+          </Button>
+        </div>
+      )}
     </>
   );
 }

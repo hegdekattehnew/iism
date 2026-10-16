@@ -1,4 +1,5 @@
 import {
+  daysToClose,
   experienceLabel,
   feeLabel,
   intakeLabel,
@@ -7,6 +8,7 @@ import {
   salaryLabel,
   seatsLabel,
   whereLabel,
+  yearlyLabel,
 } from "./labels";
 
 // A translator that prints the key and its values, so a test sees which phrase was chosen.
@@ -28,12 +30,49 @@ describe("experience", () => {
 });
 
 describe("salary", () => {
-  it("uses Indian grouping and falls back to undisclosed", () => {
-    const terms = { experience_min_years: 0 };
-    expect(salaryLabel({ ...terms, salary_min_inr: 240000, salary_max_inr: 360000 }, t)).toBe("salary(min=2,40,000,max=3,60,000)");
-    expect(salaryLabel({ ...terms, salary_min_inr: 240000 }, t)).toBe("salaryFrom(min=2,40,000)");
+  const terms = { experience_min_years: 0, employment_type: "full_time" };
+
+  it("is said as a month, with Indian grouping, and falls back to undisclosed", () => {
+    expect(salaryLabel({ ...terms, salary_min_inr: 240000, salary_max_inr: 360000 }, t)).toBe("salaryMonthly(min=20,000,max=30,000)");
+    expect(salaryLabel({ ...terms, salary_min_inr: 240000 }, t)).toBe("salaryMonthlyFrom(min=20,000)");
     expect(salaryLabel({ ...terms, salary_max_inr: 360000 }, t)).toBe("salaryUndisclosed");
     expect(salaryLabel(terms, t)).toBe("salaryUndisclosed");
+  });
+
+  it("keeps a gig's figure as posted and never turns it into a month", () => {
+    expect(salaryLabel({ ...terms, employment_type: "gig", salary_min_inr: 5000, salary_max_inr: 8000 }, t)).toBe(
+      "salaryPosted(min=5,000,max=8,000)",
+    );
+  });
+
+  it("does not guess a type: an unstated one is not treated as a salary", () => {
+    expect(salaryLabel({ experience_min_years: 0, salary_min_inr: 240000 }, t)).toBe("salaryPostedFrom(min=2,40,000)");
+  });
+
+  it("gives the posted yearly figure beneath a monthly one, and nothing beneath any other", () => {
+    expect(yearlyLabel({ ...terms, salary_min_inr: 220000, salary_max_inr: 300000 }, t)).toBe(
+      "salary(min=2,20,000,max=3,00,000)",
+    );
+    expect(yearlyLabel({ ...terms, employment_type: "gig", salary_min_inr: 5000 }, t)).toBeNull();
+    expect(yearlyLabel(terms, t)).toBeNull();
+  });
+});
+
+describe("closing soon", () => {
+  const NOW = Date.parse("2026-10-16T06:00:00Z");
+  const DAY = 86_400_000;
+
+  it("counts whole days ahead, within thirty", () => {
+    expect(daysToClose(new Date(NOW + 3 * DAY - 1000).toISOString(), NOW)).toBe(3);
+    expect(daysToClose(new Date(NOW + 3 * 3_600_000).toISOString(), NOW)).toBe(1);
+    expect(daysToClose(new Date(NOW + 30 * DAY).toISOString(), NOW)).toBe(30);
+  });
+
+  it("says nothing for no date, a past date, a far date or a date that is not one", () => {
+    expect(daysToClose(null, NOW)).toBeNull();
+    expect(daysToClose(new Date(NOW - DAY).toISOString(), NOW)).toBeNull();
+    expect(daysToClose(new Date(NOW + 31 * DAY).toISOString(), NOW)).toBeNull();
+    expect(daysToClose("not a date", NOW)).toBeNull();
   });
 });
 

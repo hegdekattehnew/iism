@@ -77,7 +77,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border-token bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-5">
-        <Link href="/" aria-label="IISM" className="shrink-0">
+        <Link href="/" aria-label="IISM" className="inline-flex min-h-11 shrink-0 items-center">
           <Logo />
         </Link>
 
@@ -86,7 +86,7 @@ export function Header() {
             <Link
               key={key}
               href={href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              className="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             >
               {t(key)}
             </Link>
@@ -105,7 +105,7 @@ export function Header() {
           aria-expanded={open}
           aria-controls="mobile-nav"
           aria-label={open ? t("closeMenu") : t("openMenu")}
-          className="rounded-lg border border-border-token p-2 lg:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border-token lg:hidden"
         >
           <svg
             viewBox="0 0 24 24"
@@ -138,7 +138,7 @@ export function Header() {
                 key={key}
                 href={href}
                 onClick={close}
-                className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-surface-muted"
+                className="flex min-h-11 items-center rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-surface-muted"
               >
                 {t(key)}
               </Link>

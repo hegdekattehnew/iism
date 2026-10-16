@@ -414,6 +414,21 @@ F = [
 ]
 F.sort(key=lambda f: int(f[0].split("-")[1]))
 
+# What Sprint 69 ("scannable jobs") did about a finding. A finding with no entry is open. Kept beside
+# the findings, as data, so the markdown and the workbook cannot disagree about what is fixed, and
+# `tests/test_ui_review.py` can check that every id named here is a finding.
+FIXED = {
+    "UI-04": "Fixed in Sprint 69 (web and phone): title, employer with a verified mark, place, pay, how soon it closes; the NSQF badge and the generated sentence are gone from the card. Still open: the match score on a signed-in card.",
+    "UI-05": "Fixed in Sprint 69 (web and phone): 'about Rs 18,300-25,000 a month' on cards and on the vacancy, the yearly figure beneath it on the vacancy. A gig keeps its posted figure. Rule shared by one fixture (tests/fixtures/pay_cases.json).",
+    "UI-06": "Fixed in Sprint 69 (web): 24 at a time, the server's total, 'Show more (n left)', a state filter that is the catalogue's own (GET /jobs/states). The phone already paged.",
+    "UI-07": "Fixed in Sprint 69 (web): nothing under 12 px (35 literal sizes and the 2xs step), held by src/lib/type-floor.test.ts.",
+    "UI-08": "Fixed in Sprint 69 (web and phone): a bar under the content that follows the person, Apply and Save side by side; none for an account that cannot apply. The match screen keeps its place on purpose.",
+    "UI-09": "Fixed in Sprint 69 (web and phone, vacancy only): each standard once, sentence case, the generic ones under 'Also covered', a 'Must have' chip instead of a score. The standard's own page is unchanged.",
+    "UI-10": "Fixed in Sprint 69 for vacancies: 'Verified employer' or 'Not yet verified' and 'Never pay to apply' with a way to report; the slug line is gone (also from the course page). A course page has no strip yet.",
+    "UI-11": "Fixed in Sprint 69 (web): a 44 px floor on buttons, the header and the footer, checked on every page of the browser sweep (header and footer only; the rest of a page is still a count).",
+    "UI-17": "Fixed in Sprint 69: both operator queues return their true size; the screen says 'Showing 100 of 162' and offers the rest.",
+}
+
 GOOD = [
     "Sign-in, applications, saved, notifications and interests are short (1.3 to 1.5 screens) and clear.",
     "Light and dark themes both exist on every page, with measured contrast (axe, in the browser sweep).",
@@ -429,9 +444,18 @@ def _metrics() -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"results": []}
 
 
+def _after() -> dict:
+    """The Sprint 69 re-measurement, if it has been made (`measurements.sprint69.json`)."""
+    path = SCREENS / "measurements.sprint69.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {(r["id"], r["variant"], r["locale"]): r for r in data["results"]}
+
+
 def _table_rows() -> list[list[str]]:
     return [
-        [i, s, p, h, sev, eff, finding, ev, ", ".join(shots), fix, files]
+        [i, s, p, h, sev, eff, finding, ev, ", ".join(shots), fix, files, FIXED.get(i, "Open")]
         for (i, s, p, h, sev, eff, finding, ev, shots, fix, files) in F
     ]
 
@@ -448,6 +472,7 @@ HEAD = [
     "Screenshots",
     "Proposed fix",
     "Files",
+    "Status",
 ]
 
 
@@ -468,15 +493,18 @@ def build_markdown() -> str:
         "4. **The brand is missing** (UI-03, UI-23): no imagery anywhere, one blue, and the app's own icon is still Expo's. That is the owner's decision, and everything else waits less on it than it seems.",
         "5. **The back office and employer screens are tidy but long**: the operator's page is one 31-screen scroll (UI-16).\n",
         "## Recommended first build\n",
-        "**Sprint 69, 'scannable jobs', size M to L, web and app together, no migration:** UI-04 (job card v2), UI-05 (monthly pay), UI-06 (paging with a total), UI-07 (12 px floor), UI-08 (sticky apply), UI-09 (clean the skills list), UI-10 (trust strip), UI-11 (44 px targets) and UI-17 (the operator's totals). Each has a file and an existing primitive named below; the browser sweep and the phone's tests already guard the rest. **Sprint 70, 'a candidate's first minute':** UI-01, UI-02, UI-12, UI-13, UI-19. **After the owner's brand decision:** UI-03, UI-18, UI-20, UI-23, UI-24, UI-27 (the icon set and illustration).\n",
+        f"**Sprint 69, 'scannable jobs', is done** ({len(FIXED)} of {len(F)} findings fixed; the Status column says how far each went): UI-04 (job card v2), UI-05 (monthly pay), UI-06 (paging with a total), UI-07 (12 px floor), UI-08 (sticky apply), UI-09 (clean the skills list), UI-10 (trust strip), UI-11 (44 px targets) and UI-17 (the operator's totals). **Next, Sprint 70, 'a candidate's first minute':** UI-01, UI-02, UI-12, UI-13, UI-19. **After the owner's brand decision:** UI-03, UI-18, UI-20, UI-23, UI-24, UI-27 (the icon set and illustration).\n",
         "## Findings\n",
-        "| " + " | ".join(HEAD[:6] + ["Finding", "Evidence", "Proposed fix"]) + " |",
-        "|" + "---|" * 9,
+        "| " + " | ".join(HEAD[:6] + ["Finding", "Evidence", "Proposed fix", "Status"]) + " |",
+        "|" + "---|" * 10,
     ]
     for i, s, p, h, sev, eff, finding, ev, _shots, fix, _files in F:
-        out.append(f"| **{i}** | {s} | {p} | {h} | {sev} | {eff} | {finding} | {ev} | {fix} |")
+        status = FIXED.get(i, "Open")
+        out.append(
+            f"| **{i}** | {s} | {p} | {h} | {sev} | {eff} | {finding} | {ev} | {fix} | {status} |"
+        )
     out += [
-        "\nFiles each fix would touch are in the workbook (`IISM-UI-Review.xlsx`), column K.\n",
+        "\nFiles each fix would touch are in the workbook (`IISM-UI-Review.xlsx`), column K; its Status is column L.\n",
         "## Measurements (phone width, production build, English, light)\n",
         "Page height in screens of 812 px; tap targets under 44 px; text under 12 px. The raw numbers, with examples, are in `docs/design/screens/measurements.json`.\n",
         "| Page | Screens | Tappable | Under 44 px | Text under 12 px | Images | SVGs |",
@@ -487,6 +515,20 @@ def build_markdown() -> str:
             out.append(
                 f"| {pid} | {r['screens']} | {r['interactive']} | {r['smallTargets']} | {r['textUnder12px']} | {r['images']} | {r['svgs']} |"
             )
+    after = _after()
+    if after:
+        out += [
+            "\n## After Sprint 69 (same pages, same method, same phone width, English, light)\n",
+            "Re-measured with `web/scripts/capture-review.mjs` against a production build of the changed code. **Screens** is page height in screens of 812 px; the other columns are counts of elements on the page. The Sprint 68 numbers above are kept as the baseline.\n",
+            "| Page | Screens before | after | Under 44 px before | after | Text under 12 px before | after |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for (pid, variant, loc), r in sorted(after.items()):
+            b = metrics.get((pid, variant, loc))
+            if variant == "light" and loc == "en" and b:
+                out.append(
+                    f"| {pid} | {b['screens']} | {r['screens']} | {b['smallTargets']} | {r['smallTargets']} | {b['textUnder12px']} | {r['textUnder12px']} |"
+                )
     out += [
         "\n## What is already good\n",
         *[f"- {g}" for g in GOOD],
@@ -515,6 +557,7 @@ def build_workbook() -> None:
             "normal",
             "normal",
             "normal",
+            "normal",
         ]
         for r in rows[1:]
     ]
@@ -527,7 +570,7 @@ def build_workbook() -> None:
         ["Severity", ", ".join(f"{counts.get(s, 0)} {s}" for s in SEVERITIES)],
         [
             "Recommended first build",
-            "Sprint 69, 'scannable jobs': UI-04, 05, 06, 07, 08, 09, 10, 11, 17. Then Sprint 70, 'a candidate's first minute': UI-01, 02, 12, 13, 19. Brand-dependent: UI-03, 18, 20, 23, 24, 27.",
+            f"Sprint 69, 'scannable jobs', is done ({len(FIXED)} findings; see the Status column). Next, Sprint 70, 'a candidate's first minute': UI-01, 02, 12, 13, 19. Brand-dependent: UI-03, 18, 20, 23, 24, 27.",
         ],
         [
             "Owner decisions",
@@ -549,7 +592,7 @@ def build_workbook() -> None:
                 styles=[["header", "header"]] + [["bold", "normal"] for _ in summary[1:]],
             ),
         ),
-        ("Findings", sheet(rows, [8, 12, 22, 20, 10, 8, 70, 46, 30, 60, 50], styles=styles)),
+        ("Findings", sheet(rows, [8, 12, 22, 20, 10, 8, 70, 46, 30, 60, 50, 60], styles=styles)),
     ]
     write_workbook(DESIGN / "IISM-UI-Review.xlsx", sheets)
 

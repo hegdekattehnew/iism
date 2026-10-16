@@ -39,6 +39,20 @@ class UnverifiedOrganisation(BaseModel):
     members: int
 
 
+class OrganisationQueue(BaseModel):
+    """The verification queue with its true size (Sprint 69, UI-17).
+
+    `total` is every organisation waiting, counted in the database. `len(items)` is only the page:
+    the screen used to print that as the queue's size, and the cap of 100 made it read "100
+    waiting" beside an overview that said 162.
+    """
+
+    items: list[UnverifiedOrganisation]
+    total: int
+    limit: int
+    offset: int
+
+
 class PlatformDashboardOut(BaseModel):
     """An operator's landing numbers (Sprint 39, BL-10.4)."""
 
@@ -101,6 +115,15 @@ class UnverifiedCertification(BaseModel):
     credential_id: str | None = None
     skill_slug: str
     skill_name: str
+
+
+class CertificationQueue(BaseModel):
+    """The certification queue with its true size, for the reason `OrganisationQueue` has one."""
+
+    items: list[UnverifiedCertification]
+    total: int
+    limit: int
+    offset: int
 
 
 class CertificationVerifyIn(BaseModel):

@@ -149,7 +149,7 @@ export function MatchBrowser() {
                       only orders equal scores, so the badge says where, never
                       "better". */}
                   {(m.locality ?? 0) > 0 && (
-                    <span className="ml-2 inline-block rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-brand">
+                    <span className="ml-2 inline-block rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-brand">
                       {m.locality === 2 ? t("nearDistrict") : t("nearState")}
                     </span>
                   )}

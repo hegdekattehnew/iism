@@ -111,7 +111,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
       <div className={stacked ? "" : "relative"}>
         <div
           aria-hidden
-          className="h-[34px] w-32 animate-pulse rounded-lg border border-border-token bg-surface-muted"
+          className="h-11 w-32 animate-pulse rounded-lg border border-border-token bg-surface-muted"
         />
       </div>
     );
@@ -156,7 +156,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex w-full items-center gap-2 rounded-lg border border-border-token px-3 py-1.5 text-sm transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border-token px-3 py-1.5 text-sm transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >
         <span className="max-w-[12rem] truncate">{label}</span>
         <svg
@@ -185,7 +185,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
           {/* The menu says what it is a menu of. Without it the list reads as
               an account menu, and the job-seeker row looks like a link to a
               page rather than the context you are currently standing in. */}
-          <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
+          <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-muted uppercase">
             {t("menuHeading")}
           </p>
 
@@ -198,7 +198,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
               type="button"
               role="menuitem"
               onClick={() => go(null)}
-              className={`block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted ${
+              className={`block w-full rounded-md px-3 py-3 text-left text-sm hover:bg-surface-muted ${
                 active === null ? "font-semibold text-brand" : ""
               }`}
             >
@@ -217,7 +217,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("filterPlaceholder")}
                 aria-label={t("filterLabel")}
-                className="w-full rounded-md border border-input-border bg-surface px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className="min-h-11 w-full rounded-md border border-input-border bg-surface px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               />
             </div>
           )}
@@ -235,7 +235,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
                 type="button"
                 role="menuitem"
                 onClick={() => go(m.tenant.slug)}
-                className={`block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-surface-muted ${
+                className={`block w-full rounded-md px-3 py-3 text-left text-sm hover:bg-surface-muted ${
                   m.tenant.slug === active ? "font-semibold text-brand" : ""
                 }`}
               >
@@ -269,7 +269,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
                 setQuery("");
                 setCreating(true);
               }}
-              className="block w-full rounded-md px-3 py-2 text-left text-sm text-brand hover:bg-surface-muted"
+              className="block w-full rounded-md px-3 py-3 text-left text-sm text-brand hover:bg-surface-muted"
             >
               {t("createOrg")}
             </button>
@@ -277,7 +277,7 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
               <Link
                 href="/employers"
                 onClick={() => setOpen(false)}
-                className="block rounded-md px-3 py-2 text-xs text-muted hover:bg-surface-muted"
+                className="block rounded-md px-3 py-3 text-xs text-muted hover:bg-surface-muted"
               >
                 {t("whatIsThis")}
               </Link>

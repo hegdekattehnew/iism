@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text as NativeText,
   TextInput,
+  useWindowDimensions,
   View,
   type TextInputProps,
 } from "react-native";
@@ -19,16 +20,42 @@ import { MAX_FONT_SCALE, MIN_TOUCH, radius, space, text, useColours } from "../t
  * everything that can be pressed. Not a design system; the smallest set M1 needs.
  */
 
-export function Screen({ children }: { children: ReactNode }) {
+/**
+ * A scrolling screen. `footer` is a bar **under** the scrolling content, outside it (Sprint 69,
+ * UI-08): the one action a screen exists for stays under the thumb however far the person has read.
+ * It is height-capped and scrolls on its own, so a confirmation opening inside it cannot push the
+ * content off a short phone.
+ */
+export function Screen({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   const c = useColours();
+  const { height } = useWindowDimensions();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
       <ScrollView
+        testID="screen-content"
         contentContainerStyle={{ padding: space.xl, gap: space.lg, flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>
+      {footer ? (
+        <View
+          testID="screen-footer"
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: c.border,
+            backgroundColor: c.surface,
+            maxHeight: height * 0.6,
+          }}
+        >
+          <ScrollView
+            contentContainerStyle={{ padding: space.md, gap: space.md }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {footer}
+          </ScrollView>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

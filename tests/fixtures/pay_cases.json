@@ -1,0 +1,18 @@
+{
+  "about": "Shared by web/src/lib/pay.test.ts and mobile/src/test/pay.test.ts (read by tests/test_scannable_listing.py too). payLine(min, max, employment_type) turns the posted annual figure into what people say: a monthly range rounded to the nearest 100, for the four types where the annual figure is a salary; a gig keeps its figure as posted; one end alone is 'from'; nothing posted is 'none'. A figure that rounds to zero a month stays annual.",
+  "cases": [
+    {"name": "full time range", "min": 220000, "max": 300000, "type": "full_time", "expect": {"unit": "month", "shape": "range", "min": 18300, "max": 25000}},
+    {"name": "part time range", "min": 120000, "max": 180000, "type": "part_time", "expect": {"unit": "month", "shape": "range", "min": 10000, "max": 15000}},
+    {"name": "contract range", "min": 240000, "max": 360000, "type": "contract", "expect": {"unit": "month", "shape": "range", "min": 20000, "max": 30000}},
+    {"name": "apprenticeship range", "min": 96000, "max": 120000, "type": "apprenticeship", "expect": {"unit": "month", "shape": "range", "min": 8000, "max": 10000}},
+    {"name": "one end only is from, not a range", "min": 180000, "max": null, "type": "full_time", "expect": {"unit": "month", "shape": "from", "min": 15000}},
+    {"name": "both ends equal after rounding is exact", "min": 180000, "max": 180400, "type": "full_time", "expect": {"unit": "month", "shape": "exact", "min": 15000}},
+    {"name": "rounds to the nearest hundred, half up", "min": 218400, "max": 219000, "type": "full_time", "expect": {"unit": "month", "shape": "range", "min": 18200, "max": 18300}},
+    {"name": "a gig keeps its posted figure", "min": 5000, "max": 8000, "type": "gig", "expect": {"unit": "posted", "shape": "range", "min": 5000, "max": 8000}},
+    {"name": "a gig with one end", "min": 5000, "max": null, "type": "gig", "expect": {"unit": "posted", "shape": "from", "min": 5000}},
+    {"name": "nothing posted", "min": null, "max": null, "type": "full_time", "expect": {"unit": "none", "shape": "none"}},
+    {"name": "zero is nothing posted", "min": 0, "max": 0, "type": "full_time", "expect": {"unit": "none", "shape": "none"}},
+    {"name": "a maximum without a minimum is not invented into a range", "min": null, "max": 300000, "type": "full_time", "expect": {"unit": "none", "shape": "none"}},
+    {"name": "an annual figure that rounds to zero a month stays annual", "min": 500, "max": 900, "type": "full_time", "expect": {"unit": "year", "shape": "range", "min": 500, "max": 900}}
+  ]
+}

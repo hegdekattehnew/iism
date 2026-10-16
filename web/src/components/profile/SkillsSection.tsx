@@ -90,10 +90,10 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
             <span className="text-sm font-medium">
               {s.skill.name}
             </span>
-            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-muted">
+            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-xs text-muted">
               {t("proficiency", { n: s.proficiency })}
             </span>
-            <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-brand">
+            <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-brand">
               {t(`source.${s.source}`)}
             </span>
             <button

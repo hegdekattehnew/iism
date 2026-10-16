@@ -102,3 +102,67 @@ def test_the_measurement_can_fail() -> None:
     )
     sources = (ROOT / "mobile" / "src" / "ui" / "primitives.tsx").read_text(encoding="utf-8")
     assert "minHeight: MIN_TOUCH" in sources  # and the phone's own floor is 48
+
+
+def test_every_finding_marked_fixed_is_a_finding_and_says_what_was_done() -> None:
+    """Sprint 69 closed nine findings; the review says which, and how far each went."""
+    m = _builder()
+    ids = {f[0] for f in m.F}
+    assert m.FIXED, "no finding is marked fixed"
+    assert set(m.FIXED) <= ids, f"marked fixed but not a finding: {sorted(set(m.FIXED) - ids)}"
+    for fid, what in m.FIXED.items():
+        assert what.startswith("Fixed in Sprint 69"), fid
+        assert len(what) > 60, fid  # says what was done, not just that something was
+    # And the markdown shows it: the status column is not dropped on the way to the reader.
+    markdown = (DESIGN / "ui-review.md").read_text(encoding="utf-8")
+    for fid in m.FIXED:
+        row = next(line for line in markdown.splitlines() if line.startswith(f"| **{fid}**"))
+        assert "Fixed in Sprint 69" in row, fid
+    open_row = next(line for line in markdown.splitlines() if line.startswith("| **UI-01**"))
+    assert open_row.rstrip().endswith("| Open |")
+
+
+def test_the_sprint_69_remeasurement_is_the_same_captures_and_shows_the_fix() -> None:
+    """The 'after' numbers come from the same script over the same pages, and the claims the review
+    makes about them are the file's, not remembered ones (Sprint 69)."""
+    before = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.json").read_text(encoding="utf-8"))["results"]
+    }
+    after = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.sprint69.json").read_text(encoding="utf-8"))[
+            "results"
+        ]
+    }
+    assert len(after) == len(before) >= 50 and set(after) == set(before), "not the same captures"
+    assert all(r.get("status") == 200 or r["id"] in {"employer-applicants"} for r in after.values())
+    key = ("jobs", "light", "en")
+    # The list that used to draw 148 cards in 42 screens pages now.
+    assert before[key]["screens"] > 30 and after[key]["screens"] < 10
+    # Nothing under 12 px anywhere (was hundreds on the lists).
+    assert sum(r["textUnder12px"] for r in before.values()) > 1000
+    assert all(r["textUnder12px"] == 0 for r in after.values())
+    # The header and footer no longer add targets under 44 px on any page: what is left is
+    # in the page's own content (inline links, a few buttons), which the review still counts.
+    chrome = {
+        "Open menu", "IISM", "Jobs", "Courses", "Skills", "How it works", "About", "Contact",
+        "Careers", "Privacy policy", "Terms of use", "Grievance redressal", "For employers",
+        "For providers",
+    }  # fmt: skip
+    for k, r in after.items():
+        labels = {e.split(" ", 2)[2].strip() for e in r["smallExamples"] if e.count(" ") >= 2}
+        assert not (labels & chrome), (k, r["smallExamples"])
+    # ...and that the same test finds them in the baseline, or it proves nothing.
+    assert any(
+        {e.split(" ", 2)[2].strip() for e in r["smallExamples"] if e.count(" ") >= 2} & chrome
+        for r in before.values()
+    )
+    assert after[key]["smallTargets"] == 0 < before[key]["smallTargets"]
+    for pictured in (
+        "sprint69.jobs.light.en.jpg",
+        "sprint69.jobs.hi.hi.jpg",
+        "sprint69.job-detail.light.en.jpg",
+        "sprint69.job-detail.hi.hi.jpg",
+    ):
+        assert (SCREENS / pictured).is_file(), pictured

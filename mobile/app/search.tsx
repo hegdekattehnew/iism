@@ -6,7 +6,8 @@ import { useTranslations } from "use-intl";
 import { lookalikeNames } from "../src/core/labels";
 import { useSearch } from "../src/lib/queries";
 import { space } from "../src/theme";
-import { Badge, BadgeRow, Button, Card, Screen, SearchBox, SkeletonRows, Text } from "../src/ui";
+import { Button, Card, Screen, SearchBox, SkeletonRows, Text } from "../src/ui";
+import { JobCard } from "../src/ui/JobCard";
 import { FailureNotice } from "../src/ui/list";
 import { Section } from "../src/ui/detail";
 
@@ -18,7 +19,6 @@ import { Section } from "../src/ui/detail";
 export default function Search() {
   const params = useLocalSearchParams<{ q?: string }>();
   const t = useTranslations("searchPage");
-  const tj = useTranslations("jobsPage");
   const ts = useTranslations("skillsPage");
   const router = useRouter();
   const [draft, setDraft] = useState(params.q ?? "");
@@ -50,13 +50,7 @@ export default function Search() {
             ) : (
               <View style={{ gap: space.sm }}>
                 {(jobs.data?.items ?? []).map((job) => (
-                  <Card key={job.slug} onPress={() => router.push(`/job/${job.slug}`)} label={job.title}>
-                    <BadgeRow>
-                      <Badge tone="brand" label={tj(`employmentType.${job.employment_type}`)} />
-                    </BadgeRow>
-                    <Text variant="lead">{job.title}</Text>
-                    <Text tone="muted">{job.tenant.name}</Text>
-                  </Card>
+                  <JobCard key={job.slug} job={job} onPress={() => router.push(`/job/${job.slug}`)} />
                 ))}
                 {(jobs.data?.total ?? 0) > (jobs.data?.items ?? []).length ? (
                   <Button

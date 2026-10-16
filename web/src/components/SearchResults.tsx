@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { experienceLabel, salaryLabel } from "@/components/JobBrowser";
+import { JobCard } from "@/components/JobCard";
 import { lookalikeNames, StandardOrigin } from "@/components/SkillBrowser";
 import { Badge, ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
@@ -187,24 +187,9 @@ function Band({
 type JobItem =
   paths["/jobs"]["get"]["responses"][200]["content"]["application/json"]["items"][number];
 
+/** The same card the jobs list shows, so a vacancy reads the same wherever it is found. */
 function JobRow({ job }: { job: JobItem }) {
-  const t = useTranslations("jobsPage");
-  return (
-    <Link
-      href={`/jobs/${job.slug}`}
-      className="block h-full rounded-xl border border-border-token bg-surface p-4 transition-colors hover:border-brand"
-    >
-      <p className="text-base font-semibold">{job.title}</p>
-      <p className="mt-0.5 text-sm text-muted">
-        {job.tenant.name}
-        {(job.location_district || job.location_state) &&
-          ` · ${[job.location_district, job.location_state].filter(Boolean).join(", ")}`}
-      </p>
-      <p className="mt-1.5 text-xs text-muted">
-        {experienceLabel(job, t)} · {salaryLabel(job, t)}
-      </p>
-    </Link>
-  );
+  return <JobCard job={job} />;
 }
 
 type RoleItem =
@@ -232,7 +217,7 @@ function RoleRow({ role }: { role: RoleItem }) {
         <span className="text-sm font-semibold">{role.job_role}</span>
         <Badge>{t("standardsCount", { count: role.standards_count })}</Badge>
       </div>
-      <p className="mt-0.5 font-mono text-[11px] text-muted">
+      <p className="mt-0.5 font-mono text-xs text-muted">
         {role.qp_code}
         {role.nsqf_level != null && ` · NSQF ${role.nsqf_level}`}
         {role.sector_name && ` · ${role.sector_name}`}
@@ -264,7 +249,7 @@ function RoleRow({ role }: { role: RoleItem }) {
                 {s.name}
               </Link>
               {s.nos_code && (
-                <span className="ml-2 font-mono text-[11px] text-muted">{s.nos_code}</span>
+                <span className="ml-2 font-mono text-xs text-muted">{s.nos_code}</span>
               )}
             </li>
           ))}

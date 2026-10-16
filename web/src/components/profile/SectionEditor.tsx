@@ -212,7 +212,7 @@ function CertificationStandard({
           <span className="min-w-0 flex-1">
             {linked.name}
             {linked.nos_code && (
-              <span className="ml-2 font-mono text-[11px] text-muted">{linked.nos_code}</span>
+              <span className="ml-2 font-mono text-xs text-muted">{linked.nos_code}</span>
             )}
           </span>
           <Button

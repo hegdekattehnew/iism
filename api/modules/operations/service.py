@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import distinct, func, select
+from sqlalchemy import ColumnElement, and_, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -47,10 +47,18 @@ from api.modules.operations.skill_gap import MIN_CELL_SIZE, suppress
 log = structlog.get_logger("iism.ops")
 
 
+def _waiting_organisations() -> ColumnElement[bool]:
+    return and_(Tenant.tenant_type.in_(ORGANISATION_TYPES), Tenant.verified_at.is_(None))
+
+
 async def unverified_organisations(
-    db: AsyncSession, *, limit: int = 100
-) -> list[tuple[Tenant, int, int, int]]:
-    """Organisations waiting on a decision, oldest first.
+    db: AsyncSession, *, limit: int = 100, offset: int = 0
+) -> tuple[list[tuple[Tenant, int, int, int]], int]:
+    """Organisations waiting on a decision, oldest first, and **how many are waiting in all**.
+
+    The second value is counted where the rows are, never read off the length of the page
+    (Sprint 69, UI-17): the screen used to print `len(rows)` as "waiting" and the cap of 100 made
+    it say 100 beside an overview that said 162.
 
     **Personal workspaces are excluded**, which is `ORGANISATION_TYPES`' lesson
     applied to a new query: every candidate owns one, so without the filter the
@@ -79,11 +87,16 @@ async def unverified_organisations(
         .outerjoin(jobs, jobs.c.tenant_id == Tenant.id)
         .outerjoin(courses, courses.c.tenant_id == Tenant.id)
         .outerjoin(members, members.c.tenant_id == Tenant.id)
-        .where(Tenant.tenant_type.in_(ORGANISATION_TYPES), Tenant.verified_at.is_(None))
-        .order_by(Tenant.created_at)
+        .where(_waiting_organisations())
+        .order_by(Tenant.created_at, Tenant.id)
         .limit(limit)
+        .offset(offset)
     )
-    return [(row[0], row[1], row[2], row[3]) for row in (await db.execute(stmt)).all()]
+    total = await db.scalar(
+        select(func.count()).select_from(Tenant).where(_waiting_organisations())
+    )
+    rows = [(row[0], row[1], row[2], row[3]) for row in (await db.execute(stmt)).all()]
+    return rows, total or 0
 
 
 async def organisation_for_review(db: AsyncSession, slug: str) -> Tenant | None:
@@ -176,9 +189,16 @@ async def set_verification(
     return event
 
 
+def _waiting_certifications() -> ColumnElement[bool]:
+    return and_(
+        CandidateCertification.skill_id.is_not(None),
+        CandidateCertification.verified_at.is_(None),
+    )
+
+
 async def unverified_certifications(
-    db: AsyncSession, *, limit: int = 100
-) -> list[tuple[CandidateCertification, str | None]]:
+    db: AsyncSession, *, limit: int = 100, offset: int = 0
+) -> tuple[list[tuple[CandidateCertification, str | None]], int]:
     """The queue: certifications naming a standard (`skill_id IS NOT NULL`)
     that nobody has verified yet (Sprint 35, BL-3.2).
 
@@ -190,14 +210,15 @@ async def unverified_certifications(
         select(CandidateCertification, User.full_name)
         .join(CandidateProfile, CandidateCertification.profile_id == CandidateProfile.id)
         .join(User, CandidateProfile.user_id == User.id)
-        .where(
-            CandidateCertification.skill_id.is_not(None),
-            CandidateCertification.verified_at.is_(None),
-        )
+        .where(_waiting_certifications())
         .order_by(CandidateCertification.id)
         .limit(limit)
+        .offset(offset)
     )
-    return [(row[0], row[1]) for row in (await db.execute(stmt)).all()]
+    total = await db.scalar(
+        select(func.count()).select_from(CandidateCertification).where(_waiting_certifications())
+    )
+    return [(row[0], row[1]) for row in (await db.execute(stmt)).all()], total or 0
 
 
 async def certification_for_review(
@@ -323,18 +344,12 @@ class PlatformDashboard:
 
 
 async def platform_dashboard(db: AsyncSession) -> PlatformDashboard:
+    # The same predicates the queues count with, so the tile and the queue cannot disagree.
     unverified_orgs = await db.scalar(
-        select(func.count())
-        .select_from(Tenant)
-        .where(Tenant.tenant_type.in_(ORGANISATION_TYPES), Tenant.verified_at.is_(None))
+        select(func.count()).select_from(Tenant).where(_waiting_organisations())
     )
     unverified_certs = await db.scalar(
-        select(func.count())
-        .select_from(CandidateCertification)
-        .where(
-            CandidateCertification.skill_id.is_not(None),
-            CandidateCertification.verified_at.is_(None),
-        )
+        select(func.count()).select_from(CandidateCertification).where(_waiting_certifications())
     )
     organisations = await db.scalar(
         select(func.count()).select_from(Tenant).where(Tenant.tenant_type.in_(ORGANISATION_TYPES))
