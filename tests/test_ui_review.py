@@ -111,7 +111,9 @@ def test_every_finding_marked_fixed_is_a_finding_and_says_what_was_done() -> Non
     assert m.FIXED, "no finding is marked fixed"
     assert set(m.FIXED) <= ids, f"marked fixed but not a finding: {sorted(set(m.FIXED) - ids)}"
     for fid, what in m.FIXED.items():
-        assert what.startswith(("Fixed in Sprint 69", "Fixed in Sprint 70")), fid
+        assert what.startswith(
+            ("Fixed in Sprint 69", "Fixed in Sprint 70", "Fixed in Sprint 73")
+        ), fid
         assert len(what) > 60, fid  # says what was done, not just that something was
     # And the markdown shows it: the status column is not dropped on the way to the reader.
     markdown = (DESIGN / "ui-review.md").read_text(encoding="utf-8")
@@ -197,5 +199,41 @@ def test_the_sprint_70_remeasurement_is_the_same_captures_and_shows_the_fix() ->
         "sprint70.about.light.en.jpg",
         "sprint70.app-home-signed-in.light.en.jpg",
         "sprint70.app-matches.light.en.jpg",
+    ):
+        assert (SCREENS / pictured).is_file(), pictured
+
+
+def test_the_sprint_73_remeasurement_is_the_same_captures_and_shows_the_fix() -> None:
+    """The hiring side's three pages (Sprint 73): the back office folds and jumps, the vacancy and
+    course rows have one primary action, and every number the review quotes is the file's."""
+    before = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.json").read_text(encoding="utf-8"))["results"]
+    }
+    after = {
+        (r["id"], r["variant"], r["locale"]): r
+        for r in json.loads((SCREENS / "measurements.sprint73.json").read_text(encoding="utf-8"))[
+            "results"
+        ]
+    }
+    assert set(after) == set(before) and len(after) >= 50, "not the same captures"
+    assert all(r.get("status") == 200 or r["id"] in {"employer-applicants"} for r in after.values())
+    admin, desktop = ("admin", "light", "en"), ("admin", "desktop", "en")
+    employer, provider = ("employer-home", "light", "en"), ("provider-home", "light", "en")
+    # /admin: 40 and 31 screens became 28 and 25, and 181 and 236 small targets none.
+    assert before[admin]["screens"] > 38 and after[admin]["screens"] < 30
+    assert before[desktop]["screens"] > 30 and after[desktop]["screens"] < 26
+    assert before[admin]["smallTargets"] > 100 and after[admin]["smallTargets"] == 0
+    assert before[desktop]["smallTargets"] > 100 and after[desktop]["smallTargets"] == 0
+    # The vacancy and course rows: dozens of loose links, now none under 44 px.
+    assert before[employer]["smallTargets"] > 40 and after[employer]["smallTargets"] == 0
+    assert before[provider]["smallTargets"] > 60 and after[provider]["smallTargets"] == 0
+    # Nothing under 12 px anywhere, as since Sprint 69.
+    assert all(r["textUnder12px"] == 0 for r in after.values())
+    for pictured in (
+        "sprint73.admin.light.en.jpg",
+        "sprint73.admin.desktop.en.jpg",
+        "sprint73.employer-home.light.en.jpg",
+        "sprint73.provider-home.light.en.jpg",
     ):
         assert (SCREENS / pictured).is_file(), pictured

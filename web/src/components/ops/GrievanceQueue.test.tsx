@@ -173,4 +173,9 @@ describe("the grievance queue", () => {
       await screen.findByText("Could not load the messages."),
     ).toBeTruthy();
   });
+
+  it("keeps its filter at the 44 px floor (Sprint 73)", async () => {
+    const { container } = renderUi(<GrievanceQueue />);
+    expect(container.querySelector("#grievance-filter")!.className).toMatch(/min-h-11/);
+  });
 });

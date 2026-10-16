@@ -39,13 +39,13 @@ test("a provider publishes a course and hears from a learner only because the le
   await page.getByRole("button", { name: "Save" }).click();
 
   const card = page.getByRole("listitem").filter({ hasText: title });
-  await expect(card.getByText("Draft")).toBeVisible();
+  await expect(card.getByText("Draft", { exact: true })).toBeVisible();
   const published = async () =>
     (await (await request.get(`http://localhost:8100/courses?q=${encodeURIComponent(title)}`)).json()).total as number;
   expect(await published(), "a draft is not on the public list").toBe(0);
 
   await card.getByRole("button", { name: "Publish" }).click();
-  await expect(card.getByText("Published")).toBeVisible();
+  await expect(card.getByText("Published", { exact: true })).toBeVisible();
   expect(await published()).toBe(1);
   await checkPage(page, "provider workspace");
 

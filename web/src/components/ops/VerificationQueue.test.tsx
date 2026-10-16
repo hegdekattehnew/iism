@@ -116,4 +116,10 @@ describe("the verification queue", () => {
     expect(await screen.findByText(/1 organisation waiting/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Show more/ })).toBeNull();
   });
+
+  it("gives each organisation's link a 44 px target (Sprint 73): a queue of 100 is 100 of them", async () => {
+    renderUi(<VerificationQueue />);
+    const link = (await screen.findAllByRole("link"))[0];
+    expect(link.className).toMatch(/min-h-11/);
+  });
 });

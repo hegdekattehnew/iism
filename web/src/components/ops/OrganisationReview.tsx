@@ -7,6 +7,7 @@ import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { statusOf } from "@/lib/http";
 import { detailOf } from "@/lib/http";
 import { NOTE_MAX, NOTE_MIN, useSetVerification, useVerificationDetail } from "@/lib/ops";
+import { useMemberships } from "@/lib/org";
 
 /**
  * One organisation, its badge, and every decision behind it.
@@ -26,6 +27,11 @@ export function OrganisationReview({ slug }: { slug: string }) {
   const detail = useVerificationDetail(slug);
   const decide = useSetVerification(slug);
   const [note, setNote] = useState("");
+  // Granting and revoking the badge are `OPS_ORG_VERIFY`, the admin tier's alone (ADR-044). A support
+  // operator used to be shown both buttons and a 403 for pressing either: a control that always
+  // fails is worse than none (Sprint 73).
+  const { data: me } = useMemberships();
+  const canDecide = me?.staff_tier === "admin";
 
   if (detail.isPending) return <Skeleton className="mt-8 h-64 w-full" />;
 
@@ -72,38 +78,44 @@ export function OrganisationReview({ slug }: { slug: string }) {
           <h2 className="text-base font-semibold">{t("decideHeading")}</h2>
           <p className="mt-1 text-sm text-muted">{t("noteHelp")}</p>
 
-          <label className="mt-4 block text-sm font-medium" htmlFor="ops-note">
-            {t("noteLabel")}
-          </label>
-          <textarea
-            id="ops-note"
-            name="note"
-            minLength={NOTE_MIN}
-            maxLength={NOTE_MAX}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            rows={3}
-            className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm"
-            placeholder={t("notePlaceholder")}
-          />
+          {canDecide ? (
+            <>
+            <label className="mt-4 block text-sm font-medium" htmlFor="ops-note">
+              {t("noteLabel")}
+            </label>
+            <textarea
+              id="ops-note"
+              name="note"
+              minLength={NOTE_MIN}
+              maxLength={NOTE_MAX}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm"
+              placeholder={t("notePlaceholder")}
+            />
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button
-              onClick={() => submit("granted")}
-              disabled={!ready || decide.isPending}
-            >
-              {t("grant")}
-            </Button>
-            {data.is_verified ? (
+            <div className="mt-4 flex flex-wrap gap-3">
               <Button
-                variant="secondary"
-                onClick={() => submit("revoked")}
+                onClick={() => submit("granted")}
                 disabled={!ready || decide.isPending}
               >
-                {t("revoke")}
+                {t("grant")}
               </Button>
-            ) : null}
-          </div>
+              {data.is_verified ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => submit("revoked")}
+                  disabled={!ready || decide.isPending}
+                >
+                  {t("revoke")}
+                </Button>
+              ) : null}
+            </div>
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-muted">{t("verifyAdminOnly")}</p>
+          )}
 
           {decide.isError ? (
             // What the server said, never a fixed sentence: it names the field

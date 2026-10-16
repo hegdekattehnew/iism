@@ -59,3 +59,11 @@ describe("JobEditor -- a gig needs an end and a place", () => {
     expect(district().required).toBe(false);
   });
 });
+
+/** Sprint 73, UI-26: the form says what a good description is, since the page already lists the standards. */
+describe("JobEditor -- the description field", () => {
+  it("says what to write, in the field's own hint", () => {
+    renderUi(editor());
+    expect(screen.getByText(/Say what the work is and what a day involves/)).toBeTruthy();
+  });
+});

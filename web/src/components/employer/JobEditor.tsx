@@ -135,7 +135,11 @@ export function JobEditor({
                 defaultValue={job?.title ?? ""}
               />
             </Field>
-            <Field label={t("descriptionEn")} className="sm:col-span-2">
+            <Field
+              label={t("descriptionEn")}
+              hint={t("descriptionHint")}
+              className="sm:col-span-2"
+            >
               <Area
                 name="description"
                 maxLength={10000}

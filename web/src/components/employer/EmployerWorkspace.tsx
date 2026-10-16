@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { EmployerDashboard } from "@/components/employer/EmployerDashboard";
 import { JobEditor } from "@/components/employer/JobEditor";
+import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
 import { detailOf, isSignedOut } from "@/lib/http";
 import {
@@ -16,7 +17,6 @@ import {
   CardBody,
   Skeleton,
 } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
 import {
   type JobPayload,
   type OrgJob,
@@ -240,71 +240,83 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                   </Alert>
                 )}
 
-                <div className="mt-4 flex flex-wrap items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setEditing(job.slug)}
-                    className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    {t("edit")}
-                  </button>
-                  {!job.taken_down_at && (
-                  <button
-                    type="button"
-                    disabled={setPublished.isPending}
-                    onClick={() => {
-                      setActionFailed(null);
-                      setPublished.mutate(
-                        {
-                          slug: job.slug,
-                          published: job.status !== "published",
-                        },
-                        { onError: onActionError },
-                      );
-                    }}
-                    className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    {job.status === "published" ? t("unpublish") : t("publish")}
-                  </button>
-                  )}
-                  {job.status === "published" && !job.taken_down_at && (
-                    <button
-                      type="button"
-                      disabled={setOpen.isPending}
-                      onClick={() => {
-                        if (
-                          job.is_open &&
-                          !confirm(t("confirmClose", { title: job.title }))
-                        )
-                          return;
-                        setActionFailed(null);
-                        setOpen.mutate(
-                          { slug: job.slug, open: !job.is_open },
-                          { onError: onActionError },
-                        );
-                      }}
-                      className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                    >
-                      {job.is_open ? t("close") : t("reopen")}
-                    </button>
-                  )}
-                  {job.status === "published" && (
-                    <>
-                      <Link
+                <RowActions
+                  moreLabel={t("more")}
+                  // One thing a person came to this row for: the candidates for a live vacancy, or
+                  // putting a draft live. Nothing for a vacancy an operator took down.
+                  primary={
+                    job.taken_down_at ? null : job.status === "published" ? (
+                      <ButtonLink
+                        size="sm"
                         href={`/employer/${orgSlug}/candidates/${job.slug}`}
-                        className="text-sm text-muted underline-offset-4 hover:underline"
                       >
                         {t("seeCandidates")}
-                      </Link>
-                      <Link
-                        href={`/jobs/${job.slug}`}
-                        className="text-sm text-muted underline-offset-4 hover:underline"
+                      </ButtonLink>
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled={setPublished.isPending}
+                        onClick={() => {
+                          setActionFailed(null);
+                          setPublished.mutate(
+                            { slug: job.slug, published: true },
+                            { onError: onActionError },
+                          );
+                        }}
                       >
+                        {t("publish")}
+                      </Button>
+                    )
+                  }
+                  secondary={
+                    <Button size="sm" variant="secondary" onClick={() => setEditing(job.slug)}>
+                      {t("edit")}
+                    </Button>
+                  }
+                  more={[
+                    job.status === "published" && !job.taken_down_at && (
+                      <Button
+                        key="unpublish"
+                        size="sm"
+                        variant="ghost"
+                        disabled={setPublished.isPending}
+                        onClick={() => {
+                          setActionFailed(null);
+                          setPublished.mutate(
+                            { slug: job.slug, published: false },
+                            { onError: onActionError },
+                          );
+                        }}
+                      >
+                        {t("unpublish")}
+                      </Button>
+                    ),
+                    job.status === "published" && !job.taken_down_at && (
+                      <Button
+                        key="open"
+                        size="sm"
+                        variant="ghost"
+                        disabled={setOpen.isPending}
+                        onClick={() => {
+                          if (job.is_open && !confirm(t("confirmClose", { title: job.title })))
+                            return;
+                          setActionFailed(null);
+                          setOpen.mutate(
+                            { slug: job.slug, open: !job.is_open },
+                            { onError: onActionError },
+                          );
+                        }}
+                      >
+                        {job.is_open ? t("close") : t("reopen")}
+                      </Button>
+                    ),
+                    job.status === "published" && (
+                      <ButtonLink key="public" size="sm" variant="ghost" href={`/jobs/${job.slug}`}>
                         {t("viewPublic")}
-                      </Link>
-                    </>
-                  )}
-                </div>
+                      </ButtonLink>
+                    ),
+                  ]}
+                />
               </CardBody>
             </Card>
           </li>

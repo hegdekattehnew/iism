@@ -1,4 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 
 import type { APIRequestContext, Page } from "@playwright/test";
 
@@ -191,4 +193,17 @@ export async function registerInterest(
     data: { course_slug: courseSlug },
   });
   if (!res.ok()) throw new Error(`register interest ${courseSlug}: ${res.status()} ${await res.text()}`);
+}
+
+/**
+ * Make an account an operator the way production does: `scripts/grant_staff.py`, which needs database
+ * credentials and refuses to create an account (ADR-042). Specs that predate this helper carry a copy.
+ */
+export function grantStaff(address: string, tier: "support" | "admin"): void {
+  const repo = path.resolve(__dirname, "..", "..", "..");
+  execFileSync(path.join(repo, ".venv", "bin", "python"), ["scripts/grant_staff.py", address, "--tier", tier, "--apply"], {
+    cwd: repo,
+    env: { ...process.env, DATABASE_URL: E2E.database, REDIS_URL: E2E.redis, ENVIRONMENT: "test" },
+    stdio: "pipe",
+  });
 }

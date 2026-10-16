@@ -115,6 +115,22 @@ async function visit(page: Page, url: string): Promise<void> {
   await expect(page.locator("[data-loading]")).toHaveCount(0, { timeout: 15_000 });
 }
 
+/**
+ * Open every folded `<details>` panel on the page, and wait for what each one loads.
+ *
+ * A closed `<details>` is skipped by axe and by every layout check, so a defect inside a folded
+ * panel would pass the sweep for ever. The back office folds its four reference panels (Sprint 73,
+ * UI-16): the sweep opens them, because "hidden" is not the same as "checked".
+ */
+async function openFolded(page: Page): Promise<void> {
+  const closed = page.locator("details:not([open]) > summary");
+  for (let n = await closed.count(); n > 0; n = await closed.count()) {
+    await closed.first().click();
+  }
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+  await expect(page.locator("[data-loading]")).toHaveCount(0, { timeout: 15_000 });
+}
+
 const PUBLIC = [
   "/",
   "/about",
@@ -304,6 +320,7 @@ test.describe("signed in as an operator", () => {
       await signInAs(page, world.operator.tokens);
       for (const route of ["/admin", `/admin/${world.employer.slug}`]) {
         await visit(page, `/${locale}${route}`);
+        if (route === "/admin") await openFolded(page);
         await checkPage(page, `operator ${locale}${route}`);
       }
     });
@@ -347,6 +364,13 @@ test.describe("on a phone", () => {
       await visit(page, `/en/employer/${world.employer.slug}${route}`);
       await checkPage(page, `phone employer en${route || "/"}`);
     }
+  });
+
+  test("an operator's back office, with its folded panels opened", async ({ page }) => {
+    await signInAs(page, world.operator.tokens);
+    await visit(page, "/en/admin");
+    await openFolded(page);
+    await checkPage(page, "phone operator en/admin");
   });
 
   test("a provider's workspace and interests", async ({ page }) => {
