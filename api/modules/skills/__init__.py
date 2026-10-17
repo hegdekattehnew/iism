@@ -25,6 +25,7 @@ from api.modules.skills.schemas import NsqfLevel, NsqfLevelIn
 from api.modules.skills.service import (
     LADDER_MAX_RISE,
     MAX_LADDER_STEPS,
+    PackFact,
     QualificationRef,
     RoleLadder,
     RoleRef,
@@ -35,12 +36,14 @@ from api.modules.skills.service import (
     get_skill_by_nos_code,
     get_skill_by_slug,
     list_skills,
+    packs_by_code,
     qualifications_for_skill,
     roles_above,
     search_roles,
     search_skills,
     skill_facets,
     standards_for_role,
+    usable_credits,
 )
 
 __all__ = [
@@ -55,6 +58,7 @@ __all__ = [
     "AliasCheck",
     "AliasTarget",
     "NsqfLevelIn",
+    "PackFact",
     "QualificationRef",
     "RoleLadder",
     "RoleRef",
@@ -74,6 +78,7 @@ __all__ = [
     "get_skill_by_slug",
     "list_aliases",
     "list_skills",
+    "packs_by_code",
     "qualifications_for_skill",
     "recent_events",
     "retire_alias",
@@ -85,4 +90,5 @@ __all__ = [
     "skill_facets",
     "standards_for_role",
     "sync_seed_aliases",
+    "usable_credits",
 ]

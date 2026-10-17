@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDeferredValue, useState } from "react";
 import { useTranslations } from "use-intl";
 
-import { feeLabel, intakeLabel, whereLabel } from "../../src/core/labels";
+import { creditsText, feeLabel, intakeLabel, whereLabel } from "../../src/core/labels";
 import { useCourses } from "../../src/lib/queries";
 import { useSeededTerm } from "../../src/lib/term";
 import { useMonthName } from "../../src/lib/months";
@@ -49,6 +49,9 @@ export default function Courses() {
               <Badge tone="brand" label={t(`mode.${course.mode}`)} />
               <Badge label={t(`language.${course.language}`)} />
               {course.nsqf_level != null ? <Badge label={t("level", { level: course.nsqf_level })} /> : null}
+              {creditsText(course.qualification_credits, (k, v) => t(k, v)) ? (
+                <Badge label={creditsText(course.qualification_credits, (k, v) => t(k, v)) ?? ""} />
+              ) : null}
             </BadgeRow>
             <Text variant="lead">{course.title}</Text>
             <Text tone="muted">{course.tenant.name}</Text>

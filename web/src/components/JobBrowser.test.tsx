@@ -143,3 +143,29 @@ describe("the state filter", () => {
     });
   });
 });
+
+/** Sprint 75: newest first, now that a vacancy has a posted date. */
+describe("the sort", () => {
+  it("is the title by default, and says nothing about it on the wire", async () => {
+    serve(30);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    const first = GET.mock.calls.find((c) => c[0] === "/jobs")![1].params.query;
+    expect(first.sort).toBeUndefined();
+    expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("title");
+  });
+
+  it("asks for newest first from the start of the list when chosen", async () => {
+    serve(60);
+    renderUi(<JobBrowser />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show more (36 left)" }));
+    await screen.findByText("Vacancy number 25");
+
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "newest" } });
+
+    await waitFor(() => {
+      const calls = GET.mock.calls.filter((c) => c[0] === "/jobs").map((c) => c[1].params.query);
+      expect(calls.at(-1)).toMatchObject({ sort: "newest", offset: 0 });
+    });
+  });
+});

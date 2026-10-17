@@ -38,6 +38,21 @@ describe("the courses list", () => {
     expect(screen.getByText("Free")).toBeTruthy();
   });
 
+  it("says what the qualification is worth, and draws nothing for a zero or a missing figure (Sprint 75)", async () => {
+    api.GET.mockResolvedValue(
+      ok(
+        page([
+          course(1, { qualification_credits: 14 }),
+          course(2, { qualification_credits: 0 }),
+          course(3, { qualification_credits: null }),
+        ]),
+      ),
+    );
+    await renderScreen(<Courses />);
+    expect(await screen.findByText("14 credits")).toBeTruthy();
+    expect(screen.queryAllByText(/credit/)).toHaveLength(1);
+  });
+
   it("gives an online course no place at all", async () => {
     api.GET.mockResolvedValue(ok(page([course(1, { mode: "online", starts_on: null })])));
     await renderScreen(<Courses />);

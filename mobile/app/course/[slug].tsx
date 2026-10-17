@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
-import { feeLabel, intakeLabel, seatsLabel, whereLabel } from "../../src/core/labels";
+import { creditsText, feeLabel, intakeLabel, seatsLabel, whereLabel } from "../../src/core/labels";
 import { useCourse } from "../../src/lib/queries";
 import { useMonthName } from "../../src/lib/months";
 import { useSignedIn } from "../../src/runtime";
@@ -49,6 +49,21 @@ export default function CourseDetail() {
                 <Fact label={t("seatsLabel")} value={seatsLabel(course.seats_left, say) ?? ""} />
               ) : null}
             </Facts>
+            {course.qualification_name ? (
+              <View style={{ gap: space.xs }}>
+                <Text tone="muted" variant="small">
+                  {t("qualificationLabel")}
+                </Text>
+                <Text variant="lead">
+                  {[course.qualification_name, creditsText(course.qualification_credits, say)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+                <Text tone="muted" variant="small">
+                  {t("qualificationNote")}
+                </Text>
+              </View>
+            ) : null}
 
             {course.description ? <Text>{course.description}</Text> : null}
 

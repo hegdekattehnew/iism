@@ -6,8 +6,9 @@ that belongs to the intelligence layer and arrives in a later sprint.
 
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -21,9 +22,12 @@ from api.modules.marketplace.models import (
     open_job,
     posted_job,
 )
+from api.modules.skills import packs_by_code
 from api.modules.skills.models import Skill
 
 PUBLISHED = "published"
+
+_Order = ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
 def seats_left(seats: int | None, enrolled: int) -> int | None:
@@ -45,6 +49,27 @@ async def seats_left_for(
     limited = [c for c in courses if c.seats is not None]
     enrolled = await enrolled_counts(db, [c.id for c in limited]) if limited else {}
     return {c.id: seats_left(c.seats, enrolled.get(c.id, 0)) for c in courses}
+
+
+async def qualification_for(
+    db: AsyncSession, courses: Sequence[Course]
+) -> dict[uuid.UUID, dict[str, object]]:
+    """What each course's `qualification_pack_code` stands for now, in one query (Sprint 75).
+
+    Returned as the fields to `model_copy(update=...)` onto the payload, like seats left: read
+    when shown and never stored, so a taxonomy re-import cannot leave a stale name or credit, and
+    a pack that has gone shows nothing rather than something wrong.
+    """
+    facts = await packs_by_code(db, [c.qualification_pack_code for c in courses])
+    out: dict[uuid.UUID, dict[str, object]] = {}
+    for c in courses:
+        fact = facts.get(c.qualification_pack_code or "")
+        out[c.id] = (
+            {"qualification_name": fact.job_role, "qualification_credits": fact.credits}
+            if fact
+            else {"qualification_name": None, "qualification_credits": None}
+        )
+    return out
 
 
 def _text_filter(stmt: Select, model: type[Job] | type[Course], q: str) -> Select:
@@ -86,12 +111,14 @@ def _text_filter(stmt: Select, model: type[Job] | type[Course], q: str) -> Selec
 async def _paged(
     db: AsyncSession,
     stmt: Select,
-    order: InstrumentedAttribute[str],
+    order: Sequence[_Order],
     limit: int,
     offset: int,
 ) -> tuple[list, int]:
+    """One page and the true total. **`order` must end in something unique** (the id): ordered by
+    a title alone, two vacancies with the same title could swap places between page one and two."""
     total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = await db.scalars(stmt.order_by(order).limit(limit).offset(offset))
+    rows = await db.scalars(stmt.order_by(*order).limit(limit).offset(offset))
     return list(rows.unique()), total
 
 
@@ -106,6 +133,7 @@ async def list_jobs(
     location_state: str | None = None,
     employment_type: str | None = None,
     nsqf_level_max: int | None = None,
+    sort: str = "title",
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Job], int]:
@@ -128,7 +156,14 @@ async def list_jobs(
     if nsqf_level_max is not None:
         stmt = stmt.where(or_(Job.nsqf_level_min.is_(None), Job.nsqf_level_min <= nsqf_level_max))
 
-    return await _paged(db, stmt, Job.title, limit, offset)
+    if sort == "newest":
+        # Newest posted first (Sprint 75). A vacancy published before `published_at` existed has no
+        # date and sorts **after** every dated one, never by its draft's date, which would be the
+        # invented posting date Sprint 74 refused to show.
+        order: list[_Order] = [Job.published_at.desc().nulls_last(), Job.title, Job.id]
+    else:
+        order = [Job.title, Job.id]
+    return await _paged(db, stmt, order, limit, offset)
 
 
 async def job_states(db: AsyncSession) -> list[tuple[str, int]]:
@@ -235,7 +270,7 @@ async def list_courses(
     if max_fee_inr is not None:
         stmt = stmt.where(or_(Course.fee_inr.is_(None), Course.fee_inr <= max_fee_inr))
 
-    return await _paged(db, stmt, Course.title, limit, offset)
+    return await _paged(db, stmt, [Course.title, Course.id], limit, offset)
 
 
 async def get_course_by_slug(db: AsyncSession, slug: str) -> Course | None:

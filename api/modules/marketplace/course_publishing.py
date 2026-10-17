@@ -38,6 +38,7 @@ from api.modules.geography import resolve_location
 from api.modules.marketplace.listings import (
     load_with_skills,
     refuse_emptying_a_published,
+    require_current_pack,
     resolve_standards,
     unique_slug,
 )
@@ -58,6 +59,7 @@ _PLAIN_FIELDS = (
     "duration_hours",
     "fee_inr",
     "nsqf_level",
+    "qualification_pack_code",
     "location_state",
     "location_district",
     "starts_on",
@@ -145,6 +147,7 @@ async def create_course(
     external_ref: str | None = None,
 ) -> Course:
     """A draft course. `external_ref` is the provider's own id (bulk upload only)."""
+    await require_current_pack(db, payload.qualification_pack_code)
     location = await resolve_location(db, payload.location_state, payload.location_district)
     course = await add_with_unique_slug(
         db,
@@ -185,6 +188,7 @@ async def update_course(
     # Anything that can refuse runs before anything is changed (Sprint 55): see
     # `publishing.update_job`.
     resolved = await _resolve_skills(db, payload.skills)
+    await require_current_pack(db, payload.qualification_pack_code)
     location = await resolve_location(db, payload.location_state, payload.location_district)
 
     for field in _PLAIN_FIELDS:

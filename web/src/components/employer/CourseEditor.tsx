@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Area, Field, Select, Text } from "@/components/profile/fields";
+import { type ChosenQualification, QualificationField } from "@/components/employer/QualificationField";
 import { type Standard, StandardPicker } from "@/components/StandardPicker";
 import { Button, Card, CardBody } from "@/components/ui";
 import type { CoursePayload, OrgCourse } from "@/lib/org";
@@ -47,6 +48,17 @@ export function CourseEditor({
 }) {
   const t = useTranslations("providerWorkspace");
   const [taught, setTaught] = useState<Taught[]>(() => toTaught(course));
+  // The provider's statement of what this course counts toward. `update_course` replaces every
+  // field, so the saved value is loaded here and sent back, or saving would clear it.
+  const [qualification, setQualification] = useState<ChosenQualification | null>(() =>
+    course?.qualification_pack_code
+      ? {
+          code: course.qualification_pack_code,
+          name: course.qualification_name ?? null,
+          credits: course.qualification_credits ?? null,
+        }
+      : null,
+  );
 
   const chosen = new Set(taught.map((s) => s.skill_slug));
 
@@ -79,6 +91,7 @@ export function CourseEditor({
       duration_hours: n("duration_hours"),
       fee_inr: n("fee_inr"),
       nsqf_level: n("nsqf_level"),
+      qualification_pack_code: qualification?.code ?? null,
       location_state: s("location_state"),
       location_district: s("location_district"),
       starts_on: s("starts_on"),
@@ -165,6 +178,11 @@ export function CourseEditor({
                 defaultValue={course?.nsqf_level ?? ""}
               />
             </Field>
+            <div className="sm:col-span-2">
+              <span className="block text-sm font-medium">{t("qualification")}</span>
+              <p className="mt-0.5 mb-2 text-xs text-muted">{t("qualificationHint")}</p>
+              <QualificationField value={qualification} onChange={setQualification} />
+            </div>
             {/* Where, when and how many (Sprint 58). The server resolves the place against the
                 national master; blank is right for an online course. */}
             <Field label={t("locationState")} hint={t("placeHint")}>

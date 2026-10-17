@@ -1649,6 +1649,32 @@ def course_intake(slug: str) -> tuple[str | None, str | None, int, int]:
     raise KeyError(slug)
 
 
+# A few demonstration courses say which qualification they count toward (Sprint 75, BL-12.8), so a
+# seeded database shows the credit chip. Course slug -> the role's exact title; resolved to a
+# current qualification's code at seed time, and a title with no qualification fails loudly (this
+# file's own convention: a wrong link is worse than none).
+COURSE_QUALIFICATIONS = {
+    "general-duty-assistant-certificate": "General Duty Assistant",
+    "phlebotomy-technician-course": "Phlebotomist",
+    "cashier-and-billing-operations": "Retail Cashier",
+    "warehouse-operations-basics": "Warehouse Associate",
+}
+
+
+async def _qualification_code(db, role: str) -> str:  # type: ignore[no-untyped-def]
+    """The code of the qualification role search itself would offer for this exact title."""
+    from api.modules.skills import search_roles
+
+    for hit in await search_roles(db, role, limit=5):
+        if hit.match_kind == "exact" and hit.job_role.lower() == role.lower():
+            # A general course never counts toward a disability-track pack (the same rule the role
+            # aliases follow): the only pack some titles have is one, and then there is no link.
+            if hit.qp_code.split("/")[0] == "PWD" or "/PWD/" in hit.qp_code:
+                break
+            return hit.qp_code
+    raise SystemExit(f"No current qualification is titled {role!r}: run `make import-nsqf` first.")
+
+
 CLOSED_VACANCY_SLUG = "inventory-clerk-nagpur"
 
 
@@ -1880,6 +1906,10 @@ async def seed() -> dict[str, int]:
             course.state_id, course.district_id = placed.state_id, placed.district_id
             course.starts_on = today_ist() + timedelta(days=start_offset)
             course.seats = intake_seats
+            if slug in COURSE_QUALIFICATIONS:
+                course.qualification_pack_code = await _qualification_code(
+                    db, COURSE_QUALIFICATIONS[slug]
+                )
             course.status = "published"
             await db.flush()
 

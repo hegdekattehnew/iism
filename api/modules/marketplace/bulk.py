@@ -73,7 +73,7 @@ from api.modules.marketplace.models import (
     Job,
 )
 from api.modules.marketplace.schemas import CourseIn, CourseSkillIn, JobIn, JobSkillIn
-from api.modules.skills import Skill, search_roles, standards_for_role
+from api.modules.skills import Skill, packs_by_code, search_roles, standards_for_role
 
 log = structlog.get_logger("iism.marketplace")
 
@@ -123,6 +123,7 @@ COURSE_COLUMNS = (
     "district",
     "starts_on",
     "seats",
+    "qualification",
     "standards",
     "job_role",
 )
@@ -184,6 +185,7 @@ _TEMPLATE_ROWS: dict[str, tuple[tuple[str, ...], ...]] = {
             "Pune",
             "2026-12-01",
             "30",
+            "",
             "HSS/N6012:4; HSS/N6002:3",
             "",
         ),
@@ -200,6 +202,7 @@ _TEMPLATE_ROWS: dict[str, tuple[tuple[str, ...], ...]] = {
             "",
             "",
             "",
+            "HSS/Q5102",
             "",
             "Home Health Aide",
         ),
@@ -918,6 +921,17 @@ async def _plan_course(
     seats = _int(cells, "seats", problems)
     if seats is not None:
         fields["seats"] = seats
+    # The qualification the provider says the course counts toward (Sprint 75, BL-12.8): a code, the
+    # same check the editor's save makes. It is **not** `job_role`, which expands into the course's
+    # standards: a course that teaches part of a role must not claim the whole of it.
+    code = cells.get("qualification", "").strip()
+    if code:
+        fields["qualification_pack_code"] = code
+        if code not in await packs_by_code(db, [code]):
+            problems.append(
+                f"qualification '{code}' is not a current qualification: use a code from the "
+                "role search in the course editor (for example HSS/Q5102)"
+            )
 
     plan.fields = fields
     try:
@@ -997,6 +1011,9 @@ _UPDATE_COLUMNS: dict[Kind, dict[str, str]] = {
         "district": "location_district",
         "starts_on": "starts_on",
         "seats": "seats",
+        # Not optional bookkeeping: `update_course` replaces every plain field, so a field missing
+        # from this map is reset to nothing by every bulk update that does not carry it.
+        "qualification": "qualification_pack_code",
     },
 }
 

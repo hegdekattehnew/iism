@@ -26,10 +26,12 @@ export function JobBrowser({
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
   const [state, setState] = useState("");
+  // Per visit, never remembered: the title order is the default everyone (and the released app) gets.
+  const [sort, setSort] = useState<"title" | "newest">("title");
   const deferred = useDeferredValue(query.trim());
 
   const results = useInfiniteQuery({
-    queryKey: ["jobs", { q: deferred, type, state, skill: initialSkill }],
+    queryKey: ["jobs", { q: deferred, type, state, skill: initialSkill, sort }],
     placeholderData: keepPreviousData,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -38,6 +40,7 @@ export function JobBrowser({
           query: {
             limit: JOBS_PAGE_SIZE,
             offset: pageParam,
+            ...(sort === "newest" ? { sort } : {}),
             ...(deferred ? { q: deferred } : {}),
             ...(type ? { employment_type: type as (typeof TYPES)[number] } : {}),
             ...(state ? { location_state: state } : {}),
@@ -123,13 +126,25 @@ export function JobBrowser({
         )}
       </div>
 
-      {results.isPending ? (
-        <Skeleton className="mt-4 h-5 w-32" />
-      ) : (
-        <p className="mt-4 text-sm text-muted" aria-live="polite">
-          {t("resultsCount", { count: total })}
-        </p>
-      )}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        {results.isPending ? (
+          <Skeleton className="h-5 w-32" />
+        ) : (
+          <p className="text-sm text-muted" aria-live="polite">
+            {t("resultsCount", { count: total })}
+          </p>
+        )}
+        {/* Always drawn, so the row is the same shape before and after the count arrives. */}
+        <select
+          aria-label={t("sortLabel")}
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "title" | "newest")}
+          className="rounded-lg border border-border-token bg-surface px-3 py-3 text-sm"
+        >
+          <option value="title">{t("sortTitle")}</option>
+          <option value="newest">{t("sortNewest")}</option>
+        </select>
+      </div>
 
       {results.isError && (
         <p className="mt-6 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">

@@ -12,6 +12,7 @@ EmploymentType = Literal["full_time", "part_time", "contract", "apprenticeship",
 CourseMode = Literal["online", "offline", "hybrid"]
 CourseLanguage = Literal["en", "hi", "both"]
 Status = Literal["draft", "published"]
+JobSort = Literal["title", "newest"]
 SkillSource = Literal["self_declared", "inferred", "assessed", "certified"]
 EducationLevel = Literal[
     "none",
@@ -196,6 +197,12 @@ class CourseOut(BaseModel):
     fee_inr: int | None = None
     nsqf_level: NsqfLevel | None = None
     qualification_pack_code: str | None = None
+    # What that code stands for, read when it is shown (Sprint 75, BL-12.8), never stored: the
+    # qualification's own job-role name and what it is worth. A statement the **provider** made,
+    # so the page says so. `None` when nothing is linked, the pack has gone, or its credits are
+    # unknown, zero or not a number.
+    qualification_name: str | None = None
+    qualification_credits: float | None = None
     # Where, when and how many (Sprint 58, BL-14.5). All optional: a course published before this
     # has no stated place, and the screen says so rather than guessing.
     location_state: str | None = None
@@ -247,11 +254,19 @@ class CourseIn(BaseModel):
     duration_hours: int | None = Field(None, ge=1, le=10_000)
     fee_inr: int | None = Field(None, ge=0)
     nsqf_level: NsqfLevelIn | None = None
+    # The qualification this course counts toward, as its provider says (Sprint 75, BL-12.8): a
+    # code from role search. Checked against the current packs on write; blank is none.
+    qualification_pack_code: str | None = Field(None, max_length=60)
     location_state: str | None = Field(None, max_length=120)
     location_district: str | None = Field(None, max_length=120)
     starts_on: date | None = None
     seats: int | None = Field(None, ge=1, le=100_000)
     skills: list[CourseSkillIn] = Field(default_factory=list, max_length=50)
+
+    @field_validator("qualification_pack_code")
+    @classmethod
+    def _blank_is_none(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
 
 
 class OrgCourseOut(CourseDetail):

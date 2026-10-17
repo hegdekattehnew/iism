@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.core.text import slugify
+from api.modules.skills import packs_by_code
 from api.modules.skills.models import Skill
 
 
@@ -72,6 +73,22 @@ async def resolve_standards(
             f"Retired standards cannot be {verb}: {', '.join(retired)}",
         )
     return {slug: found[slug][0] for slug in found}
+
+
+async def require_current_pack(db: AsyncSession, code: str | None) -> None:
+    """A course may only point at a qualification that exists now (Sprint 75, BL-12.8).
+
+    `Course.qualification_pack_code` was a free string nothing could write. It is written now, so
+    it is checked here, **before anything is changed** (the Sprint 55 rule), in words a form can
+    show. `None` is "no qualification" and always allowed.
+    """
+    if code is None:
+        return
+    if code not in await packs_by_code(db, [code]):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "We could not find that qualification. Search for it again and pick one from the list.",
+        )
 
 
 def refuse_emptying_a_published(
