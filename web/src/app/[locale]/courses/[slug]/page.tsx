@@ -6,6 +6,7 @@ import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { creditsText, type Translate } from "@/lib/job-text";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,22 @@ export default async function CourseDetailPage({
           <dt className="text-xs text-muted">{t("intakeLabel")}</dt>
           <dd className="mt-0.5 text-lg font-semibold">{intake}</dd>
         </div>
+        {data.qualification_name && (
+          <div className="col-span-2">
+            <dt className="text-xs text-muted">{t("qualificationLabel")}</dt>
+            <dd className="mt-0.5 text-lg font-semibold">
+              {data.qualification_name}
+              {creditsText(data.qualification_credits, t as unknown as Translate) && (
+                <span className="font-normal text-muted">
+                  {` · ${creditsText(data.qualification_credits, t as unknown as Translate)}`}
+                </span>
+              )}
+              <span className="mt-0.5 block text-xs font-normal text-muted">
+                {t("qualificationNote")}
+              </span>
+            </dd>
+          </div>
+        )}
         {data.seats_left != null && (
           <div>
             <dt className="text-xs text-muted">{t("seatsLabel")}</dt>

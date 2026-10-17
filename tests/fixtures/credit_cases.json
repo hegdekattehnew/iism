@@ -1,0 +1,13 @@
+{
+  "about": "Shared by web/src/lib/credits.test.ts and mobile/src/test/credits.test.ts (read by tests/test_scannable_listing.py too). creditCount(credits) is the number a course's qualification is worth, or null when there is nothing a person can make sense of: no figure, zero, a negative, or not a number. The API already sends null for those (Sprint 75); this is the clients' own guard, so a stray figure never renders as '0 credits' or 'NaN credits'. A fractional figure is kept as written (2.5).",
+  "cases": [
+    {"name": "no figure", "credits": null, "expect": null},
+    {"name": "zero is not a number of credits", "credits": 0, "expect": null},
+    {"name": "a negative", "credits": -3, "expect": null},
+    {"name": "just above zero", "credits": 0.5, "expect": 0.5},
+    {"name": "one", "credits": 1, "expect": 1},
+    {"name": "a fraction is kept", "credits": 2.5, "expect": 2.5},
+    {"name": "the median pack", "credits": 14, "expect": 14},
+    {"name": "a large figure", "credits": 99, "expect": 99}
+  ]
+}

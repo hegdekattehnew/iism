@@ -7,6 +7,7 @@ import { useDeferredValue, useState } from "react";
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { creditsText, type Translate } from "@/lib/job-text";
 
 const MODES = ["online", "offline", "hybrid"] as const;
 const LANGS = ["en", "hi"] as const;
@@ -21,6 +22,7 @@ type Course = {
   duration_hours?: number | null;
   fee_inr?: number | null;
   nsqf_level?: number | null;
+  qualification_credits?: number | null;
   location_state?: string | null;
   location_district?: string | null;
   starts_on?: string | null;
@@ -188,6 +190,11 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
                 {c.nsqf_level != null && (
                   <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                     {t("level", { level: c.nsqf_level })}
+                  </span>
+                )}
+                {creditsText(c.qualification_credits, t as unknown as Translate) && (
+                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
+                    {creditsText(c.qualification_credits, t as unknown as Translate)}
                   </span>
                 )}
               </div>

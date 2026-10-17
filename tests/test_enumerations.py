@@ -52,6 +52,7 @@ from api.modules.marketplace.schemas import (
     EducationLevel,
     EmploymentType,
     Gender,
+    JobSort,
     LanguageProficiency,
     NoticePeriod,
     SkillSource,
@@ -133,9 +134,11 @@ class TestEachUnionMatchesItsConstraint:
         # `QpRequirement` is checked by the test above; `InvitationState` is
         # **derived from three timestamps** by `Invitation.state` and stored
         # nowhere, so there is no CHECK for it to agree with -- which is the
-        # point of storing it nowhere.
+        # point of storing it nowhere; `JobSort` (Sprint 75) is a **query
+        # parameter** (`GET /jobs?sort=`), an ordering and not a column.
         assert declared - {u for u, _, _ in BACKED} == {
             OrgTenantType,
             QpRequirement,
             InvitationState,
+            JobSort,
         }

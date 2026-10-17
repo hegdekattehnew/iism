@@ -184,6 +184,9 @@ class RoleHit(BaseModel):
     variants: int = 1
     matched_on: str
     match_kind: Literal["exact", "prefix", "contains", "words", "fuzzy", "alias"]
+    # What the qualification is worth (Sprint 75), so a provider choosing one for a course sees it.
+    # `None` for unknown, zero or not-a-number.
+    credits: float | None = None
 
 
 class RoleStandardOut(SkillOut):

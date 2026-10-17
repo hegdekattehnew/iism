@@ -135,6 +135,15 @@ class TestSharedVectors:
         names = {c["name"] for c in cases}
         assert {"exactly a day", "exactly thirty days"} <= names
 
+    def test_the_credit_cases_cover_nothing_zero_a_fraction_and_a_whole_number(self) -> None:
+        cases = json.loads((FIXTURES / "credit_cases.json").read_text())["cases"]
+        assert len(cases) >= 6
+        expects = [c["expect"] for c in cases]
+        assert None in expects  # nothing to show is a case
+        assert any(c["credits"] == 0 and c["expect"] is None for c in cases)
+        assert any(isinstance(e, float) and e != int(e) for e in expects)  # a fraction is kept
+        assert any(isinstance(e, int) and e > 1 for e in expects)
+
     def test_both_clients_read_all_the_files(self) -> None:
         """If a client stopped reading the shared file it would pass on cases of its own."""
         readers = {
@@ -149,6 +158,10 @@ class TestSharedVectors:
             "posted_cases.json": [
                 "web/src/lib/posted.test.ts",
                 "mobile/src/test/posted.test.ts",
+            ],
+            "credit_cases.json": [
+                "web/src/lib/credits.test.ts",
+                "mobile/src/test/credits.test.ts",
             ],
         }
         for fixture, tests in readers.items():

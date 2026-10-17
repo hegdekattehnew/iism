@@ -42,6 +42,7 @@ async def list_jobs(
     location_state: str | None = Query(None),
     employment_type: schemas.EmploymentType | None = Query(None),
     nsqf_level_max: int | None = Query(None, ge=1, le=10),
+    sort: schemas.JobSort = Query("title", description="`title` (default) or `newest` posted"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
@@ -54,6 +55,7 @@ async def list_jobs(
         location_state=location_state,
         employment_type=employment_type,
         nsqf_level_max=nsqf_level_max,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
@@ -121,9 +123,12 @@ async def list_courses(
         offset=offset,
     )
     overrides = await overrides_for(db, "course", items, ("title", "description"), locale)
+    qualifications = await service.qualification_for(db, items)
     return schemas.CoursePage(
         items=[
-            schemas.CourseOut.model_validate(c).model_copy(update=overrides.get(c.id, {}))
+            schemas.CourseOut.model_validate(c).model_copy(
+                update={**overrides.get(c.id, {}), **qualifications[c.id]}
+            )
             for c in items
         ],
         total=total,
@@ -143,8 +148,9 @@ async def get_course(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
     overrides = await overrides_for(db, "course", [course], ("title", "description"), locale)
     left = (await service.seats_left_for(db, [course]))[course.id]
+    qualification = (await service.qualification_for(db, [course]))[course.id]
     return schemas.CourseDetail.model_validate(course).model_copy(
-        update={**overrides.get(course.id, {}), "seats_left": left}
+        update={**overrides.get(course.id, {}), "seats_left": left, **qualification}
     )
 
 
@@ -178,4 +184,7 @@ async def courses_for_skill(
     if skill is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill not found")
     courses = await service.courses_teaching_skill(db, skill.id, limit=limit)
-    return [schemas.CourseOut.model_validate(c) for c in courses]
+    qualifications = await service.qualification_for(db, courses)
+    return [
+        schemas.CourseOut.model_validate(c).model_copy(update=qualifications[c.id]) for c in courses
+    ]

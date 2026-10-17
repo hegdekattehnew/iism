@@ -220,6 +220,24 @@ describe("a course", () => {
     expect(screen.getByText("to level 4")).toBeTruthy();
   });
 
+  it("says what it counts toward as the provider's statement, with the credits (Sprint 75)", async () => {
+    world.params = { slug: "phlebotomy-1" };
+    api.GET.mockResolvedValue(
+      ok(course(1, { qualification_name: "General Duty Assistant", qualification_credits: 14 })),
+    );
+    await renderScreen(<CourseDetail />);
+    expect(await screen.findByText("General Duty Assistant · 14 credits")).toBeTruthy();
+    expect(screen.getByText(/Stated by the provider/)).toBeTruthy();
+  });
+
+  it("shows no qualification line for a course with none", async () => {
+    world.params = { slug: "phlebotomy-1" };
+    api.GET.mockResolvedValue(ok(course(1, { qualification_name: null })));
+    await renderScreen(<CourseDetail />);
+    await screen.findByText("Phlebotomy 1");
+    expect(screen.queryByText("Counts toward")).toBeNull();
+  });
+
   it("says full at no seats", async () => {
     world.params = { slug: "phlebotomy-1" };
     api.GET.mockResolvedValue(ok(course(1, { seats_left: 0 })));

@@ -100,6 +100,21 @@ export function postedText(
   }
 }
 
+/**
+ * What a course's qualification is worth (Sprint 75, BL-12.8): a number, or `null` when there is
+ * nothing a person can make sense of (no figure, zero, negative, not a number). The server already
+ * says `null` for those; this is the guard that keeps "0 credits" and "NaN credits" off a screen. The
+ * same rule runs on the phone over `tests/fixtures/credit_cases.json`.
+ */
+export function creditCount(credits: number | null | undefined): number | null {
+  return typeof credits === "number" && Number.isFinite(credits) && credits > 0 ? credits : null;
+}
+
+export function creditsText(credits: number | null | undefined, t: Translate): string | null {
+  const count = creditCount(credits);
+  return count === null ? null : t("creditsChip", { count });
+}
+
 export function experienceText(
   job: Pick<JobCardData, "experience_min_years" | "experience_max_years">,
   t: Translate,

@@ -113,6 +113,17 @@ export function postedText(
   }
 }
 
+/** What a course's qualification is worth (Sprint 75): the rule in `web/src/lib/job-text.ts`, over the
+ *  same `tests/fixtures/credit_cases.json`. `null` when there is nothing a person can make sense of. */
+export function creditCount(credits: number | null | undefined): number | null {
+  return typeof credits === "number" && Number.isFinite(credits) && credits > 0 ? credits : null;
+}
+
+export function creditsText(credits: number | null | undefined, t: Translate): string | null {
+  const count = creditCount(credits);
+  return count === null ? null : t("creditsChip", { count });
+}
+
 export type CourseTerms = {
   mode: "online" | "offline" | "hybrid";
   fee_inr?: number | null;

@@ -19,10 +19,14 @@ router = APIRouter(prefix="/org/{org_slug}/courses", tags=["publishing"])
 
 
 async def _out(db: AsyncSession, courses: list[Course]) -> list[schemas.OrgCourseOut]:
-    """A provider's own listings, with the seats still free on each (Sprint 58)."""
+    """A provider's own listings, with the seats still free on each (Sprint 58) and what the
+    qualification they linked stands for (Sprint 75)."""
     left = await service.seats_left_for(db, courses)
+    qualifications = await service.qualification_for(db, courses)
     return [
-        schemas.OrgCourseOut.model_validate(c).model_copy(update={"seats_left": left[c.id]})
+        schemas.OrgCourseOut.model_validate(c).model_copy(
+            update={"seats_left": left[c.id], **qualifications[c.id]}
+        )
         for c in courses
     ]
 

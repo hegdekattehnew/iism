@@ -3882,6 +3882,10 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Qualification Name */
+            qualification_name?: string | null;
+            /** Qualification Credits */
+            qualification_credits?: number | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -3943,6 +3947,8 @@ export interface components {
             fee_inr?: number | null;
             /** Nsqf Level */
             nsqf_level?: number | null;
+            /** Qualification Pack Code */
+            qualification_pack_code?: string | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -4006,6 +4012,10 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Qualification Name */
+            qualification_name?: string | null;
+            /** Qualification Credits */
+            qualification_credits?: number | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -5545,6 +5555,10 @@ export interface components {
             nsqf_level?: number | null;
             /** Qualification Pack Code */
             qualification_pack_code?: string | null;
+            /** Qualification Name */
+            qualification_name?: string | null;
+            /** Qualification Credits */
+            qualification_credits?: number | null;
             /** Location State */
             location_state?: string | null;
             /** Location District */
@@ -6284,6 +6298,8 @@ export interface components {
              * @enum {string}
              */
             match_kind: "exact" | "prefix" | "contains" | "words" | "fuzzy" | "alias";
+            /** Credits */
+            credits?: number | null;
         };
         /** RoleRefOut */
         RoleRefOut: {
@@ -7276,6 +7292,8 @@ export interface operations {
                 location_state?: string | null;
                 employment_type?: ("full_time" | "part_time" | "contract" | "apprenticeship" | "gig") | null;
                 nsqf_level_max?: number | null;
+                /** @description `title` (default) or `newest` posted */
+                sort?: "title" | "newest";
                 limit?: number;
                 offset?: number;
                 /** @description Override the negotiated language */

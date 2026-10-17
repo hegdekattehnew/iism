@@ -4,9 +4,11 @@ Routes validate and delegate here; they contain no logic themselves (CLAUDE.md).
 """
 
 import json
+import math
 import uuid
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -619,6 +621,52 @@ LIMIT :limit
 
 
 @dataclass(frozen=True)
+class PackFact:
+    """What a course's `qualification_pack_code` stands for, read when it is shown (Sprint 75)."""
+
+    qp_code: str
+    job_role: str
+    credits: float | None
+
+
+def usable_credits(value: Decimal | float | None) -> float | None:
+    """Credits a person may be shown: finite and above zero, else nothing.
+
+    The importer once stored `NaN` (five packs) and 18 packs say 0; neither is a number of credits,
+    so a reader never has to know.
+    """
+    if value is None:
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and number > 0 else None
+
+
+async def packs_by_code(db: AsyncSession, codes: Iterable[str | None]) -> dict[str, PackFact]:
+    """The current qualification behind each code, in one query. A code that names no current pack
+    is simply absent: a re-import that retires a pack means no chip, never a wrong one."""
+    wanted = sorted({c for c in codes if c})
+    if not wanted:
+        return {}
+    rows = (
+        await db.execute(
+            select(
+                QualificationPack.qp_code,
+                QualificationPack.job_role,
+                QualificationPack.name,
+                QualificationPack.credits,
+            )
+            .where(QualificationPack.qp_code.in_(wanted), QualificationPack.is_current.is_(True))
+            .order_by(QualificationPack.qp_code, QualificationPack.version)
+        )
+    ).all()
+    # Ordered by version, so a later current version of one code wins.
+    return {
+        code: PackFact(code, role or name, usable_credits(credits))
+        for code, role, name, credits in rows
+    }
+
+
+@dataclass(frozen=True)
 class RoleHit:
     slug: str
     qp_code: str
@@ -629,6 +677,7 @@ class RoleHit:
     variants: int
     matched_on: str
     match_kind: str
+    credits: float | None = None
 
 
 def _pgvector_literal(vector: list[float]) -> str:
@@ -759,7 +808,10 @@ async def search_roles(db: AsyncSession, query: str, *, limit: int = 20) -> list
                 match_kind=kind,
             )
         )
-    return hits
+    # What the qualification is worth, for the one place that picks one (a provider linking a
+    # course). One more query for the page, not a column in the ranking SQL.
+    facts = await packs_by_code(db, [h.qp_code for h in hits])
+    return [replace(h, credits=facts[h.qp_code].credits) if h.qp_code in facts else h for h in hits]
 
 
 @dataclass(frozen=True)

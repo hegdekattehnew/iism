@@ -2095,3 +2095,119 @@ class TestDescriptionNotes:
         )
         assert body["rows"][0]["status"] == "update"
         assert [n for n in body["notes"] if "description" in n] == []
+
+
+# ================================================== a course says what it counts toward (Sprint 75)
+
+QUAL_HEADER = "external_ref,title,mode,qualification,standards"
+
+
+async def _qualification(db: AsyncSession, role: str) -> str:
+    """A current qualification, returning its code."""
+    from decimal import Decimal
+
+    from api.modules.skills.hierarchy import QualificationPack
+
+    n = uuid.uuid4().hex[:6].upper()
+    db.add(
+        QualificationPack(
+            qp_code=f"BQ/Q{n}",
+            version="1.0",
+            slug=f"bq-{n.lower()}",
+            name=f"{role} qualification",
+            job_role=role,
+            nsqf_level=Decimal("4"),
+            credits=Decimal("12"),
+            is_current=True,
+        )
+    )
+    await db.commit()
+    return f"BQ/Q{n}"
+
+
+class TestACourseQualificationColumn:
+    async def test_it_is_checked_applied_and_stored_and_an_unknown_code_fails_its_row(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        code = await _qualification(db, "Bulk Role")
+        headers, org = await _org(client, "Qualification Academy", "course_provider")
+        text = _csv(
+            f"Q1,Phlebotomy,offline,{code},HC/N0001",
+            "Q2,Wound care,offline,NOPE/Q9,HC/N0001",
+            "Q3,Dressing,offline,,HC/N0001",
+            header=QUAL_HEADER,
+        )
+
+        checked = (await _post(client, f"/org/{org}/courses/bulk/check", text, headers)).json()
+        statuses = [r["status"] for r in checked["rows"]]
+        # A warning is "no place stated": fine. Only the unknown code is an error.
+        assert statuses == ["warning", "error", "warning"], checked
+        assert "not a current qualification" in " ".join(checked["rows"][1]["messages"])
+        assert (await _course_rows(client, headers, org)) == {}  # a check writes nothing
+
+        await _post(client, f"/org/{org}/courses/bulk/apply", text, headers)
+        courses = await _course_rows(client, headers, org)
+        assert courses["Phlebotomy"]["qualification_pack_code"] == code
+        assert courses["Phlebotomy"]["qualification_name"] == "Bulk Role"
+        assert courses["Dressing"]["qualification_pack_code"] is None
+        assert "Wound care" not in courses  # a bad row never blocks a good one, and never lands
+
+    async def test_an_update_that_does_not_carry_the_column_leaves_the_link_alone(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        """`update_course` replaces every plain field, so a field missing from the update map would
+        be reset by every bulk update that never mentioned it (ADR-064: only the columns the file
+        carries)."""
+        code = await _qualification(db, "Kept By Bulk")
+        headers, org = await _org(client, "Keep Academy", "course_provider")
+        await _post(
+            client,
+            f"/org/{org}/courses/bulk/apply",
+            _csv(f"K1,Phlebotomy,offline,{code},HC/N0001", header=QUAL_HEADER),
+            headers,
+        )
+
+        text = "external_ref,title,seats\nK1,Phlebotomy,12\n"
+        await _post(client, f"/org/{org}/courses/bulk/apply{UPDATE}", text, headers)
+
+        course = (await _course_rows(client, headers, org))["Phlebotomy"]
+        assert course["seats"] == 12
+        assert course["qualification_pack_code"] == code
+
+    async def test_an_update_can_change_and_a_blank_cell_clears(
+        self, client: AsyncClient, db: AsyncSession, corpus: None
+    ) -> None:
+        first, second = await _qualification(db, "First Role"), await _qualification(db, "Second")
+        headers, org = await _org(client, "Change Academy", "course_provider")
+        await _post(
+            client,
+            f"/org/{org}/courses/bulk/apply",
+            _csv(f"C1,Phlebotomy,offline,{first},HC/N0001", header=QUAL_HEADER),
+            headers,
+        )
+
+        changed = f"external_ref,title,qualification\nC1,Phlebotomy,{second}\n"
+        await _post(client, f"/org/{org}/courses/bulk/apply{UPDATE}", changed, headers)
+        assert (await _course_rows(client, headers, org))["Phlebotomy"][
+            "qualification_pack_code"
+        ] == second
+
+        cleared = "external_ref,title,qualification\nC1,Phlebotomy,\n"
+        await _post(client, f"/org/{org}/courses/bulk/apply{UPDATE}", cleared, headers)
+        assert (await _course_rows(client, headers, org))["Phlebotomy"][
+            "qualification_pack_code"
+        ] is None
+
+    def test_every_plain_field_of_a_course_is_in_the_update_map(self) -> None:
+        """The structural form of the first test: a new plain field that the update map forgets is
+        silently cleared by every bulk update."""
+        from api.modules.marketplace import course_publishing
+
+        mapped = set(bulk._UPDATE_COLUMNS["courses"].values())
+        assert course_publishing._PLAIN_FIELDS  # found them before judging
+        assert set(course_publishing._PLAIN_FIELDS) <= mapped
+
+    def test_the_template_names_the_column_and_never_calls_it_a_role(self) -> None:
+        header = bulk.COLUMNS["courses"]
+        assert "qualification" in header and "job_role" in header
+        assert header.index("qualification") != header.index("job_role")

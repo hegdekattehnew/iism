@@ -262,7 +262,10 @@
     "alsoCovered": "Also covered ({count})",
     "showMore": "Show more ({left} left)",
     "loadMoreError": "Could not load more. Check your connection and try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "sortLabel": "Sort by",
+    "sortTitle": "A to Z",
+    "sortNewest": "Newest first"
   },
   "coursesPage": {
     "title": "Courses",
@@ -306,7 +309,10 @@
     "full": "Full",
     "showMore": "Show more ({left} left)",
     "loadMoreError": "Could not load more. Check your connection and try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "creditsChip": "{count, plural, one {# credit} other {# credits}}",
+    "qualificationLabel": "Counts toward",
+    "qualificationNote": "Stated by the provider. The credits are for the whole qualification, not only this course."
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -1000,7 +1006,12 @@
     "startsOnHint": "Leave blank if you admit people all the time.",
     "seats": "Seats in the next intake",
     "seatsHint": "Seats left is worked out from the learners you mark as enrolled.",
-    "descriptionHint": "Say who the course is for and what a learner can do afterwards, in a sentence or two. The page already lists the standards it teaches."
+    "descriptionHint": "Say who the course is for and what a learner can do afterwards, in a sentence or two. The page already lists the standards it teaches.",
+    "qualification": "Qualification (optional)",
+    "qualificationHint": "Search for the qualification this course counts toward. Learners see it as your statement. Leave it empty if there is none.",
+    "qualificationPlaceholder": "For example: general duty assistant",
+    "qualificationNone": "No qualification found. Try a different word.",
+    "qualificationRemove": "Remove qualification"
   },
   "chooser": {
     "title": "I'm here to…",
