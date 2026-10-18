@@ -49,8 +49,8 @@ const devanagari = Noto_Sans_Devanagari({
  *  A mismatch here is what makes an installed app look like a web page. */
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
+    { media: "(prefers-color-scheme: light)", color: "#f8f9fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#111417" },
   ],
 };
 

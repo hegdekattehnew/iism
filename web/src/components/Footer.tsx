@@ -75,7 +75,7 @@ export async function Footer() {
                   <li key={l.key}>
                     <Link
                       href={l.href}
-                      className="-mx-1 flex min-h-11 items-center rounded px-1 py-1.5 text-sm text-foreground/80 hover:text-brand hover:underline"
+                      className="-mx-1 flex min-h-11 items-center rounded px-1 py-1.5 text-sm text-muted hover:text-brand hover:underline"
                     >
                       {label(l.ns, l.key)}
                     </Link>

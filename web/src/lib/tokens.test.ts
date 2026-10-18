@@ -36,6 +36,11 @@ const PALETTE = new RegExp(
   String.raw`(?:^|\s|"|'|\`)(?:[a-z-]+:)*(?:bg|text|border|ring|outline|divide|from|via|to|decoration|shadow|accent|caret|fill|stroke|placeholder)-(?:${FAMILIES})-\d{2,3}\b`,
 );
 
+// A semantic text colour at a partial opacity (`text-brand-contrast/80`). Borders and fills may be
+// translucent; text may not.
+const TRANSLUCENT_TEXT =
+  /(?:^|\s|"|'|`)(?:[a-z-]+:)*text-(?:foreground|muted|brand|brand-strong|brand-contrast|accent-text|success-text|warning-text|danger-text|info-text)\/\d+/;
+
 function tsxFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
@@ -70,5 +75,30 @@ describe("colour tokens", () => {
     expect(PALETTE.test('className="bg-rose-50 text-rose-800"')).toBe(true);
     expect(PALETTE.test('className="dark:border-emerald-900"')).toBe(true);
     expect(PALETTE.test('className="bg-danger-surface text-danger-text"')).toBe(false);
+  });
+
+  it("no text is made secondary by translucency", () => {
+    // Sprint 77: the call-to-action band's sentence was `text-brand-contrast/80`. Over the dark
+    // theme's lighter blue it measured 3.94:1, under the 4.5:1 AA asks for, and only the browser
+    // sweep's axe run could see it. A tone that is meant to read as secondary is `text-muted`,
+    // never a colour at partial opacity: the rule `CLAUDE.md` has stated since Sprint 53.
+    const offenders = tsxFiles(SRC)
+      .filter((f) => !f.endsWith("tokens.test.ts"))
+      .flatMap((file) =>
+        readFileSync(file, "utf8")
+          .split("\n")
+          .flatMap((line, i) =>
+            TRANSLUCENT_TEXT.test(line) && !line.trimStart().startsWith("*")
+              ? [`${relative(SRC, file)}:${i + 1}  ${line.trim()}`]
+              : [],
+          ),
+      );
+    expect(offenders).toEqual([]);
+  });
+
+  it("the translucent-text detector can fail", () => {
+    expect(TRANSLUCENT_TEXT.test('className="text-brand-contrast/80"')).toBe(true);
+    expect(TRANSLUCENT_TEXT.test('className="hover:text-muted/70"')).toBe(true);
+    expect(TRANSLUCENT_TEXT.test('className="text-brand-contrast border-brand-contrast/30"')).toBe(false);
   });
 });
