@@ -1,3 +1,6 @@
+import { appendFileSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { expect, test as base, type Page } from "@playwright/test";
 
 // Playwright transpiles these files as CommonJS (the package is not `"type": "module"`).
@@ -101,6 +104,11 @@ type Options = {
   flush?: boolean;
   /** Skip the touch-target check (Sprint 69, UI-11) on a page with no header and footer. */
   targets?: boolean;
+  /**
+   * Hold the page to its recorded count of controls under 44 px (Sprint 78, BL-19.9): the count may
+   * only go down, and a page with no recorded count fails until somebody records one on purpose.
+   */
+  ratchet?: boolean;
 };
 
 /** Core Web Vitals call a layout-shift score up to 0.1 "good"; above 0.25 it is "poor". */
@@ -145,6 +153,29 @@ export async function checkPage(page: Page, label: string, options: Options = {}
 
   if (options.targets !== false) {
     expect.soft(await smallTargets(page), `${label}: header or footer control under 44 px`).toEqual([]);
+  }
+
+  if (options.ratchet) {
+    const found = await pageTargets(page);
+    // A page made for the run has a random id in its slug: the record is for the page, not the run.
+    const key = label.replace(/\b[0-9a-f]{8}\b/g, "<id>");
+    // A run that is recording writes what it saw and checks nothing; `scripts/merge_target_baseline.py`
+    // folds the log into the baseline, keeping the lower number for a page already there.
+    if (process.env.TARGETS_LOG) {
+      appendFileSync(process.env.TARGETS_LOG, `${JSON.stringify({ label: key, count: found.length })}\n`);
+    } else {
+      const allowed = targetBaseline()[key];
+      expect.soft(
+        allowed,
+        `${label}: no recorded count of small controls (record one with TARGETS_LOG, see scripts/merge_target_baseline.py)`,
+      ).not.toBeUndefined();
+      if (allowed !== undefined) {
+        expect.soft(
+          found.length <= allowed ? [] : found.slice(0, 8),
+          `${label}: ${found.length} controls under 44 px, was ${allowed}; fix the new one, or lower the record if you fixed old ones`,
+        ).toEqual([]);
+      }
+    }
   }
 
   // Colours fade (`transition-colors`), and axe samples the computed value: measured the instant
@@ -260,6 +291,59 @@ async function smallTargets(page: Page): Promise<string[]> {
       }
     }
     return found.slice(0, 8);
+  });
+}
+
+/** The recorded number of controls under 44 px per page (Sprint 78, BL-19.9). It only goes down. */
+function targetBaseline(): Record<string, number> {
+  return JSON.parse(readFileSync(path.join(__dirname, "target-baseline.json"), "utf8"));
+}
+
+/**
+ * Every control on the page, not only the header and footer, whose box is under 44 px either way.
+ *
+ * The header and footer must have none (`smallTargets`, an absolute rule); a page's own controls are
+ * held to a **ratchet** because 92 of them exist today across the 52 reviewed pages and the revamp
+ * removes them family by family. Exempt, as WCAG 2.5.8 exempts them: a link inside a sentence, and a
+ * checkbox or radio whose label (the box a finger lands on) is large enough. Skipped because they
+ * are not on screen: hidden controls, a skip link, and the one-pixel `sr-only` clip. The result is
+ * one entry per kind of control (tag and label), so a list that grows does not move the count.
+ */
+async function pageTargets(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const MIN = 44;
+    const found: string[] = [];
+    const controls = document.querySelectorAll(
+      "a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link], [role=tab], [role=menuitem]",
+    );
+    for (const el of controls) {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      let box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      if (box.width <= 1 && box.height <= 1) continue;
+      if (box.bottom < 0 || box.right < 0) continue;
+      if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+        const label = el.closest("label") ?? el.labels?.[0];
+        if (label) box = label.getBoundingClientRect();
+      }
+      if (el.tagName === "A") {
+        const parent = el.parentElement;
+        const row = parent ? getComputedStyle(parent).display : "";
+        const inline = parent && row !== "flex" && row !== "inline-flex" && row !== "grid";
+        if (inline && (parent.textContent ?? "").trim() !== (el.textContent ?? "").trim()) continue;
+      }
+      if (box.height < MIN - 0.5 || box.width < MIN - 0.5) {
+        const label = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 24);
+        found.push(`${el.tagName.toLowerCase()} "${label}" ${Math.round(box.width)}x${Math.round(box.height)}`);
+      }
+    }
+    // One entry per *kind* of control: a list of five matches has five "Details" buttons, and the
+    // number of rows is the data's (other journeys publish vacancies while this one runs), not the
+    // page's. The size is dropped from the kind for the same reason: it follows the label's width.
+    const kinds = new Map<string, string>();
+    for (const entry of found) kinds.set(entry.replace(/ \d+x\d+$/, ""), entry);
+    return [...kinds.values()];
   });
 }
 

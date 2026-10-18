@@ -6,6 +6,7 @@ import { consentPrompt } from "../../src/core/account";
 import { useAccount, useProfile, useUnreadCount } from "../../src/lib/me-queries";
 import { endSession, useSignedIn } from "../../src/runtime";
 import { space } from "../../src/theme";
+import { AppearanceChooser } from "../../src/ui/AppearanceChooser";
 import { SeekerGate } from "../../src/ui/gate";
 import { Card } from "../../src/ui/list";
 import { Button, Notice, Screen, Text } from "../../src/ui/primitives";
@@ -25,6 +26,8 @@ export default function Me() {
       <SeekerGate prompt={t("me.signInPrompt")}>
         <Menu />
       </SeekerGate>
+      {/* Not behind the gate: it asks nothing of the server and a visitor may prefer the dark. */}
+      <AppearanceChooser />
       {signedIn ? (
         <Button variant="secondary" label={ta("signOut")} onPress={() => void endSession()} />
       ) : null}

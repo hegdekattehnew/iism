@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { ThemeDisclosure } from "@/components/ThemeDisclosure";
 import { Logo } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 
@@ -58,6 +59,16 @@ export async function Footer() {
                 {tf("language")}
               </p>
               <LocaleSwitcher />
+            </div>
+            <div className="mt-3">
+              <ThemeDisclosure>
+                <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg text-xs font-semibold uppercase tracking-wide text-muted marker:hidden hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+                  {tf("appearance")}
+                  <span aria-hidden className="transition-transform group-open:rotate-90">
+                    ›
+                  </span>
+                </summary>
+              </ThemeDisclosure>
             </div>
           </div>
 

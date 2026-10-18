@@ -10,6 +10,7 @@ import { createTokenStore } from "./core/token-store";
 import { unregisterThisDevice } from "./push";
 import { API_BASE_URL, APP_VERSION, PLATFORM } from "./config";
 import { LOCALE_KEY, storage } from "./storage";
+import { themePreference } from "./theme/preference";
 
 /**
  * The few things that live for the whole run of the app: the session, the language, and whether the
@@ -58,11 +59,21 @@ export const useCourseBudget = (): number | null =>
 
 /**
  * Signing out: forget what was kept on disk (the in-memory cache is the query client's). The public
- * cache, and the budget, which is personal in the only way that matters on a shared phone.
+ * cache, and the budget and the appearance choice, which are personal in the only way that matters
+ * on a shared phone.
  */
 export const forgetPersistedCache = async (): Promise<void> => {
-  await Promise.all([wipePersistedCache(storage), courseBudget.clear()]);
+  await Promise.all([wipePersistedCache(storage), courseBudget.clear(), themePreference.clear()]);
 };
+
+/**
+ * Light, dark or follow the phone (Sprint 78, ADR-087): remembered on the phone, never on the
+ * profile, and **forgotten when the session ends** for the reason the budget is. The store lives in
+ * `theme/` so the colours can read it; it keeps to the phone's storage from here on.
+ */
+themePreference.attach(storage);
+export const setThemePreference = themePreference.set;
+export const restoreThemePreference = themePreference.restore;
 export const getLocale = () => locale;
 export const useLocale = () =>
   useSyncExternalStore(

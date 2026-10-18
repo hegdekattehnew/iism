@@ -89,7 +89,11 @@
     "grievance": "Grievance redressal",
     "nsqfNote": "Skill definitions follow the National Skills Qualifications Framework. IISM is not a certifying body.",
     "rights": "All rights reserved.",
-    "language": "Language"
+    "language": "Language",
+    "appearance": "Appearance",
+    "themeSystem": "Match device",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "placeholder": {
     "badge": "Drafting",

@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 
+import { CheckCircleIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
 import {
   daysToClose,
@@ -45,9 +46,7 @@ export function JobCard({ job, now }: { job: JobCardData; now?: number }) {
         {job.tenant.name}
         {job.tenant.is_verified && (
           <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-success-text">
-            <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-current">
-              <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm3.7 5.6-4.4 5a.8.8 0 0 1-1.2 0L4.3 8.7a.8.8 0 1 1 1.2-1l1.2 1.4 3.8-4.3a.8.8 0 1 1 1.2 1.1Z" />
-            </svg>
+            <CheckCircleIcon className="h-3.5 w-3.5" />
             {tj("verifiedEmployer")}
           </span>
         )}

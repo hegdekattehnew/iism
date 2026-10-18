@@ -158,5 +158,11 @@
     "apply": "Show courses I can afford",
     "invalid": "Enter a whole number of rupees.",
     "note": "Kept on this phone only. It is forgotten when you sign out."
+  },
+  "appearance": {
+    "title": "Appearance",
+    "system": "Match phone",
+    "light": "Light",
+    "dark": "Dark"
   }
 }
