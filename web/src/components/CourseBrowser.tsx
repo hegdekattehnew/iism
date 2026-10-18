@@ -8,6 +8,8 @@ import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { creditsText, type Translate } from "@/lib/job-text";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BookOpenIcon } from "@/components/ui/icons";
 
 const MODES = ["online", "offline", "hybrid"] as const;
 const LANGS = ["en", "hi"] as const;
@@ -168,7 +170,7 @@ export function CourseBrowser({ initialSkill = "" }: { initialSkill?: string }) 
         </p>
       )}
       {!results.isError && !results.isPending && rows.length === 0 && (
-        <p className="mt-8 text-sm text-muted">{t("noResults")}</p>
+        <EmptyState icon={BookOpenIcon} title={t("noResults")} className="mt-8" />
       )}
 
       {results.isPending && <ListSkeleton />}

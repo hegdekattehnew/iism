@@ -9,6 +9,8 @@ import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { JobCardData } from "@/lib/job-text";
 import { EMPLOYMENT_TYPES as TYPES } from "@/lib/profile";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BriefcaseIcon } from "@/components/ui/icons";
 
 /** A page. Small enough to arrive quickly on mobile data; the total says how many more there are. */
 export const JOBS_PAGE_SIZE = 24;
@@ -152,7 +154,7 @@ export function JobBrowser({
         </p>
       )}
       {!results.isError && !results.isPending && rows.length === 0 && (
-        <p className="mt-8 text-sm text-muted">{t("noResults")}</p>
+        <EmptyState icon={BriefcaseIcon} title={t("noResults")} className="mt-8" />
       )}
 
       {results.isPending && <ListSkeleton />}

@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { providerDashboardKey } from "@/lib/counts";
 import { apiErrorFrom, detailOf } from "@/lib/http";
+import { EmptyState } from "@/components/ui/empty-state";
+import { UsersIcon } from "@/components/ui/icons";
 
 // What a provider may set, from the generated schema. The mutation used to
 // hardcode "contacted", so a provider had no way to record an enrolment and the
@@ -83,7 +85,7 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
       </ButtonLink>
 
       {items.length === 0 ? (
-        <p className="mt-8 text-sm text-muted">{t("empty")}</p>
+        <EmptyState icon={UsersIcon} title={t("empty")} className="mt-8" />
       ) : (
         <ul className="mt-6 space-y-4">
           {items.map((learner) => {

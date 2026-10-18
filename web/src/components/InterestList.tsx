@@ -7,6 +7,8 @@ import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BookOpenIcon } from "@/components/ui/icons";
 
 // From the generated client, never restated: the hand-written three-value copy
 // plus a cast let `enrolled` reach this screen with no colour and no wording,
@@ -37,12 +39,12 @@ export function InterestList() {
   if (isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
   if (data.length === 0) {
     return (
-      <div className="mt-8">
-        <p className="text-sm text-muted">{t("empty")}</p>
-        <ButtonLink href="/courses" className="mt-4">
-          {t("emptyCta")}
-        </ButtonLink>
-      </div>
+      <EmptyState
+        icon={BookOpenIcon}
+        title={t("empty")}
+        action={<ButtonLink href="/courses">{t("emptyCta")}</ButtonLink>}
+        className="mt-8"
+      />
     );
   }
 

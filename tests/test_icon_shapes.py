@@ -69,3 +69,21 @@ def test_every_shape_is_a_path_an_svg_draws() -> None:
         for d in paths:
             assert d.startswith(("M", "m")), f"{name}: a path must start with a move: {d!r}"
             assert _PATH_CHARS.fullmatch(d), f"{name}: {d!r} holds a character an SVG path does not"
+
+
+def test_the_alerts_own_shapes_are_the_icon_sets() -> None:
+    """`Alert` draws four of the set's icons inline, to stay off the icon factory (Sprint 80)."""
+    alert = (ROOT / "web" / "src" / "components" / "ui" / "alert.tsx").read_text(encoding="utf-8")
+    block = alert.split("const SHAPES = {", 1)[1].split("} as const;", 1)[0]
+    icons = _web()
+    for tone, name in (
+        ("danger", "XCircle"),
+        ("warning", "AlertTriangle"),
+        ("success", "CheckCircle"),
+        ("info", "Info"),
+    ):
+        drawn = re.search(rf"{tone}: \[(.*?)\]", block, re.S)
+        assert drawn, f"no shape for {tone}"
+        assert re.findall(r'"([^"]*)"', drawn.group(1)) == icons[name], (
+            f"{tone} drifted from {name}"
+        )

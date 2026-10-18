@@ -17,9 +17,11 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-brand text-brand-contrast hover:bg-brand-strong",
+        primary: "bg-brand text-brand-contrast hover:bg-brand-strong active:brightness-95",
+        // A quieter primary: the brand tint, for the second action beside a primary one.
+        soft: "bg-accent-tint text-accent-text hover:brightness-95 active:brightness-90",
         secondary:
-          "border border-border-token bg-surface text-foreground hover:bg-surface-muted",
+          "border border-border-token bg-surface text-foreground hover:bg-surface-muted active:bg-surface-muted active:brightness-95",
         ghost: "text-muted hover:bg-surface-muted hover:text-foreground",
         danger:
           "border border-danger-border bg-danger-surface text-danger-text " +

@@ -21,6 +21,7 @@ import {
   useReportQueue,
 } from "@/lib/moderation";
 import { useMemberships } from "@/lib/org";
+import { EmptyState } from "@/components/ui/empty-state";
 
 /**
  * Listings people have reported, and the ones an operator has removed (Sprint 59, ADR-069).
@@ -101,9 +102,7 @@ function Body({
   }
   if (queue.data.items.length === 0) {
     return (
-      <p className="mt-6 text-muted">
-        {t(view === "open" ? "emptyOpen" : "emptyRemoved")}
-      </p>
+      <EmptyState title={t(view === "open" ? "emptyOpen" : "emptyRemoved")} className="mt-6" />
     );
   }
   return (
