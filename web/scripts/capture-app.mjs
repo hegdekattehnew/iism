@@ -18,8 +18,8 @@
  *
  * `app-layout-shift-baseline.json` is the one place a screen is allowed above 0.1: a screen whose jump
  * is a **known open finding** has its ceiling recorded there, and may only go down (the web's target
- * baseline works the same way). Today that is the signed-in home, whose personal block lands in four
- * pieces above the search box; fixing it is the phone home's design (BL-19.22), not a tolerance.
+ * baseline works the same way). **It is empty since Sprint 83**: the signed-in home, the one entry it
+ * ever held (0.25), now waits for all four of its queries and arrives as one block (0.000).
  */
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";

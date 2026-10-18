@@ -222,6 +222,82 @@ export function RowGroup({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The heading of a section: an icon in a tinted disc, the title (a heading to a screen reader) and a
+ * line under it. Used by `Panel` and, bare, above a `RowGroup` (Sprint 83, BL-19.23).
+ */
+export function PanelHeader({ icon, title, subtitle }: { icon: IconName; title: string; subtitle?: string }) {
+  const c = useColours();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: space.md }}>
+      <View
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: radius.md,
+          backgroundColor: c.accentTint,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name={icon} size={20} color={c.accentText} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <NativeText
+          accessibilityRole="header"
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          style={{ color: c.foreground, fontSize: text.lead, fontWeight: "600", lineHeight: 28 }}
+        >
+          {title}
+        </NativeText>
+        {subtitle ? (
+          <NativeText
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={{ color: c.muted, fontSize: text.secondary, marginTop: 2, lineHeight: 22 }}
+          >
+            {subtitle}
+          </NativeText>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * A section of a screen as one surface, with its own heading and (when it has one) its own Save: the
+ * profile is a stack of these, not one long form. Not pressable. Anything pressable inside it that is
+ * itself a card is an `inset` one: never a card in a card.
+ */
+export function Panel({
+  icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
+  const c = useColours();
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: c.border,
+        backgroundColor: c.surface,
+        borderRadius: radius.lg,
+        padding: space.lg,
+        gap: space.md,
+      }}
+    >
+      <PanelHeader icon={icon} title={title} subtitle={subtitle} />
+      {children}
+    </View>
+  );
+}
+
 export function BadgeRow({ children }: { children: ReactNode }) {
   return <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>{children}</View>;
 }
@@ -308,7 +384,7 @@ export function SearchBox({
 }
 
 /** A row-shaped placeholder: the same box a card will occupy, so nothing moves when it arrives. */
-export function SkeletonRows({ count = 4 }: { count?: number }) {
+export function SkeletonRows({ count = 4, height = 112 }: { count?: number; height?: number }) {
   const c = useColours();
   const t = useTranslations("mobile.list");
   return (
@@ -317,7 +393,7 @@ export function SkeletonRows({ count = 4 }: { count?: number }) {
         <View
           key={i}
           style={{
-            height: 112,
+            height,
             borderRadius: radius.lg,
             borderWidth: 1,
             borderColor: c.border,

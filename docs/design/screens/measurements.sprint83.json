@@ -1,0 +1,99 @@
+{
+ "capturedAgainst": "http://localhost:8081 (the phone app's browser build, 375x812, reads held back 250 ms)",
+ "note": "Sprint 83 is phone only (BL-19.22 second half, BL-19.23); the web is unchanged, so its Sprint 81 capture stands. A browser rendering, not a phone.",
+ "results": [
+  {
+   "id": "home-signed-out",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.01
+  },
+  {
+   "id": "jobs",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "job-detail",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "home-signed-in",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.002
+  },
+  {
+   "id": "matches",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "me",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "applications",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "profile",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "careers",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "match-detail",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "me-dark-chosen",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  }
+ ],
+ "signedInHome": {
+  "layoutShiftBefore": 0.169,
+  "ceilingBefore": 0.25,
+  "layoutShiftAfter": 0.002,
+  "blockHeightDp": {
+   "held": 330,
+   "natural_on_seeded_account": 336
+  }
+ },
+ "androidBundleBytes": {
+  "before": 3726798,
+  "after": 3729584,
+  "ceiling": 3800000,
+  "left": 70416
+ },
+ "baselineFile": "web/scripts/app-layout-shift-baseline.json is empty: no screen is above 0.1"
+}

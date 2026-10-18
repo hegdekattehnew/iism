@@ -241,3 +241,24 @@ export function Notice({
     </View>
   );
 }
+
+/**
+ * How far along something is (Sprint 83, BL-19.23): a track and a fill, read by a screen reader as a
+ * progress bar with its value (the number is also written beside it by the screen, so nothing rests
+ * on the bar's colour). A value outside 0 to 100, or not a number, is drawn as the nearest end.
+ */
+export function ProgressBar({ percent, label }: { percent: number; label: string }) {
+  const c = useColours();
+  const now = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now }}
+      style={{ height: 8, borderRadius: radius.sm, backgroundColor: c.border, overflow: "hidden" }}
+    >
+      <View style={{ width: `${now}%`, height: 8, borderRadius: radius.sm, backgroundColor: c.brand }} />
+    </View>
+  );
+}

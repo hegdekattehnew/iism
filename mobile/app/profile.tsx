@@ -20,17 +20,20 @@ import {
 } from "../src/core/profile";
 import { COLLECTIONS, type Collection } from "../src/core/profile-sections";
 import { useProfile, useRemoveSkill, useUpdateProfile } from "../src/lib/me-queries";
+import type { IconName } from "../src/ui/icon";
 import { space } from "../src/theme";
 import { SeekerGate } from "../src/ui/gate";
-import { Chip, ChipRow, FailureNotice, SkeletonRows } from "../src/ui/list";
-import { Button, Notice, Screen, Text, TextField } from "../src/ui/primitives";
+import { Chip, ChipRow, FailureNotice, ListRow, Panel, PanelHeader, RowGroup, SkeletonRows } from "../src/ui/list";
+import { Button, Notice, ProgressBar, Screen, Text, TextField } from "../src/ui/primitives";
 import { RolePicker } from "../src/ui/RolePicker";
 import { SessionExpired } from "../src/ui/session";
 
 /**
- * The profile, on a phone: who you are in a few fields, and what you can do. The skills are the part
- * that moves a match score, so the role picker comes first and the basics after. Experience,
- * education history, certificates and languages are on the website (BL-15.3 does not ask for them).
+ * The profile, on a phone, as a stack of sections (Sprint 83, BL-19.23) under a progress header: how
+ * complete it is and the next thing to add; then the skills (the part that moves a match score, so
+ * first), about you, your history (one row per section, with its count) and what you are looking for.
+ * **Each form section has its own Save**, named for the section, so a screen reader and a person can
+ * tell the two apart. Date of birth and gender stay on the website (Sprint 67).
  */
 export default function Profile() {
   const t = useTranslations("profilePage");
@@ -50,7 +53,14 @@ function Body() {
   const query = useProfile();
   const remove = useRemoveSkill();
 
-  if (query.isPending) return <SkeletonRows count={3} />;
+  // The shape of what will arrive (a progress header and the sections), so nothing is pushed when it does.
+  if (query.isPending)
+    return (
+      <View style={{ gap: space.xl }}>
+        <SkeletonRows count={1} height={88} />
+        <SkeletonRows count={3} height={220} />
+      </View>
+    );
   if (query.isError) {
     return isSignedOut(query.error) ? (
       <SessionExpired />
@@ -65,14 +75,16 @@ function Body() {
 
   return (
     <View style={{ gap: space.xl }}>
-      <View style={{ gap: space.xs }}>
+      <View style={{ gap: space.sm }}>
         <Text variant="lead">{t("completeness", { percent: profile.completeness?.percent ?? 0 })}</Text>
+        <ProgressBar
+          percent={profile.completeness?.percent ?? 0}
+          label={t("completeness", { percent: profile.completeness?.percent ?? 0 })}
+        />
         {next ? <Text tone="muted">{t("completeNext", { what: t(`field.${next}`) })}</Text> : null}
       </View>
 
-      <View style={{ gap: space.md }}>
-        <Text variant="lead">{t("skillsTitle")}</Text>
-        <Text tone="muted">{t("skillsSubtitle")}</Text>
+      <Panel icon="Target" title={t("skillsTitle")} subtitle={t("skillsSubtitle")}>
         <RolePicker held={held} />
         {skills.length === 0 ? <Text tone="muted">{t("noSkills")}</Text> : null}
         {skills.map((s) => (
@@ -104,12 +116,12 @@ function Body() {
         <Text tone="muted" variant="small">
           {t("sourceNote")}
         </Text>
-      </View>
-
-      <Sections profile={profile as unknown as Record<string, unknown[] | undefined>} />
+      </Panel>
 
       {/* Keyed on the loaded profile, so a refetch can never overwrite what is being typed. */}
       <Basics key={profile.id} initial={basicsFrom(profile)} />
+
+      <Sections profile={profile as unknown as Record<string, unknown[] | undefined>} />
 
       <Preferences key={`${profile.id}-prefs`} initial={preferencesFrom(profile)} />
     </View>
@@ -119,6 +131,7 @@ function Body() {
 function Basics({ initial }: { initial: BasicsForm }) {
   const t = useTranslations("profilePage");
   const f = useTranslations("profilePage.fields");
+  const s = useTranslations("mobile.profileSections");
   const [form, setForm] = useState(initial);
   const [badYears, setBadYears] = useState(false);
   const save = useUpdateProfile();
@@ -131,7 +144,7 @@ function Basics({ initial }: { initial: BasicsForm }) {
   };
 
   return (
-    <View style={{ gap: space.md }}>
+    <Panel icon="User" title={s("aboutTitle")}>
       <TextField label={f("fullName")} value={form.fullName} onChangeText={(v) => set("fullName", v)} maxLength={LIMITS.fullName} />
       <TextField
         label={t("headline")}
@@ -171,11 +184,26 @@ function Basics({ initial }: { initial: BasicsForm }) {
           <Notice tone="danger">{save.error instanceof ApiError && save.error.detail ? save.error.detail : t("errors.generic")}</Notice>
         )
       ) : null}
-      <Button label={save.isPending ? t("saving") : t("save")} busy={save.isPending} onPress={submit} />
-      {save.isSuccess && !save.isError ? <Text tone="muted">{t("saved")}</Text> : null}
-    </View>
+      <Button
+        label={save.isPending ? t("saving") : t("save")}
+        // Two forms on this screen each end in "Save": the name says which section it saves.
+        accessibilityLabel={`${save.isPending ? t("saving") : t("save")}: ${s("aboutTitle")}`}
+        busy={save.isPending}
+        onPress={submit}
+      />
+      {save.isSuccess && !save.isError ? <Notice tone="success">{t("saved")}</Notice> : null}
+    </Panel>
   );
 }
+
+const SECTION_ICONS: Record<Collection, IconName> = {
+  experiences: "Briefcase",
+  educations: "GraduationCap",
+  certifications: "Award",
+  languages: "Globe",
+  preferred_roles: "Target",
+  preferred_locations: "MapPin",
+};
 
 /** The six history sections, each one screen (`profile/[section]`), with how many entries it holds. */
 function Sections({ profile }: { profile: Record<string, unknown[] | undefined> }) {
@@ -183,19 +211,22 @@ function Sections({ profile }: { profile: Record<string, unknown[] | undefined> 
   const router = useRouter();
   return (
     <View style={{ gap: space.md }}>
-      <Text variant="lead">{s("title")}</Text>
-      <Text tone="muted">{s("intro")}</Text>
-      {COLLECTIONS.map((c: Collection) => {
-        const count = profile[c]?.length ?? 0;
-        return (
-          <Button
-            key={c}
-            variant="secondary"
-            label={`${s(`names.${c}`)} · ${s("count", { count })}`}
-            onPress={() => router.push(`/profile/${c}`)}
-          />
-        );
-      })}
+      <PanelHeader icon="Briefcase" title={s("title")} subtitle={s("intro")} />
+      <RowGroup>
+        {COLLECTIONS.map((c: Collection) => {
+          const count = profile[c]?.length ?? 0;
+          return (
+            <ListRow
+              key={c}
+              icon={SECTION_ICONS[c]}
+              title={s(`names.${c}`)}
+              subtitle={s("count", { count })}
+              accessibilityLabel={`${s(`names.${c}`)} · ${s("count", { count })}`}
+              onPress={() => router.push(`/profile/${c}`)}
+            />
+          );
+        })}
+      </RowGroup>
     </View>
   );
 }
@@ -221,8 +252,7 @@ function Preferences({ initial }: { initial: PreferencesForm }) {
   };
 
   return (
-    <View style={{ gap: space.md }}>
-      <Text variant="lead">{s("preferencesTitle")}</Text>
+    <Panel icon="Rupee" title={s("preferencesTitle")}>
       <TextField
         label={f("salaryMin")}
         value={form.salaryMin}
@@ -290,7 +320,7 @@ function Preferences({ initial }: { initial: PreferencesForm }) {
         busy={save.isPending}
         onPress={submit}
       />
-      {save.isSuccess && !save.isError ? <Text tone="muted">{t("saved")}</Text> : null}
-    </View>
+      {save.isSuccess && !save.isError ? <Notice tone="success">{t("saved")}</Notice> : null}
+    </Panel>
   );
 }

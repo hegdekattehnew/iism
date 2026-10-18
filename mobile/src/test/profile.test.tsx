@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import Profile from "../../app/profile";
 import { account, api, failed, ok, profile, resetWorld, roleHit, roleStandard, router, serve, world } from "./mocks";
@@ -6,6 +6,10 @@ import { renderScreen, settle } from "./harness";
 
 jest.mock("../runtime", () => require("./mocks").runtimeModule);
 jest.mock("expo-router", () => require("./mocks").routerModule);
+// Draws each icon as a marker carrying its name, so a test can say which icon a row has.
+jest.mock("../ui/icon", () => ({
+  Icon: ({ name }: { name: string }) => require("react").createElement(require("react-native").View, { testID: `icon-${name}` }),
+}));
 
 beforeEach(() => {
   resetWorld();
@@ -47,7 +51,7 @@ describe("the basics", () => {
     serve(api.PUT, { "/me/profile": ok(profile({ headline: "Ward attendant" })) });
     await renderScreen(<Profile />);
     await fireEvent.changeText(await screen.findByLabelText("Headline"), "  Ward attendant ");
-    await press("Save");
+    await press("Save: About you");
     await settle();
     expect(putBody()).toEqual({
       full_name: "Asha Rao",
@@ -65,7 +69,7 @@ describe("the basics", () => {
     serve(api.PUT, { "/me/profile": ok(profile()) });
     await renderScreen(<Profile />);
     await fireEvent.changeText(await screen.findByLabelText("District or city"), "");
-    await press("Save");
+    await press("Save: About you");
     await settle();
     expect(putBody().location_district).toBeNull();
   });
@@ -74,7 +78,7 @@ describe("the basics", () => {
     serveProfile();
     await renderScreen(<Profile />);
     await fireEvent.changeText(await screen.findByLabelText("Years of experience"), "x1");
-    await press("Save");
+    await press("Save: About you");
     expect(await screen.findByText("Could not save. Please check the fields.")).toBeTruthy();
     expect(api.PUT).not.toHaveBeenCalled();
   });
@@ -84,7 +88,7 @@ describe("the basics", () => {
     serve(api.PUT, { "/me/profile": ok(profile()) });
     await renderScreen(<Profile />);
     await press("ITI");
-    await press("Save");
+    await press("Save: About you");
     await settle();
     expect(putBody().education_level).toBe("iti");
   });
@@ -93,7 +97,7 @@ describe("the basics", () => {
     serveProfile();
     serve(api.PUT, { "/me/profile": failed(422, "Expected maximum salary cannot be below the minimum") });
     await renderScreen(<Profile />);
-    await press("Save");
+    await press("Save: About you");
     expect(await screen.findByText("Expected maximum salary cannot be below the minimum")).toBeTruthy();
   });
 
@@ -101,7 +105,7 @@ describe("the basics", () => {
     serveProfile();
     serve(api.PUT, { "/me/profile": failed(401) });
     await renderScreen(<Profile />);
-    await press("Save");
+    await press("Save: About you");
     expect(await screen.findByText(/Your session has expired/)).toBeTruthy();
   });
 
@@ -113,6 +117,94 @@ describe("the basics", () => {
     expect(screen.getByLabelText("State").props.maxLength).toBe(80);
     expect(screen.getByLabelText("District or city").props.maxLength).toBe(80);
     expect(screen.getByLabelText("Years of experience").props.maxLength).toBe(2);
+  });
+});
+
+describe("the profile as sections (Sprint 83, BL-19.23)", () => {
+  it("leads with a progress bar that says the same number as the sentence beside it", async () => {
+    serveProfile();
+    await renderScreen(<Profile />);
+    const bar = await screen.findByRole("progressbar", { name: "Profile 60% complete" });
+    expect(bar.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 60 });
+  });
+
+  it("is a heading for each section, in the order a person fills them in", async () => {
+    serveProfile();
+    await renderScreen(<Profile />);
+    await screen.findByDisplayValue("Asha Rao");
+    const headings = screen.getAllByRole("header").map((h) => h.props.children);
+    expect(headings).toEqual(["My profile", "My skills", "About you", "Your history", "What you are looking for"]);
+  });
+
+  it("gives each form section its own Save, named for the section, and no bare 'Save'", async () => {
+    serveProfile();
+    await renderScreen(<Profile />);
+    await screen.findByDisplayValue("Asha Rao");
+    expect(screen.getByRole("button", { name: "Save: About you" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save: What you are looking for" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  });
+
+  it("saving one section sends only that section's fields, and confirms in that section", async () => {
+    serveProfile();
+    serve(api.PUT, { "/me/profile": ok(profile()) });
+    await renderScreen(<Profile />);
+    await fireEvent.changeText(await screen.findByLabelText("Headline"), "Ward attendant");
+    await press("Save: About you");
+    await settle();
+    expect(Object.keys(putBody())).not.toContain("expected_salary_min_inr");
+    expect(screen.getAllByText("Saved")).toHaveLength(1);
+  });
+
+  it("shows each history section as a row with its count, and opens it", async () => {
+    serveProfile(profile({ experiences: [{ id: "e1" }, { id: "e2" }] }));
+    await renderScreen(<Profile />);
+    await press("Work history · 2 entries");
+    expect(router.push).toHaveBeenCalledWith("/profile/experiences");
+    expect(screen.getByRole("button", { name: "Education · Nothing added" })).toBeTruthy();
+  });
+
+  it("gives each history section its own icon, and each panel its own", async () => {
+    serveProfile();
+    await renderScreen(<Profile />);
+    await screen.findByDisplayValue("Asha Rao");
+    for (const icon of ["Target", "User", "Briefcase", "GraduationCap", "Award", "Globe", "MapPin", "Rupee"]) {
+      expect(screen.getAllByTestId(`icon-${icon}`, { includeHiddenElements: true }).length).toBeGreaterThan(0);
+    }
+    // Six history rows, one icon each, all different from their neighbour's.
+    const rows = screen.getAllByRole("button").filter((b) => /· /.test(b.props.accessibilityLabel ?? ""));
+    expect(rows).toHaveLength(6);
+  });
+
+  it("a role found by the picker is an inset card, not a second raised one inside the panel", async () => {
+    serveProfile(profile(), { "/roles/search": ok([roleHit(1)]) });
+    await renderScreen(<Profile />);
+    await fireEvent.changeText(await screen.findByLabelText("e.g. ward boy, delivery, cashier, electrician"), "ward boy");
+    const hit = await screen.findByRole("button", { name: "General Duty Assistant 1" });
+    const fill = (node: { props: Record<string, unknown> }) => {
+      const style = node.props.style;
+      const flat = typeof style === "function" ? style({ pressed: false }) : style;
+      return (Array.isArray(flat) ? Object.assign({}, ...flat.flat(Infinity)) : flat).backgroundColor;
+    };
+    const historyRow = screen.getByRole("button", { name: "Work history · Nothing added" });
+    expect(fill(hit)).toBeTruthy();
+    expect(fill(hit)).not.toBe(fill(historyRow));
+  });
+
+  it("holds the shape of the page while it loads, so nothing is pushed when it arrives", async () => {
+    // The profile never answers: what is on screen is the placeholder, in two blocks (the header's, the sections').
+    serve(api.GET, { "/auth/me": ok(account()), "/me/profile": (() => new Promise(() => undefined)) as never });
+    await renderScreen(<Profile />);
+    await waitFor(() => expect(screen.getAllByLabelText("Loading")).toHaveLength(2));
+    await settle();
+    expect(screen.getAllByLabelText("Loading")).toHaveLength(2);
+    // A header-sized block (88) and three section-sized ones (220): the shape of what arrives.
+    const heights = screen.getAllByLabelText("Loading").map((block) =>
+      block.children.map((box) => (box as unknown as { props: { style: { height: number } } }).props.style.height),
+    );
+    expect(heights).toEqual([[88], [220, 220, 220]]);
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByText("My skills")).toBeNull();
   });
 });
 

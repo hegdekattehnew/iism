@@ -66,7 +66,7 @@ describe("a job seeker's home", () => {
     await renderScreen(<Home />);
     expect(await screen.findByText("Profile 60% complete")).toBeTruthy();
     expect(screen.getByText("Add your skills next")).toBeTruthy();
-    await fireEvent.press(screen.getByRole("button", { name: "My profile" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Profile 60% complete. Add your skills next" }));
     expect(router.push).toHaveBeenCalledWith("/profile");
   });
 
@@ -81,6 +81,7 @@ describe("a job seeker's home", () => {
     seeker({ "/me/notifications/unread-count": ok({ unread: 3 }) });
     await renderScreen(<Home />);
     const button = await screen.findByRole("button", { name: /Updates: 3 new updates/ });
+    expect(screen.getByText("3", { includeHiddenElements: true })).toBeTruthy(); // drawn in the pill too
     await fireEvent.press(button);
     expect(router.push).toHaveBeenCalledWith("/notices");
   });
@@ -139,6 +140,64 @@ describe("a job seeker's home", () => {
     expect(screen.queryByText("Your best match")).toBeNull();
     answer(ok(page([matchItem(1)])));
     await settle();
+  });
+
+  it.each([
+    ["/me/applications", "the applications"],
+    ["/me/notifications/unread-count", "the unread count"],
+    ["/me/profile", "the profile"],
+  ])("waits for %s too, so the block arrives once and not in pieces (Sprint 83)", async (path) => {
+    let answer!: (v: unknown) => void;
+    seeker({ [path]: () => new Promise((resolve) => (answer = resolve)) });
+    await renderScreen(<Home />);
+    await screen.findByLabelText("Loading");
+    await settle();
+    // The other three have answered; none of their parts is shown until this one has too.
+    expect(screen.getAllByLabelText("Loading")).toHaveLength(1);
+    expect(screen.queryByText("Your best match")).toBeNull();
+    expect(screen.queryByText(/Profile \d+% complete/)).toBeNull();
+    answer(ok(path === "/me/profile" ? profile() : path === "/me/applications" ? [] : { unread: 0 }));
+    expect(await screen.findByText("Your best match")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+  });
+
+  it("is a failed part that does not hold the rest back for ever", async () => {
+    seeker({ "/me/applications": () => Promise.resolve({ data: undefined, error: {}, response: { status: 500 } }) });
+    await renderScreen(<Home />);
+    expect(await screen.findByText("Your best match")).toBeTruthy();
+  });
+
+  it("holds the same height before and after it loads, so the search below does not move", async () => {
+    const heightOf = (node: { props: { style?: unknown } }) => {
+      const style = node.props.style;
+      const flat = Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity)) : (style as Record<string, unknown>);
+      return (flat.minHeight ?? flat.height) as number;
+    };
+    let answer!: (v: unknown) => void;
+    seeker({ "/me/matches": () => new Promise((resolve) => (answer = resolve)) });
+    await renderScreen(<Home />);
+    const placeholder = await screen.findByLabelText("Loading");
+    const before = heightOf(placeholder.children[0] as never);
+    expect(before).toBeGreaterThan(0);
+    answer(ok(page([matchItem(1)])));
+    await screen.findByText("Your best match");
+    expect(heightOf(screen.getByTestId("signed-in-home") as never)).toBe(before);
+  });
+
+  it("shows the profile, updates and news as rows in one group, in that order", async () => {
+    seeker({
+      "/me/notifications/unread-count": ok({ unread: 2 }),
+      "/me/applications": ok([application(1, { status: "hired", updated_at: daysAgo(1) })]),
+    });
+    await renderScreen(<Home />);
+    await screen.findByText("Your best match");
+    const rows = screen.getAllByRole("button").map((b) => b.props.accessibilityLabel);
+    const group = rows.filter((n: string) => /complete|Updates|news/.test(n));
+    expect(group).toEqual([
+      "Profile 60% complete. Add your skills next",
+      "Updates: 2 new updates",
+      "1 application has news",
+    ]);
   });
 
   it("still has the search and the way to browse, below the person's own", async () => {
