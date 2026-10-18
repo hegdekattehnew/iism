@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { CareerLadder } from "@/components/CareerLadder";
 import { SeekerOnly } from "@/components/SeekerOnly";
+import { CandidateNav } from "@/components/CandidateNav";
 
 export default async function CareerPathsPage({
   params,
@@ -14,6 +15,7 @@ export default async function CareerPathsPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
+      <CandidateNav />
       <SeekerOnly>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("title")}</h1>
         <p className="mt-2 text-base text-muted">{t("subtitle")}</p>

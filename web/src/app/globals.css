@@ -218,6 +218,23 @@
   color-scheme: light;
 }
 
+/* Room under the page for the job seeker's bottom tab bar (Sprint 81, BL-19.13). `--tabbar` is 0 until the
+   head script marks a signed-in browser (`data-auth`), and only below the laptop width, where the bar
+   shows. Things anchored to the bottom of the screen (the apply bar, the consent banner) sit above it
+   by the same variable, and the page keeps the room from the first paint so nothing moves when the
+   bar arrives. */
+:root {
+  --tabbar: 0px;
+}
+@media (max-width: 1023px) {
+  html[data-auth] {
+    --tabbar: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
+body {
+  padding-bottom: var(--tabbar);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

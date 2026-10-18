@@ -164,6 +164,11 @@ export const SHAPES = {
     "M9 9l6 6",
     "M15 9l-6 6",
   ],
+  Target: [
+    "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z",
+    "M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9z",
+    "M12 11.5v1",
+  ],
 } as const;
 
 export type IconName = keyof typeof SHAPES;

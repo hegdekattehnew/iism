@@ -150,7 +150,7 @@ export default async function JobDetailPage({
           thumb at any scroll position (UI-08). A static block beside the content from `lg`. */}
       <div
         data-testid="apply-bar"
-        className="sticky bottom-0 z-20 -mx-5 mt-6 max-h-[85vh] overflow-y-auto border-t border-border-token bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden max-lg:order-last lg:static lg:mx-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0"
+        className="sticky bottom-[var(--tabbar)] z-20 -mx-5 mt-6 max-h-[85vh] overflow-y-auto border-t border-border-token bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden max-lg:order-last lg:static lg:mx-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0"
       >
         <ApplyPanel
           jobSlug={data.slug}

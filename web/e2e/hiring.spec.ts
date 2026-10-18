@@ -99,15 +99,16 @@ test("an employer messages and annotates an applicant, exports them, and the can
   await expect(seeker.getByText(MESSAGE)).toBeVisible();
   await expect(seeker.getByText(/A message from E2E Clinic/)).toBeVisible();
   await expect(seeker.getByText(NOTE)).toHaveCount(0);
-  await expect(seeker.getByRole("link", { name: "Updates 1 unread" })).toBeVisible();
+  // The header's count (the candidate strip below carries the same link, so the header is named).
+  await expect(seeker.getByRole("banner").getByRole("link", { name: "Updates 1 unread" })).toBeVisible();
   await checkPage(seeker, "my applications with the employer's message");
 
-  await seeker.getByRole("link", { name: "Updates 1 unread" }).click();
+  await seeker.getByRole("banner").getByRole("link", { name: "Updates 1 unread" }).click();
   await expect(seeker.getByText(/left you a message/)).toBeVisible();
   await expect(seeker.getByText(MESSAGE)).toHaveCount(0); // the notice says there is one, not what it says
   await checkPage(seeker, "notification page with an unread notice");
   await seeker.getByRole("button", { name: "Mark as read" }).click();
-  await expect(seeker.getByRole("link", { name: "Updates", exact: true })).toBeVisible();
+  await expect(seeker.getByRole("banner").getByRole("link", { name: "Updates", exact: true })).toBeVisible();
   await expect(seeker.getByText("Everything read")).toBeVisible();
 
   // ---- the person's own export carries what was said to them and written about them

@@ -8,8 +8,10 @@ import type { ReactNode } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { QueryProvider } from "@/components/QueryProvider";
+import { SeekerTabs } from "@/components/SeekerTabs";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { routing } from "@/i18n/routing";
+import { authHintScript } from "@/lib/auth-hint";
 import { THEME_COLOURS, themeScript } from "@/lib/theme";
 import "../globals.css";
 
@@ -102,6 +104,8 @@ export default async function LocaleLayout({
       <head>
         {/* Runs before the body is parsed, so a chosen theme is on the page for the first paint. */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Makes room for the job seeker's bottom bar before it arrives, so the footer does not jump. */}
+        <script dangerouslySetInnerHTML={{ __html: authHintScript }} />
       </head>
       <body className="flex min-h-screen flex-col antialiased">
         {/* First focusable thing on every page: a keyboard or switch user
@@ -120,6 +124,7 @@ export default async function LocaleLayout({
               {children}
             </main>
             <Footer />
+            <SeekerTabs />
             <ServiceWorkerRegistrar />
           </QueryProvider>
         </NextIntlClientProvider>
