@@ -76,12 +76,16 @@ test("a course says who is behind it and what registering costs, and where to re
   await expect(page).toHaveURL(/#report$/);
   await checkPage(page, "course page with its trust strip");
 
+  // The page as it loads, checked untouched: typing a search into it moves the list on purpose, and a
+  // check that began before the typing would score the person's own filtering as the page jumping.
   await page.goto("/en/courses");
+  await expect(page.getByRole("heading", { level: 2 }).first()).toBeVisible();
+  await checkPage(page, "courses list on the new card");
+
   await page.getByRole("searchbox").fill(title);
   const card = page.getByRole("link", { name: new RegExp(title) });
   await expect(card).toBeVisible();
   // the card never says a provider is unverified
   await expect(card.getByText(/verified/i)).toHaveCount(0);
   await expect(card.getByText("₹5,000")).toBeVisible();
-  await checkPage(page, "courses list on the new card");
 });
