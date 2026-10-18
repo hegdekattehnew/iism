@@ -10,6 +10,7 @@ import { Header } from "@/components/Header";
 import { QueryProvider } from "@/components/QueryProvider";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { routing } from "@/i18n/routing";
+import { THEME_COLOURS, themeScript } from "@/lib/theme";
 import "../globals.css";
 
 /**
@@ -46,11 +47,12 @@ const devanagari = Noto_Sans_Devanagari({
 });
 
 /** The address bar and the splash screen, matched to the manifest's colour.
- *  A mismatch here is what makes an installed app look like a web page. */
+ *  A mismatch here is what makes an installed app look like a web page. A person who chose a theme
+ *  overrides both tags from the script in `<head>` (`lib/theme.ts`). */
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8f9fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#111417" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOURS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOURS.dark },
   ],
 };
 
@@ -94,7 +96,13 @@ export default async function LocaleLayout({
   const tn = await getTranslations({ locale, namespace: "nav" });
 
   return (
-    <html lang={locale} className={`${inter.variable} ${devanagari.variable}`}>
+    // `suppressHydrationWarning`: the script below sets `data-theme` on this element before React
+    // sees it, which is the point of the script (no flash of the wrong theme) and not a mismatch.
+    <html lang={locale} className={`${inter.variable} ${devanagari.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Runs before the body is parsed, so a chosen theme is on the page for the first paint. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="flex min-h-screen flex-col antialiased">
         {/* First focusable thing on every page: a keyboard or switch user
             otherwise tabs through the whole header on every navigation. */}

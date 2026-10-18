@@ -128,8 +128,13 @@
   --type-display-lh: 2.25rem;
 }
 
+/* Dark follows the device unless the person chose light (Sprint 78, BL-19.8): `data-theme` is set on
+   <html> by `lib/theme.ts` and, before the first paint, by the script in the layout's <head>.
+   The dark tokens are written twice because CSS cannot share a declaration list between a media
+   query and an attribute selector; `tests/test_design_tokens.py` fails when the two differ. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --background: #111417;
     --surface: #181c20;
     --surface-muted: #20262b;
@@ -167,6 +172,50 @@
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.35);
     --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.55);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #111417;
+  --surface: #181c20;
+  --surface-muted: #20262b;
+  --surface-raised: #2c333a;
+  --foreground: #eff1f3;
+  --muted: #96a4b0;
+  --border: #2c333a;
+  --input-border: #6e8091;
+  --brand: #5497d3;
+  --brand-strong: #89b7e1;
+  --brand-contrast: #0c1f31;
+  --accent-soft: #0c1f31;
+  --accent-tint: #153451;
+  --accent-text: #b9d2ea;
+
+  --success-surface: #022c22;
+  --success-border: #065f46;
+  --success-text: #6ee7b7;
+  --warning-surface: #451a03;
+  --warning-border: #92400e;
+  --warning-text: #fcd34d;
+  --danger-surface: #4c0519;
+  --danger-border: #9f1239;
+  --danger-text: #fda4af;
+  --info-surface: #082f49;
+  --info-border: #075985;
+  --info-text: #7dd3fc;
+
+  --success-solid: #34d399;
+  --warning-solid: #fbbf24;
+  --danger-solid: #fb7185;
+
+  --overlay: rgb(2 6 23 / 0.7);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 @theme inline {

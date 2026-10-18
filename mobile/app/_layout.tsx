@@ -16,6 +16,7 @@ import {
   forgetPersistedCache,
   restoreCourseBudget,
   restoreLocale,
+  restoreThemePreference,
   tokens,
   useLocale,
   useUpgradeRequired,
@@ -71,6 +72,7 @@ export default function RootLayout() {
     void Promise.all([
       restoreLocale(getLocales().map((l) => l.languageTag)),
       restoreCourseBudget(),
+      restoreThemePreference(),
       tokens.load(),
     ]).finally(
       () => setReady(true),

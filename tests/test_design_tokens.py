@@ -171,9 +171,13 @@ class TestTheCopiesOfAColour:
     """The address bar, the installed app and the offline page cannot read the stylesheet."""
 
     def test_the_address_bar_follows_the_page(self) -> None:
+        """The layout names the colours through `THEME_COLOURS` (Sprint 78), their one home."""
         layout = (ROOT / "web" / "src" / "app" / "[locale]" / "layout.tsx").read_text("utf-8")
-        light = re.search(r'prefers-color-scheme: light\)", color: "(#[0-9a-f]{6})"', layout)
-        dark = re.search(r'prefers-color-scheme: dark\)", color: "(#[0-9a-f]{6})"', layout)
+        assert re.search(r'prefers-color-scheme: light\)", color: THEME_COLOURS\.light', layout)
+        assert re.search(r'prefers-color-scheme: dark\)", color: THEME_COLOURS\.dark', layout)
+        theme = (ROOT / "web" / "src" / "lib" / "theme.ts").read_text("utf-8")
+        light = re.search(r'light: "(#[0-9a-f]{6})"', theme)
+        dark = re.search(r'dark: "(#[0-9a-f]{6})"', theme)
         assert light and dark
         assert light[1] == LIGHT["background"]
         assert dark[1] == DARK["background"]
@@ -297,3 +301,53 @@ class TestThePhonesTables:
             )
         ]  # type: ignore[index]
         assert values and all(v % 4 == 0 for v in values)
+
+
+class TestTheThemeControl:
+    """Light, dark or follow the device (Sprint 78, BL-19.8, ADR-087)."""
+
+    THEME_TS = (ROOT / "web" / "src" / "lib" / "theme.ts").read_text(encoding="utf-8")
+    LAYOUT = (ROOT / "web" / "src" / "app" / "[locale]" / "layout.tsx").read_text(encoding="utf-8")
+
+    def test_the_media_query_yields_to_a_person_who_chose_light(self) -> None:
+        media = _block(CSS, "@media (prefers-color-scheme: dark)")
+        assert ':root:not([data-theme="light"])' in media, (
+            "a chosen light theme would still turn dark with the device"
+        )
+
+    def test_the_two_copies_of_the_dark_tokens_are_the_same(self) -> None:
+        by_media = _block(
+            _block(CSS, "@media (prefers-color-scheme: dark)"), ':root:not([data-theme="light"])'
+        )
+        by_choice = _block(CSS, ':root[data-theme="dark"]')
+        read = lambda text: {k: v.strip() for k, v in re.findall(r"([a-z-]+)\s*:\s*([^;]+);", text)}  # noqa: E731
+        assert read(by_media), "found no dark tokens"
+        assert read(by_media) == read(by_choice), (
+            "the dark theme differs between the device's and the person's choice"
+        )
+        assert "color-scheme" in read(by_media), (
+            "native controls and scrollbars must follow the theme too"
+        )
+
+    def test_light_is_a_pin_not_a_second_copy(self) -> None:
+        assert _block(CSS, ':root[data-theme="light"]').strip() == "color-scheme: light;"
+
+    def test_the_address_bar_colours_are_the_page_background_in_each_theme(self) -> None:
+        colours = dict(
+            re.findall(
+                r'(light|dark): "(#[0-9a-fA-F]{6})"', self.THEME_TS.split("THEME_COLOURS")[1]
+            )
+        )
+        assert colours["light"].lower() == LIGHT["background"].lower()
+        assert colours["dark"].lower() == DARK["background"].lower()
+
+    def test_the_layout_sets_the_theme_before_the_first_paint_and_tolerates_the_attribute(
+        self,
+    ) -> None:
+        assert "themeScript" in self.LAYOUT and "dangerouslySetInnerHTML" in self.LAYOUT
+        assert "suppressHydrationWarning" in self.LAYOUT, (
+            "the head script changes <html> before React hydrates it"
+        )
+        assert self.LAYOUT.index("themeScript") < self.LAYOUT.index("<body"), (
+            "the script must come before the body"
+        )

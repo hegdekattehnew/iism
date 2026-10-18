@@ -51,6 +51,9 @@ type World = {
 
 let world: World;
 
+/** `checkPage` with the ratchet on: every page the sweep visits has its count of small controls recorded. */
+const checkSwept: typeof checkPage = (page, label, options = {}) => checkPage(page, label, { ...options, ratchet: true });
+
 test.beforeAll(async () => {
   const request = await playwrightRequest.newContext();
   const id = suffix();
@@ -172,7 +175,7 @@ async function checkPublic(page: Page, locale: string, route: string, label: str
   await visit(page, `/${locale}${route === "/" ? "" : route}`);
   // An unknown invitation is a refusal the page is meant to show, so its 4xx is its own doing.
   const refused = route.startsWith("/invite/");
-  await checkPage(page, `${label}${route}`, {
+  await checkSwept(page, `${label}${route}`, {
     allowResponses: refused ? [/\/invitations\//] : [],
     allowConsole: refused ? [/status of 404/] : [],
   });
@@ -182,7 +185,7 @@ async function checkPublic(page: Page, locale: string, route: string, label: str
 async function checkDetailPages(page: Page, locale: string, label: string): Promise<void> {
   for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/${COLLECT_BLOOD_SLUG}`]) {
     await visit(page, `/${locale}${route}`);
-    await checkPage(page, `${label}${route}`);
+    await checkSwept(page, `${label}${route}`);
   }
 }
 
@@ -205,7 +208,7 @@ test.describe("signed out", () => {
     test(`${locale}: a page that does not exist is a real 404`, async ({ page }) => {
       const response = await page.goto(`/${locale}/this-page-does-not-exist`);
       expect(response?.status()).toBe(404);
-      await checkPage(page, `${locale} 404`, { allowResponses: [/404/], allowConsole: [/status of 404/] });
+      await checkSwept(page, `${locale} 404`, { allowResponses: [/404/], allowConsole: [/status of 404/] });
     });
   }
 
@@ -270,7 +273,7 @@ test.describe("signed in as a job seeker, with something on every list", () => {
       test(`${locale}${route}`, async ({ page }) => {
         await signInAs(page, world.seeker);
         await visit(page, `/${locale}${route}`);
-        await checkPage(page, `seeker ${locale}${route}`);
+        await checkSwept(page, `seeker ${locale}${route}`);
       });
     }
   }
@@ -282,7 +285,7 @@ test.describe("signed in as an employer", () => {
       test(`${locale}/employer/<org>${route}`, async ({ page }) => {
         await signInAs(page, world.employer.tokens);
         await visit(page, `/${locale}/employer/${world.employer.slug}${route}`);
-        await checkPage(page, `employer ${locale}${route || "/"}`);
+        await checkSwept(page, `employer ${locale}${route || "/"}`);
       });
     }
 
@@ -290,7 +293,7 @@ test.describe("signed in as an employer", () => {
       await signInAs(page, world.employer.tokens);
       for (const route of [`/jobs/${world.jobSlug}/applications`, `/candidates/${world.jobSlug}`]) {
         await visit(page, `/${locale}/employer/${world.employer.slug}${route}`);
-        await checkPage(page, `employer ${locale}${route}`);
+        await checkSwept(page, `employer ${locale}${route}`);
       }
     });
   }
@@ -302,14 +305,14 @@ test.describe("signed in as a training provider", () => {
       test(`${locale}/employer/<provider>${route}`, async ({ page }) => {
         await signInAs(page, world.provider.tokens);
         await visit(page, `/${locale}/employer/${world.provider.slug}${route}`);
-        await checkPage(page, `provider ${locale}${route || "/"}`);
+        await checkSwept(page, `provider ${locale}${route || "/"}`);
       });
     }
 
     test(`${locale}: who is interested in a course`, async ({ page }) => {
       await signInAs(page, world.provider.tokens);
       await visit(page, `/${locale}/employer/${world.provider.slug}/courses/${world.courseSlug}/interests`);
-      await checkPage(page, `provider ${locale} course interests`);
+      await checkSwept(page, `provider ${locale} course interests`);
     });
   }
 });
@@ -321,7 +324,7 @@ test.describe("signed in as an operator", () => {
       for (const route of ["/admin", `/admin/${world.employer.slug}`]) {
         await visit(page, `/${locale}${route}`);
         if (route === "/admin") await openFolded(page);
-        await checkPage(page, `operator ${locale}${route}`);
+        await checkSwept(page, `operator ${locale}${route}`);
       }
     });
   }
@@ -354,7 +357,7 @@ test.describe("on a phone", () => {
     test(`job seeker en${route}`, async ({ page }) => {
       await signInAs(page, world.seeker);
       await visit(page, `/en${route}`);
-      await checkPage(page, `phone seeker en${route}`);
+      await checkSwept(page, `phone seeker en${route}`);
     });
   }
 
@@ -362,7 +365,7 @@ test.describe("on a phone", () => {
     await signInAs(page, world.employer.tokens);
     for (const route of ["", "/team", `/jobs/${world.jobSlug}/applications`, `/candidates/${world.jobSlug}`]) {
       await visit(page, `/en/employer/${world.employer.slug}${route}`);
-      await checkPage(page, `phone employer en${route || "/"}`);
+      await checkSwept(page, `phone employer en${route || "/"}`);
     }
   });
 
@@ -370,14 +373,14 @@ test.describe("on a phone", () => {
     await signInAs(page, world.operator.tokens);
     await visit(page, "/en/admin");
     await openFolded(page);
-    await checkPage(page, "phone operator en/admin");
+    await checkSwept(page, "phone operator en/admin");
   });
 
   test("a provider's workspace and interests", async ({ page }) => {
     await signInAs(page, world.provider.tokens);
     for (const route of ["", "/interests"]) {
       await visit(page, `/en/employer/${world.provider.slug}${route}`);
-      await checkPage(page, `phone provider en${route || "/"}`);
+      await checkSwept(page, `phone provider en${route || "/"}`);
     }
   });
 });

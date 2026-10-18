@@ -1,5 +1,6 @@
 import { BUDGET_STORAGE_KEY } from "../core/course-budget";
 import { CACHE_STORAGE_KEY } from "../core/persist";
+import { THEME_STORAGE_KEY } from "../core/theme-preference";
 import { unregisterThisDevice } from "../push";
 import {
   api,
@@ -9,11 +10,14 @@ import {
   getLocale,
   restoreCourseBudget,
   restoreLocale,
+  restoreThemePreference,
   setCourseBudget,
   setLocale,
+  setThemePreference,
   tokens,
 } from "../runtime";
 import { storage } from "../storage";
+import { themePreference } from "../theme/preference";
 
 // A store in memory, and the two native modules the runtime would otherwise load.
 jest.mock("../storage", () => {
@@ -111,6 +115,31 @@ describe("what the person would pay for a course", () => {
     await forgetPersistedCache();
     expect(courseBudget.get()).toBeNull();
     expect(fake().data.has(BUDGET_STORAGE_KEY)).toBe(false);
+  });
+});
+
+describe("light, dark or follow the phone (BL-19.8)", () => {
+  it("is remembered across a launch", async () => {
+    setThemePreference("dark");
+    expect(fake().data.get(THEME_STORAGE_KEY)).toBe("dark");
+    themePreference.set("system");
+    fake().data.set(THEME_STORAGE_KEY, "dark");
+    await restoreThemePreference();
+    expect(themePreference.get()).toBe("dark");
+  });
+
+  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts on its own setting", async () => {
+    setThemePreference("light");
+    await forgetPersistedCache();
+    expect(themePreference.get()).toBe("system");
+    expect(fake().data.has(THEME_STORAGE_KEY)).toBe(false);
+  });
+
+  it("does not forget the language when the session ends", async () => {
+    fake().data.set("iism.locale", "hi");
+    setThemePreference("dark");
+    await forgetPersistedCache();
+    expect(fake().data.get("iism.locale")).toBe("hi");
   });
 });
 

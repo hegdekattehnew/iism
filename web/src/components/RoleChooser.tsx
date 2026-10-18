@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 
 import { Card } from "@/components/ui";
+import { ChevronRightIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
 
 /**
@@ -73,18 +74,7 @@ export async function RoleChooser({ className = "" }: { className?: string }) {
                   {t(`${key}Meta`)}
                 </span>
               </span>
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden
-                className="h-4 w-4 shrink-0 text-muted"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m9 6 6 6-6 6" />
-              </svg>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />
             </Link>
           </li>
         ))}

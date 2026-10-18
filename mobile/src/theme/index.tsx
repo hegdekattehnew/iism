@@ -1,14 +1,18 @@
 import { useColorScheme } from "react-native";
 
+import { useThemePreference } from "./preference";
 import { dark, light, radius as radiusTokens, type as typeTokens, type Colours } from "./tokens";
 
 /**
  * The colours for the phone's current appearance. One rule, carried over from the web: **no screen
  * names a colour**. Every colour is a token from `tokens.ts`, which is generated from the web's
- * `globals.css`, so a colour cannot exist for one theme and be missing in the other.
+ * `globals.css`, so a colour cannot exist for one theme and be missing in the other. The person's
+ * choice (light or dark, Sprint 78) wins; with none, the phone's own setting decides, as it always did.
  */
 export function useColours(): Colours {
-  return useColorScheme() === "dark" ? dark : light;
+  const system = useColorScheme();
+  const choice = useThemePreference();
+  return (choice === "system" ? system : choice) === "dark" ? dark : light;
 }
 
 /** Spacing on one scale (multiples of 4, the web's own spacing unit), so a screen never invents a number. */
