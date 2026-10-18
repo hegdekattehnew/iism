@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Text as NativeText } from "react-native";
+import { View } from "react-native";
 import { useTranslations } from "use-intl";
 
 import { daysToClose, experienceLabel, postedText, salaryLabel } from "../core/labels";
-import { MAX_FONT_SCALE, useColours } from "../theme";
+import { space, useColours } from "../theme";
+import { Icon } from "./icon";
 import { Badge, BadgeRow, Card } from "./list";
 import { Text } from "./primitives";
 
@@ -56,12 +57,22 @@ export function JobCard({
   return (
     <Card onPress={onPress} label={job.title}>
       <Text variant="lead">{job.title}</Text>
-      <Text tone="muted">{job.tenant.name}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+        <Icon name="Building" size={16} color={c.muted} />
+        <View style={{ flex: 1 }}>
+          <Text tone="muted">{job.tenant.name}</Text>
+        </View>
+      </View>
       {job.tenant.is_verified ? <Badge tone="success" label={t("verifiedEmployer")} /> : null}
       {place ? (
-        <NativeText maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: c.muted, fontSize: 13 }}>
-          {place}
-        </NativeText>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <Icon name="MapPin" size={16} color={c.muted} />
+          <View style={{ flex: 1 }}>
+            <Text tone="muted" variant="small">
+              {place}
+            </Text>
+          </View>
+        </View>
       ) : null}
       <Text variant="lead">{salaryLabel(job, say)}</Text>
       <Text tone="muted" variant="small">

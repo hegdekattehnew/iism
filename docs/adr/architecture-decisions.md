@@ -4290,3 +4290,43 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Size:** the Android Hermes bundle went **3,538,200 to 3,726,798 bytes** (ceiling 3,800,000, **73,202 left**) because the tab bar is the first thing to import `react-native-svg`, which the app has declared since Sprint 78. That is the whole cost of drawing icons on the phone; the next story that adds a package has to come out of it.
 - **Verified:** strict `tsc`, `eslint`, **786 Jest tests** (26 new for the primitives and rows, 2 for the icon and the bar, the tab and Me tests changed to the badge and the rows), the phone guards, both bundles, and **the real screens run in a browser** (the bar with its five icons and a badge of 3 on Me; the Updates row with its pill; the dark theme; the layout-shift run: every screen 0.000 except the signed-in home at 0.169, still its known open finding, ceiling 0.25). **14 mutation checks** over the row's floor, divider, count cap and zero, the row's spoken name, the card level, the alert role, the danger and soft looks, the Svg's props, the badge and its cap, the bar's height and an icon in the map: all killed after one first survived (the card-level test compared styles that differ in radius as well).
 - **Not done and not claimed:** BL-19.23 (the profile as sections), the signed-in home's layout jump (BL-19.22's second half: the home is not rebuilt on rows), cards and job/course cards on the new tokens beyond what already used them, and the screens' own use of `ghost`, `danger` and `soft` (the primitives exist and are tested; no screen asks for a danger button yet). The Hindi and Malay are unchanged (no new string). **Nothing ran on a device**: TalkBack and VoiceOver reading of the badge and the rows, the bar's height on a real notch and at 200% text are the checklist in `mobile/ACCESSIBILITY.md`.
+
+
+## ADR-092: The Phone's Profile Is a Stack of Sections, and a Home That Arrives in Pieces Waits and Arrives Once
+
+**Status:** Accepted (October 2026). Sprint 83 (Epic B19, BL-19.23 and the second half of BL-19.22). Extends ADR-065 (a page must not jump while it loads), ADR-078 (the profile's forms are one table compared with the server) and ADR-091 (the phone's vocabulary). Phone only and frontend only: no migration, no API or contract change (54 operations).
+
+**Context:** The phone's profile was one long screen: a sentence about completeness, the skills, six buttons for the history sections, then two forms ending in a "Save" each, with nothing to say which of the two a screen reader was on. The signed-in home read four queries (matches, profile, applications, unread count) and drew each block as it landed above the search box, so the box was pushed four times: the phone's browser run scored it 0.17 to 0.22 and it had been the one screen allowed above 0.1 (a recorded ceiling of 0.25) since Sprint 78. Two placeholder-height fixes tried then made it worse.
+
+**Decision:**
+
+- **The profile is a progress header and four sections.** The header is a progress bar (`ProgressBar`: a progressbar role with its value, clamped to 0 to 100, a number that is not one is drawn as 0) beside the sentence that says the same number. Then, in the order a person fills them in: **My skills** (the role picker and what is held), **About you**, **Your history** (the six sections as `ListRow`s, each with its count in the subtitle and the same spoken name as before), and **What you are looking for**. A form section is a `Panel` (an icon, a heading a screen reader reaches as a heading, its own surface) with **its own Save, named for the section** ("Save: About you"), and its own confirmation (a success notice, in that section). Date of birth and gender stay web-only. `test_mobile_section_limits.py` is untouched and green: no limit moved.
+- **No card in a card.** A role the picker finds is an `inset` card inside the skills panel; the history rows are one group, not a card each.
+- **The loading screen is the shape of what arrives**: a header-sized block and three section-sized ones (`SkeletonRows` takes a `height`), so a profile that loads moves nothing.
+- **A block made of several queries waits for all of them and arrives once.** `SignedInHome` shows one placeholder until matches, profile, applications and the unread count have each answered (an answer that is an error counts: a failed part must not hold the rest back for ever), then draws one block. The placeholder and the block share one height (`HOME_PLACE`, 330 dp, **measured** on the seeded demonstration account whose natural height is 336), and the block is never shorter than it, so the usual account moves nothing and an unusually short one moves things once, not four times. The profile's next step, the updates and the applications with news are **rows in one group**, in that order, the updates with their count in a pill and in the spoken name.
+- **The job card is on the scale.** Its place line was the one hand-written `fontSize: 13` in the phone's list code; the employer and the place are now `Text` steps with an icon each (Building, MapPin), the icon decorative beside its words.
+- **The ceiling file is empty.** `web/scripts/app-layout-shift-baseline.json` held one entry, the home. It is `{}` now, so every phone screen is held to 0.1, and the capture script's own comment says so.
+
+**Options considered:**
+
+1. Keep one long profile screen and rename the Saves
+2. **Sections as panels, each with its own Save** (chosen)
+3. A tabbed profile (one section on screen at a time)
+4. Fix the home's jump with a taller placeholder per part
+5. **Hold one placeholder and draw one block, at a measured height** (chosen)
+6. Move the personal block below the search so nothing it does can push it
+
+**Trade-offs:**
+
+- Option 1: ✅ nothing to build ❌ two "Save"s that cannot be told apart, and no sense of where in the profile you are.
+- Option 3: ✅ shortest screens ❌ hides what is incomplete, and a half-typed section is lost on a tab change.
+- Option 4: ✅ small ❌ tried in Sprint 78 and made it worse: a placeholder taller than the content shifts what is under it, and four parts arrive at four moments.
+- Option 6: ✅ nothing above moves ❌ the person's own best match stops being the first thing they see (ADR-080).
+
+**Consequences:**
+
+- **The cost of waiting**: the home shows nothing of the person's until the slowest of four reads has answered. Each is a read the app already makes and none is slow, but a slow unread count now delays the best match. A block per part with its own reserved height would avoid that and was not built.
+- **The held height is an account's, not a constant of nature**: 330 against 336 natural on the demonstration account; a person with a longer match sentence or with updates and news (56 dp a row) gets a taller block and one shift, not four.
+- **Size:** the Android bundle went 3,726,798 to 3,729,584 bytes (ceiling 3,800,000, **70,416 left**).
+- **Verified:** strict `tsc`, `eslint`, **814 Jest tests** (28 new across the primitives, the profile and the home; the profile and home tests changed to the sections, the rows and the one Save names), the phone guards, both bundles, and the real screens in a browser: the **signed-in home 0.169 to 0.002**, every other screen 0.000 except the signed-out home at 0.010, the profile read in full at a tall viewport (header, four sections, the history rows with their icons, two Saves). **20 mutation checks** over the bar's clamp, not-a-number, fill and role, the heading role, the placeholder's default and given height, the home waiting for all four, a failed part, the held height and the placeholder's, the updates count, both Save names, the preferences panel, the saved confirmation, the profile's loading shape, the inset card, a section's icon and the about section's presence: all killed after four first survived (the updates count, the loading shape, the inset card and the icons were each asserted by nothing).
+- **Not done and not claimed:** the web (BL-19.15 onward: nothing on the web changed), a block per part with its own held height on the home, a redesign of the job or course card beyond the job card's place line (the course card is built from the same `Card`, `Badge` and `Text` and was not changed), the Hindi for the one new string ("आपके बारे में", the engineer's, needs a native reader), and nothing ran on a device: TalkBack's reading of the progress bar and the two Saves, and 200% text in a panel, are on `mobile/ACCESSIBILITY.md`'s checklist.

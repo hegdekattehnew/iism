@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 
-import { Badge, Card, ListRow, RowGroup } from "../ui/list";
-import { Button, Notice } from "../ui/primitives";
+import { Badge, Card, ListRow, Panel, PanelHeader, RowGroup, SkeletonRows } from "../ui/list";
+import { Button, Notice, ProgressBar } from "../ui/primitives";
 import { renderScreen } from "./harness";
 import { resetWorld } from "./mocks";
 
@@ -137,5 +137,75 @@ describe("a list row", () => {
       return flat.borderTopWidth;
     };
     expect([top("One"), top("Two"), top("Three")]).toEqual([0, 1, 1]);
+  });
+});
+
+/** Sprint 83, BL-19.23: the pieces the profile is made of. */
+describe("a progress bar", () => {
+  it.each([
+    [60, 60],
+    [0, 0],
+    [100, 100],
+    [-5, 0],
+    [140, 100],
+    [33.4, 33],
+    [Number.NaN, 0],
+    [Number.POSITIVE_INFINITY, 0],
+  ])("%s percent is read as %s", async (given, read) => {
+    await renderScreen(<ProgressBar percent={given} label="Profile" />);
+    const bar = screen.getByRole("progressbar", { name: "Profile" });
+    expect(bar.props.accessibilityValue).toEqual({ min: 0, max: 100, now: read });
+  });
+
+  it("draws the fill as that share of the track", async () => {
+    await renderScreen(<ProgressBar percent={60} label="Profile" />);
+    const bar = screen.getByRole("progressbar", { name: "Profile" });
+    expect(bar.children[0]).toBeTruthy();
+    const fill = (bar.children[0] as unknown as { props: { style: { width: string } } }).props.style;
+    expect(fill.width).toBe("60%");
+  });
+});
+
+describe("a panel", () => {
+  it("has a heading, an optional line under it, and holds what it is given", async () => {
+    await renderScreen(
+      <Panel icon="User" title="About you" subtitle="Who you are">
+        <Badge label="inside" />
+      </Panel>,
+    );
+    expect(screen.getByRole("header", { name: "About you" })).toBeTruthy();
+    expect(screen.getByText("Who you are")).toBeTruthy();
+    expect(screen.getByText("inside")).toBeTruthy();
+  });
+
+  it("a header alone has no line under it when it has no subtitle", async () => {
+    await renderScreen(<PanelHeader icon="User" title="About you" />);
+    expect(screen.getByRole("header", { name: "About you" })).toBeTruthy();
+    expect(screen.toJSON()).toBeTruthy();
+  });
+
+  it("a panel is not a button, so a card inside it is the only thing that can be pressed", async () => {
+    await renderScreen(
+      <Panel icon="User" title="About you">
+        <Card label="inner" level="inset" onPress={jest.fn()}>
+          <Badge label="x" />
+        </Card>
+      </Panel>,
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+  });
+});
+
+describe("the loading placeholder", () => {
+  it("takes the height of what it stands in for", async () => {
+    await renderScreen(<SkeletonRows count={1} height={88} />);
+    const box = screen.getByLabelText("Loading").children[0] as unknown as { props: { style: { height: number } } };
+    expect(box.props.style.height).toBe(88);
+  });
+
+  it("is 112 high when nothing else is said, as it always was", async () => {
+    await renderScreen(<SkeletonRows count={1} />);
+    const box = screen.getByLabelText("Loading").children[0] as unknown as { props: { style: { height: number } } };
+    expect(box.props.style.height).toBe(112);
   });
 });

@@ -148,7 +148,7 @@ export function RolePicker({ held }: { held: ReadonlySet<string> }) {
         <FailureNotice error={hits.error} onRetry={() => void hits.refetch()} />
       ) : null}
       {(hits.data ?? []).map((hit) => (
-        <Card key={hit.slug} onPress={() => choose(hit)} label={hit.job_role}>
+        <Card key={hit.slug} level="inset" onPress={() => choose(hit)} label={hit.job_role}>
           <Text>{hit.job_role}</Text>
           <BadgeRow>
             <Badge label={t("standardsCount", { count: hit.standards_count })} />

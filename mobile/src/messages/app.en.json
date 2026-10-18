@@ -115,6 +115,7 @@
   },
   "profileSections": {
     "title": "Your history",
+    "aboutTitle": "About you",
     "intro": "Work, education, certificates, languages and where you would like to work. The more you add, the more complete your profile.",
     "count": "{count, plural, =0 {Nothing added} one {# entry} other {# entries}}",
     "add": "Add",

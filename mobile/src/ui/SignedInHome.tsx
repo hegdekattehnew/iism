@@ -6,9 +6,12 @@ import { useTranslations } from "use-intl";
 import { applicationsWithNews } from "../core/home";
 import { useApplications, useMatches, useProfile, useUnreadCount } from "../lib/me-queries";
 import { space } from "../theme";
-import { Badge, BadgeRow, Card, SkeletonRows } from "./list";
+import { Badge, BadgeRow, Card, ListRow, RowGroup, SkeletonRows } from "./list";
 import { MatchSentence } from "./match";
 import { Button, Text } from "./primitives";
+
+/** The height the block is held at while it loads, and the least it is once loaded (dp). Measured on the seeded demo account. */
+const HOME_PLACE = 330;
 
 /**
  * A signed-in job seeker's home (Sprint 70, UI-19): **their** things, not the signed-out page with
@@ -34,21 +37,28 @@ export function SignedInHome() {
   const router = useRouter();
   const matches = useMatches();
   const profile = useProfile();
-  const unread = useUnreadCount().data ?? 0;
+  const unreadQuery = useUnreadCount();
+  const unread = unreadQuery.data ?? 0;
   const applications = useApplications();
   // Read once when the screen opens; a render must give the same answer twice.
   const [openedAt] = useState(() => Date.now());
+
+  // **One block, shown when every part has answered** (Sprint 83): the four used to land one by one
+  // above the search box and each pushed it down (layout shift 0.17 to 0.22 on a phone). Held at a
+  // height of its own meanwhile, and never shorter than that once it arrives, so the usual account
+  // moves nothing and an unusually short one moves things once, not four times.
+  const settled = [matches, profile, applications, unreadQuery].every((q) => !q.isPending);
+  if (!settled) return <SkeletonRows count={1} height={HOME_PLACE} />;
 
   const top = matches.data?.items[0];
   const news = applications.data ? applicationsWithNews(applications.data, openedAt) : 0;
   const completeness = profile.data?.completeness;
   const next = completeness?.missing?.[0];
+  const sentence = completeness ? tp("completeness", { percent: completeness.percent ?? 0 }) : null;
 
   return (
-    <View style={{ gap: space.lg }}>
-      {matches.isPending ? (
-        <SkeletonRows count={1} />
-      ) : top ? (
+    <View testID="signed-in-home" style={{ gap: space.lg, minHeight: HOME_PLACE }}>
+      {top ? (
         <View style={{ gap: space.sm }}>
           <Text tone="muted" variant="small">
             {t("home.topMatch")}
@@ -71,29 +81,35 @@ export function SignedInHome() {
         <Text tone="muted">{t("home.noTopMatch")}</Text>
       ) : null}
 
-      {completeness ? (
-        <View style={{ gap: space.xs }}>
-          <Text variant="lead">{tp("completeness", { percent: completeness.percent ?? 0 })}</Text>
-          {next ? <Text tone="muted">{tp("completeNext", { what: tp(`field.${next}`) })}</Text> : null}
-          <Button variant="secondary" label={tp("title")} onPress={() => router.push("/profile")} />
-        </View>
-      ) : null}
-
-      {unread > 0 ? (
-        <Button
-          variant="secondary"
-          label={`${tn("title")} (${unread})`}
-          accessibilityLabel={`${tn("title")}: ${t("me.updatesCount", { count: unread })}`}
-          onPress={() => router.push("/notices")}
-        />
-      ) : null}
-
-      {news > 0 ? (
-        <Button
-          variant="secondary"
-          label={t("home.applicationsNews", { count: news })}
-          onPress={() => router.push("/applications")}
-        />
+      {/* What needs a look, as rows: the profile and its next step, new updates, applications with news. */}
+      {completeness || unread > 0 || news > 0 ? (
+        <RowGroup>
+          {completeness && sentence ? (
+            <ListRow
+              icon="User"
+              title={sentence}
+              subtitle={next ? tp("completeNext", { what: tp(`field.${next}`) }) : undefined}
+              accessibilityLabel={next ? `${sentence}. ${tp("completeNext", { what: tp(`field.${next}`) })}` : sentence}
+              onPress={() => router.push("/profile")}
+            />
+          ) : null}
+          {unread > 0 ? (
+            <ListRow
+              icon="Bell"
+              title={tn("title")}
+              count={unread}
+              accessibilityLabel={`${tn("title")}: ${t("me.updatesCount", { count: unread })}`}
+              onPress={() => router.push("/notices")}
+            />
+          ) : null}
+          {news > 0 ? (
+            <ListRow
+              icon="Inbox"
+              title={t("home.applicationsNews", { count: news })}
+              onPress={() => router.push("/applications")}
+            />
+          ) : null}
+        </RowGroup>
       ) : null}
     </View>
   );
