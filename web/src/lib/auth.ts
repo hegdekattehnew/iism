@@ -1,5 +1,7 @@
 "use client";
 
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/storage-keys";
+
 /**
  * Client-side token storage.
  *
@@ -10,8 +12,8 @@
  * the right change once the API is served from the same origin.
  */
 
-const ACCESS = "iism.access_token";
-const REFRESH = "iism.refresh_token";
+const ACCESS = ACCESS_TOKEN_KEY;
+const REFRESH = REFRESH_TOKEN_KEY;
 
 export type Tokens = { access_token: string; refresh_token: string };
 

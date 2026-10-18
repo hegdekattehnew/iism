@@ -19,7 +19,11 @@
     "skipToContent": "Langkau ke kandungan utama",
     "language": "Bahasa",
     "learners": "Interested learners",
-    "team": "Team"
+    "team": "Team",
+    "tabsLabel": "Tab utama",
+    "candidateLabel": "Halaman anda",
+    "tabMatches": "Padanan",
+    "tabProfile": "Profil"
   },
   "hero": {
     "eyebrow": "For people looking for work",

@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { SavedList } from "@/components/ApplicationList";
 import { SeekerOnly } from "@/components/SeekerOnly";
+import { CandidateNav } from "@/components/CandidateNav";
 
 export default async function Page({
   params,
@@ -13,6 +14,7 @@ export default async function Page({
   const t = await getTranslations("applications");
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
+      <CandidateNav />
       <SeekerOnly>
         <h1 className="text-3xl font-bold tracking-tight">{t("savedPageTitle")}</h1>
         <p className="mt-2 text-muted">{t("savedPageSubtitle")}</p>

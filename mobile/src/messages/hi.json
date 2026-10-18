@@ -19,7 +19,11 @@
     "skipToContent": "मुख्य सामग्री पर जाएँ",
     "language": "भाषा",
     "learners": "इच्छुक शिक्षार्थी",
-    "team": "टीम"
+    "team": "टीम",
+    "tabsLabel": "मुख्य टैब",
+    "candidateLabel": "आपके पन्ने",
+    "tabMatches": "मैच",
+    "tabProfile": "प्रोफ़ाइल"
   },
   "hero": {
     "eyebrow": "काम खोजने वालों के लिए",

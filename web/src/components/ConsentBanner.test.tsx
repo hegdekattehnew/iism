@@ -78,7 +78,8 @@ describe("the consent banner", () => {
     renderUi(<ConsentBanner />);
     const box = screen.getByRole("status").parentElement!;
     expect(box.className).toContain("fixed");
-    expect(box.className).toContain("bottom-0");
+    // At the bottom of the window, above the job seeker's tab bar when there is one (`--tabbar` is 0 when not).
+    expect(box.className).toContain("bottom-[var(--tabbar)]");
   });
 
   it("hides for this session on 'Not now', and asks again in the next one", () => {

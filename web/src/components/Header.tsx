@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AuthNav } from "@/components/AuthNav";
 import { ContextSwitcher, useActiveOrg } from "@/components/ContextSwitcher";
@@ -9,6 +9,8 @@ import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { Logo } from "@/components/ui";
 import { Link, usePathname } from "@/i18n/navigation";
 import { SEEKER, rememberContext } from "@/lib/context";
+import { currentHref, isReducedHeader } from "@/lib/nav";
+import { useDismiss } from "@/lib/use-dismiss";
 import { useOrgType } from "@/lib/org";
 
 /** What a job seeker is here to do. Also what an anonymous visitor sees. */
@@ -49,6 +51,10 @@ export function Header() {
   const activeOrg = useActiveOrg();
   const orgType = useOrgType(activeOrg);
   const pathname = usePathname();
+  const headerRef = useRef<HTMLElement>(null);
+  const closeNav = useCallback(() => setOpen(false), []);
+  // Escape, or a tap outside the header, closes the mobile menu (it only ever closed by its own button).
+  useDismiss(headerRef, open, closeNav);
   // Inside an organisation, its nav -- once we know what kind it is. The old
   // fallback, `ORG_NAV[orgType ?? "employer"]`, showed a training provider
   // "Vacancies" on every first paint, because `orgType` is null until
@@ -72,62 +78,84 @@ export function Header() {
   }, [activeOrg, pathname]);
   // Closed on click rather than in an effect keyed to the path: the effect form
   // sets state during render-commit, which React 19 flags.
-  const close = () => setOpen(false);
+  const close = closeNav;
+  // The page the person is on, in the navigation (`aria-current`, and drawn so).
+  const current = currentHref(
+    nav.map((n) => n.href),
+    pathname,
+  );
+
+  // Signing in or up: the logo to go back, the language, and nothing else to leave for (Sprint 81).
+  const reduced = isReducedHeader(pathname);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border-token bg-background/85 backdrop-blur">
+    <header
+      ref={headerRef}
+      className="sticky top-0 z-50 border-b border-border-token bg-background/85 backdrop-blur"
+    >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-5">
         <Link href="/" aria-label="IISM" className="inline-flex min-h-11 shrink-0 items-center">
           <Logo />
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
-          {nav.map(({ key, href }) => (
-            <Link
-              key={key}
-              href={href}
-              className="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-            >
-              {t(key)}
-            </Link>
-          ))}
-        </nav>
+        {!reduced && (
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
+            {nav.map(({ key, href }) => (
+              <Link
+                key={key}
+                href={href}
+                aria-current={href === current ? "page" : undefined}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-muted hover:text-foreground ${
+                  href === current ? "bg-accent-soft text-foreground" : "text-muted"
+                }`}
+              >
+                {t(key)}
+              </Link>
+            ))}
+          </nav>
+        )}
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <ContextSwitcher />
+        {reduced ? (
           <LocaleSwitcher />
-          <AuthNav />
-        </div>
+        ) : (
+          <div className="hidden items-center gap-2 lg:flex">
+            <ContextSwitcher />
+            <LocaleSwitcher />
+            <AuthNav />
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-controls="mobile-nav"
-          aria-label={open ? t("closeMenu") : t("openMenu")}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border-token lg:hidden"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
+        {!reduced && (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? t("closeMenu") : t("openMenu")}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border-token lg:hidden"
           >
-            {open ? (
-              <path d="M6 6l12 12M18 6L6 18" />
-            ) : (
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            )}
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              {open ? (
+                <path d="M6 6l12 12M18 6L6 18" />
+              ) : (
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              )}
+            </svg>
+          </button>
+        )}
       </div>
 
-      {open && (
+      {open && !reduced && (
         <div
           id="mobile-nav"
-          className="border-t border-border-token bg-background lg:hidden"
+          className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border-token bg-background lg:hidden"
         >
           <nav
             className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4"
@@ -138,7 +166,10 @@ export function Header() {
                 key={key}
                 href={href}
                 onClick={close}
-                className="flex min-h-11 items-center rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-surface-muted"
+                aria-current={href === current ? "page" : undefined}
+                className={`flex min-h-12 items-center rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-surface-muted ${
+                  href === current ? "bg-accent-soft" : ""
+                }`}
               >
                 {t(key)}
               </Link>

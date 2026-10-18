@@ -66,7 +66,7 @@ export function ConsentBanner() {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[var(--tabbar)] z-40 px-4 pb-4">
       <Alert
         tone={paused ? "warning" : "info"}
         role="status"

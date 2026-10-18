@@ -19,7 +19,11 @@
     "skipToContent": "Skip to main content",
     "language": "Language",
     "learners": "Interested learners",
-    "team": "Team"
+    "team": "Team",
+    "tabsLabel": "Main tabs",
+    "candidateLabel": "Your pages",
+    "tabMatches": "Matches",
+    "tabProfile": "Profile"
   },
   "hero": {
     "eyebrow": "For people looking for work",
