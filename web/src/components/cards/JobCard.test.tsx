@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { JobCard } from "@/components/JobCard";
+import { JobCard } from "@/components/cards/JobCard";
 import { daysToClose } from "@/lib/job-text";
 import { renderUi, resetWorld } from "@/test/harness";
 
@@ -129,5 +129,67 @@ describe("daysToClose", () => {
   it("rounds a part of a day up, and counts 30 days in", () => {
     expect(daysToClose(new Date(NOW + 3 * 3_600_000).toISOString(), NOW)).toBe(1);
     expect(daysToClose(new Date(NOW + 30 * DAY).toISOString(), NOW)).toBe(30);
+  });
+});
+
+/** Sprint 84, BL-19.15: the avatar-and-icon-chip card, and the score a signed-in seeker sees on it. */
+describe("card v3", () => {
+  it("has the employer's mark beside the title, hidden from a screen reader", () => {
+    const { container } = renderUi(<JobCard job={JOB} now={NOW} />);
+    const mark = container.querySelector('[aria-hidden="true"]') as HTMLElement;
+    expect(mark.textContent).toBe("A");
+  });
+
+  it("draws the pay and the place as chips with an icon each", () => {
+    renderUi(<JobCard job={JOB} now={NOW} />);
+    const pay = screen.getByText("About ₹18,300–25,000 a month");
+    const place = screen.getByText("Chennai, Tamil Nadu");
+    expect(pay.className).toContain("bg-accent-soft");
+    expect(pay.querySelector("svg")).toBeTruthy();
+    expect(place.className).toContain("bg-surface-muted");
+    expect(place.querySelector("svg")).toBeTruthy();
+  });
+
+  it("has no place chip for a vacancy with no place", () => {
+    const { container } = renderUi(
+      <JobCard job={{ ...JOB, location_state: null, location_district: null }} now={NOW} />,
+    );
+    expect(container.querySelectorAll("svg").length).toBe(2); // the rupee and the verified mark
+  });
+
+  it("is a link to the vacancy", () => {
+    renderUi(<JobCard job={JOB} now={NOW} />);
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/jobs/gda-chennai");
+  });
+});
+
+describe("the match score on a card (UI-04)", () => {
+  it("shows the person's score when there is one", () => {
+    renderUi(<JobCard job={JOB} now={NOW} score={87} scoreSlot />);
+    expect(screen.getByText("87% match")).toBeTruthy();
+  });
+
+  it("shows a score of zero, which is a score, and nothing for no score", () => {
+    const zero = renderUi(<JobCard job={JOB} now={NOW} score={0} scoreSlot />);
+    expect(screen.getByText("0% match")).toBeTruthy();
+    zero.unmount();
+    renderUi(<JobCard job={JOB} now={NOW} scoreSlot />);
+    expect(screen.queryByText(/% match/)).toBeNull();
+  });
+
+  it("leaves the title room for a score before it arrives, and does not for a visitor", () => {
+    const seeker = renderUi(<JobCard job={JOB} now={NOW} scoreSlot />);
+    expect(seeker.container.querySelector("h2")?.parentElement?.className).toContain("pr-24");
+    seeker.unmount();
+    const visitor = renderUi(<JobCard job={JOB} now={NOW} />);
+    expect(visitor.container.querySelector("h2")?.parentElement?.className).not.toContain("pr-24");
+  });
+
+  it("keeps the same room whether or not the score has landed (so the title never re-wraps)", () => {
+    const before = renderUi(<JobCard job={JOB} now={NOW} scoreSlot />);
+    const room = before.container.querySelector("h2")?.parentElement?.className;
+    before.unmount();
+    const after = renderUi(<JobCard job={JOB} now={NOW} scoreSlot score={72} />);
+    expect(after.container.querySelector("h2")?.parentElement?.className).toBe(room);
   });
 });

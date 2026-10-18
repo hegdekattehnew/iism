@@ -4,10 +4,12 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-qu
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
-import { JobCard } from "@/components/JobCard";
+import { JobCard } from "@/components/cards/JobCard";
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
+import { ChipButton, ChipRow, ChipSelect } from "@/components/ui/chip";
 import { api } from "@/lib/api";
 import type { JobCardData } from "@/lib/job-text";
+import { useMyScores } from "@/lib/matches";
 import { EMPLOYMENT_TYPES as TYPES } from "@/lib/profile";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BriefcaseIcon } from "@/components/ui/icons";
@@ -24,6 +26,7 @@ export function JobBrowser({
   initialQuery?: string;
 }) {
   const t = useTranslations("jobsPage");
+  const { scores, isSeeker } = useMyScores();
 
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
@@ -79,53 +82,54 @@ export function JobBrowser({
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("searchPlaceholder")}
-          aria-label={t("searchPlaceholder")}
-          className="w-full flex-1 rounded-lg border border-border-token bg-surface px-4 py-3 text-base placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        />
-        <select
-          aria-label={t("allTypes")}
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="rounded-lg border border-border-token bg-surface px-3 py-3 text-sm"
-        >
-          <option value="">{t("allTypes")}</option>
-          {TYPES.map((ty) => (
-            <option key={ty} value={ty}>
-              {t(`employmentType.${ty}`)}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label={t("allStates")}
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-          className="rounded-lg border border-border-token bg-surface px-3 py-3 text-sm"
-        >
-          <option value="">{t("allStates")}</option>
-          {states.map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.name} ({s.count})
-            </option>
-          ))}
-        </select>
-        {(query || type || state) && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setQuery("");
-              setType("");
-              setState("");
-            }}
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("searchPlaceholder")}
+        aria-label={t("searchPlaceholder")}
+        className="w-full rounded-lg border border-border-token bg-surface px-4 py-3 text-base placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      />
+      <div className="mt-3">
+        <ChipRow label={t("filters")}>
+          <ChipSelect label={t("allTypes")} active={type !== ""} value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="">{t("allTypes")}</option>
+            {TYPES.map((ty) => (
+              <option key={ty} value={ty}>
+                {t(`employmentType.${ty}`)}
+              </option>
+            ))}
+          </ChipSelect>
+          <ChipSelect label={t("allStates")} active={state !== ""} value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="">{t("allStates")}</option>
+            {states.map((s) => (
+              <option key={s.name} value={s.name}>
+                {s.name} ({s.count})
+              </option>
+            ))}
+          </ChipSelect>
+          {/* Always drawn, so the row is the same shape before and after the list arrives. */}
+          <ChipSelect
+            label={t("sortLabel")}
+            active={sort !== "title"}
+            value={sort}
+            onChange={(e) => setSort(e.target.value as "title" | "newest")}
           >
-            {t("clear")}
-          </Button>
-        )}
+            <option value="title">{t("sortTitle")}</option>
+            <option value="newest">{t("sortNewest")}</option>
+          </ChipSelect>
+          {(query || type || state) && (
+            <ChipButton
+              onClick={() => {
+                setQuery("");
+                setType("");
+                setState("");
+              }}
+            >
+              {t("clear")}
+            </ChipButton>
+          )}
+        </ChipRow>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -136,16 +140,6 @@ export function JobBrowser({
             {t("resultsCount", { count: total })}
           </p>
         )}
-        {/* Always drawn, so the row is the same shape before and after the count arrives. */}
-        <select
-          aria-label={t("sortLabel")}
-          value={sort}
-          onChange={(e) => setSort(e.target.value as "title" | "newest")}
-          className="rounded-lg border border-border-token bg-surface px-3 py-3 text-sm"
-        >
-          <option value="title">{t("sortTitle")}</option>
-          <option value="newest">{t("sortNewest")}</option>
-        </select>
       </div>
 
       {results.isError && (
@@ -162,7 +156,7 @@ export function JobBrowser({
       <ul className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {rows.map((j) => (
           <li key={j.slug}>
-            <JobCard job={j} />
+            <JobCard job={j} score={scores.get(j.slug)} scoreSlot={isSeeker} />
           </li>
         ))}
       </ul>

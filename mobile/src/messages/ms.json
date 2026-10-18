@@ -273,7 +273,8 @@
     "retry": "Try again",
     "sortLabel": "Sort by",
     "sortTitle": "A to Z",
-    "sortNewest": "Newest first"
+    "sortNewest": "Newest first",
+    "filters": "Filters"
   },
   "coursesPage": {
     "title": "Courses",
@@ -320,7 +321,12 @@
     "retry": "Try again",
     "creditsChip": "{count, plural, one {# credit} other {# credits}}",
     "qualificationLabel": "Counts toward",
-    "qualificationNote": "Stated by the provider. The credits are for the whole qualification, not only this course."
+    "qualificationNote": "Stated by the provider. The credits are for the whole qualification, not only this course.",
+    "filters": "Filters",
+    "verifiedProvider": "Verified provider",
+    "notVerifiedYet": "Provider not yet verified",
+    "interestFree": "Registering interest is free. Ask the provider what any fee covers before you pay anyone.",
+    "reportThis": "Report this course if it asks you for money."
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
