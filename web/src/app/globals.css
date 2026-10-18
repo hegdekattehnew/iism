@@ -11,23 +11,58 @@
    did this correctly; these tokens are that pattern, extended rather than
    replaced. */
 :root {
-  --background: #ffffff;
+  /* The ramps (Sprint 77, ADR-086, BL-19.4). The brand ramp is today's blue with a scale around it
+     (700 is the colour the product has always used); the neutral ramp is a grey tinted to the same
+     hue so the greys sit with the blue. **Components never name a ramp step.** They use the
+     semantic tokens below, which point at a step in each theme (a test holds each pairing to the
+     step it names and to its contrast), because a step used directly is a colour that cannot flip
+     in dark mode. 850 and 950 exist only for the dark theme. */
+  --brand-50: #eff5fa;
+  --brand-100: #dce9f4;
+  --brand-200: #b9d2ea;
+  --brand-300: #89b7e1;
+  --brand-400: #5497d3;
+  --brand-500: #3078bb;
+  --brand-600: #266196;
+  --brand-700: #1f4e79;
+  --brand-800: #153451;
+  --brand-900: #0c1f31;
+  --neutral-50: #f8f9fa;
+  --neutral-100: #eff1f3;
+  --neutral-200: #dfe3e7;
+  --neutral-300: #c5ccd3;
+  --neutral-400: #96a4b0;
+  --neutral-500: #6e8091;
+  --neutral-600: #586774;
+  --neutral-700: #424d57;
+  --neutral-800: #2c333a;
+  --neutral-850: #20262b;
+  --neutral-900: #181c20;
+  --neutral-950: #111417;
+
+  /* Surfaces, by level: the page is grey and a card is white, so a card reads as a card without
+     depending on its border alone (the Sprint 76 direction). */
+  --background: #f8f9fa;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
-  --foreground: #0f172a;
+  --surface-muted: #eff1f3;
+  --surface-raised: #ffffff;
+  --foreground: #181c20;
   /* Secondary text. Was #64748b, which is 4.76:1 on white but **4.33:1 on the hero's tinted
      surface** -- under the 4.5:1 WCAG AA asks for, and invisible to every test until Sprint 52's
      browser run measured it (jsdom has no layout, so `a11y.test.tsx` cannot check contrast).
      This passes on white, on `--accent-soft` and down to #e2e8f0. */
-  --muted: #586980;
-  --border: #e2e8f0;
+  --muted: #586774;
+  --border: #dfe3e7;
   /* A form control's edge. `--border` is 1.23:1 on white, which is fine for a
      card and fails WCAG 1.4.11 (3:1) for an input you have to find to type in. */
-  --input-border: #7c8aa0;
+  --input-border: #6e8091;
   --brand: #1f4e79;
-  --brand-strong: #163a5a;
+  --brand-strong: #153451;
   --brand-contrast: #ffffff;
-  --accent-soft: #eff5fb;
+  /* A tint of the brand for chips and avatars, and the text that sits on it. */
+  --accent-soft: #eff5fa;
+  --accent-tint: #dce9f4;
+  --accent-text: #153451;
 
   /* Semantic tones. Three values each, because that is what the two shapes
      using them need: a badge takes surface + text, an alert takes all three.
@@ -59,22 +94,56 @@
   /* Elevation, as a scale rather than a `shadow-lg` sprinkled where it was
      noticed. Two steps is all this product has needed. */
   --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.06);
   --shadow-raised: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.12);
+
+  /* Radius (Sprint 77, BL-19.6): three steps and "full". The phone's `radius` is generated from
+     these, so a corner is the same on both. Tailwind's `rounded-md`, `-lg` and `-xl` point at
+     them in the theme block below, so no call site moved. */
+  --r-sm: 0.375rem;
+  --r-md: 0.625rem;
+  --r-lg: 1rem;
+
+  /* Motion. Two durations and one ease; the reduced-motion rule below switches them off for a
+     person who asked their device for less movement. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* The type scale (BL-19.5): caption, small, body, lead, title, display, each a size and a line
+     height. Secondary text is 15 px, not 14 (the Sprint 76 direction). Devanagari takes a
+     taller line at every step (see `html[lang="hi"]`). The phone's scale is generated from these
+     and the 12 px floor is held by `src/lib/type-floor.test.ts`. */
+  --type-caption: 0.8125rem;
+  --type-caption-lh: 1.125rem;
+  --type-small: 0.9375rem;
+  --type-small-lh: 1.375rem;
+  --type-body: 1rem;
+  --type-body-lh: 1.5rem;
+  --type-lead: 1.125rem;
+  --type-lead-lh: 1.75rem;
+  --type-title: 1.5rem;
+  --type-title-lh: 2rem;
+  --type-display: 1.875rem;
+  --type-display-lh: 2.25rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #020617;
-    --surface: #0b1220;
-    --surface-muted: #0f172a;
-    --foreground: #e2e8f0;
-    --muted: #94a3b8;
-    --border: #1e293b;
-    --input-border: #5b6b82;
-    --brand: #5b9bd5;
-    --brand-strong: #7db3e3;
-    --brand-contrast: #041022;
-    --accent-soft: #0e1c2d;
+    --background: #111417;
+    --surface: #181c20;
+    --surface-muted: #20262b;
+    --surface-raised: #2c333a;
+    --foreground: #eff1f3;
+    --muted: #96a4b0;
+    --border: #2c333a;
+    --input-border: #6e8091;
+    --brand: #5497d3;
+    --brand-strong: #89b7e1;
+    --brand-contrast: #0c1f31;
+    --accent-soft: #0c1f31;
+    --accent-tint: #153451;
+    --accent-text: #b9d2ea;
 
     --success-surface: #022c22;
     --success-border: #065f46;
@@ -95,6 +164,7 @@
 
     --overlay: rgb(2 6 23 / 0.7);
     --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.35);
     --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.55);
   }
 }
@@ -103,6 +173,7 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border-token: var(--border);
@@ -111,6 +182,8 @@
   --color-brand-strong: var(--brand-strong);
   --color-brand-contrast: var(--brand-contrast);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-text: var(--accent-text);
 
   --color-success-surface: var(--success-surface);
   --color-success-border: var(--success-border);
@@ -130,7 +203,14 @@
   --color-overlay: var(--overlay);
 
   --shadow-soft: var(--shadow-soft);
+  --shadow-card: var(--shadow-card);
   --shadow-raised: var(--shadow-raised);
+
+  /* Tailwind's own radius steps point at ours (see `--r-*`): `rounded-md` was 6 px and is still
+     6, `rounded-lg` was 8 and is 10, `rounded-xl` was 12 and is 16. */
+  --radius-md: var(--r-sm);
+  --radius-lg: var(--r-md);
+  --radius-xl: var(--r-lg);
 
   /* The type scale. Sprint 26 found 34 arbitrary sizes sitting beside the Tailwind steps,
      and `2xs` was named for the 11 px one. Sprint 69 (UI-07) raised the floor: nothing is
@@ -152,10 +232,58 @@
   --font-system: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Type sizes are a plain `@theme` (not `inline`) so a locale can change the line heights at run
+   time: `inline` would bake the values in at build. Tailwind's own `text-xs`, `-sm`, `-base`,
+   `-lg`, `-2xl` and `-3xl` are the named steps, so the 700 existing call sites moved with them
+   (secondary text went from 14 to 15 px, captions from 12 to 13), and `text-caption`, `-small`,
+   `-body`, `-lead`, `-title` and `-display` are the names for new code. `text-2xs` (12 px) is
+   the floor and stays for legal and meta lines. */
+@theme {
+  --text-xs: var(--type-caption);
+  --text-xs--line-height: var(--type-caption-lh);
+  --text-sm: var(--type-small);
+  --text-sm--line-height: var(--type-small-lh);
+  --text-base: var(--type-body);
+  --text-base--line-height: var(--type-body-lh);
+  --text-lg: var(--type-lead);
+  --text-lg--line-height: var(--type-lead-lh);
+  --text-2xl: var(--type-title);
+  --text-2xl--line-height: var(--type-title-lh);
+  --text-3xl: var(--type-display);
+  --text-3xl--line-height: var(--type-display-lh);
+
+  --text-caption: var(--type-caption);
+  --text-caption--line-height: var(--type-caption-lh);
+  --text-small: var(--type-small);
+  --text-small--line-height: var(--type-small-lh);
+  --text-body: var(--type-body);
+  --text-body--line-height: var(--type-body-lh);
+  --text-lead: var(--type-lead);
+  --text-lead--line-height: var(--type-lead-lh);
+  --text-title: var(--type-title);
+  --text-title--line-height: var(--type-title-lh);
+  --text-display: var(--type-display);
+  --text-display--line-height: var(--type-display-lh);
+
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* A person who asked their device for less movement gets none: no transition, no animation (the
+   loading placeholders stop pulsing but still read as placeholders). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Hindi pages, and only Hindi pages, load the Devanagari face.
@@ -177,6 +305,18 @@ body {
 html[lang="hi"] body {
   font-family: var(--font-inter), var(--font-devanagari), system-ui, sans-serif;
   line-height: 1.7;
+}
+
+/* Devanagari takes a taller line at every step of the scale (about 0.1 of the size more), because
+   its marks above and below the line collide at Latin proportions. The fold budget of the home
+   hero is measured in Hindi for this reason. */
+html[lang="hi"] {
+  --type-caption-lh: 1.25rem;
+  --type-small-lh: 1.5rem;
+  --type-body-lh: 1.625rem;
+  --type-lead-lh: 1.875rem;
+  --type-title-lh: 2.125rem;
+  --type-display-lh: 2.5rem;
 }
 
 /* The footer waits for the page.

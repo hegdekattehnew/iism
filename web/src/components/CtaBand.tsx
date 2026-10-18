@@ -12,7 +12,7 @@ export async function CtaBand() {
           <h2 className="text-2xl font-bold tracking-tight text-brand-contrast sm:text-3xl">
             {t("title")}
           </h2>
-          <p className="mt-2 max-w-xl text-sm text-brand-contrast/80">
+          <p className="mt-2 max-w-xl text-sm text-brand-contrast">
             {t("subtitle")}
           </p>
         </div>
