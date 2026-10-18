@@ -133,6 +133,23 @@ export default async function CourseDetailPage({
         )}
       </dl>
 
+      {/* Who is behind it and what registering costs (UI-10; the vacancy page has the same strip). The
+          page says "not yet verified"; a card in a list never does, because it would read as an
+          accusation of every provider without a mark. */}
+      <div className="mt-4 rounded-xl border border-border-token bg-surface p-4 text-sm">
+        <p className={data.tenant.is_verified ? "font-medium text-success-text" : "text-muted"}>
+          {data.tenant.is_verified ? t("verifiedProvider") : t("notVerifiedYet")}
+        </p>
+        <p className="mt-1 text-muted">{t("interestFree")}</p>
+        {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
+        <a
+          href="#report"
+          className="inline-flex min-h-11 items-center text-brand underline underline-offset-2"
+        >
+          {t("reportThis")}
+        </a>
+      </div>
+
       {description && <p className="mt-8 text-base leading-relaxed">{description}</p>}
 
       <section className="mt-10">
@@ -158,7 +175,7 @@ export default async function CourseDetailPage({
         </ul>
       </section>
 
-      <div className="mt-10">
+      <div id="report" className="mt-10 scroll-mt-24">
         <ReportListing kind="course" slug={data.slug} />
       </div>
     </div>

@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobBrowser } from "@/components/JobBrowser";
-import { renderUi, resetWorld } from "@/test/harness";
+import { renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
 vi.mock("@/lib/org", async () => (await import("@/test/harness")).orgMock);
@@ -26,9 +26,10 @@ const job = (n: number) => ({
 type Q = { offset?: number; limit?: number; location_state?: string };
 
 /** A catalogue of `total` vacancies, served the way the API does: a window and the full total. */
-function serve(total: number, states = [{ name: "Maharashtra", count: total }]) {
+function serve(total: number, states = [{ name: "Maharashtra", count: total }], matches?: unknown) {
   GET.mockImplementation(async (path: string, init?: { params?: { query?: Q } }) => {
     if (path === "/jobs/states") return { data: states };
+    if (path === "/me/matches") return matches === undefined ? { error: {}, response: { status: 403 } } : { data: matches };
     const q = init?.params?.query ?? {};
     const offset = q.offset ?? 0;
     const limit = q.limit ?? 50;
@@ -167,5 +168,139 @@ describe("the sort", () => {
       const calls = GET.mock.calls.filter((c) => c[0] === "/jobs").map((c) => c[1].params.query);
       expect(calls.at(-1)).toMatchObject({ sort: "newest", offset: 0 });
     });
+  });
+});
+
+const seeker = () => {
+  world.memberships = [{ role: "owner", tenant: { slug: "me", name: "Me", tenant_type: "personal" } }];
+};
+
+/** Sprint 84, BL-19.15 (UI-04): a signed-in job seeker's list carries their own scores. */
+describe("the match score on the list", () => {
+  const scored = { items: [{ job: { slug: "job-2" }, score: 87 }, { job: { slug: "job-3" }, score: 31 }], total: 2, has_skills: true };
+
+  it("shows a seeker the score of each vacancy they have one for, and nothing on the rest", async () => {
+    seeker();
+    serve(5, undefined, scored);
+    renderUi(<JobBrowser />);
+    expect(await screen.findByText("87% match")).toBeTruthy();
+    expect(screen.getByText("31% match")).toBeTruthy();
+    expect(screen.getAllByText(/% match/)).toHaveLength(2);
+  });
+
+  it("puts each score on its own vacancy's card", async () => {
+    seeker();
+    serve(5, undefined, scored);
+    renderUi(<JobBrowser />);
+    await screen.findByText("87% match");
+    const card = screen.getByRole("heading", { name: "Vacancy number 2" }).closest("a")!;
+    expect(card.textContent).toContain("87% match");
+    const other = screen.getByRole("heading", { name: "Vacancy number 1" }).closest("a")!;
+    expect(other.textContent).not.toMatch(/% match/);
+  });
+
+  it("asks the server for the matches once, with the route's own page size", async () => {
+    seeker();
+    serve(5, undefined, scored);
+    renderUi(<JobBrowser />);
+    await screen.findByText("87% match");
+    const calls = GET.mock.calls.filter((c) => c[0] === "/me/matches");
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1].params.query.limit).toBe(50);
+  });
+
+  it("asks nothing of /me/matches for a visitor, who has no score and no use for one", async () => {
+    world.signedIn = false;
+    serve(5, undefined, scored);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    expect(GET.mock.calls.some((c) => c[0] === "/me/matches")).toBe(false);
+    expect(screen.queryByText(/% match/)).toBeNull();
+  });
+
+  it("asks nothing for an organisation-only account either (the route would refuse it)", async () => {
+    world.memberships = [{ role: "owner", tenant: { slug: "apollo", name: "Apollo", tenant_type: "employer" } }];
+    serve(5, undefined, scored);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    expect(GET.mock.calls.some((c) => c[0] === "/me/matches")).toBe(false);
+  });
+
+  it("is silent when the matches cannot be had, and the list is still the list", async () => {
+    seeker();
+    serve(5); // /me/matches answers an error
+    renderUi(<JobBrowser />);
+    expect(await screen.findByText("Vacancy number 1")).toBeTruthy();
+    await waitFor(() => expect(GET.mock.calls.some((c) => c[0] === "/me/matches")).toBe(true));
+    expect(screen.queryByText(/% match/)).toBeNull();
+    expect(screen.queryByText(/Could not load/)).toBeNull();
+  });
+
+  it("says nothing for a seeker with no skills, who has no matches yet", async () => {
+    seeker();
+    serve(5, undefined, { items: [], total: 0, has_skills: false });
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    expect(screen.queryByText(/% match/)).toBeNull();
+  });
+});
+
+/** Sprint 84, BL-19.15: the filters are one row of chips, not a column of selects. */
+describe("the filter chips", () => {
+  it("are one named group holding type, place and order", async () => {
+    serve(5);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    const group = screen.getByRole("group", { name: "Filters" });
+    expect(group.querySelectorAll("select")).toHaveLength(3);
+    for (const name of ["All types", "All locations", "Sort by"]) {
+      expect(screen.getByRole("combobox", { name })).toBeTruthy();
+    }
+  });
+
+  it("has no clear chip until something narrows the list, then has one that undoes it", async () => {
+    serve(5);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    fireEvent.change(screen.getByRole("combobox", { name: "All types" }), { target: { value: "gig" } });
+    const clear = await screen.findByRole("button", { name: "Clear" });
+    fireEvent.click(clear);
+    await waitFor(() => expect((screen.getByRole("combobox", { name: "All types" }) as HTMLSelectElement).value).toBe(""));
+  });
+
+  it("puts the search box above the row, full width", async () => {
+    serve(5);
+    renderUi(<JobBrowser />);
+    const box = await screen.findByRole("searchbox");
+    expect(box.className).toContain("w-full");
+  });
+});
+
+describe("the chips say what is narrowing the list, and the card leaves room for a score", () => {
+  it("draws the order chip filled once it is not the default", async () => {
+    serve(5);
+    renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    const chip = () => screen.getByRole("combobox", { name: "Sort by" }).parentElement as HTMLElement;
+    expect(chip().className).not.toContain("bg-accent-soft");
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort by" }), { target: { value: "newest" } });
+    expect(chip().className).toContain("bg-accent-soft");
+  });
+
+  it("reserves the score's place on every card for a seeker, before any score arrives, and not for a visitor", async () => {
+    seeker();
+    serve(3, undefined, { items: [], total: 0, has_skills: true });
+    const view = renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    const rooms = view.container.querySelectorAll("h2");
+    expect(rooms.length).toBe(3);
+    for (const h of rooms) expect(h.parentElement?.className).toContain("pr-24");
+    view.unmount();
+    resetWorld();
+    serve(3);
+    const visitor = renderUi(<JobBrowser />);
+    await screen.findByText("Vacancy number 1");
+    for (const h of visitor.container.querySelectorAll("h2")) expect(h.parentElement?.className).not.toContain("pr-24");
   });
 });

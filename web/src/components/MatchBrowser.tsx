@@ -8,30 +8,13 @@ import { CoverageBar, LevelScale } from "@/components/CoverageBar";
 import { SkillChip } from "@/components/GapPanel";
 import { CourseBudgetControl, SuggestedCourses } from "@/components/SuggestedCourses";
 import { Button, ButtonLink, Skeleton } from "@/components/ui";
+import { ScoreDial } from "@/components/cards/ScoreDial";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { useCourseBudget } from "@/lib/course-budget";
+import { fetchMatches } from "@/lib/matches";
 import { matchSummary } from "@/lib/match-summary";
 
-
-function ScoreDial({ score }: { score: number }) {
-  const t = useTranslations("matchesPage");
-  // Colour carries no information the number does not: it is a second
-  // encoding for scanning, never the only one.
-  const tone =
-    score >= 75
-      ? "bg-success-surface text-success-text"
-      : score >= 45
-        ? "bg-warning-surface text-warning-text"
-        : "bg-surface-muted text-foreground";
-  return (
-    <span
-      className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${tone}`}
-    >
-      {t("matchScore", { score })}
-    </span>
-  );
-}
 
 /** ADR-025 names candidate-to-course click-through as one of three metrics that
  *  stand in for a revenue signal while v1 is free. It is the one event the
@@ -46,8 +29,7 @@ function reportCourseOpened(courseSlug: string, fromJobSlug: string) {
   });
 }
 
-/** How many matches arrive at once (the route's maximum) and how many are shown before "Show more". */
-const FETCH = 50;
+/** How many matches are shown before "Show more" (how many arrive is `MATCHES_FETCH`, in `lib/matches`). */
 const FIRST = 5;
 
 /**
@@ -86,17 +68,7 @@ export function MatchBrowser() {
 
   const matches = useQuery({
     queryKey: ["matches"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/me/matches", {
-        params: { query: { limit: FETCH } },
-      });
-      // openapi-fetch resolves rather than throws on a non-2xx, so without
-      // this a 401 arrives as `data: undefined` and renders as "nothing
-      // matches" -- telling a signed-out visitor they have no matches rather
-      // than that they are not signed in.
-      if (error || !data) throw new Error("matches request failed");
-      return data;
-    },
+    queryFn: fetchMatches,
     retry: false,
   });
 

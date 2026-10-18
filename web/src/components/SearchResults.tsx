@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { JobCard } from "@/components/JobCard";
+import { JobCard } from "@/components/cards/JobCard";
 import { lookalikeNames, StandardOrigin } from "@/components/SkillBrowser";
 import { Badge, ButtonLink } from "@/components/ui";
 import { Link } from "@/i18n/navigation";

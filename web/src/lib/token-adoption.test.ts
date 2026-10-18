@@ -21,7 +21,7 @@ import { describe, expect, it } from "vitest";
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Directories under `src/`, relative, whose files are held to the scale. Grows with the revamp. */
-export const MIGRATED = ["components/ui"];
+export const MIGRATED = ["components/ui", "components/cards"];
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -81,8 +81,10 @@ describe("token adoption in the migrated families", () => {
   it("finds the sources it checks (a checker that read nothing would pass)", () => {
     // An empty list holds no family to the scale and every check below would pass over nothing.
     expect(MIGRATED, "the component library is the first family held to the scale").toContain("components/ui");
+    // The library is big; a smaller family (`components/cards`, Sprint 84: three files) still has to be found.
+    expect(files(join(SRC, "components/ui")).length, "components/ui").toBeGreaterThan(5);
     for (const family of MIGRATED) {
-      expect(files(join(SRC, family)).length, family).toBeGreaterThan(5);
+      expect(files(join(SRC, family)).length, family).toBeGreaterThanOrEqual(3);
     }
   });
 
