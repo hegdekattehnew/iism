@@ -38,6 +38,15 @@ describe("Icon", () => {
     expect(root.props.importantForAccessibility).toBe("yes");
   });
 
+  it("keeps accessibility props off the Svg, which hands every prop to a DOM element on the web", async () => {
+    await render(<Icon name="Bell" title="Updates" />);
+    const root = screen.toJSON() as { children: { props: Record<string, unknown> }[] };
+    const svg = root.children[0].props;
+    for (const prop of ["accessible", "accessibilityRole", "accessibilityLabel", "importantForAccessibility"]) {
+      expect(svg[prop]).toBeUndefined();
+    }
+  });
+
   it("every icon renders (in one render: a test that renders twice leaves overlapping act scopes)", async () => {
     const names = Object.keys(SHAPES) as IconName[];
     await render(

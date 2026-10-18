@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 import { useColours } from "../theme";
@@ -26,24 +27,31 @@ type Props = {
 export function Icon({ name, size = 20, color, title }: Props) {
   const colours = useColours();
   const stroke = color ?? colours.foreground;
+  // The accessibility props sit on a View, not on the Svg: on the web (react-native-web) the Svg
+  // hands every prop to a DOM element, and `accessible` / `importantForAccessibility` are not DOM
+  // attributes, so React logged an error and the dev overlay covered the screen (found by running it).
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={stroke}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <View
+      style={{ width: size, height: size }}
       accessible={title !== undefined}
       accessibilityRole={title !== undefined ? "image" : undefined}
       accessibilityLabel={title}
       importantForAccessibility={title !== undefined ? "yes" : "no-hide-descendants"}
     >
-      {SHAPES[name].map((d) => (
-        <Path key={d} d={d} />
-      ))}
-    </Svg>
+      <Svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {SHAPES[name].map((d) => (
+          <Path key={d} d={d} />
+        ))}
+      </Svg>
+    </View>
   );
 }

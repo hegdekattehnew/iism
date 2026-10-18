@@ -1,0 +1,102 @@
+{
+ "capturedAgainst": "http://localhost:8081 (the phone app's browser build, 375x812, reads held back 250 ms)",
+ "note": "Sprint 82 is phone-only (BL-19.14, 19.21, 19.22); the web is unchanged, so its Sprint 81 capture stands. A browser rendering, not a phone: no native fonts, Hermes or safe area.",
+ "results": [
+  {
+   "id": "home-signed-out",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "jobs",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "job-detail",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "home-signed-in",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.169
+  },
+  {
+   "id": "matches",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "me",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "applications",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "profile",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "careers",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "match-detail",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  },
+  {
+   "id": "me-dark-chosen",
+   "variant": "light",
+   "locale": "en",
+   "viewport": "375x812",
+   "layoutShift": 0.0
+  }
+ ],
+ "tabBar": {
+  "before": {
+   "icons": 0,
+   "heightDp": 49,
+   "labelClipped": false
+  },
+  "after": {
+   "icons": 5,
+   "heightDpAboveInset": 64,
+   "unreadDrawn": "badge on the Me icon"
+  },
+  "note": "the first run with icons and the navigator's default 49 dp cut the labels off; the bar is 64 dp plus the bottom inset"
+ },
+ "androidBundleBytes": {
+  "before": 3538200,
+  "after": 3726798,
+  "ceiling": 3800000,
+  "why": "react-native-svg, which the app declared since Sprint 78 but no screen imported until the tab bar did"
+ }
+}

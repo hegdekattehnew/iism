@@ -8,7 +8,7 @@ import { endSession, useSignedIn } from "../../src/runtime";
 import { space } from "../../src/theme";
 import { AppearanceChooser } from "../../src/ui/AppearanceChooser";
 import { SeekerGate } from "../../src/ui/gate";
-import { Card } from "../../src/ui/list";
+import { Card, ListRow, RowGroup } from "../../src/ui/list";
 import { Button, Notice, Screen, Text } from "../../src/ui/primitives";
 
 /**
@@ -59,18 +59,25 @@ function Menu() {
         {p ? <Text tone="muted">{tp("completeness", { percent: p.completeness?.percent ?? 0 })}</Text> : null}
         <Text variant="small">{tp("title")}</Text>
       </Card>
-      <Button
-        variant="secondary"
-        label={unread > 0 ? `${tn("title")} (${unread})` : tn("title")}
-        accessibilityLabel={unread > 0 ? `${tn("title")}: ${t("me.updatesCount", { count: unread })}` : undefined}
-        onPress={() => router.push("/notices")}
-      />
-      <Button variant="secondary" label={ta("pageTitle")} onPress={() => router.push("/applications")} />
-      <Button variant="secondary" label={ta("savedPageTitle")} onPress={() => router.push("/saved")} />
-      <Button variant="secondary" label={tc("pageTitle")} onPress={() => router.push("/interests")} />
-      <Button variant="secondary" label={tcp("title")} onPress={() => router.push("/careers")} />
-      <Button variant="secondary" label={ta2("title")} onPress={() => router.push("/account")} />
-      <Button variant="secondary" label={tct("title")} onPress={() => router.push("/contact")} />
+      {/* Two groups, each with an icon per row (Sprint 82, BL-19.22): what the person did, then the
+          account and the way to reach us. The unread count is drawn in a pill and spoken in the name. */}
+      <RowGroup>
+        <ListRow
+          icon="Bell"
+          title={tn("title")}
+          count={unread}
+          accessibilityLabel={unread > 0 ? `${tn("title")}: ${t("me.updatesCount", { count: unread })}` : undefined}
+          onPress={() => router.push("/notices")}
+        />
+        <ListRow icon="Inbox" title={ta("pageTitle")} onPress={() => router.push("/applications")} />
+        <ListRow icon="Bookmark" title={ta("savedPageTitle")} onPress={() => router.push("/saved")} />
+        <ListRow icon="GraduationCap" title={tc("pageTitle")} onPress={() => router.push("/interests")} />
+        <ListRow icon="Navigation" title={tcp("title")} onPress={() => router.push("/careers")} />
+      </RowGroup>
+      <RowGroup>
+        <ListRow icon="ShieldCheck" title={ta2("title")} onPress={() => router.push("/account")} />
+        <ListRow icon="Info" title={tct("title")} onPress={() => router.push("/contact")} />
+      </RowGroup>
       {/* After everything else, never above it: it arrives when the account does (Sprint 72). A stale
           notice asks and blocks nothing; a withdrawal says the account is paused. */}
       {prompt ? (
