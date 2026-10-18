@@ -154,6 +154,16 @@ export const SHAPES = {
   Navigation: [
     "M12 3l7 17-7-4-7 4z",
   ],
+  Inbox: [
+    "M4 13l2.5-7a1 1 0 0 1 1-.7h9a1 1 0 0 1 1 .7L20 13",
+    "M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5",
+    "M4 13h4.5a1 1 0 0 1 1 .6 3 3 0 0 0 5 0 1 1 0 0 1 1-.6H20",
+  ],
+  XCircle: [
+    "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z",
+    "M9 9l6 6",
+    "M15 9l-6 6",
+  ],
 } as const;
 
 export type IconName = keyof typeof SHAPES;

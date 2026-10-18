@@ -142,6 +142,7 @@ const PUBLIC = [
   "/courses",
   "/employers",
   "/employers/signin",
+  "/gallery",
   "/grievance",
   "/jobs",
   "/privacy",

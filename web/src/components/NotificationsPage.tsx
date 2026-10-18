@@ -9,6 +9,8 @@ import { useIsSignedIn } from "@/lib/auth";
 import { detailOf, isSignedOut } from "@/lib/http";
 import { noticePath, useNoticeText } from "@/lib/notice-text";
 import { useNoticePages, useReadAll, useReadOne } from "@/lib/notifications";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BellIcon } from "@/components/ui/icons";
 
 /**
  * Every notice, not only the newest fifty (Sprint 60, BL-14.9).
@@ -41,7 +43,7 @@ export function NotificationsPage() {
   const failure = readOne.error ?? readAll.error;
 
   if (notices.length === 0) {
-    return <p className="mt-6 text-muted">{t("empty")}</p>;
+    return <EmptyState icon={BellIcon} title={t("empty")} className="mt-6" />;
   }
 
   return (

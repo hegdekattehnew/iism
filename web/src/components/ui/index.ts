@@ -23,6 +23,9 @@ export { Button } from "@/components/ui/button";
 export { buttonVariants } from "@/components/ui/button-variants";
 export { ButtonLink } from "@/components/ui/button-link";
 export { Card, CardBody, CardTitle } from "@/components/ui/card";
+// `EmptyState` and `Spinner` are NOT re-exported either (Sprint 80): they draw icons, and a barrel that
+// names them put them on the first load of every route that imports it for a Button (measured: about
+// 4 KB on `/profile`). Import them from `@/components/ui/empty-state` and `@/components/ui/spinner`.
 // `Dialog` is deliberately NOT re-exported here. Almost every component
 // imports this barrel for a Button, and Radix's dialog is ~33KB of the
 // first-load budget; re-exporting it put a modal on the first load of every

@@ -11,6 +11,8 @@ import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { apiErrorFrom } from "@/lib/http";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BookmarkIcon, BriefcaseIcon } from "@/components/ui/icons";
 
 // From the generated client, never restated: a hand-written copy plus a cast
 // let `completed`/`no_show` reach this screen with no colour and no compile error.
@@ -66,12 +68,12 @@ export function ApplicationList() {
   if (isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
   if (data.length === 0) {
     return (
-      <div className="mt-8">
-        <p className="text-sm text-muted">{t("empty")}</p>
-        <ButtonLink href="/matches" className="mt-4">
-          {t("emptyCta")}
-        </ButtonLink>
-      </div>
+      <EmptyState
+        icon={BriefcaseIcon}
+        title={t("empty")}
+        action={<ButtonLink href="/matches">{t("emptyCta")}</ButtonLink>}
+        className="mt-8"
+      />
     );
   }
 
@@ -181,12 +183,12 @@ export function SavedList() {
   if (isError) return <p className="mt-8 text-sm text-muted">{t("errorGeneric")}</p>;
   if (data.length === 0) {
     return (
-      <div className="mt-8">
-        <p className="text-sm text-muted">{t("savedEmpty")}</p>
-        <ButtonLink href="/jobs" className="mt-4">
-          {t("emptyCta")}
-        </ButtonLink>
-      </div>
+      <EmptyState
+        icon={BookmarkIcon}
+        title={t("savedEmpty")}
+        action={<ButtonLink href="/jobs">{t("emptyCta")}</ButtonLink>}
+        className="mt-8"
+      />
     );
   }
 

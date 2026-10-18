@@ -20,6 +20,7 @@ import {
   useGrievanceQueue,
 } from "@/lib/grievances";
 import { detailOf } from "@/lib/http";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const TONE: Record<GrievanceStatus, "warn" | "brand" | "good" | "neutral"> = {
   open: "warn",
@@ -119,7 +120,7 @@ function Body({ queue }: { queue: ReturnType<typeof useGrievanceQueue> }) {
     );
   }
   if (queue.data.items.length === 0) {
-    return <p className="mt-6 text-muted">{t("empty")}</p>;
+    return <EmptyState title={t("empty")} className="mt-6" />;
   }
   return (
     <ul className="mt-6 space-y-3">

@@ -7,6 +7,8 @@ import { useDeferredValue, useState } from "react";
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SearchIcon } from "@/components/ui/icons";
 
 // One screenful on a phone, and a small enough payload to stay quick on mobile
 // data. The taxonomy is 21k rows: fetching it all and filtering in the browser
@@ -280,7 +282,7 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
       )}
 
       {!results.isError && rows.length === 0 && !results.isPending && (
-        <p className="mt-8 text-sm text-muted">{t("noResults")}</p>
+        <EmptyState icon={SearchIcon} title={t("noResults")} className="mt-8" />
       )}
 
       {results.isPending && <ListSkeleton className="md:grid-cols-2 lg:grid-cols-2" />}

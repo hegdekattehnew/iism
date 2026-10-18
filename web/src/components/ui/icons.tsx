@@ -1,7 +1,7 @@
 /**
  * The icon set (Sprint 78, BL-19.7, ADR-087).
  *
- * Thirty-four icons drawn as strokes on a 24 x 24 grid, written here and nowhere else: no icon
+ * Thirty-six icons drawn as strokes on a 24 x 24 grid, written here and nowhere else: no icon
  * package, no image request (the CSP blocks remote images anyway), and nothing to download on a
  * low-end phone. The colour is `currentColor`, so an icon takes its text colour from a token and
  * follows the theme with it.
@@ -85,3 +85,5 @@ export const ShieldCheckIcon = /*#__PURE__*/ makeIcon("ShieldCheck", ["M12 3l8 3
 export const PlusIcon = /*#__PURE__*/ makeIcon("Plus", ["M12 5v14", "M5 12h14"]);
 export const AwardIcon = /*#__PURE__*/ makeIcon("Award", ["M12 3a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11z", "M8.5 13.5L7 21l5-3 5 3-1.5-7.5"]);
 export const NavigationIcon = /*#__PURE__*/ makeIcon("Navigation", ["M12 3l7 17-7-4-7 4z"]);
+export const InboxIcon = /*#__PURE__*/ makeIcon("Inbox", ["M4 13l2.5-7a1 1 0 0 1 1-.7h9a1 1 0 0 1 1 .7L20 13", "M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5", "M4 13h4.5a1 1 0 0 1 1 .6 3 3 0 0 0 5 0 1 1 0 0 1 1-.6H20"]);
+export const XCircleIcon = /*#__PURE__*/ makeIcon("XCircle", ["M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z", "M9 9l6 6", "M15 9l-6 6"]);

@@ -14,6 +14,8 @@ import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
 import { saveCsv } from "@/lib/download";
 import { apiErrorFrom, detailOf } from "@/lib/http";
 import { STATUS_MESSAGE_MAX } from "@/lib/hiring";
+import { EmptyState } from "@/components/ui/empty-state";
+import { UsersIcon } from "@/components/ui/icons";
 
 // Derived from the generated schema, never restated: the hand-written
 // three-value union this replaced is why `completed` and `no_show` could not
@@ -160,7 +162,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
       </ButtonLink>
 
       {items.length === 0 ? (
-        <p className="mt-8 text-sm text-muted">{t("empty")}</p>
+        <EmptyState icon={UsersIcon} title={t("empty")} className="mt-8" />
       ) : (
         <ul className="mt-6 space-y-4">
           {items.map((applicant) => {
