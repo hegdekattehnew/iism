@@ -13,7 +13,7 @@ import { CourseBudgetControl, SuggestedCourses } from "@/components/SuggestedCou
 import { api } from "@/lib/api";
 import { useCourseBudget } from "@/lib/course-budget";
 import type { paths } from "@/lib/api-schema";
-import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 
 type RoleHit =
   paths["/roles/search"]["get"]["responses"][200]["content"]["application/json"][number];
@@ -48,7 +48,7 @@ export function CareerLadder() {
           query: { ...(role ? { role } : {}), ...(budget === null ? {} : { budget_inr: budget }) },
         },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     retry: false,
@@ -61,7 +61,7 @@ export function CareerLadder() {
       const { data, error, response } = await api.PUT("/me/profile", {
         body: { current_role_slug: slug },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: (_data, slug) => {

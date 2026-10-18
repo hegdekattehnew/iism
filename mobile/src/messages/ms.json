@@ -2055,5 +2055,16 @@
     "formerOperator": "a former operator",
     "batchLine": "{when} · {operator} · notice {version}",
     "batchCounts": "{created} new, {tagged} tagged, {already} left alone, {errors} errors"
+  },
+  "form": {
+    "required": "Isi ruang ini.",
+    "tooShort": "Gunakan sekurang-kurangnya {min} aksara.",
+    "tooLong": "Gunakan paling banyak {max} aksara.",
+    "rangeUnderflow": "Masukkan {min} atau lebih.",
+    "rangeOverflow": "Masukkan {max} atau kurang.",
+    "typeEmail": "Masukkan alamat e-mel, seperti name@example.com.",
+    "typeUrl": "Masukkan alamat web yang bermula dengan https://",
+    "pattern": "Ini bukan dalam bentuk yang dijangka.",
+    "badInput": "Masukkan nombor."
   }
 }

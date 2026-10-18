@@ -7,7 +7,7 @@ import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/component
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { providerDashboardKey } from "@/lib/counts";
-import { ApiError, detailOf, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf } from "@/lib/http";
 
 // What a provider may set, from the generated schema. The mutation used to
 // hardcode "contacted", so a provider had no way to record an enrolment and the
@@ -56,7 +56,7 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
         },
       );
       const code = response.status;
-      if (error) throw new ApiError(code, readDetail(error));
+      if (error) throw apiErrorFrom(code, error);
     },
     // Every mutation that can fail needs an onError: a button that silently
     // does nothing is worse than an error (Sprint 14).

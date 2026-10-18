@@ -2055,5 +2055,16 @@
     "formerOperator": "a former operator",
     "batchLine": "{when} · {operator} · notice {version}",
     "batchCounts": "{created} new, {tagged} tagged, {already} left alone, {errors} errors"
+  },
+  "form": {
+    "required": "Fill in this field.",
+    "tooShort": "Use at least {min} characters.",
+    "tooLong": "Use at most {max} characters.",
+    "rangeUnderflow": "Enter {min} or more.",
+    "rangeOverflow": "Enter {max} or less.",
+    "typeEmail": "Enter an email address, like name@example.com.",
+    "typeUrl": "Enter a web address that starts with https://",
+    "pattern": "This is not in the expected form.",
+    "badInput": "Enter a number."
   }
 }

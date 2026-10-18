@@ -8,7 +8,7 @@ import {
 
 import type { components } from "./api-schema";
 import { api } from "./api";
-import { ApiError, readDetail } from "./http";
+import { apiErrorFrom } from "./http";
 import { NOTICES } from "./unread-count";
 
 export type Notice = components["schemas"]["NotificationOut"];
@@ -27,7 +27,7 @@ export function useNoticePages(signedIn: boolean) {
         params: { query: { limit: PAGE_SIZE, ...(pageParam ?? {}) } },
       });
       const status = response.status;
-      if (error || !data) throw new ApiError(status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(status, error);
       return data;
     },
     getNextPageParam: (last) =>
@@ -51,7 +51,7 @@ export function useReadOne() {
         },
       );
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: NOTICES });
@@ -65,7 +65,7 @@ export function useReadAll() {
     mutationFn: async () => {
       const { error, response } = await api.POST("/me/notifications/read");
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: NOTICES });

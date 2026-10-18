@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
 import { saveCsv } from "@/lib/download";
-import { ApiError, detailOf, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf } from "@/lib/http";
 import { STATUS_MESSAGE_MAX } from "@/lib/hiring";
 
 // Derived from the generated schema, never restated: the hand-written
@@ -64,7 +64,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
         { params: { path: { org_slug: org, job_slug: jobSlug } }, parseAs: "text" },
       );
       const code = response.status;
-      if (error || typeof data !== "string") throw new ApiError(code, readDetail(error));
+      if (error || typeof data !== "string") throw apiErrorFrom(code, error);
       saveCsv(`applicants-${jobSlug}.csv`, data);
     },
   });
@@ -89,7 +89,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
       // Read before the check, and keep what the server said: "only a hired
       // application can be marked completed" is worth showing.
       const code = response.status;
-      if (error) throw new ApiError(code, readDetail(error));
+      if (error) throw apiErrorFrom(code, error);
     },
     // Every mutation that can fail needs an onError: a form that silently does
     // nothing is worse than an error (Sprint 14).
@@ -118,7 +118,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
         },
       );
       const code = response.status;
-      if (error) throw new ApiError(code, readDetail(error));
+      if (error) throw apiErrorFrom(code, error);
     };
 
   if (isPending) return <Skeleton className="mt-8 h-40 w-full" />;

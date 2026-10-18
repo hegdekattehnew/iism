@@ -2055,5 +2055,16 @@
     "formerOperator": "एक पूर्व ऑपरेटर",
     "batchLine": "{when} · {operator} · सूचना {version}",
     "batchCounts": "{created} नए, {tagged} टैग लगे, {already} छोड़े गए, {errors} त्रुटियाँ"
+  },
+  "form": {
+    "required": "यह जानकारी भरें।",
+    "tooShort": "कम से कम {min} अक्षर लिखें।",
+    "tooLong": "{max} अक्षरों से ज़्यादा न लिखें।",
+    "rangeUnderflow": "{min} या उससे ज़्यादा लिखें।",
+    "rangeOverflow": "{max} या उससे कम लिखें।",
+    "typeEmail": "ईमेल पता लिखें, जैसे name@example.com।",
+    "typeUrl": "वेब पता लिखें, जो https:// से शुरू हो।",
+    "pattern": "यह सही रूप में नहीं है।",
+    "badInput": "संख्या लिखें।"
   }
 }

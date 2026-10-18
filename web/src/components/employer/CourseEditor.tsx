@@ -3,10 +3,11 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Area, Field, Select, Text } from "@/components/profile/fields";
+import { Area, Field, FormErrors, Select, Text } from "@/components/profile/fields";
 import { type ChosenQualification, QualificationField } from "@/components/employer/QualificationField";
 import { type Standard, StandardPicker } from "@/components/StandardPicker";
 import { Button, Card, CardBody } from "@/components/ui";
+import { fieldsOf } from "@/lib/http";
 import type { CoursePayload, OrgCourse } from "@/lib/org";
 
 /**
@@ -38,11 +39,14 @@ function toTaught(course: OrgCourse | null): Taught[] {
 export function CourseEditor({
   course,
   saving,
+  error,
   onSave,
   onCancel,
 }: {
   course: OrgCourse | null;
   saving: boolean;
+  /** What the last save failed with: the server's message about each field lands next to it. */
+  error?: unknown;
   onSave: (payload: CoursePayload) => void;
   onCancel: () => void;
 }) {
@@ -106,204 +110,206 @@ export function CourseEditor({
   return (
     <Card>
       <CardBody>
-        <form onSubmit={submit} key={course?.slug ?? "new"}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t("titleEn")} className="sm:col-span-2">
-              <Text
-                name="title"
-                required
-                // Mirrors `CourseIn.title`'s `min_length=3`, for the reason the
-                // job editor does: a rule the form does not know about becomes
-                // "Could not save" with nothing to act on.
-                minLength={3}
-                maxLength={200}
-                defaultValue={course?.title ?? ""}
-              />
-            </Field>
-            <Field
-              label={t("descriptionEn")}
-              hint={t("descriptionHint")}
-              className="sm:col-span-2"
-            >
-              <Area
-                name="description"
-                maxLength={10000}
-                defaultValue={course?.description ?? ""}
-              />
-            </Field>
-            <Field label={t("mode")}>
-              <Select name="mode" defaultValue={course?.mode ?? "offline"}>
-                {["online", "offline", "hybrid"].map((v) => (
-                  <option key={v} value={v}>
-                    {t(`modes.${v}`)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t("language")}>
-              <Select name="language" defaultValue={course?.language ?? "both"}>
-                {["en", "hi", "both"].map((v) => (
-                  <option key={v} value={v}>
-                    {t(`languages.${v}`)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t("durationHours")}>
-              <Text
-                name="duration_hours"
-                max={10000}
-                type="number"
-                min={1}
-                defaultValue={course?.duration_hours ?? ""}
-              />
-            </Field>
-            <Field label={t("fee")} hint={t("feeHint")}>
-              <Text
-                name="fee_inr"
-                type="number"
-                min={0}
-                defaultValue={course?.fee_inr ?? ""}
-              />
-            </Field>
-            <Field label={t("nsqfLevel")} hint={t("nsqfLevelHint")}>
-              {/* step 0.5: the corpus is 38% half-levels, and a whole-number
-                  spinner silently hides them. */}
-              <Text
-                name="nsqf_level"
-                type="number"
-                min={1}
-                max={10}
-                step={0.5}
-                defaultValue={course?.nsqf_level ?? ""}
-              />
-            </Field>
-            <div className="sm:col-span-2">
-              <span className="block text-sm font-medium">{t("qualification")}</span>
-              <p className="mt-0.5 mb-2 text-xs text-muted">{t("qualificationHint")}</p>
-              <QualificationField value={qualification} onChange={setQualification} />
-            </div>
-            {/* Where, when and how many (Sprint 58). The server resolves the place against the
-                national master; blank is right for an online course. */}
-            <Field label={t("locationState")} hint={t("placeHint")}>
-              <Text
-                name="location_state"
-                maxLength={120}
-                defaultValue={course?.location_state ?? ""}
-              />
-            </Field>
-            <Field label={t("locationDistrict")}>
-              <Text
-                name="location_district"
-                maxLength={120}
-                defaultValue={course?.location_district ?? ""}
-              />
-            </Field>
-            <Field label={t("startsOn")} hint={t("startsOnHint")}>
-              <Text name="starts_on" type="date" defaultValue={course?.starts_on ?? ""} />
-            </Field>
-            <Field label={t("seats")} hint={t("seatsHint")}>
-              <Text
-                name="seats"
-                type="number"
-                min={1}
-                max={100000}
-                defaultValue={course?.seats ?? ""}
-              />
-            </Field>
-          </div>
-
-          <div className="mt-8 border-t border-border-token pt-6">
-            <h3 className="text-base font-semibold">{t("teachesTitle")}</h3>
-            <p className="mt-1 text-sm text-muted">{t("teachesSubtitle")}</p>
-
-            <div className="mt-4">
-              <StandardPicker
-                onSelect={add}
-                chosen={chosen}
-                placeholder={t("standardsSearch")}
-                addLabel={t("addStandard")}
-              />
+        <FormErrors fields={fieldsOf(error)}>
+          <form onSubmit={submit} key={course?.slug ?? "new"}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("titleEn")} className="sm:col-span-2">
+                <Text
+                  name="title"
+                  required
+                  // Mirrors `CourseIn.title`'s `min_length=3`, for the reason the
+                  // job editor does: a rule the form does not know about becomes
+                  // "Could not save" with nothing to act on.
+                  minLength={3}
+                  maxLength={200}
+                  defaultValue={course?.title ?? ""}
+                />
+              </Field>
+              <Field
+                label={t("descriptionEn")}
+                hint={t("descriptionHint")}
+                className="sm:col-span-2"
+              >
+                <Area
+                  name="description"
+                  maxLength={10000}
+                  defaultValue={course?.description ?? ""}
+                />
+              </Field>
+              <Field label={t("mode")}>
+                <Select name="mode" defaultValue={course?.mode ?? "offline"}>
+                  {["online", "offline", "hybrid"].map((v) => (
+                    <option key={v} value={v}>
+                      {t(`modes.${v}`)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("language")}>
+                <Select name="language" defaultValue={course?.language ?? "both"}>
+                  {["en", "hi", "both"].map((v) => (
+                    <option key={v} value={v}>
+                      {t(`languages.${v}`)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("durationHours")}>
+                <Text
+                  name="duration_hours"
+                  max={10000}
+                  type="number"
+                  min={1}
+                  defaultValue={course?.duration_hours ?? ""}
+                />
+              </Field>
+              <Field label={t("fee")} hint={t("feeHint")}>
+                <Text
+                  name="fee_inr"
+                  type="number"
+                  min={0}
+                  defaultValue={course?.fee_inr ?? ""}
+                />
+              </Field>
+              <Field label={t("nsqfLevel")} hint={t("nsqfLevelHint")}>
+                {/* step 0.5: the corpus is 38% half-levels, and a whole-number
+                    spinner silently hides them. */}
+                <Text
+                  name="nsqf_level"
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  defaultValue={course?.nsqf_level ?? ""}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <span className="block text-sm font-medium">{t("qualification")}</span>
+                <p className="mt-0.5 mb-2 text-xs text-muted">{t("qualificationHint")}</p>
+                <QualificationField value={qualification} onChange={setQualification} />
+              </div>
+              {/* Where, when and how many (Sprint 58). The server resolves the place against the
+                  national master; blank is right for an online course. */}
+              <Field label={t("locationState")} hint={t("placeHint")}>
+                <Text
+                  name="location_state"
+                  maxLength={120}
+                  defaultValue={course?.location_state ?? ""}
+                />
+              </Field>
+              <Field label={t("locationDistrict")}>
+                <Text
+                  name="location_district"
+                  maxLength={120}
+                  defaultValue={course?.location_district ?? ""}
+                />
+              </Field>
+              <Field label={t("startsOn")} hint={t("startsOnHint")}>
+                <Text name="starts_on" type="date" defaultValue={course?.starts_on ?? ""} />
+              </Field>
+              <Field label={t("seats")} hint={t("seatsHint")}>
+                <Text
+                  name="seats"
+                  type="number"
+                  min={1}
+                  max={100000}
+                  defaultValue={course?.seats ?? ""}
+                />
+              </Field>
             </div>
 
-            {taught.length === 0 ? (
-              <p className="mt-4 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
-                {t("noStandardsWarning")}
-              </p>
-            ) : (
-              <ul className="mt-4 space-y-2">
-                {taught.map((s) => (
-                  <li
-                    key={s.skill_slug}
-                    className="rounded-lg border border-border-token bg-background px-3 py-2.5"
-                  >
-                    <span className="block text-sm">
-                      {s.name}
-                      {s.nos_code && (
-                        <span className="ml-2 font-mono text-xs text-muted">
-                          {s.nos_code}
-                        </span>
-                      )}
-                    </span>
-                    <div className="mt-2 flex flex-wrap items-center gap-4">
-                      <label className="flex items-center gap-2 text-xs text-muted">
-                        {t("levelTaught")}
-                        <Select
-                          value={s.level_taught ?? ""}
-                          onChange={(e) =>
+            <div className="mt-8 border-t border-border-token pt-6">
+              <h3 className="text-base font-semibold">{t("teachesTitle")}</h3>
+              <p className="mt-1 text-sm text-muted">{t("teachesSubtitle")}</p>
+
+              <div className="mt-4">
+                <StandardPicker
+                  onSelect={add}
+                  chosen={chosen}
+                  placeholder={t("standardsSearch")}
+                  addLabel={t("addStandard")}
+                />
+              </div>
+
+              {taught.length === 0 ? (
+                <p className="mt-4 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
+                  {t("noStandardsWarning")}
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-2">
+                  {taught.map((s) => (
+                    <li
+                      key={s.skill_slug}
+                      className="rounded-lg border border-border-token bg-background px-3 py-2.5"
+                    >
+                      <span className="block text-sm">
+                        {s.name}
+                        {s.nos_code && (
+                          <span className="ml-2 font-mono text-xs text-muted">
+                            {s.nos_code}
+                          </span>
+                        )}
+                      </span>
+                      <div className="mt-2 flex flex-wrap items-center gap-4">
+                        <label className="flex items-center gap-2 text-xs text-muted">
+                          {t("levelTaught")}
+                          <Select
+                            value={s.level_taught ?? ""}
+                            onChange={(e) =>
+                              setTaught((rs) =>
+                                rs.map((x) =>
+                                  x.skill_slug === s.skill_slug
+                                    ? {
+                                        ...x,
+                                        level_taught: e.target.value
+                                          ? Number(e.target.value)
+                                          : null,
+                                      }
+                                    : x,
+                                ),
+                              )
+                            }
+                            className="mt-0 w-auto py-1"
+                          >
+                            <option value="">{t("levelUnset")}</option>
+                            {[
+                              1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7,
+                              8, 9, 10,
+                            ].map((v) => (
+                              <option key={v} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                          </Select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
                             setTaught((rs) =>
-                              rs.map((x) =>
-                                x.skill_slug === s.skill_slug
-                                  ? {
-                                      ...x,
-                                      level_taught: e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                    }
-                                  : x,
-                              ),
+                              rs.filter((x) => x.skill_slug !== s.skill_slug),
                             )
                           }
-                          className="mt-0 w-auto py-1"
+                          className="ml-auto text-xs text-muted hover:text-danger-text hover:underline"
                         >
-                          <option value="">{t("levelUnset")}</option>
-                          {[
-                            1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7,
-                            8, 9, 10,
-                          ].map((v) => (
-                            <option key={v} value={v}>
-                              {v}
-                            </option>
-                          ))}
-                        </Select>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTaught((rs) =>
-                            rs.filter((x) => x.skill_slug !== s.skill_slug),
-                          )
-                        }
-                        className="ml-auto text-xs text-muted hover:text-danger-text hover:underline"
-                      >
-                        {t("remove")}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                          {t("remove")}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button type="submit" disabled={saving}>
-              {saving ? t("saving") : t("save")}
-            </Button>
-            <Button type="button" variant="secondary" onClick={onCancel}>
-              {t("cancel")}
-            </Button>
-          </div>
-        </form>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button type="submit" disabled={saving}>
+                {saving ? t("saving") : t("save")}
+              </Button>
+              <Button type="button" variant="secondary" onClick={onCancel}>
+                {t("cancel")}
+              </Button>
+            </div>
+          </form>
+        </FormErrors>
       </CardBody>
     </Card>
   );

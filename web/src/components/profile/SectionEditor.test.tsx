@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -66,7 +69,8 @@ describe("a certification's linked standard", () => {
   it("is chosen from the national standards and sent as skill_slug", async () => {
     renderUi(<Certifications entries={[]} />);
     fireEvent.click(screen.getByRole("button", { name: /Add/ }));
-    fireEvent.change(screen.getByLabelText("Certificate"), {
+    // The fields are a chunk fetched when a form is first opened (Sprint 79).
+    fireEvent.change(await screen.findByLabelText("Certificate"), {
       target: { value: "Phlebotomy Technician Certificate" },
     });
 
@@ -85,7 +89,7 @@ describe("a certification's linked standard", () => {
     expect(screen.getByText(/Perform sample collection activities/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(screen.getByRole("button", { name: "Remove link" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Remove link" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(PUT).toHaveBeenCalledTimes(1));
@@ -96,7 +100,7 @@ describe("a certification's linked standard", () => {
   it("is unlinked only when the person removes it", async () => {
     renderUi(<Certifications entries={[SAVED]} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove link" }));
     expect(screen.getByRole("searchbox")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -104,12 +108,34 @@ describe("a certification's linked standard", () => {
     expect(bodyOf(PUT).skill_slug).toBeNull();
   });
 
-  it("does not submit the certificate when Enter is pressed in the search box", () => {
+  it("does not submit the certificate when Enter is pressed in the search box", async () => {
     renderUi(<Certifications entries={[]} />);
     fireEvent.click(screen.getByRole("button", { name: /Add/ }));
 
-    const proceeded = fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Enter" });
+    const proceeded = fireEvent.keyDown(await screen.findByRole("searchbox"), { key: "Enter" });
     // `fireEvent` returns false when the handler called preventDefault.
     expect(proceeded).toBe(false);
+  });
+});
+
+/**
+ * `/profile` is within a few kilobytes of the first-load ceiling and four sections of fields are a
+ * good deal of code that nobody sees until they press Add (Sprint 79). A source guard, because
+ * jsdom cannot measure bytes: the editor reaches the fields only through a dynamic `import()`.
+ */
+describe("the section forms stay out of the first load", () => {
+  const editor = readFileSync(join(__dirname, "SectionEditor.tsx"), "utf8");
+
+  it("SectionEditor imports the forms only as a type, and loads them when a form opens", () => {
+    expect(editor).toMatch(/import type \{ SectionForm \} from "@\/components\/profile\/section-forms"/);
+    expect(editor).not.toMatch(/^import \{[^}]*\} from "@\/components\/profile\/section-forms"/m);
+    expect(editor).toMatch(/import\("@\/components\/profile\/section-forms"\)/);
+  });
+
+  it("and nothing else in the profile imports them statically", () => {
+    for (const file of ["ProfileEditor.tsx", "OnboardingWizard.tsx", "AboutSection.tsx"]) {
+      const path = file === "ProfileEditor.tsx" ? join(__dirname, "..", file) : join(__dirname, file);
+      expect(readFileSync(path, "utf8"), file).not.toMatch(/from "@\/components\/profile\/section-forms"/);
+    }
   });
 });

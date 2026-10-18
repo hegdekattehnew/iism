@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { components } from "./api-schema";
 import { api } from "./api";
-import { ApiError, readDetail } from "./http";
+import { apiErrorFrom } from "./http";
 
 export type ReportReason = components["schemas"]["ReportIn"]["reason"];
 export type TargetType =
@@ -50,7 +50,7 @@ export function useReportListing(kind: TargetType, slug: string) {
               body,
             });
       if (!result.data) {
-        throw new ApiError(result.response.status, readDetail(result.error));
+        throw apiErrorFrom(result.response.status, result.error);
       }
       return result.data;
     },
@@ -66,7 +66,7 @@ export function useReportQueue(view: QueueView) {
         params: { query: { view } },
       });
       if (error || !data)
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -105,7 +105,7 @@ export function useDecideListing() {
                 },
               );
       if (!result.data)
-        throw new ApiError(result.response.status, readDetail(result.error));
+        throw apiErrorFrom(result.response.status, result.error);
       return result.data;
     },
     onSuccess: async () => {

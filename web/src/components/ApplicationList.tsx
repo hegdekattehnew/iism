@@ -10,7 +10,7 @@ import { Badge, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
-import { ApiError, readDetail } from "@/lib/http";
+import { apiErrorFrom } from "@/lib/http";
 
 // From the generated client, never restated: a hand-written copy plus a cast
 // let `completed`/`no_show` reach this screen with no colour and no compile error.
@@ -59,7 +59,7 @@ export function ApplicationList() {
         body: review,
       });
       const code = response.status;
-      if (error) throw new ApiError(code, readDetail(error));
+      if (error) throw apiErrorFrom(code, error);
     };
 
   if (isPending) return <Skeleton className="mt-8 h-32 w-full" />;

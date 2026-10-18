@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./api";
 import type { components } from "./api-schema";
-import { ApiError, readDetail } from "./http";
+import { ApiError, apiErrorFrom } from "./http";
 
 export type EnrolmentReport = components["schemas"]["EnrolmentReportOut"];
 export type EnrolmentRow = components["schemas"]["EnrolmentRowOut"];
@@ -32,7 +32,7 @@ export function useEnrolmentBatches() {
       const result = await api.GET("/ops/enrolment/batches", {});
       const errorBody: unknown = result.error;
       if (errorBody || !result.data)
-        throw new ApiError(result.response.status, readDetail(errorBody));
+        throw apiErrorFrom(result.response.status, errorBody);
       return result.data.batches;
     },
   });
@@ -66,7 +66,7 @@ export function useEnrolmentCheck() {
         ...csv,
       });
       if (error || !data)
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -83,7 +83,7 @@ export function useEnrolmentApply() {
         ...csv,
       });
       if (error || !data)
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: () => {

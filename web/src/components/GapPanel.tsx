@@ -9,7 +9,7 @@ import { SessionExpired } from "@/components/SessionExpired";
 import { Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useCourseBudget } from "@/lib/course-budget";
-import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 
 /** One standard, as a chip: required ones say so, and the code is shown because
  *  it is what an assessor and a certificate both say. Shared by the matches page,
@@ -74,7 +74,7 @@ export function GapPanel({ applicationId }: { applicationId: string }) {
         },
       });
       const status = response.status;
-      if (error || !data) throw new ApiError(status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(status, error);
       return data;
     },
     retry: false,

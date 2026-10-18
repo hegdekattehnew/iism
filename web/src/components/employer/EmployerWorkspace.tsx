@@ -136,6 +136,7 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
         <JobEditor
           job={current ?? null}
           saving={create.isPending || update.isPending}
+          error={editing === "new" ? create.error : update.error}
           onSave={save}
           onCancel={() => setEditing(null)}
         />

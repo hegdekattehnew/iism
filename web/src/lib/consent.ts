@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-import { ApiError, readDetail } from "@/lib/http";
+import { apiErrorFrom } from "@/lib/http";
 import { PRIVACY_NOTICE_VERSION } from "@/lib/legal";
 
 /**
@@ -45,7 +45,7 @@ export function useConfirmConsent() {
       const { data, error, response } = await api.POST("/me/account/consent", {
         body: { consent_version: PRIVACY_NOTICE_VERSION },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -61,7 +61,7 @@ export function useWithdrawConsent() {
       const result = await api.POST("/me/account/consent/withdraw");
       const status = result.response.status;
       const failure: unknown = result.error;
-      if (failure || !result.data) throw new ApiError(status, readDetail(failure));
+      if (failure || !result.data) throw apiErrorFrom(status, failure);
       return result.data;
     },
     onSuccess: refresh,
