@@ -6,7 +6,7 @@ import type { paths } from "./api-schema";
 import { api } from "./api";
 import { getAccessToken, getRefreshToken } from "./auth";
 import { employerDashboardKey, invalidatePublicCounts, providerDashboardKey } from "./counts";
-import { ApiError, readDetail } from "./http";
+import { apiErrorFrom } from "./http";
 
 /**
  * The employer workspace's data layer.
@@ -143,7 +143,7 @@ export function useOrgJobMutations(orgSlug: string) {
       if (error || !data)
         // `ApiError`, not a made-up message: the server says which
         // field is wrong and that is the only useful thing here.
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -158,7 +158,7 @@ export function useOrgJobMutations(orgSlug: string) {
       if (error || !data)
         // `ApiError`, not a made-up message: the server says which
         // field is wrong and that is the only useful thing here.
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -184,7 +184,7 @@ export function useOrgJobMutations(orgSlug: string) {
       // the screen then showed "a vacancy needs at least one standard" for
       // *every* failure, including an expired session. A sentence that is
       // wrong about why is worse than one that admits it does not know.
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -211,7 +211,7 @@ export function useOrgJobMutations(orgSlug: string) {
         params: { path: { org_slug: orgSlug, slug } },
         ...(open ? {} : { body: { reason: reason ?? "filled" } }),
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -225,7 +225,7 @@ export function useOrgJobMutations(orgSlug: string) {
       if (error)
         // `ApiError`, not a made-up message: the server says which
         // field is wrong and that is the only useful thing here.
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
     },
     onSuccess: refresh,
   });
@@ -332,7 +332,7 @@ export function useOrgCourseMutations(orgSlug: string) {
       if (error || !data)
         // `ApiError`, not a made-up message: the server says which
         // field is wrong and that is the only useful thing here.
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -353,7 +353,7 @@ export function useOrgCourseMutations(orgSlug: string) {
       if (error || !data)
         // `ApiError`, not a made-up message: the server says which
         // field is wrong and that is the only useful thing here.
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,
@@ -376,7 +376,7 @@ export function useOrgCourseMutations(orgSlug: string) {
       // The API refuses to publish a course teaching nothing, and that refusal
       // is the message the provider needs to see -- so carry it, for the
       // reason the job path above spells out.
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: refresh,

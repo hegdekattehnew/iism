@@ -1,55 +1,20 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
-
-const BASE =
-  "mt-1.5 w-full rounded-lg border border-input-border bg-background px-3 py-2.5 text-sm " +
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
-
-export function Field({
-  label,
-  hint,
-  children,
-  className = "",
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="text-sm font-medium">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
-    </label>
-  );
-}
-
-export function Text(props: ComponentProps<"input">) {
-  return <input {...props} className={`${BASE} ${props.className ?? ""}`} />;
-}
-
-export function Area(props: ComponentProps<"textarea">) {
-  return <textarea rows={3} {...props} className={`${BASE} ${props.className ?? ""}`} />;
-}
-
-export function Select(props: ComponentProps<"select">) {
-  return <select {...props} className={`${BASE} ${props.className ?? ""}`} />;
-}
-
-export function Check({ label, ...props }: ComponentProps<"input"> & { label: string }) {
-  return (
-    <label className="flex items-center gap-2 py-2 text-sm">
-      <input
-        type="checkbox"
-        {...props}
-        className="h-4 w-4 rounded border-input-border accent-brand"
-      />
-      {label}
-    </label>
-  );
-}
+/**
+ * The form controls every editor in the product uses, under the names they have always had here.
+ * Since Sprint 79 (BL-19.10) they are the library's own (`components/ui/field.tsx`): a label tied to
+ * its control, a hint, a place for what is wrong, 44 px, and the checks that run when somebody leaves
+ * a field. Writing `<Field label><Text minLength={3} /></Field>` is still all a form does, and the
+ * limits stay literal where `constraints.test.ts` reads them.
+ */
+export {
+  Checkbox as Check,
+  Field,
+  FormErrors,
+  Input as Text,
+  Select,
+  Textarea as Area,
+} from "@/components/ui/field";
 
 /** A saved row in a repeating section, with its edit and remove controls. */
 export function EntryRow({

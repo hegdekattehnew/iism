@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./api";
-import { ApiError, readDetail } from "./http";
+import { apiErrorFrom } from "./http";
 
 /** Everything under this prefix is the notice list or the count, so one invalidation moves both. */
 export const NOTICES = ["me", "notifications"] as const;
@@ -27,7 +27,7 @@ export function useUnreadCount(signedIn: boolean): number {
       );
       // Read before the check: this route declares no error body.
       const status = response.status;
-      if (error || !data) throw new ApiError(status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(status, error);
       return data.unread;
     },
   });

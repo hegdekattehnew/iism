@@ -9,7 +9,7 @@ import { SuggestedCourses } from "@/components/SuggestedCourses";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 
 /**
  * Hire and train: for a candidate one standard short, see what teaches it and
@@ -48,7 +48,7 @@ export function SponsorPanel({
         { params },
       );
       const status = response.status;
-      if (error || !data) throw new ApiError(status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(status, error);
       return data;
     },
   });
@@ -60,7 +60,7 @@ export function SponsorPanel({
         { params },
       );
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });

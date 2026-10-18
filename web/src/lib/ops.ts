@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
-import { ApiError, readDetail } from "./http";
+import { apiErrorFrom } from "./http";
 
 export type QueuePage =
   paths["/ops/organisations"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -56,7 +56,7 @@ export function useVerificationQueue() {
       const { data, error, response } = await api.GET("/ops/organisations", {
         params: { query: { limit: QUEUE_PAGE_SIZE, offset: pageParam } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     getNextPageParam: (last) => {
@@ -79,7 +79,7 @@ export function useOperatorDashboard() {
       const result = await api.GET("/ops/dashboard", {});
       const status = result.response.status;
       const errorBody: unknown = result.error;
-      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      if (errorBody || !result.data) throw apiErrorFrom(status, errorBody);
       return result.data;
     },
   });
@@ -93,7 +93,7 @@ export function useKnownProgrammes() {
       const result = await api.GET("/ops/programmes", {});
       const status = result.response.status;
       const errorBody: unknown = result.error;
-      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      if (errorBody || !result.data) throw apiErrorFrom(status, errorBody);
       return result.data.programmes;
     },
   });
@@ -108,7 +108,7 @@ export function useProgrammeReport(programme: string | null) {
       const { data, error, response } = await api.GET("/ops/programmes/{name}", {
         params: { path: { name: programme as string } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -129,7 +129,7 @@ export function useProgrammeDistricts(programme: string | null) {
       const { data, error, response } = await api.GET("/ops/programmes/{name}/districts", {
         params: { path: { name: programme as string } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -144,7 +144,7 @@ export function useVerificationDetail(slug: string) {
         "/ops/organisations/{org_slug}/verification",
         { params: { path: { org_slug: slug } } },
       );
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -160,7 +160,7 @@ export function useSetVerification(slug: string) {
       );
       // The server names the field and the reason; a fixed sentence here would
       // throw that away, which this project has a shipped defect about.
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: (data) => {
@@ -198,7 +198,7 @@ export function useRoleAliases(query: string) {
       const { data, error, response } = await api.GET("/ops/role-aliases", {
         params: { query: { q: query || undefined, limit: 100 } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -212,7 +212,7 @@ export function useAliasHistory() {
       const { data, error, response } = await api.GET("/ops/role-aliases/history", {
         params: { query: { limit: 20 } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -233,7 +233,7 @@ export function useAliasCheck(surfaceForm: string, jobRole: string | null) {
       const { data, error, response } = await api.POST("/ops/role-aliases/check", {
         body: { surface_form: term, job_role: jobRole as string },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -246,7 +246,7 @@ export function useAddAlias() {
       const { data, error, response } = await api.POST("/ops/role-aliases", { body });
       // The server's own sentence ("... is itself a role's exact title ..."), never a
       // fixed one: it names which rule was broken and for which term.
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ALIASES }),
@@ -261,7 +261,7 @@ export function useRetireAlias() {
         params: { path: { alias_id: id } },
         body: { note },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ALIASES }),
@@ -282,7 +282,7 @@ export function useDistrictsWithDemand() {
       const result = await api.GET("/ops/districts", {});
       const status = result.response.status;
       const errorBody: unknown = result.error;
-      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      if (errorBody || !result.data) throw apiErrorFrom(status, errorBody);
       return result.data;
     },
   });
@@ -299,7 +299,7 @@ export function useDistrictSkillGap(districtId: string | null) {
       const { data, error, response } = await api.GET("/ops/districts/{district_id}/skill-gap", {
         params: { path: { district_id: districtId as string } },
       });
-      if (error || !data) throw new ApiError(response.status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(response.status, error);
       return data;
     },
   });

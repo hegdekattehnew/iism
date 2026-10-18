@@ -158,7 +158,9 @@ describe("forms mirror the server's constraints", () => {
           // its attributes live.
           const at = source.indexOf(`name="${field}"`);
           expect(at, `no input named ${field}`).toBeGreaterThan(-1);
-          const window = source.slice(at, at + 400);
+          // To the end of the element, so a neighbour's identical limit cannot stand in for this one.
+          const end = source.indexOf("/>", at);
+          const window = source.slice(at, end > -1 ? Math.min(end, at + 600) : at + 400);
           for (const attr of attrs) expect(window).toContain(attr);
         });
       }
@@ -167,8 +169,8 @@ describe("forms mirror the server's constraints", () => {
 
   // The six profile collections share one editor, so their fields are keyed on
   // the value they read rather than a `name=`.
-  describe("the six profile collections (SectionEditor)", () => {
-    const source = read("components/profile/SectionEditor.tsx");
+  describe("the repeating profile sections (section-forms, split out of SectionEditor in Sprint 79)", () => {
+    const source = read("components/profile/section-forms.tsx");
     const LIMITS: Record<string, string> = {
       employer_name: "maxLength={120}",
       role_title: "maxLength={120}",
@@ -186,7 +188,8 @@ describe("forms mirror the server's constraints", () => {
       it(`${field} carries ${attr}`, () => {
         const at = source.indexOf(`str(d, "${field}")`);
         expect(at, `no field reading ${field}`).toBeGreaterThan(-1);
-        expect(source.slice(at, at + 200)).toContain(attr);
+        // To the end of this element: the next field's limit must not count for this one.
+        expect(source.slice(at, source.indexOf("/>", at))).toContain(attr);
       });
     }
 
@@ -194,7 +197,7 @@ describe("forms mirror the server's constraints", () => {
       // `LanguageIn.language` is min_length=2: a single character is the
       // realistic mistake, and it used to 422 with "check the fields".
       const at = source.indexOf('str(d, "language")');
-      expect(source.slice(at, at + 200)).toContain("minLength={2}");
+      expect(source.slice(at, source.indexOf("/>", at))).toContain("minLength={2}");
     });
   });
 });

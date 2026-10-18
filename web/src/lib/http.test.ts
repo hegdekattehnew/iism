@@ -1,6 +1,19 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
-import { ApiError, detailOf, isSignedOut, readDetail, statusOf } from "@/lib/http";
+import {
+  ApiError,
+  apiErrorFrom,
+  detailOf,
+  fieldErrorOf,
+  isSignedOut,
+  readDetail,
+  readFieldErrors,
+  statusOf,
+} from "@/lib/http";
 
 /**
  * The helper that stops "you are signed out" being rendered as "this is not
@@ -136,5 +149,78 @@ describe("ApiError", () => {
 
   it("has no detail to give for an ordinary Error", () => {
     expect(detailOf(new Error("403"))).toBeNull();
+  });
+});
+
+
+/**
+ * What the server said about each field (Sprint 79, BL-19.10): `readDetail` folds a 422 into one
+ * sentence for the top of a form, and these keep the parts so each sits next to its own field.
+ */
+describe("readFieldErrors", () => {
+  const body = {
+    detail: [
+      { loc: ["body", "title"], msg: "String should have at least 3 characters" },
+      { loc: ["body", "skills", 0, "skill_slug"], msg: "Unknown standard" },
+      { loc: ["body", "title"], msg: "A second thing about the title" },
+      { loc: ["body"], msg: "Something about the whole form" },
+      { msg: "No location at all" },
+      "not an object",
+    ],
+  };
+
+  it("keys each message by the last field name in its location, the server's words untouched", () => {
+    expect(readFieldErrors(body)).toEqual({
+      title: "String should have at least 3 characters",
+      skill_slug: "Unknown standard",
+    });
+  });
+
+  it("keeps a field's first message and ignores a message that names no field", () => {
+    expect(readFieldErrors(body).title).toBe("String should have at least 3 characters");
+    expect(Object.keys(readFieldErrors(body))).not.toContain("body");
+  });
+
+  it("names no field for a plain-string detail or for anything that is not a body", () => {
+    expect(readFieldErrors({ detail: "Unknown standards: welding-x" })).toEqual({});
+    for (const odd of [null, undefined, "x", 3, [], {}, { detail: null }]) expect(readFieldErrors(odd)).toEqual({});
+  });
+
+  it("an ApiError built from a body carries the sentence and the parts", () => {
+    const error = apiErrorFrom(422, body);
+    expect(error.status).toBe(422);
+    expect(error.detail).toBe(readDetail(body));
+    expect(fieldErrorOf(error, "title")).toBe("String should have at least 3 characters");
+    expect(fieldErrorOf(error, "description")).toBeUndefined();
+  });
+
+  it("an error that is not an ApiError has no field to speak of", () => {
+    expect(fieldErrorOf(new Error("422"), "title")).toBeUndefined();
+    expect(fieldErrorOf(null, "title")).toBeUndefined();
+    expect(new ApiError(500, null).fields).toEqual({});
+  });
+});
+
+describe("every failed response goes through apiErrorFrom", () => {
+  const SRC = dirname(dirname(fileURLToPath(import.meta.url)));
+  const files = (dir: string): string[] =>
+    readdirSync(dir).flatMap((entry) => {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) return files(full);
+      return /\.tsx?$/.test(entry) && !/\.test\./.test(entry) ? [full] : [];
+    });
+
+  it("no file builds an ApiError from readDetail by hand, which would drop the per-field parts", () => {
+    const all = files(SRC);
+    expect(all.length).toBeGreaterThan(100);
+    const offenders = all
+      .filter((f) => !f.endsWith(join("lib", "http.ts")))
+      .filter((f) => /new ApiError\([^)]*readDetail\(/.test(readFileSync(f, "utf8")))
+      .map((f) => relative(SRC, f));
+    expect(offenders).toEqual([]);
+  });
+
+  it("and the guard can fail", () => {
+    expect(/new ApiError\([^)]*readDetail\(/.test("throw new ApiError(status, readDetail(error));")).toBe(true);
   });
 });

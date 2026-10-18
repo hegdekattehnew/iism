@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import { invalidatePublicCounts } from "@/lib/counts";
-import { ApiError, readDetail } from "@/lib/http";
+import { apiErrorFrom } from "@/lib/http";
 import type { paths } from "@/lib/api-schema";
 
 export type Collection =
@@ -62,7 +62,7 @@ export function useProfile(enabled = true) {
       const result = await api.GET("/me/profile");
       const errorBody: unknown = result.error;
       if (errorBody || !result.data)
-        throw new ApiError(result.response.status, readDetail(errorBody));
+        throw apiErrorFrom(result.response.status, errorBody);
       return result.data;
     },
   });
@@ -81,7 +81,7 @@ export function useCandidateDashboard() {
       const result = await api.GET("/me/dashboard", {});
       const status = result.response.status;
       const errorBody: unknown = result.error;
-      if (errorBody || !result.data) throw new ApiError(status, readDetail(errorBody));
+      if (errorBody || !result.data) throw apiErrorFrom(status, errorBody);
       return result.data;
     },
   });
@@ -108,7 +108,7 @@ export function useProfileMutations() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: body as any,
       });
-      if (error) throw new ApiError(response.status, readDetail(error));
+      if (error) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: write,
@@ -124,7 +124,7 @@ export function useProfileMutations() {
       if (error)
         // `ApiError`, so the screen can say which field the server
         // refused instead of "Could not save. Please check the fields."
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: write,
@@ -147,7 +147,7 @@ export function useProfileMutations() {
       if (error)
         // `ApiError`, so the screen can say which field the server
         // refused instead of "Could not save. Please check the fields."
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: write,
@@ -159,7 +159,7 @@ export function useProfileMutations() {
         "/me/profile/{collection}/{entry_id}",
         { params: { path: { collection: v.collection, entry_id: v.id } } },
       );
-      if (error) throw new ApiError(response.status, readDetail(error));
+      if (error) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: write,
@@ -168,7 +168,7 @@ export function useProfileMutations() {
   const addSkill = useMutation({
     mutationFn: async (v: { skill_slug: string; proficiency: number }) => {
       const { data, error, response } = await api.POST("/me/profile/skills", { body: v });
-      if (error) throw new ApiError(response.status, readDetail(error));
+      if (error) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: writeSkills,
@@ -187,7 +187,7 @@ export function useProfileMutations() {
       if (error)
         // `ApiError`, so the screen can say which field the server
         // refused instead of "Could not save. Please check the fields."
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: writeSkills,
@@ -199,7 +199,7 @@ export function useProfileMutations() {
         "/me/profile/skills/{skill_slug}",
         { params: { path: { skill_slug: slug } } },
       );
-      if (error) throw new ApiError(response.status, readDetail(error));
+      if (error) throw apiErrorFrom(response.status, error);
       return data;
     },
     onSuccess: writeSkills,
@@ -213,7 +213,7 @@ export function useProfileMutations() {
       );
       // See `Notices.tsx`: the status is read before the narrowing.
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
       return data;
     },
     onSuccess: write,

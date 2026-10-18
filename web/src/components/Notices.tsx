@@ -6,7 +6,7 @@ import { useFormatter, useNow, useTranslations } from "next-intl";
 import { Alert, Button } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-import { ApiError, detailOf, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf } from "@/lib/http";
 import { noticePath, useNoticeText } from "@/lib/notice-text";
 
 // A notice about an application points at `/applications`, which is where this panel already is.
@@ -51,7 +51,7 @@ export function Notices() {
       // and this endpoint declares no error body, so `response` would be
       // `never` inside the branch.
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["me", "notifications"] });

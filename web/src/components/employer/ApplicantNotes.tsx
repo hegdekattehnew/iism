@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ApiError, detailOf, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf } from "@/lib/http";
 import { NOTES_MAX } from "@/lib/hiring";
 
 /**
@@ -49,7 +49,7 @@ export function ApplicantNotes({
         },
       );
       const status = response.status;
-      if (error) throw new ApiError(status, readDetail(error));
+      if (error) throw apiErrorFrom(status, error);
     },
     onSuccess: async () => {
       await onSaved();

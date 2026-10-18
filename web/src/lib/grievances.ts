@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { components } from "./api-schema";
 import { api } from "./api";
-import { ApiError, failedWith, readDetail, type WaitError } from "./http";
+import { apiErrorFrom, failedWith, type WaitError } from "./http";
 
 export type GrievanceKind = components["schemas"]["GrievanceIn"]["kind"];
 export type GrievanceStatus = components["schemas"]["GrievanceOut"]["status"];
@@ -43,7 +43,7 @@ export function useSendGrievance() {
       });
       if (!data) {
         const failure: WaitError = failedWith(response);
-        throw Object.assign(new ApiError(response.status, readDetail(error)), {
+        throw Object.assign(apiErrorFrom(response.status, error), {
           retryAfter: failure.retryAfter,
         });
       }
@@ -66,7 +66,7 @@ export function useMyGrievances(enabled: boolean) {
       // Read before the check: this route declares no error body, so `response` narrows to
       // `never` inside the branch.
       const status = response.status;
-      if (error || !data) throw new ApiError(status, readDetail(error));
+      if (error || !data) throw apiErrorFrom(status, error);
       return data;
     },
   });
@@ -81,7 +81,7 @@ export function useGrievanceQueue(status: GrievanceStatus | "all") {
         params: { query: status === "all" ? {} : { status } },
       });
       if (error || !data)
-        throw new ApiError(response.status, readDetail(error));
+        throw apiErrorFrom(response.status, error);
       return data;
     },
   });
@@ -113,7 +113,7 @@ export function useDecideGrievance() {
                 body: { note: input.note ?? "" },
               });
       if (!result.data)
-        throw new ApiError(result.response.status, readDetail(result.error));
+        throw apiErrorFrom(result.response.status, result.error);
       return result.data;
     },
     onSuccess: async () => {

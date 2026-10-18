@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Select, Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
+import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 import { api } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 
@@ -169,7 +169,7 @@ export function TeamPanel({ org }: { org: string }) {
         body: { user_id: userId, then },
       });
       const status = response.status;
-      if (err) throw new ApiError(status, readDetail(err));
+      if (err) throw apiErrorFrom(status, err);
       return name;
     },
     onSuccess: async (name) => {

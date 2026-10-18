@@ -21,7 +21,7 @@ import {
   providerDashboardKey,
 } from "@/lib/counts";
 import { saveCsv } from "@/lib/download";
-import { ApiError, detailOf, isSignedOut, readDetail } from "@/lib/http";
+import { ApiError, apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 
 type Kind = "jobs" | "courses";
 type Report = components["schemas"]["BulkReportOut"];
@@ -69,7 +69,7 @@ async function send(
         });
   // Keep what the server said: "daily limit reached" and "that file is not UTF-8" both
   // arrive here, and a fixed sentence would be wrong about why.
-  if (error || !data) throw new ApiError(response.status, readDetail(error));
+  if (error || !data) throw apiErrorFrom(response.status, error);
   return data;
 }
 
@@ -87,7 +87,7 @@ async function publish(
           params,
           body,
         });
-  if (error || !data) throw new ApiError(response.status, readDetail(error));
+  if (error || !data) throw apiErrorFrom(response.status, error);
   return data;
 }
 

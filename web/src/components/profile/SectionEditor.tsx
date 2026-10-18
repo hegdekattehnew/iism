@@ -1,18 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Area, Check, Field, EntryRow, Select, Text } from "@/components/profile/fields";
-import { StandardPicker } from "@/components/StandardPicker";
+import { EntryRow } from "@/components/profile/fields";
+import type { SectionForm } from "@/components/profile/section-forms";
 import { Button } from "@/components/ui";
-import {
-  type Collection,
-  EDUCATION_LEVELS,
-  LANG_PROFICIENCY,
-  type Profile,
-  useProfileMutations,
-} from "@/lib/profile";
+import { type Collection, type Profile, useProfileMutations } from "@/lib/profile";
 import { detailOf, statusOf } from "@/lib/http";
 
 type Entry = Record<string, unknown> & { id: string };
@@ -169,88 +163,41 @@ export function SectionEditor({
   );
 }
 
+
+/**
+ * A section's fields, fetched the first time a form is opened (`section-forms.tsx`). Opening a form
+ * is the person's own act, so nothing on the page moves while the chunk arrives; the slot holds the
+ * height of one field until it does.
+ */
+function LazyForm(props: React.ComponentProps<typeof SectionForm>) {
+  const [loaded, setLoaded] = useState<typeof import("@/components/profile/section-forms") | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import("@/components/profile/section-forms").then((m) => live && setLoaded(m));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return loaded ? <loaded.SectionForm {...props} /> : <div className="min-h-11 sm:col-span-2" aria-busy="true" />;
+}
+
 // ---------------------------------------------------------------- per-section
 // Field sets and row summaries, kept beside the generic editor so adding a
 // section is one entry here rather than a new component.
 
-const str = (d: Record<string, unknown>, k: string) => (d[k] as string) ?? "";
+export const str = (d: Record<string, unknown>, k: string) => (d[k] as string) ?? "";
 
 type LinkedStandard = { slug: string; name: string; nos_code?: string | null };
 
 /** The standard a certification is linked to, from either shape it can have:
  *  the saved entry carries a `skill` object, a draft being edited carries the
  *  `skill_slug` it will send. */
-function linkedStandard(entry: Record<string, unknown>): LinkedStandard | null {
+export function linkedStandard(entry: Record<string, unknown>): LinkedStandard | null {
   const skill = entry.skill as LinkedStandard | null | undefined;
   return skill ?? null;
 }
 
-/**
- * Link a certification to the national standard it covers.
- *
- * Without this the operator's certification queue could never hold anything:
- * it lists only credentials that name a standard, and no screen let a candidate
- * name one. Linking is what lets a reviewer verify the certificate, which turns
- * that skill from self-declared into certified and gives it more weight in a
- * match.
- */
-function CertificationStandard({
-  draft,
-  set,
-}: {
-  draft: Record<string, unknown>;
-  set: (patch: Record<string, unknown>) => void;
-}) {
-  const f = useTranslations("profilePage.fields");
-  const linked = linkedStandard(draft);
-
-  return (
-    <div className="sm:col-span-2">
-      <p className="text-sm font-medium">{f("certStandard")}</p>
-      {linked ? (
-        <div className="mt-1 flex flex-wrap items-center gap-3 rounded-lg border border-border-token bg-background px-3 py-2 text-sm">
-          <span className="min-w-0 flex-1">
-            {linked.name}
-            {linked.nos_code && (
-              <span className="ml-2 font-mono text-xs text-muted">{linked.nos_code}</span>
-            )}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => set({ skill_slug: null, skill: null })}
-          >
-            {f("certStandardRemove")}
-          </Button>
-        </div>
-      ) : (
-        // Enter in the search box would otherwise submit the whole certificate.
-        <div
-          className="mt-1"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
-          }}
-        >
-          <StandardPicker
-            chosen={new Set()}
-            placeholder={f("certStandardSearch")}
-            addLabel={f("certStandardLink")}
-            onSelect={(s) =>
-              set({
-                skill_slug: s.slug,
-                skill: { slug: s.slug, name: s.name, nos_code: s.nos_code ?? null },
-              })
-            }
-          />
-        </div>
-      )}
-      <p className="mt-1 text-xs text-muted">{f("certStandardHint")}</p>
-    </div>
-  );
-}
-
 export function useSectionDefs(profile: Profile | null) {
-  const f = useTranslations("profilePage.fields");
   const t = useTranslations("profilePage");
   const ts = useTranslations("profilePage.sections");
   const list = <T,>(k: keyof Profile): T[] => ((profile?.[k] ?? []) as T[]);
@@ -262,35 +209,7 @@ export function useSectionDefs(profile: Profile | null) {
       entries: list<Entry>("experiences"),
       blank: { employer_name: "", role_title: "", started_on: "", is_current: false },
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
-        <>
-          <Field label={f("employer")}>
-            <Text required value={str(d, "employer_name")} maxLength={120} onChange={(e) => set({ employer_name: e.target.value })} />
-          </Field>
-          <Field label={f("roleTitle")}>
-            <Text required value={str(d, "role_title")} maxLength={120} onChange={(e) => set({ role_title: e.target.value })} />
-          </Field>
-          <Field label={f("location")}>
-            <Text value={str(d, "location")} maxLength={120} onChange={(e) => set({ location: e.target.value })} />
-          </Field>
-          <Field label={f("startedOn")}>
-            <Text type="date" required value={str(d, "started_on")} onChange={(e) => set({ started_on: e.target.value })} />
-          </Field>
-          {!d.is_current && (
-            <Field label={f("endedOn")}>
-              <Text type="date" value={str(d, "ended_on")} onChange={(e) => set({ ended_on: e.target.value })} />
-            </Field>
-          )}
-          <div className="self-end">
-            <Check
-              label={f("current")}
-              checked={Boolean(d.is_current)}
-              onChange={(e) => set({ is_current: e.target.checked, ended_on: null })}
-            />
-          </div>
-          <Field label={f("description")} className="sm:col-span-2">
-            <Area value={str(d, "description")} maxLength={1000} onChange={(e) => set({ description: e.target.value })} />
-          </Field>
-        </>
+        <LazyForm collection="experiences" d={d} set={set} />
       ),
       summarise: (e: Entry) => ({
         title: `${e.role_title as string} · ${e.employer_name as string}`,
@@ -304,31 +223,7 @@ export function useSectionDefs(profile: Profile | null) {
       entries: list<Entry>("educations"),
       blank: { qualification: "", is_pursuing: false },
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
-        <>
-          <Field label={f("qualification")}>
-            <Text required value={str(d, "qualification")} maxLength={160} onChange={(e) => set({ qualification: e.target.value })} />
-          </Field>
-          <Field label={f("institution")}>
-            <Text value={str(d, "institution")} maxLength={160} onChange={(e) => set({ institution: e.target.value })} />
-          </Field>
-          <Field label={f("specialisation")}>
-            <Text value={str(d, "specialisation")} maxLength={120} onChange={(e) => set({ specialisation: e.target.value })} />
-          </Field>
-          <Field label={f("yearCompleted")}>
-            <Text type="number" min={1950} max={2100} value={str(d, "year_completed")} onChange={(e) => set({ year_completed: e.target.value ? Number(e.target.value) : null })} />
-          </Field>
-          <Field label={t("education")}>
-            <Select value={str(d, "education_level")} onChange={(e) => set({ education_level: e.target.value || null })}>
-              <option value="">—</option>
-              {EDUCATION_LEVELS.map((l) => (
-                <option key={l} value={l}>{t(`educationLevel.${l}`)}</option>
-              ))}
-            </Select>
-          </Field>
-          <div className="self-end">
-            <Check label={f("pursuing")} checked={Boolean(d.is_pursuing)} onChange={(e) => set({ is_pursuing: e.target.checked })} />
-          </div>
-        </>
+        <LazyForm collection="educations" d={d} set={set} />
       ),
       summarise: (e: Entry) => ({
         title: e.qualification as string,
@@ -342,27 +237,7 @@ export function useSectionDefs(profile: Profile | null) {
       entries: list<Entry>("certifications"),
       blank: { name: "" },
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
-        <>
-          <Field label={f("certName")}>
-            <Text required value={str(d, "name")} maxLength={160} onChange={(e) => set({ name: e.target.value })} />
-          </Field>
-          <Field label={f("issuingBody")}>
-            <Text value={str(d, "issuing_body")} maxLength={160} onChange={(e) => set({ issuing_body: e.target.value })} />
-          </Field>
-          <Field label={f("credentialId")}>
-            <Text value={str(d, "credential_id")} maxLength={80} onChange={(e) => set({ credential_id: e.target.value })} />
-          </Field>
-          <Field label={f("nsqfLevel")}>
-            <Text type="number" min={1} max={10} value={str(d, "nsqf_level")} onChange={(e) => set({ nsqf_level: e.target.value ? Number(e.target.value) : null })} />
-          </Field>
-          <Field label={f("issuedOn")}>
-            <Text type="date" value={str(d, "issued_on")} onChange={(e) => set({ issued_on: e.target.value })} />
-          </Field>
-          <Field label={f("expiresOn")}>
-            <Text type="date" value={str(d, "expires_on")} onChange={(e) => set({ expires_on: e.target.value })} />
-          </Field>
-          <CertificationStandard draft={d} set={set} />
-        </>
+        <LazyForm collection="certifications" d={d} set={set} />
       ),
       summarise: (e: Entry) => ({
         title: e.name as string,
@@ -382,22 +257,7 @@ export function useSectionDefs(profile: Profile | null) {
       entries: list<Entry>("languages"),
       blank: { language: "", proficiency: "conversational", can_read: true, can_write: true },
       renderForm: (d: Record<string, unknown>, set: (p: Record<string, unknown>) => void) => (
-        <>
-          <Field label={f("language")}>
-            <Text required value={str(d, "language")} minLength={2} maxLength={40} onChange={(e) => set({ language: e.target.value })} />
-          </Field>
-          <Field label={f("proficiency")}>
-            <Select value={str(d, "proficiency")} onChange={(e) => set({ proficiency: e.target.value })}>
-              {LANG_PROFICIENCY.map((p) => (
-                <option key={p} value={p}>{t(`langProficiency.${p}`)}</option>
-              ))}
-            </Select>
-          </Field>
-          <div className="flex gap-4 sm:col-span-2">
-            <Check label={f("canRead")} checked={Boolean(d.can_read)} onChange={(e) => set({ can_read: e.target.checked })} />
-            <Check label={f("canWrite")} checked={Boolean(d.can_write)} onChange={(e) => set({ can_write: e.target.checked })} />
-          </div>
-        </>
+        <LazyForm collection="languages" d={d} set={set} />
       ),
       summarise: (e: Entry) => ({
         title: e.language as string,

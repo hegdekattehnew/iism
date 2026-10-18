@@ -145,6 +145,7 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
         <CourseEditor
           course={current ?? null}
           saving={create.isPending || update.isPending}
+          error={editing === "new" ? create.error : update.error}
           onSave={save}
           onCancel={() => setEditing(null)}
         />

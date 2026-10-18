@@ -42,6 +42,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string | null,
+    /** What the server said about each field it named, by the schema's own field name (BL-19.10). */
+    readonly fields: Readonly<Record<string, string>> = {},
   ) {
     // The message is the detail when there is one, so anything that only logs
     // `error.message` still says something useful.
@@ -108,6 +110,44 @@ export function readDetail(body: unknown): string | null {
     return [label ? `${label}: ${msg}` : msg];
   });
   return parts.length ? parts.join(". ") : null;
+}
+
+/**
+ * What the server said about each field, by the schema's field name.
+ *
+ * A 422 from a schema is a list of `{loc, msg}`; `readDetail` folds it into one sentence for the
+ * alert at the top of a form, and this keeps the parts so each can sit **next to the field it is
+ * about** (BL-19.10). The key is the last string in `loc` (`["body", "title"]` is `title`, a nested
+ * `["body", "skills", 0, "skill_slug"]` is `skill_slug`); a field named twice keeps its first message,
+ * and the server's words are kept exactly as it wrote them. A plain-string `detail` names no field.
+ */
+export function readFieldErrors(body: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const detail = typeof body === "object" && body !== null ? (body as { detail?: unknown }).detail : null;
+  if (!Array.isArray(detail)) return out;
+  for (const item of detail) {
+    if (typeof item !== "object" || item === null) continue;
+    const { loc, msg } = item as { loc?: unknown; msg?: unknown };
+    if (typeof msg !== "string" || !Array.isArray(loc)) continue;
+    const field = [...loc].reverse().find((p): p is string => typeof p === "string" && p !== "body");
+    if (field && !(field in out)) out[field] = msg;
+  }
+  return out;
+}
+
+/** An `ApiError` for a failed response body: the status, the one-sentence detail and the per-field parts. */
+export function apiErrorFrom(status: number, body: unknown): ApiError {
+  return new ApiError(status, readDetail(body), readFieldErrors(body));
+}
+
+/** What the server said about one field of a failed save, if it said anything. */
+export function fieldErrorOf(error: unknown, field: string): string | undefined {
+  return error instanceof ApiError ? error.fields[field] : undefined;
+}
+
+/** Everything the server said by field about a failed save, for `FormErrors`; nothing for any other failure. */
+export function fieldsOf(error: unknown): Readonly<Record<string, string>> | undefined {
+  return error instanceof ApiError ? error.fields : undefined;
 }
 
 /** The server's explanation for a failed query or mutation, if it kept one. */
