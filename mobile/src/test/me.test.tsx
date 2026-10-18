@@ -92,7 +92,9 @@ describe("my page", () => {
     });
     await renderScreen(<Me />);
     expect(await screen.findByRole("button", { name: "Updates: 3 new updates" })).toBeTruthy();
-    expect(screen.getByText("Updates (3)")).toBeTruthy();
+    // Drawn once, in the pill; the row's name carries it for a screen reader.
+    expect(screen.getByText("3", { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByText("Updates")).toBeTruthy();
   });
 
   it("says nothing of a count when there are no new updates", async () => {
@@ -104,6 +106,7 @@ describe("my page", () => {
     });
     await renderScreen(<Me />);
     expect(await screen.findByRole("button", { name: "Updates" })).toBeTruthy();
+    expect(screen.queryByText("0", { includeHiddenElements: true })).toBeNull();
   });
 
   it("signs out through the one function that takes the phone off the push list first", async () => {

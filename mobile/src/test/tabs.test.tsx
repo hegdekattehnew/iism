@@ -8,15 +8,26 @@ import { renderScreen, settle } from "./harness";
 const shown: Record<string, Record<string, unknown>> = {};
 
 jest.mock("../runtime", () => require("./mocks").runtimeModule);
+// The harness renders no `SafeAreaProvider`; the layout reads the bottom inset to size the bar.
+jest.mock("react-native-safe-area-context", () => ({
+  ...jest.requireActual("react-native-safe-area-context"),
+  useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 20 }),
+}));
 jest.mock("../push", () => require("./mocks").pushModule);
 jest.mock("expo-router", () => ({
   ...require("./mocks").routerModule,
-  Tabs: Object.assign(({ children }: { children: ReactNode }) => children, {
-    Screen: ({ name, options }: { name: string; options: Record<string, unknown> }) => {
-      shown[name] = options;
-      return null;
+  Tabs: Object.assign(
+    ({ children, screenOptions }: { children: ReactNode; screenOptions?: Record<string, unknown> }) => {
+      shown.__bar = screenOptions ?? {};
+      return children;
     },
-  }),
+    {
+      Screen: ({ name, options }: { name: string; options: Record<string, unknown> }) => {
+        shown[name] = options;
+        return null;
+      },
+    },
+  ),
 }));
 
 beforeEach(() => {
@@ -27,19 +38,46 @@ beforeEach(() => {
 describe("the tab bar", () => {
   it("has five places, with Standards out of the bar but still a route", async () => {
     await renderScreen(<TabsLayout />);
-    expect(Object.keys(shown)).toEqual(["index", "jobs", "courses", "matches", "me", "skills"]);
+    expect(Object.keys(shown).filter((k) => k !== "__bar")).toEqual(["index", "jobs", "courses", "matches", "me", "skills"]);
     expect(shown.skills.href).toBeNull();
     expect(shown.matches.title).toBe("Matches");
   });
 
-  it("puts a number in the Me label when there are new updates, and says it aloud too", async () => {
+  it("is tall enough for an icon over a label, and clears the bottom inset", async () => {
+    await renderScreen(<TabsLayout />);
+    const style = (shown.__bar as { tabBarStyle: { height: number; paddingBottom: number } }).tabBarStyle;
+    expect(style.height).toBe(64 + 20); // the 20 dp the mocked inset reports
+    expect(style.height - style.paddingBottom).toBeGreaterThanOrEqual(48); // what is left for the touch target
+    expect(style.paddingBottom).toBeGreaterThanOrEqual(20);
+  });
+
+  it("gives every tab an icon beside its label, each its own", async () => {
+    await renderScreen(<TabsLayout />);
+    const icons = ["index", "jobs", "courses", "matches", "me"].map((name) => {
+      const draw = shown[name].tabBarIcon as (p: { color: string; size: number }) => { props: { name: string } };
+      return draw({ color: "black", size: 24 }).props.name;
+    });
+    expect(icons).toEqual(["Home", "Briefcase", "BookOpen", "Target", "User"]);
+    expect(shown.skills.tabBarIcon).toBeUndefined();
+  });
+
+  it("draws the count as a badge on Me when there are new updates, and says it aloud too", async () => {
     world.signedIn = true;
     serve(api.GET, { "/auth/me": ok(account()), "/me/notifications/unread-count": ok({ unread: 4 }) });
     await renderScreen(<TabsLayout />);
-    await waitFor(() => expect(shown.me.tabBarLabel).toBe("Me (4)"));
+    await waitFor(() => expect(shown.me.tabBarBadge).toBe(4));
     expect(shown.me.tabBarAccessibilityLabel).toBe("Me, 4 unread");
-    // A badge would hang off an icon this bar does not draw: it must not be the way the count shows.
-    expect(shown.me.tabBarBadge).toBeUndefined();
+    // The label stays the plain word: the number is drawn once, in the badge.
+    expect(shown.me.tabBarLabel).toBeUndefined();
+    expect(shown.me.title).toBe("Me");
+  });
+
+  it("caps a large count at 99+ and keeps the exact number in the spoken name", async () => {
+    world.signedIn = true;
+    serve(api.GET, { "/auth/me": ok(account()), "/me/notifications/unread-count": ok({ unread: 150 }) });
+    await renderScreen(<TabsLayout />);
+    await waitFor(() => expect(shown.me.tabBarBadge).toBe("99+"));
+    expect(shown.me.tabBarAccessibilityLabel).toBe("Me, 150 unread");
   });
 
   it("shows no number when everything is read", async () => {
@@ -49,7 +87,7 @@ describe("the tab bar", () => {
     // The count was asked for and answered 0: only then is "no number" a fact about the answer.
     await waitFor(() => expect(api.GET.mock.calls.map((c) => c[0])).toContain("/me/notifications/unread-count"));
     await settle();
-    expect(shown.me.tabBarLabel).toBe("Me");
+    expect(shown.me.tabBarBadge).toBeUndefined();
     expect(shown.me.tabBarAccessibilityLabel).toBe("Me");
   });
 
@@ -57,7 +95,7 @@ describe("the tab bar", () => {
     await renderScreen(<TabsLayout />);
     await settle();
     expect(api.GET).not.toHaveBeenCalled();
-    expect(shown.me.tabBarLabel).toBe("Me");
+    expect(shown.me.tabBarBadge).toBeUndefined();
   });
 });
 

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MAX_FONT_SCALE, MIN_TOUCH, radius, space, text, useColours } from "../theme";
+import { Icon, type IconName } from "./icon";
 
 /**
  * The few primitives every screen is built from. They are the phone's `ui/` library: tokens only
@@ -103,13 +104,21 @@ export function Button({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "soft";
   /** Set on a button that shows or hides something: a screen reader says "expanded" or "collapsed". */
   expanded?: boolean;
 }) {
   const c = useColours();
   const inactive = disabled || busy;
-  const primary = variant === "primary";
+  // Every variant is one row of tokens: background, edge and the colour of the words. The web's
+  // `buttonVariants` has the same five (Sprint 82, BL-19.14), so a button means the same on both.
+  const look = {
+    primary: { background: c.brand, edge: null, text: c.brandContrast },
+    secondary: { background: c.surface, edge: c.inputBorder, text: c.brand },
+    ghost: { background: "transparent", edge: null, text: c.brand },
+    danger: { background: c.dangerSurface, edge: c.dangerBorder, text: c.dangerText },
+    soft: { background: c.accentTint, edge: null, text: c.accentText },
+  }[variant];
   return (
     <Pressable
       accessibilityRole="button"
@@ -126,16 +135,16 @@ export function Button({
         flexDirection: "row",
         gap: space.sm,
         opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
-        backgroundColor: primary ? c.brand : c.surface,
-        borderWidth: primary ? 0 : StyleSheet.hairlineWidth * 2,
-        borderColor: c.inputBorder,
+        backgroundColor: look.background,
+        borderWidth: look.edge ? StyleSheet.hairlineWidth * 2 : 0,
+        borderColor: look.edge ?? undefined,
       })}
     >
-      {busy && <ActivityIndicator color={primary ? c.brandContrast : c.brand} />}
+      {busy && <ActivityIndicator color={look.text} />}
       <NativeText
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         style={{
-          color: primary ? c.brandContrast : c.brand,
+          color: look.text,
           fontSize: text.body,
           fontWeight: "600",
         }}
@@ -180,16 +189,25 @@ export function TextField({
   );
 }
 
+/** A tone is also a shape, so a notice does not rest on colour alone (the web's `Alert`, ADR-089). */
+const NOTICE_ICONS: Record<"info" | "success" | "warning" | "danger", IconName> = {
+  info: "Info",
+  success: "CheckCircle",
+  warning: "AlertTriangle",
+  danger: "XCircle",
+};
+
 export function Notice({
   children,
   tone = "info",
 }: {
   children: ReactNode;
-  tone?: "info" | "danger" | "warning";
+  tone?: "info" | "success" | "danger" | "warning";
 }) {
   const c = useColours();
   const palette = {
     info: [c.infoSurface, c.infoBorder, c.infoText],
+    success: [c.successSurface, c.successBorder, c.successText],
     danger: [c.dangerSurface, c.dangerBorder, c.dangerText],
     warning: [c.warningSurface, c.warningBorder, c.warningText],
   }[tone];
@@ -205,11 +223,18 @@ export function Notice({
         borderWidth: 1,
         borderRadius: radius.md,
         padding: space.md,
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: space.sm,
       }}
     >
+      {/* Decoration: the words say it, and the group is read as one item. */}
+      <View style={{ paddingTop: 5 }}>
+        <Icon name={NOTICE_ICONS[tone]} size={18} color={palette[2]} />
+      </View>
       <NativeText
         maxFontSizeMultiplier={MAX_FONT_SCALE}
-        style={{ color: palette[2], fontSize: text.body, lineHeight: 26 }}
+        style={{ color: palette[2], fontSize: text.body, lineHeight: 26, flex: 1 }}
       >
         {children}
       </NativeText>

@@ -1,5 +1,5 @@
 import type { UseInfiniteQueryResult } from "@tanstack/react-query";
-import type { ReactElement, ReactNode } from "react";
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import { useTranslations } from "use-intl";
 
 import { ApiError } from "../core/errors";
 import { MAX_FONT_SCALE, MIN_TOUCH, radius, space, text, useColours } from "../theme";
+import { Icon, type IconName } from "./icon";
 import { Button, Text } from "./primitives";
 
 /**
@@ -29,14 +30,20 @@ import { Button, Text } from "./primitives";
  *   say when the server could not be reached.
  */
 
+/**
+ * A surface. `level="default"` is a card on the page; `inset` is a box inside a card (the muted
+ * surface, no second edge): the web's levels (ADR-089). Never a card in a card.
+ */
 export function Card({
   children,
   onPress,
   label,
+  level = "default",
 }: {
   children: ReactNode;
   onPress?: () => void;
   label?: string;
+  level?: "default" | "inset";
 }) {
   const c = useColours();
   return (
@@ -48,8 +55,8 @@ export function Card({
       style={({ pressed }) => ({
         borderWidth: 1,
         borderColor: c.border,
-        backgroundColor: c.surface,
-        borderRadius: radius.lg,
+        backgroundColor: level === "inset" ? c.surfaceMuted : c.surface,
+        borderRadius: level === "inset" ? radius.md : radius.lg,
         padding: space.lg,
         gap: space.sm,
         opacity: pressed ? 0.85 : 1,
@@ -65,7 +72,7 @@ export function Badge({
   tone = "muted",
 }: {
   label: string;
-  tone?: "brand" | "muted" | "success" | "warning";
+  tone?: "brand" | "muted" | "success" | "warning" | "danger" | "info";
 }) {
   const c = useColours();
   const palette = {
@@ -73,6 +80,8 @@ export function Badge({
     muted: [c.surfaceMuted, c.muted],
     success: [c.successSurface, c.successText],
     warning: [c.warningSurface, c.warningText],
+    danger: [c.dangerSurface, c.dangerText],
+    info: [c.infoSurface, c.infoText],
   }[tone];
   return (
     <View
@@ -90,6 +99,125 @@ export function Badge({
       >
         {label}
       </NativeText>
+    </View>
+  );
+}
+
+/**
+ * One place to go, as a row (Sprint 82, BL-19.14): an icon in a tinted disc, a title, a line under it
+ * if there is one, and a chevron. The phone's Me tab was eight identical buttons; a row says what
+ * each is before it is read. At least 56 dp tall (above the 48 dp floor, since a row is the thing a
+ * thumb scans), a button to a screen reader with the **title as its name** unless a longer one is
+ * given (it must contain the title: "Updates: 3 new updates"). `count` is drawn in a pill before the
+ * chevron and is not read by itself, because the name already says it.
+ */
+export function ListRow({
+  title,
+  subtitle,
+  icon,
+  onPress,
+  count,
+  accessibilityLabel,
+  divider = false,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: IconName;
+  onPress: () => void;
+  /** A number to draw beside the title (unread updates). Say it in `accessibilityLabel` too. */
+  count?: number;
+  accessibilityLabel?: string;
+  /** A hairline above this row; `RowGroup` sets it on every row but the first. */
+  divider?: boolean;
+}) {
+  const c = useColours();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: MIN_TOUCH + 8,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: space.md,
+        paddingHorizontal: space.lg,
+        paddingVertical: space.sm,
+        borderTopWidth: divider ? 1 : 0,
+        borderTopColor: c.border,
+        backgroundColor: pressed ? c.surfaceMuted : c.surface,
+      })}
+    >
+      <View
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: radius.md,
+          backgroundColor: c.accentTint,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name={icon} size={20} color={c.accentText} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <NativeText
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          style={{ color: c.foreground, fontSize: text.body, fontWeight: "600" }}
+        >
+          {title}
+        </NativeText>
+        {subtitle ? (
+          <NativeText
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={{ color: c.muted, fontSize: text.small, marginTop: 2 }}
+          >
+            {subtitle}
+          </NativeText>
+        ) : null}
+      </View>
+      {count ? (
+        <View
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            minWidth: 24,
+            height: 24,
+            borderRadius: 12,
+            paddingHorizontal: space.sm,
+            backgroundColor: c.brand,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <NativeText
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={{ color: c.brandContrast, fontSize: text.small, fontWeight: "700" }}
+          >
+            {count > 99 ? "99+" : String(count)}
+          </NativeText>
+        </View>
+      ) : null}
+      <Icon name="ChevronRight" size={20} color={c.muted} />
+    </Pressable>
+  );
+}
+
+/** Rows in one rounded box with a hairline between them. Children are `ListRow`s. */
+export function RowGroup({ children }: { children: ReactNode }) {
+  const c = useColours();
+  const rows = Children.toArray(children).filter(isValidElement) as ReactElement<{ divider?: boolean }>[];
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: c.border,
+        borderRadius: radius.lg,
+        overflow: "hidden",
+        backgroundColor: c.surface,
+      }}
+    >
+      {rows.map((row, i) => cloneElement(row, { divider: i > 0 }))}
     </View>
   );
 }
