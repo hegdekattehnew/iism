@@ -4,6 +4,17 @@ import { notFound } from "next/navigation";
 import { ApplyPanel } from "@/components/ApplyPanel";
 import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Fact, FactValue, Facts } from "@/components/ui/fact";
+import {
+  BriefcaseIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  RupeeIcon,
+  TargetIcon,
+} from "@/components/ui/icons";
+import { TrustStrip } from "@/components/ui/trust-strip";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import {
@@ -84,28 +95,35 @@ export default async function JobDetailPage({
       </ButtonLink>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-brand">
+        <Badge tone="brand" size="md">
+          <BriefcaseIcon className="h-4 w-4" />
           {t(`employmentType.${data.employment_type}`)}
-        </span>
+        </Badge>
         {data.nsqf_level_min != null && (
-          <span className="rounded-md bg-surface-muted px-2.5 py-1 text-xs font-medium text-muted">
+          <Badge size="md" className="font-medium">
+            <TargetIcon className="h-4 w-4" />
             {t("minLevel", { level: data.nsqf_level_min })}
-          </span>
+          </Badge>
         )}
         {days !== null && (
-          <span className="rounded-md bg-warning-surface px-2.5 py-1 text-xs font-medium text-warning-text">
+          <Badge tone="warn" size="md" className="font-medium">
+            <ClockIcon className="h-4 w-4" />
             {t("closesIn", { days })}
-          </span>
+          </Badge>
         )}
       </div>
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
-      <p className="mt-1 text-lg text-muted">
-        {data.tenant.name}
-        {data.location_district ? ` · ${data.location_district}` : ""}
-        {data.location_state ? `, ${data.location_state}` : ""}
-      </p>
-      {posted !== null && <p className="mt-1 text-sm text-muted">{posted}</p>}
+      {/* The organisation's mark beside who and where, as on the card in the list (Sprint 85). */}
+      <div className="mt-3 flex items-center gap-3">
+        <Avatar name={data.tenant.name} />
+        <p className="min-w-0 flex-1 text-lg text-muted">
+          {data.tenant.name}
+          {data.location_district ? ` · ${data.location_district}` : ""}
+          {data.location_state ? `, ${data.location_state}` : ""}
+        </p>
+      </div>
+      {posted !== null && <p className="mt-2 text-sm text-muted">{posted}</p>}
       {rated && (
         <p className="mt-1 text-sm text-muted">
           {tr("ofPoster")}:{" "}
@@ -118,30 +136,32 @@ export default async function JobDetailPage({
         </p>
       )}
 
-      <dl className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-border-token bg-surface p-5 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-xs text-muted">{t("salaryLabel")}</dt>
-          <dd className="mt-0.5 text-base font-semibold">{salary}</dd>
+      <Facts className="mt-6 grid-cols-1 sm:grid-cols-2">
+        <Fact icon={<RupeeIcon />} label={t("salaryLabel")}>
+          <FactValue>{salary}</FactValue>
           {salaryYearly && <dd className="text-xs text-muted">{salaryYearly}</dd>}
-        </div>
-        <div>
-          <dt className="text-xs text-muted">{t("experienceLabel")}</dt>
-          <dd className="mt-0.5 font-medium">{experience}</dd>
-        </div>
-      </dl>
+        </Fact>
+        <Fact icon={<BriefcaseIcon />} label={t("experienceLabel")}>
+          <FactValue>{experience}</FactValue>
+        </Fact>
+      </Facts>
 
       {/* Who is behind it and what they may not ask for. The page says "not yet verified"; a card in
           a list never does (it would read as an accusation of every employer without a mark). */}
-      <div className="mt-4 rounded-xl border border-border-token bg-surface p-4 text-sm">
-        <p className={data.tenant.is_verified ? "font-medium text-success-text" : "text-muted"}>
-          {data.tenant.is_verified ? t("verifiedEmployer") : t("notVerifiedYet")}
-        </p>
-        <p className="mt-1 text-muted">
-          {t("neverPay")}{" "}
-          <a href="#report" className="text-brand underline underline-offset-2">
+      <div className="mt-4">
+        <TrustStrip
+          verified={data.tenant.is_verified}
+          statement={data.tenant.is_verified ? t("verifiedEmployer") : t("notVerifiedYet")}
+        >
+          <p className="mt-1 text-muted">{t("neverPay")}</p>
+          {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
+          <a
+            href="#report"
+            className="inline-flex min-h-11 items-center text-brand underline underline-offset-2"
+          >
             {t("reportThis")}
           </a>
-        </p>
+        </TrustStrip>
       </div>
 
       {/* Client-side: whether someone is signed in, and whether they are a job seeker, is only
@@ -170,14 +190,15 @@ export default async function JobDetailPage({
             <li key={s.slug}>
               <Link
                 href={`/skills/${s.slug}`}
-                className="flex flex-wrap items-center gap-2 rounded-lg border border-border-token bg-surface px-3 py-3 text-sm transition-colors hover:border-brand"
+                className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-border-token bg-surface px-3 py-3 text-sm transition-colors hover:border-brand"
               >
                 <span className="font-medium">{s.name}</span>
                 {s.mandatory && (
-                  <span className="ml-auto rounded bg-brand px-1.5 py-0.5 text-xs font-bold text-brand-contrast">
+                  <span className="ml-auto rounded-md bg-brand px-1.5 py-0.5 text-xs font-bold text-brand-contrast">
                     {t("mandatory")}
                   </span>
                 )}
+                <ChevronRightIcon className={`h-4 w-4 text-muted ${s.mandatory ? "" : "ml-auto"}`} />
               </Link>
             </li>
           ))}

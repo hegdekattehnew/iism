@@ -1,0 +1,217 @@
+{
+  "sprint": 85,
+  "captured": "2026-10-19",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000 (jobs 148, courses 179, standards 21,303), dark colour scheme, English unless noted. BEFORE = `main` with web/src and web/e2e stashed; AFTER = this branch; the same pages, the same script, the same session. NOT the capture script (no Chromium on the machine; the download was declined), so the figures are comparable with each other and NOT with measurements.sprint84.json (production build, different harness). A control under 44 px is an a/button/select/input/textarea/[role] narrower or shorter than 44 px; text under 12 px counts elements with a text node below 12 px; the Next dev tools button is excluded.",
+  "pages": {
+    "home": {
+      "url": "/en",
+      "before": {
+        "pageHeight": 5148,
+        "screens": 6.3,
+        "smallTargets": 1,
+        "smallExamples": [
+          "Browse all courses"
+        ],
+        "textUnder12px": 0,
+        "svgs": 6
+      },
+      "after": {
+        "pageHeight": 5228,
+        "screens": 6.4,
+        "smallTargets": 1,
+        "smallExamples": [
+          "Browse all courses"
+        ],
+        "textUnder12px": 0,
+        "svgs": 13
+      }
+    },
+    "job-detail": {
+      "url": "/en/jobs/technician-room-air-conditioner-home-appliances-electronics",
+      "before": {
+        "pageHeight": 2366,
+        "screens": 2.9,
+        "smallTargets": 2,
+        "smallExamples": [
+          "Report this vacancy if it asks you for money.",
+          "Sign in"
+        ],
+        "textUnder12px": 0,
+        "svgs": 3
+      },
+      "after": {
+        "pageHeight": 2402,
+        "screens": 3.0,
+        "smallTargets": 1,
+        "smallExamples": [
+          "Sign in"
+        ],
+        "textUnder12px": 0,
+        "svgs": 10
+      }
+    },
+    "course-detail": {
+      "url": "/en/courses/general-duty-assistant-certificate",
+      "before": {
+        "pageHeight": 2631,
+        "screens": 3.2,
+        "smallTargets": 2,
+        "smallExamples": [
+          "Replace linen and make bed (skill chip)",
+          "Sign in"
+        ],
+        "textUnder12px": 0,
+        "svgs": 3
+      },
+      "after": {
+        "pageHeight": 2693,
+        "screens": 3.3,
+        "smallTargets": 1,
+        "smallExamples": [
+          "Sign in"
+        ],
+        "textUnder12px": 0,
+        "svgs": 12
+      }
+    },
+    "search": {
+      "url": "/en/search?q=nurse",
+      "before": {
+        "pageHeight": 4271,
+        "screens": 5.3,
+        "smallTargets": 6,
+        "smallExamples": [
+          "What this job involves x5",
+          "Browse all matching standards"
+        ],
+        "textUnder12px": 0,
+        "svgs": 9
+      },
+      "afterFirstVersion": {
+        "pageHeight": 4965,
+        "screens": 6.1,
+        "smallTargets": 0,
+        "svgs": 19,
+        "note": "standards cards with description and usage count"
+      },
+      "after": {
+        "pageHeight": 4639,
+        "screens": 5.7,
+        "smallTargets": 0,
+        "textUnder12px": 0,
+        "svgs": 19,
+        "note": "compact standards cards"
+      }
+    },
+    "skills": {
+      "url": "/en/skills",
+      "before": {
+        "pageHeight": 7743,
+        "screens": 9.5,
+        "smallTargets": 0,
+        "textUnder12px": 0,
+        "svgs": 3
+      },
+      "after": {
+        "pageHeight": 7867,
+        "screens": 9.7,
+        "smallTargets": 0,
+        "textUnder12px": 0,
+        "svgs": 27
+      }
+    },
+    "skill-detail": {
+      "url": "/en/skills/employability-skills-60-hours-dgt-vsq-n0102",
+      "before": {
+        "pageHeight": 7799,
+        "screens": 9.6,
+        "smallTargets": 2,
+        "smallExamples": [
+          "See all jobs needing it",
+          "See all courses teaching it"
+        ],
+        "svgs": 3
+      },
+      "after": {
+        "pageHeight": 7825,
+        "screens": 9.6,
+        "smallTargets": 0,
+        "svgs": 5
+      }
+    }
+  },
+  "hindi": {
+    "course-detail": {
+      "overflowX": false,
+      "factTerms": [
+        "शुल्क",
+        "अवधि",
+        "कहाँ",
+        "अगला बैच",
+        "इसके लिए गिना जाता है",
+        "स्थान"
+      ]
+    },
+    "home": {
+      "overflowX": false,
+      "searchButtonBottomPx": 478,
+      "viewportHeight": 812
+    }
+  },
+  "firstLoadJsBytes": {
+    "note": "build:e2e then .next-e2e/diagnostics/route-bundle-stats.json; main and this branch built the same way",
+    "routes": {
+      "/[locale]/profile": [
+        697945,
+        698043
+      ],
+      "/[locale]/employer/[org]": [
+        697871,
+        697969
+      ],
+      "/[locale]/matches": [
+        689813,
+        689911
+      ],
+      "/[locale]/jobs": [
+        677487,
+        677733
+      ],
+      "/[locale]/courses": [
+        673398,
+        673644
+      ],
+      "/[locale]/search": [
+        679520,
+        675688
+      ],
+      "/[locale]/skills": [
+        669282,
+        670271
+      ],
+      "/[locale]": [
+        663440,
+        663538
+      ],
+      "/[locale]/jobs/[slug]": [
+        667467,
+        667565
+      ],
+      "/[locale]/courses/[slug]": [
+        666455,
+        666553
+      ],
+      "/[locale]/skills/[slug]": [
+        659989,
+        660087
+      ]
+    },
+    "format": "[before, after]"
+  },
+  "notRun": [
+    "make e2e (146 existing journeys and 3 new)",
+    "the sweep's axe contrast in light and dark, layout shift and target ratchet",
+    "the 52-capture script",
+    "Hindi dark, Malay, desktop"
+  ]
+}

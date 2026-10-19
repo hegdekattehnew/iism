@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { JobCard } from "@/components/cards/JobCard";
-import { lookalikeNames, StandardOrigin } from "@/components/SkillBrowser";
+import { lookalikeNames, StandardCard } from "@/components/cards/StandardCard";
 import { Badge, ButtonLink } from "@/components/ui";
+import { IconTile } from "@/components/ui/icon-tile";
+import { AwardIcon, BriefcaseIcon, ChevronRightIcon, UserIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { paths } from "@/lib/api-schema";
@@ -26,7 +28,6 @@ const PREVIEW = 5;
 
 export function SearchResults({ query }: { query: string }) {
   const t = useTranslations("searchPage");
-  const tSkills = useTranslations("skillsPage");
   const q = query.trim();
 
   const jobs = useQuery({
@@ -60,6 +61,7 @@ export function SearchResults({ query }: { query: string }) {
     <div className="space-y-12">
       <Band
         title={t("jobsHeading")}
+        icon={<BriefcaseIcon />}
         count={jobs.data?.total}
         pending={jobs.isPending}
         empty={t("noJobs")}
@@ -82,6 +84,7 @@ export function SearchResults({ query }: { query: string }) {
 
       <Band
         title={t("rolesHeading")}
+        icon={<UserIcon />}
         note={t("rolesNote")}
         pending={roles.isPending}
         empty={t("noRoles")}
@@ -99,6 +102,7 @@ export function SearchResults({ query }: { query: string }) {
 
       <Band
         title={t("standardsHeading")}
+        icon={<AwardIcon />}
         count={standardRows.length}
         pending={standards.isPending}
         empty={t("noStandards")}
@@ -112,23 +116,12 @@ export function SearchResults({ query }: { query: string }) {
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {shownStandards.map((s) => (
               <li key={s.slug}>
-                <Link
-                  href={`/skills/${s.slug}`}
-                  className="block h-full rounded-xl border border-border-token bg-surface p-4 transition-colors hover:border-brand"
-                >
-                  <p className="text-sm font-semibold">{s.name}</p>
-                  {/* The browse page shows level as a chip; here it is one of
-                      the few things that differs between same-named twins. */}
-                  {s.nsqf_level != null && (
-                    <p className="mt-0.5 text-xs text-muted">
-                      {tSkills("levelShort", { level: s.nsqf_level })}
-                    </p>
-                  )}
-                  <StandardOrigin
-                    row={s}
-                    lookalike={lookalikes.has(s.name.trim().toLowerCase())}
-                  />
-                </Link>
+                <StandardCard
+                  row={s}
+                  heading="h3"
+                  compact
+                  lookalike={lookalikes.has(s.name.trim().toLowerCase())}
+                />
               </li>
             ))}
           </ul>
@@ -140,6 +133,7 @@ export function SearchResults({ query }: { query: string }) {
 
 function Band({
   title,
+  icon,
   note,
   count,
   pending,
@@ -148,6 +142,8 @@ function Band({
   children,
 }: {
   title: string;
+  /** The band's mark, drawn beside its heading (Sprint 85). */
+  icon: React.ReactNode;
   note?: string;
   count?: number;
   pending: boolean;
@@ -160,13 +156,17 @@ function Band({
   return (
     <section>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-          {title}
-          {count != null && count > 0 && <span className="ml-2">({count})</span>}
+        <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+          <IconTile size="sm">{icon}</IconTile>
+          <span>
+            {title}
+            {count != null && count > 0 && <span className="ml-2">({count})</span>}
+          </span>
         </h2>
         {more && (
-          <Link href={more.href} className="text-sm text-brand hover:underline">
-            {more.label} →
+          <Link href={more.href} className="inline-flex min-h-11 items-center gap-1 text-sm text-brand hover:underline">
+            {more.label}
+            <ChevronRightIcon className="h-4 w-4" />
           </Link>
         )}
       </div>
@@ -212,7 +212,7 @@ function RoleRow({ role }: { role: RoleItem }) {
   });
 
   return (
-    <div className="rounded-xl border border-border-token bg-surface p-4">
+    <div className="rounded-xl border border-border-token bg-surface p-4 shadow-card">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">{role.job_role}</span>
         <Badge>{t("standardsCount", { count: role.standards_count })}</Badge>
@@ -232,7 +232,7 @@ function RoleRow({ role }: { role: RoleItem }) {
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className="text-sm text-brand hover:underline"
+          className="inline-flex min-h-11 items-center text-sm text-brand hover:underline"
         >
           {open ? t("hideStandards") : t("showStandards")}
         </button>

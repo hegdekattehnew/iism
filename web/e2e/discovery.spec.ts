@@ -89,3 +89,77 @@ test("a course says who is behind it and what registering costs, and where to re
   await expect(card.getByText(/verified/i)).toHaveCount(0);
   await expect(card.getByText("₹5,000")).toBeVisible();
 });
+
+/**
+ * Journey 19 (Sprint 85, BL-19.15 second half): the home's icon tiles, the vacancy and course pages
+ * on facts and a trust strip, search with a mark on each band, and the standards cards. At 360x640,
+ * and through `checkPage` (contrast in both themes, no layout shift, targets, no console error).
+ */
+test("the home leads each tile with an icon, and nothing about the order of the steps is lost", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto("/en");
+  await expect(page.getByRole("heading", { name: "Explore the marketplace" })).toBeVisible();
+  for (const name of ["Jobs", "Courses", "Skills"]) {
+    const heading = page.getByRole("heading", { level: 3, name, exact: true });
+    const tile = heading.locator("xpath=..").locator("svg");
+    await expect(tile, `${name} panel has its icon`).toHaveCount(1);
+    const box = await tile.boundingBox();
+    expect(box!.width, `${name} icon is drawn`).toBeGreaterThan(10);
+  }
+  const steps = page.locator("#how-it-works ol > li");
+  await expect(steps).toHaveCount(4);
+  for (let i = 0; i < 4; i++) {
+    await expect(steps.nth(i).locator("svg")).toHaveCount(1);
+    await expect(steps.nth(i).getByText(String(i + 1), { exact: true })).toBeVisible();
+  }
+  await checkPage(page, "home with icon tiles");
+});
+
+test("a vacancy and a course show their facts with icons, and the trust strip's link is a 44 px target", async ({
+  page,
+  request,
+}) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  const id = suffix();
+  const employer = await organisation(request, "employer", `E2E Facts ${id}`);
+  const jobSlug = await publishedJob(request, employer, `Facts assistant ${id}`, [
+    { skill_slug: SKILL_STERILE_FIELD, importance: 5, is_mandatory: true },
+  ]);
+  const provider = await organisation(request, "course_provider", `E2E Facts Academy ${id}`);
+  const courseSlug = await publishedCourse(request, provider, `Facts course ${id}`, [SKILL_STERILE_FIELD], {
+    fee_inr: 5000,
+    seats: 10,
+  });
+
+  await page.goto(`/en/jobs/${jobSlug}`);
+  await expect(page.getByRole("heading", { level: 1, name: `Facts assistant ${id}` })).toBeVisible();
+  const facts = page.locator("dl").first();
+  await expect(facts.locator("dt svg")).toHaveCount(2);
+  const report = page.getByRole("link", { name: "Report this vacancy if it asks you for money." });
+  expect((await report.boundingBox())!.height, "the report link is a 44 px target").toBeGreaterThanOrEqual(43.5);
+  const requirement = page.getByRole("link", { name: /Must have/ }).first();
+  expect((await requirement.boundingBox())!.height, "a required standard is a 44 px row").toBeGreaterThanOrEqual(43.5);
+  await checkPage(page, "vacancy page on facts and a trust strip");
+
+  await page.goto(`/en/courses/${courseSlug}`);
+  await expect(page.getByRole("heading", { level: 1, name: `Facts course ${id}` })).toBeVisible();
+  await expect(page.locator("dl").first().locator("dt svg").first()).toBeVisible();
+  expect(await page.locator("dl").first().locator("dt svg").count()).toBeGreaterThanOrEqual(3);
+  await checkPage(page, "course page on facts and a trust strip");
+});
+
+test("search puts a mark on each band, and a standard reads the same on the browser and in search", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto("/en/search?q=nurse");
+  await expect(page.getByRole("heading", { level: 2, name: /Standards/i })).toBeVisible();
+  const bands = page.locator("section > div > h2");
+  expect(await bands.count()).toBe(3);
+  for (let i = 0; i < 3; i++) await expect(bands.nth(i).locator("svg")).toHaveCount(1);
+  await checkPage(page, "search with a mark on each band");
+
+  await page.goto("/en/skills");
+  await expect(page.getByRole("heading", { level: 2 }).first()).toBeVisible();
+  const card = page.locator("ul > li > a[href*='/skills/']").first();
+  await expect(card.locator("svg")).toHaveCount(1);
+  await checkPage(page, "standards browser on the new card");
+});
