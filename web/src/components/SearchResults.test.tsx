@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SearchResults } from "@/components/SearchResults";
-import { lookalikeNames } from "@/components/SkillBrowser";
+import { lookalikeNames } from "@/components/cards/StandardCard";
 import { renderUi, resetWorld } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -158,5 +158,40 @@ describe("StandardOrigin", () => {
     expect(screen.queryByText("Healthcare · Healthcare")).toBeNull();
     // Level is one of the few things that tells twins apart.
     expect(screen.getByText("Level 4.5")).toBeTruthy();
+  });
+});
+
+/** Sprint 85, BL-19.15: each band has a mark, a standard is the shared compact card, and every control is 44 px. */
+describe("the bands and their controls", () => {
+  it("puts a mark beside each band's heading, hidden from a screen reader", async () => {
+    const { container } = renderUi(<SearchResults query="General Duty Assistant" />);
+    await screen.findByText("MSU/HSS/CRS0005-001");
+    const headings = [...container.querySelectorAll("section > div > h2")];
+    expect(headings.map((h) => h.textContent?.replace(/\(\d+\)/, "").trim())).toEqual([
+      "Open jobs",
+      "Job roles",
+      "Skill standards",
+    ]);
+    for (const h of headings) {
+      const mark = h.querySelector("[aria-hidden='true']") as HTMLElement;
+      expect(mark?.querySelector("svg"), h.textContent ?? "").toBeTruthy();
+    }
+  });
+
+  it("draws a standard on the shared card, as a third-level heading under the band, without its description", async () => {
+    answer({
+      standards: [{ ...twin("MSU/HSS/CRS0005-001", "MSU/HSS/CRS0005", 4), description: "A long line nobody scanning asked for." }],
+    });
+    renderUi(<SearchResults query="General Duty Assistant" />);
+    expect(await screen.findByRole("heading", { level: 3, name: "Broad Functions of General Duty Assistant" })).toBeTruthy();
+    expect(screen.queryByText("A long line nobody scanning asked for.")).toBeNull();
+    expect(screen.getByText("Technical")).toBeTruthy();
+  });
+
+  it("makes the controls it owns 44 px: the role's toggle and the link to the rest", async () => {
+    answer({ jobsTotal: 12 });
+    renderUi(<SearchResults query="ward attendant" />);
+    expect((await screen.findByRole("button", { name: "What this job involves" })).className).toContain("min-h-11");
+    expect(screen.getByRole("link", { name: /See all 12 jobs/ }).className).toContain("min-h-11");
   });
 });

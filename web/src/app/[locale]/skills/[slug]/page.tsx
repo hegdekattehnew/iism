@@ -5,6 +5,8 @@ import { SkillQualifications } from "@/components/SkillQualifications";
 import { SkillRequirements } from "@/components/SkillRequirements";
 import { SkillRelated } from "@/components/SkillRelated";
 import { ButtonLink } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangleIcon, AwardIcon, TargetIcon } from "@/components/ui/icons";
 import { api } from "@/lib/api";
 
 // Rendered per request: skills change as the taxonomy is imported, and there is
@@ -51,14 +53,16 @@ export default async function SkillDetailPage({
       </ButtonLink>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-brand">
+        <Badge tone="brand" size="md">
+          <AwardIcon className="h-4 w-4" />
           {t(`type.${data.skill_type}`)}
-        </span>
-        <span className="rounded-md bg-surface-muted px-2.5 py-1 text-xs font-medium text-muted">
+        </Badge>
+        <Badge size="md" className="font-medium">
+          <TargetIcon className="h-4 w-4" />
           {data.nsqf_level != null
             ? t("level", { level: data.nsqf_level })
             : t("noLevel")}
-        </span>
+        </Badge>
         {data.nos_code && (
           <span className="rounded-md border border-border-token px-2.5 py-1 font-mono text-xs text-muted">
             {data.nos_code}
@@ -71,7 +75,8 @@ export default async function SkillDetailPage({
           because profiles reference it. Saying so beats letting it look like a
           standard it is not. */}
       {data.source === "legacy" && (
-        <p className="mt-3 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
+        <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
           {t("curatedNotice")}
         </p>
       )}

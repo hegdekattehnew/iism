@@ -4,8 +4,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 
+import { lookalikeNames, StandardCard, type StandardRow } from "@/components/cards/StandardCard";
 import { Button, ListSkeleton, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchIcon } from "@/components/ui/icons";
@@ -15,87 +15,7 @@ import { SearchIcon } from "@/components/ui/icons";
 // does not degrade at that size, it breaks.
 const PAGE_SIZE = 24;
 
-type Row = {
-  slug: string;
-  name: string;
-  description?: string | null;
-  skill_type: "technical" | "core" | "generic";
-  nsqf_level?: number | null;
-  qp_count?: number;
-  nos_code?: string | null;
-  context?: {
-    awarding_body?: string | null;
-    sector?: string | null;
-    qualification_code?: string | null;
-    qualification_name?: string | null;
-  } | null;
-  matched_on?: string | null;
-  match_kind?: "exact" | "prefix" | "alias" | "text";
-};
-
-/**
- * What tells a standard apart from another with the same name.
- *
- * A quarter of the corpus shares its name with another standard -- searching
- * "General Duty Assistant" returned two cards both titled "Broad Functions of
- * General Duty Assistant", identical until opened. The code and the
- * qualification each belongs to are what differ, so every card shows them.
- * Exported so the search results page renders standards the same way.
- */
-export function StandardOrigin({ row, lookalike }: { row: Row; lookalike: boolean }) {
-  const t = useTranslations("skillsPage");
-  const c = row.context;
-  return (
-    <>
-      {row.nos_code && (
-        <p className="mt-1 font-mono text-xs text-muted">{row.nos_code}</p>
-      )}
-      {c?.qualification_name && (
-        <p className="mt-1.5 text-xs text-muted">
-          {t("partOf", { name: c.qualification_name })}
-          {c.qualification_code && (
-            <span className="ml-1 font-mono text-xs">({c.qualification_code})</span>
-          )}
-        </p>
-      )}
-      {(c?.awarding_body || c?.sector) && (
-        <p className="mt-0.5 text-xs text-muted">
-          {/* A Sector Skill Council is often stored under its sector's own
-              name ("Healthcare"), which printed "Healthcare · Healthcare". */}
-          {[...new Set([c.awarding_body, c.sector].filter(Boolean))].join(" · ")}
-        </p>
-      )}
-      {lookalike && (
-        <p className="mt-2 text-xs text-warning-text">{t("lookalike")}</p>
-      )}
-    </>
-  );
-}
-
-/** Names that appear more than once on the page, compared as a reader would. */
-export function lookalikeNames(rows: { name: string }[]): Set<string> {
-  const seen = new Map<string, number>();
-  for (const r of rows) {
-    const key = r.name.trim().toLowerCase();
-    seen.set(key, (seen.get(key) ?? 0) + 1);
-  }
-  return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
-}
-
-function TypeChip({ type }: { type: Row["skill_type"] }) {
-  const t = useTranslations("skillsPage.type");
-  const tone =
-    type === "technical"
-      ? "bg-accent-soft text-brand"
-      : type === "core"
-        ? "bg-warning-surface text-warning-text"
-        : "bg-surface-muted text-foreground";
-  return (
-    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${tone}`}>
-      {t(type)}
-    </span>
-  );
-}
+type Row = StandardRow & { skill_type: "technical" | "core" | "generic" };
 
 export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
   const t = useTranslations("skillsPage");
@@ -175,10 +95,6 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
   const rows = results.data?.rows ?? [];
   const total = results.data?.total ?? 0;
   const lookalikes = lookalikeNames(rows);
-  const name = (r: Row) => (r.name);
-  const desc = (r: Row) =>
-    r.description;
-
   // Levels arrive as numbers: 4 renders as "4", 4.5 as "4.5". A trailing ".0"
   // on every whole level is noise on a chip.
   const fmtLevel = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -290,43 +206,7 @@ export function SkillBrowser({ initialQuery = "" }: { initialQuery?: string }) {
       <ul className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
         {rows.map((r) => (
           <li key={r.slug}>
-            <Link
-              href={`/skills/${r.slug}`}
-              className="block h-full rounded-xl border border-border-token bg-surface p-5 transition-colors hover:border-brand"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <TypeChip type={r.skill_type} />
-                {r.nsqf_level != null && (
-                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
-                    {t("levelShort", { level: fmtLevel(r.nsqf_level) })}
-                  </span>
-                )}
-                {/* Why this sorts where it does, and a real signal of how
-                    central the unit is to the framework. */}
-                {(r.qp_count ?? 0) > 0 && (
-                  <span className="text-xs text-muted">
-                    {t("usedInQps", { count: r.qp_count ?? 0 })}
-                  </span>
-                )}
-              </div>
-
-              <h2 className="mt-2.5 text-base font-semibold">{name(r)}</h2>
-              <StandardOrigin
-                row={r}
-                lookalike={lookalikes.has(r.name.trim().toLowerCase())}
-              />
-
-              {desc(r) && (
-                <p className="mt-1.5 line-clamp-2 text-sm text-muted">{desc(r)}</p>
-              )}
-
-              {/* Why this matched. Without it a transliterated hit looks wrong. */}
-              {r.matched_on && r.match_kind === "alias" && (
-                <p className="mt-3 text-xs text-brand">
-                  {t("matchedVia", { term: r.matched_on })}
-                </p>
-              )}
-            </Link>
+            <StandardCard row={r} lookalike={lookalikes.has(r.name.trim().toLowerCase())} />
           </li>
         ))}
       </ul>

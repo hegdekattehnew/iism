@@ -50,7 +50,7 @@ export async function SkillRelated({ slug }: { slug: string }) {
             </ul>
             <Link
               href={`/jobs?skill=${slug}`}
-              className="mt-3 inline-block text-sm font-medium text-brand hover:underline"
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline"
             >
               {t("viewAllJobs")} →
             </Link>
@@ -86,7 +86,7 @@ export async function SkillRelated({ slug }: { slug: string }) {
             </ul>
             <Link
               href={`/courses?skill=${slug}`}
-              className="mt-3 inline-block text-sm font-medium text-brand hover:underline"
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline"
             >
               {t("viewAllCourses")} →
             </Link>

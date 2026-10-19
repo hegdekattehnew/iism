@@ -4,6 +4,21 @@ import { notFound } from "next/navigation";
 import { InterestPanel } from "@/components/InterestPanel";
 import { ReportListing } from "@/components/ReportListing";
 import { ButtonLink } from "@/components/ui";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Fact, FactValue, Facts } from "@/components/ui/fact";
+import {
+  AwardIcon,
+  BuildingIcon,
+  CalendarIcon,
+  ClockIcon,
+  GlobeIcon,
+  MapPinIcon,
+  RupeeIcon,
+  TargetIcon,
+  UsersIcon,
+} from "@/components/ui/icons";
+import { TrustStrip } from "@/components/ui/trust-strip";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { creditsText, type Translate } from "@/lib/job-text";
@@ -64,21 +79,27 @@ export default async function CourseDetailPage({
       </ButtonLink>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-semibold text-brand">
+        <Badge tone="brand" size="md">
+          {data.mode === "online" ? <GlobeIcon className="h-4 w-4" /> : <BuildingIcon className="h-4 w-4" />}
           {t(`mode.${data.mode}`)}
-        </span>
-        <span className="rounded-md bg-surface-muted px-2.5 py-1 text-xs font-medium text-muted">
+        </Badge>
+        <Badge size="md" className="font-medium">
           {t(`language.${data.language}`)}
-        </span>
+        </Badge>
         {data.nsqf_level != null && (
-          <span className="rounded-md bg-surface-muted px-2.5 py-1 text-xs font-medium text-muted">
+          <Badge size="md" className="font-medium">
+            <TargetIcon className="h-4 w-4" />
             {t("level", { level: data.nsqf_level })}
-          </span>
+          </Badge>
         )}
       </div>
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
-      <p className="mt-1 text-lg text-muted">{data.tenant.name}</p>
+      {/* The provider's mark beside its name, as on the card in the list (Sprint 85). */}
+      <div className="mt-3 flex items-center gap-3">
+        <Avatar name={data.tenant.name} />
+        <p className="min-w-0 flex-1 text-lg text-muted">{data.tenant.name}</p>
+      </div>
 
       {/* The one thing a learner can do here. Until Sprint 24 this page
           was a dead end: the gap named, the course named, nothing to press. */}
@@ -86,31 +107,26 @@ export default async function CourseDetailPage({
         <InterestPanel courseSlug={data.slug} organisation={data.tenant.name} />
       </div>
 
-      <dl className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-border-token bg-surface p-5 text-sm">
-        <div>
-          <dt className="text-xs text-muted">{t("feeLabel")}</dt>
-          <dd className="mt-0.5 text-lg font-semibold">{fee}</dd>
-        </div>
+      <Facts className="mt-6 grid-cols-2">
+        <Fact icon={<RupeeIcon />} label={t("feeLabel")}>
+          <FactValue large>{fee}</FactValue>
+        </Fact>
         {data.duration_hours != null && (
-          <div>
-            <dt className="text-xs text-muted">{t("durationLabel")}</dt>
-            <dd className="mt-0.5 text-lg font-semibold">{t("duration", { hours: data.duration_hours })}</dd>
-          </div>
+          <Fact icon={<ClockIcon />} label={t("durationLabel")}>
+            <FactValue large>{t("duration", { hours: data.duration_hours })}</FactValue>
+          </Fact>
         )}
         {place && (
-          <div>
-            <dt className="text-xs text-muted">{t("placeLabel")}</dt>
-            <dd className="mt-0.5 text-lg font-semibold">{place}</dd>
-          </div>
+          <Fact icon={<MapPinIcon />} label={t("placeLabel")}>
+            <FactValue large>{place}</FactValue>
+          </Fact>
         )}
-        <div>
-          <dt className="text-xs text-muted">{t("intakeLabel")}</dt>
-          <dd className="mt-0.5 text-lg font-semibold">{intake}</dd>
-        </div>
+        <Fact icon={<CalendarIcon />} label={t("intakeLabel")}>
+          <FactValue large>{intake}</FactValue>
+        </Fact>
         {data.qualification_name && (
-          <div className="col-span-2">
-            <dt className="text-xs text-muted">{t("qualificationLabel")}</dt>
-            <dd className="mt-0.5 text-lg font-semibold">
+          <Fact icon={<AwardIcon />} label={t("qualificationLabel")} wide>
+            <FactValue large>
               {data.qualification_name}
               {creditsText(data.qualification_credits, t as unknown as Translate) && (
                 <span className="font-normal text-muted">
@@ -120,34 +136,35 @@ export default async function CourseDetailPage({
               <span className="mt-0.5 block text-xs font-normal text-muted">
                 {t("qualificationNote")}
               </span>
-            </dd>
-          </div>
+            </FactValue>
+          </Fact>
         )}
         {data.seats_left != null && (
-          <div>
-            <dt className="text-xs text-muted">{t("seatsLabel")}</dt>
-            <dd className="mt-0.5 text-lg font-semibold">
+          <Fact icon={<UsersIcon />} label={t("seatsLabel")}>
+            <FactValue large>
               {data.seats_left === 0 ? t("full") : t("seatsLeft", { count: data.seats_left })}
-            </dd>
-          </div>
+            </FactValue>
+          </Fact>
         )}
-      </dl>
+      </Facts>
 
       {/* Who is behind it and what registering costs (UI-10; the vacancy page has the same strip). The
           page says "not yet verified"; a card in a list never does, because it would read as an
           accusation of every provider without a mark. */}
-      <div className="mt-4 rounded-xl border border-border-token bg-surface p-4 text-sm">
-        <p className={data.tenant.is_verified ? "font-medium text-success-text" : "text-muted"}>
-          {data.tenant.is_verified ? t("verifiedProvider") : t("notVerifiedYet")}
-        </p>
-        <p className="mt-1 text-muted">{t("interestFree")}</p>
-        {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
-        <a
-          href="#report"
-          className="inline-flex min-h-11 items-center text-brand underline underline-offset-2"
+      <div className="mt-4">
+        <TrustStrip
+          verified={data.tenant.is_verified}
+          statement={data.tenant.is_verified ? t("verifiedProvider") : t("notVerifiedYet")}
         >
-          {t("reportThis")}
-        </a>
+          <p className="mt-1 text-muted">{t("interestFree")}</p>
+          {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
+          <a
+            href="#report"
+            className="inline-flex min-h-11 items-center text-brand underline underline-offset-2"
+          >
+            {t("reportThis")}
+          </a>
+        </TrustStrip>
       </div>
 
       {description && <p className="mt-8 text-base leading-relaxed">{description}</p>}
@@ -161,7 +178,7 @@ export default async function CourseDetailPage({
             <li key={s.skill.slug}>
               <Link
                 href={`/skills/${s.skill.slug}`}
-                className="inline-flex items-center gap-2 rounded-lg border border-border-token bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-token bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
               >
                 <span>{s.skill.name}</span>
                 {s.level_taught != null && (
