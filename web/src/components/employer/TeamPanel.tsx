@@ -6,7 +6,10 @@ import { useState } from "react";
 
 import { Select, Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
-import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { Alert, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { Avatar } from "@/components/ui/avatar";
+import { CheckIcon, ClockIcon, ShieldCheckIcon, UserIcon, UsersIcon, XCircleIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
 import { api } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
@@ -231,8 +234,9 @@ export function TeamPanel({ org }: { org: string }) {
           <li key={member.user_id}>
             <Card>
               <CardBody>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-start gap-3">
+                  <Avatar name={nameOf(member)} />
+                  <div className="min-w-0 flex-1">
                     <p className="text-base font-semibold">
                       {nameOf(member)}
                       {member.is_you && (
@@ -247,10 +251,16 @@ export function TeamPanel({ org }: { org: string }) {
                         date: format.dateTime(new Date(member.since), { dateStyle: "medium" }),
                       })}
                     </p>
+                    {/* Under the name, not beside it: at 375 px a chip beside the mark and the name squeezed
+                        "Apollo Care Hospitals team" onto two lines. */}
+                    <StatusChip
+                      className="mt-2"
+                      tone={member.role === "owner" ? "good" : member.role === "admin" ? "brand" : "neutral"}
+                      icon={{ owner: ShieldCheckIcon, admin: UsersIcon, member: UserIcon }[member.role as "owner" | "admin" | "member"] ?? UserIcon}
+                    >
+                      {roleLabel(member.role)}
+                    </StatusChip>
                   </div>
-                  <Badge tone={member.role === "owner" ? "good" : undefined}>
-                    {roleLabel(member.role)}
-                  </Badge>
                 </div>
 
                 {canManage && !member.is_you && (
@@ -446,7 +456,16 @@ export function TeamPanel({ org }: { org: string }) {
                             </p>
                           )}
                         </div>
-                        <Badge tone={invitation.state === "pending" ? "good" : undefined}>
+                        <StatusChip
+                          tone={invitation.state === "pending" ? "good" : "neutral"}
+                          icon={
+                            invitation.state === "pending"
+                              ? ClockIcon
+                              : invitation.state === "accepted"
+                                ? CheckIcon
+                                : XCircleIcon
+                          }
+                        >
                           {t(
                             invitation.state === "pending"
                               ? "statePending"
@@ -456,7 +475,7 @@ export function TeamPanel({ org }: { org: string }) {
                                   ? "stateRevoked"
                                   : "stateExpired",
                           )}
-                        </Badge>
+                        </StatusChip>
                       </div>
                       {invitation.state === "pending" && (
                         <div className="mt-3">

@@ -6,8 +6,15 @@ import { useState } from "react";
 
 import { SessionExpired } from "@/components/SessionExpired";
 import {
+  AlertTriangleIcon,
+  ArrowRightIcon,
+  CheckCircleIcon,
+  InfoIcon,
+  XCircleIcon,
+} from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
+import {
   Alert,
-  Badge,
   Button,
   ButtonLink,
   Card,
@@ -33,13 +40,18 @@ type Published = components["schemas"]["BulkPublishOut"];
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const PUBLISH_BATCH = 200;
 
-const TONE = {
-  ok: "good",
-  warning: "warn",
-  error: "bad",
-  skip: "neutral",
-  update: "brand",
-} as const;
+/**
+ * What each row of a check says, as a tone and a shape (Sprint 88, BL-19.18): a column of grey and
+ * green words was read by colour in a file of two hundred rows. Typed over the server's own statuses,
+ * so a new one is a compile error and not a chip with no shape.
+ */
+export const ROW_LOOK: Record<Row["status"], { tone: "good" | "warn" | "bad" | "neutral" | "brand"; icon: typeof CheckCircleIcon }> = {
+  ok: { tone: "good", icon: CheckCircleIcon },
+  warning: { tone: "warn", icon: AlertTriangleIcon },
+  error: { tone: "bad", icon: XCircleIcon },
+  skip: { tone: "neutral", icon: InfoIcon },
+  update: { tone: "brand", icon: ArrowRightIcon },
+};
 
 /** The file is the request body, so the typed client is told not to JSON-encode it. */
 const csv = {
@@ -260,10 +272,10 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
       <Card>
         <CardBody className="space-y-3">
           <h2 className="text-base font-semibold">{t("step2")}</h2>
-          <label className="flex items-start gap-2 text-sm">
+          <label className="flex min-h-11 items-start gap-2 py-2 text-sm">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 h-5 w-5 shrink-0"
               checked={update}
               disabled={check.isPending || apply.isPending}
               onChange={(e) => choose_existing(e.target.checked)}
@@ -282,7 +294,7 @@ export function BulkUpload({ kind, org }: { kind: Kind; org: string }) {
             id="bulk-file"
             type="file"
             accept=".csv,text/csv"
-            className="block w-full text-sm"
+            className="block min-h-11 w-full text-sm"
             disabled={check.isPending || apply.isPending}
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -536,7 +548,9 @@ function ReviewTable({ rows }: { rows: Row[] }) {
               <td className="py-2 pr-3 tabular-nums">{r.row}</td>
               <td className="py-2 pr-3">{r.title ?? "—"}</td>
               <td className="py-2 pr-3">
-                <Badge tone={TONE[r.status]}>{t(`status.${r.status}`)}</Badge>
+                <StatusChip tone={ROW_LOOK[r.status].tone} icon={ROW_LOOK[r.status].icon}>
+                  {t(`status.${r.status}`)}
+                </StatusChip>
               </td>
               <td className="py-2">
                 {/* The index is in the key: two rows of one file can say the same thing, and a

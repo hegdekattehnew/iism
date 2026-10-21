@@ -2,7 +2,7 @@ import axe from "axe-core";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BulkUpload, MAX_FILE_BYTES } from "@/components/employer/BulkUpload";
+import { BulkUpload, MAX_FILE_BYTES, ROW_LOOK } from "@/components/employer/BulkUpload";
 import { renderUi, resetWorld } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -458,5 +458,47 @@ describe("BulkUpload", () => {
     const duplicateKey = warn.mock.calls.filter((c) => /same key/i.test(String(c[0])));
     warn.mockRestore();
     expect(duplicateKey).toEqual([]);
+  });
+});
+
+/** Sprint 88, BL-19.18: a check's rows are words with shapes, and the screen's two controls are 44 px. */
+describe("BulkUpload -- the look of a check", () => {
+  const STATUSES = [
+    ["ok", "Ready", "bg-success-surface"],
+    ["warning", "Warning", "bg-warning-surface"],
+    ["error", "Problem", "bg-danger-surface"],
+    ["skip", "Skipped", "bg-surface-muted"],
+    ["update", "Update", "bg-accent-soft"],
+  ] as const;
+
+  it("has a tone and a shape for every status a row can have, and no two the same", () => {
+    expect(Object.keys(ROW_LOOK).sort()).toEqual(["error", "ok", "skip", "update", "warning"]);
+    const seen = new Set(Object.values(ROW_LOOK).map((l) => `${l.tone}:${l.icon.displayName ?? l.icon.name}`));
+    expect(seen.size).toBe(5);
+    expect(ROW_LOOK.error.tone).toBe("bad");
+    expect(ROW_LOOK.warning.tone).toBe("warn");
+  });
+
+  it("draws each row's result as its word with a shape, in the tone of its look", async () => {
+    POST.mockResolvedValue(
+      ok(report({ rows: STATUSES.map(([status], i) => row({ row: i + 2, status, title: `Row ${status}`, messages: [] })) })),
+    );
+    screenFor();
+    upload();
+    await screen.findByText("Row ok");
+    const chips = [...document.querySelectorAll("tbody td:nth-child(3) span")] as HTMLElement[];
+    expect(chips.map((c) => c.textContent)).toEqual(STATUSES.map(([, word]) => word));
+    chips.forEach((chip, i) => {
+      expect(chip.className, STATUSES[i][1]).toContain(STATUSES[i][2]);
+      expect(chip.querySelector("svg"), STATUSES[i][1]).toBeTruthy();
+    });
+    expect(new Set(chips.map((c) => c.querySelector("svg")!.innerHTML)).size).toBe(5);
+  });
+
+  it("makes the file input and the update checkbox's row 44 px", () => {
+    screenFor();
+    expect(screen.getByLabelText(/Your CSV file/).className).toContain("min-h-11");
+    const box = screen.getByRole("checkbox");
+    expect((box.closest("label") as HTMLElement).className).toContain("min-h-11");
   });
 });

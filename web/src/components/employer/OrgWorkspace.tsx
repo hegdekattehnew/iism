@@ -1,11 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 
-import { EmployerWorkspace } from "@/components/employer/EmployerWorkspace";
-import { ProviderWorkspace } from "@/components/employer/ProviderWorkspace";
 import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { useMemberships, useOrgType } from "@/lib/org";
+
+/**
+ * **Neither workspace is in the route's first load** (Sprint 88, BL-19.18). The page used to import
+ * both, so every organisation downloaded the other kind's screen too, and once the workspaces gained
+ * status shapes and dashboard tiles the route went past the 700 KB ceiling (703,701 bytes). A visit
+ * needs exactly one, and only after the memberships say which: each is a `next/dynamic` chunk at module
+ * level, and the placeholder is the same `Skeleton` the memberships wait shows, in the same place, so
+ * nothing moves when the real screen arrives. `workspace-structure.test.ts` fails on a static import.
+ */
+const loading = () => <Skeleton className="h-64 w-full rounded-xl" />;
+const EmployerWorkspace = dynamic(
+  () => import("@/components/employer/EmployerWorkspace").then((m) => m.EmployerWorkspace),
+  { loading },
+);
+const ProviderWorkspace = dynamic(
+  () => import("@/components/employer/ProviderWorkspace").then((m) => m.ProviderWorkspace),
+  { loading },
+);
 
 /**
  * The right workspace for the kind of organisation this is.

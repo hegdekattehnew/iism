@@ -314,3 +314,46 @@ describe("EmployerInbox -- a message with a status, a private note, and the spre
   });
 });
 
+
+/** Sprint 88, BL-19.18: an applicant's state is a word with a shape, and the score has one too. */
+describe("EmployerInbox -- the look of an applicant's state", () => {
+  it("marks a new application with a shape, in the good tone", async () => {
+    answer([applicant()]);
+    renderUi(<EmployerInbox org="acme" jobSlug="gda-chennai" />);
+    const chip = (await screen.findByText("New", { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain("bg-success-surface");
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it.each([
+    ["shortlisted", "Shortlisted", "bg-success-surface"],
+    ["rejected", "Not suitable", "bg-surface-muted"],
+    ["hired", "Hired", "bg-success-surface"],
+  ])("draws %s as %s on %s, with the same shape the candidate sees", async (status, word, token) => {
+    answer([applicant({ status })]);
+    renderUi(<EmployerInbox org="acme" jobSlug="gda-chennai" />);
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("gives the score a shape, and a rejection a different one from a shortlisting", async () => {
+    answer([applicant({ status: "shortlisted" }), applicant({ application_id: "a2", status: "rejected" })]);
+    const { container } = renderUi(<EmployerInbox org="acme" jobSlug="gda-chennai" />);
+    const short = (await screen.findByText("Shortlisted", { selector: "span" })) as HTMLElement;
+    const rejected = screen.getByText("Not suitable", { selector: "span" }) as HTMLElement;
+    expect(short.querySelector("svg")!.innerHTML).not.toBe(rejected.querySelector("svg")!.innerHTML);
+    const scores = screen.getAllByText("88% match", { selector: "span" }) as HTMLElement[];
+    expect(scores.length).toBe(2);
+    for (const s of scores) expect(s.querySelector("svg")).toBeTruthy();
+    expect(container.querySelectorAll("ul > li").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("gives the score a shape of its own, not the one the New chip has", async () => {
+    answer([applicant()]);
+    renderUi(<EmployerInbox org="acme" jobSlug="gda-chennai" />);
+    const fresh = (await screen.findByText("New", { selector: "span" })) as HTMLElement;
+    const score = screen.getByText("88% match", { selector: "span" }) as HTMLElement;
+    expect(score.querySelector("svg")!.innerHTML).not.toBe(fresh.querySelector("svg")!.innerHTML);
+  });
+});

@@ -6,6 +6,8 @@ import { useState } from "react";
 import { ProgressRing } from "@/components/charts/progress-ring";
 import { RankedBarList } from "@/components/charts/ranked-bar-list";
 import { Skeleton, StatTile } from "@/components/ui";
+import { AwardIcon, BookOpenIcon, InboxIcon, UsersIcon } from "@/components/ui/icons";
+import { MetricTile } from "@/components/ui/metric-tile";
 import { useProviderDashboard } from "@/lib/org";
 
 /**
@@ -41,11 +43,13 @@ export function ProviderDashboard({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="rounded-xl border border-border-token bg-surface p-5">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-        <StatTile value={data.published_courses} label={t("publishedCourses")} />
-        <StatTile value={data.interested_live} label={t("interestedLive")} />
-        <StatTile value={data.interested_total} label={t("interestedTotal")} />
-        <StatTile value={data.enrolled} label={t("enrolled")} />
+      <div className="grid grid-cols-2 gap-3">
+        <MetricTile icon={<BookOpenIcon />} value={data.published_courses} label={t("publishedCourses")} />
+        <MetricTile icon={<UsersIcon />} value={data.interested_live} label={t("interestedLive")} />
+        <MetricTile icon={<InboxIcon />} value={data.interested_total} label={t("interestedTotal")} />
+        <MetricTile icon={<AwardIcon />} value={data.enrolled} label={t("enrolled")} />
+      </div>
+      <div className="mt-4">
         <ProgressRing percent={(data.conversion_rate ?? 0) * 100} label={t("conversionRate")} />
       </div>
 

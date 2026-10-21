@@ -118,3 +118,29 @@ describe("EmployerDashboard: reading the charts", () => {
     expect(counts.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+/** Sprint 88, BL-19.18: the headline figures are tiles with a mark. */
+describe("EmployerDashboard -- the headline tiles", () => {
+  const base = { posted_jobs: 7, open_jobs: 5, applied: 2, shortlisted: 2, hired: 2, jobs: [JOB] };
+
+  it("draws the posted and open figures each on a tile with its own mark", async () => {
+    GET.mockResolvedValue({ data: { ...base, rating: null }, error: undefined, response: { status: 200 } });
+    const { container } = renderUi(<EmployerDashboard orgSlug="apollo-care-hospitals" />);
+    await screen.findByText("Open vacancies");
+    const tiles = [...container.querySelectorAll(".grid > div")] as HTMLElement[];
+    expect(tiles.length).toBe(2);
+    const shapes = tiles.map((t) => t.querySelector("[aria-hidden='true'] svg")!.innerHTML);
+    expect(new Set(shapes).size).toBe(2);
+    expect(tiles[0].textContent).toContain("Posted vacancies");
+  });
+
+  it("gives the rating a tile of its own that takes the whole row, and only when there is one", async () => {
+    GET.mockResolvedValue({ data: { ...base, rating: { average: 4.2, count: 1 } }, error: undefined, response: { status: 200 } });
+    const { container } = renderUi(<EmployerDashboard orgSlug="apollo-care-hospitals" />);
+    await screen.findByText("Workers rate you");
+    const tiles = [...container.querySelectorAll(".grid > div")] as HTMLElement[];
+    expect(tiles.length).toBe(3);
+    expect(tiles[2].className).toContain("col-span-2");
+    expect(tiles[2].textContent).toContain("4.2");
+  });
+});

@@ -75,3 +75,22 @@ describe("ProviderDashboard", () => {
     expect(container.textContent).toBe("");
   });
 });
+
+/** Sprint 88, BL-19.18: the four headline figures are tiles with a mark each; the conversion ring is below them. */
+describe("ProviderDashboard -- the headline tiles", () => {
+  it("draws four tiles with four different marks, and the ring under them", async () => {
+    GET.mockResolvedValue({
+      data: { published_courses: 4, interested_live: 6, interested_total: 9, enrolled: 2, conversion_rate: 0.22, courses: [COURSE] },
+      error: undefined,
+      response: { status: 200 },
+    });
+    const { container } = renderUi(<ProviderDashboard orgSlug="learn-co" />);
+    await screen.findByText("22%");
+    const tiles = [...container.querySelectorAll(".grid > div")] as HTMLElement[];
+    expect(tiles.length).toBe(4);
+    const shapes = tiles.map((t) => t.querySelector("[aria-hidden='true'] svg")!.innerHTML);
+    expect(new Set(shapes).size).toBe(4);
+    const ring = screen.getByText("22%");
+    expect(tiles.some((t) => t.contains(ring))).toBe(false);
+  });
+});

@@ -168,3 +168,37 @@ describe("ProviderInbox", () => {
     expect(await screen.findByText(/Nobody has registered interest/)).toBeTruthy();
   });
 });
+
+/** Sprint 88, BL-19.18: a learner's state is a word with a shape. */
+describe("ProviderInbox -- the look of a learner's state", () => {
+  it.each([
+    ["registered", "New", "bg-success-surface"],
+    ["contacted", "Contacted", "bg-surface-muted"],
+    ["enrolled", "Enrolled", "bg-success-surface"],
+  ])("draws %s as %s on %s, with a shape", async (status, word, token) => {
+    answer([learner({ status })]);
+    renderUi(inbox());
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws the three states in three different shapes", async () => {
+    const shapes: string[] = [];
+    for (const [status, word] of [["registered", "New"], ["contacted", "Contacted"], ["enrolled", "Enrolled"]] as const) {
+      answer([learner({ status })]);
+      const { unmount } = renderUi(inbox());
+      shapes.push(((await screen.findByText(word, { selector: "span" })) as HTMLElement).querySelector("svg")!.innerHTML);
+      unmount();
+    }
+    expect(new Set(shapes).size).toBe(3);
+  });
+
+  it("shows no state chip for a withdrawn learner (the note says it)", async () => {
+    answer([learner({ status: "withdrawn", contact: null })]);
+    renderUi(inbox());
+    await screen.findAllByText(/withdrew|no longer/i);
+    expect(screen.queryByText("New", { selector: "span" })).toBeNull();
+    expect(screen.queryByText("Contacted", { selector: "span" })).toBeNull();
+  });
+});

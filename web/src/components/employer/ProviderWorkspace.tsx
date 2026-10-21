@@ -5,7 +5,10 @@ import { useState } from "react";
 
 import { CourseEditor } from "@/components/employer/CourseEditor";
 import { ProviderDashboard } from "@/components/employer/ProviderDashboard";
-import { Alert, Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { courseState, LISTING_LOOK } from "@/components/cards/listing-look";
+import { Alert, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { BookOpenIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
 import { detailOf, isSignedOut } from "@/lib/http";
@@ -214,17 +217,16 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
                         ` · ${t("nsqfLevelIs", { level: course.nsqf_level })}`}
                     </p>
                   </div>
-                  {course.taken_down_at ? (
-                    <Badge tone="bad">{te("removed")}</Badge>
-                  ) : course.status === "published" ? (
-                    <Badge tone="good">{te("published")}</Badge>
-                  ) : (
-                    <Badge tone="warn">{te("draft")}</Badge>
-                  )}
+                  <StatusChip tone={LISTING_LOOK[courseState(course)].tone} icon={LISTING_LOOK[courseState(course)].icon}>
+                    {{ removed: te("removed"), draft: te("draft"), live: te("published") }[courseState(course)]}
+                  </StatusChip>
                 </div>
 
-                <p className="mt-3 text-sm text-muted">
-                  {t("teachesCount", { count: (course.skills ?? []).length })}
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1">
+                    <BookOpenIcon className="h-4 w-4" />
+                    {t("teachesCount", { count: (course.skills ?? []).length })}
+                  </span>
                 </p>
 
                 {course.taken_down_at && (

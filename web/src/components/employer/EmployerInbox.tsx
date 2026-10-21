@@ -7,7 +7,10 @@ import { useState } from "react";
 import { CoverageBar } from "@/components/CoverageBar";
 import { ApplicantNotes } from "@/components/employer/ApplicantNotes";
 import { ReviewControl } from "@/components/ReviewControl";
+import { APPLICATION_LOOK } from "@/components/cards/application-look";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { InboxIcon, TargetIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { employerDashboardKey, invalidatePublicCounts } from "@/lib/counts";
@@ -192,11 +195,24 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        {applicant.status === "applied" && <Badge tone="good">{t("newBadge")}</Badge>}
+                        {applicant.status === "applied" && (
+                          <StatusChip tone="good" icon={InboxIcon}>
+                            {t("newBadge")}
+                          </StatusChip>
+                        )}
                         {["shortlisted", "rejected", "hired", "completed", "no_show"].includes(
                           applicant.status,
-                        ) && <Badge>{t(`status.${applicant.status}`)}</Badge>}
-                        <Badge>{tc("matchScore", { score: applicant.candidate.score })}</Badge>
+                        ) && (
+                          <StatusChip
+                            tone={APPLICATION_LOOK[applicant.status].tone}
+                            icon={APPLICATION_LOOK[applicant.status].icon}
+                          >
+                            {t(`status.${applicant.status}`)}
+                          </StatusChip>
+                        )}
+                        <StatusChip tone="neutral" icon={TargetIcon}>
+                          {tc("matchScore", { score: applicant.candidate.score })}
+                        </StatusChip>
                       </div>
                     </div>
 

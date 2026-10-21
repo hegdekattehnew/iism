@@ -5,12 +5,14 @@ import { useState } from "react";
 
 import { EmployerDashboard } from "@/components/employer/EmployerDashboard";
 import { JobEditor } from "@/components/employer/JobEditor";
+import { jobState, LISTING_LOOK } from "@/components/cards/listing-look";
 import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
+import { AwardIcon, MapPinIcon, ShieldCheckIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { detailOf, isSignedOut } from "@/lib/http";
 import {
   Alert,
-  Badge,
   Button,
   ButtonLink,
   Card,
@@ -196,35 +198,43 @@ export function EmployerWorkspace({ orgSlug }: { orgSlug: string }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-base font-semibold">{job.title}</h3>
-                    <p className="mt-0.5 text-sm text-muted">
-                      {[job.location_district, job.location_state]
-                        .filter(Boolean)
-                        .join(", ")}
-                      {job.nsqf_level_min != null &&
-                        ` · ${t("nsqfLevel", { level: job.nsqf_level_min })}`}
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted">
+                      <MapPinIcon className="h-4 w-4 shrink-0" />
+                      <span>
+                        {[job.location_district, job.location_state]
+                          .filter(Boolean)
+                          .join(", ")}
+                        {job.nsqf_level_min != null &&
+                          ` · ${t("nsqfLevel", { level: job.nsqf_level_min })}`}
+                      </span>
                     </p>
                   </div>
                   {/* Three states, not two. A closed vacancy is published --
                       its page is still there -- so a published/draft badge
                       would call it open when it is not. */}
-                  {job.taken_down_at ? (
-                    <Badge tone="bad">{t("removed")}</Badge>
-                  ) : job.status !== "published" ? (
-                    <Badge tone="warn">{t("draft")}</Badge>
-                  ) : job.is_open ? (
-                    <Badge tone="good">{t("published")}</Badge>
-                  ) : (
-                    <Badge>{t(`closed_${job.close_reason ?? "filled"}`)}</Badge>
-                  )}
+                  <StatusChip tone={LISTING_LOOK[jobState(job)].tone} icon={LISTING_LOOK[jobState(job)].icon}>
+                    {{
+                      removed: t("removed"),
+                      draft: t("draft"),
+                      live: t("published"),
+                      closed: t(`closed_${job.close_reason ?? "filled"}`),
+                    }[jobState(job)]}
+                  </StatusChip>
                 </div>
 
-                <p className="mt-3 text-sm text-muted">
-                  {t("standardsCount", { count: (job.skills ?? []).length })}
-                  {(job.skills ?? []).some((s) => s.is_mandatory) &&
-                    ` · ${t("mandatoryCount", {
-                      count: (job.skills ?? []).filter((s) => s.is_mandatory)
-                        .length,
-                    })}`}
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1">
+                    <AwardIcon className="h-4 w-4" />
+                    {t("standardsCount", { count: (job.skills ?? []).length })}
+                  </span>
+                  {(job.skills ?? []).some((s) => s.is_mandatory) && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1">
+                      <ShieldCheckIcon className="h-4 w-4" />
+                      {t("mandatoryCount", {
+                        count: (job.skills ?? []).filter((s) => s.is_mandatory).length,
+                      })}
+                    </span>
+                  )}
                 </p>
 
                 {job.taken_down_at && (

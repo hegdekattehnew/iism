@@ -6,39 +6,14 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
-import {
-  AlertTriangleIcon,
-  AwardIcon,
-  CalendarIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  InboxIcon,
-  XCircleIcon,
-} from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon } from "@/components/ui/icons";
+import { APPLICATION_LOOK, type ApplicationStatus } from "@/components/cards/application-look";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Link } from "@/i18n/navigation";
 import type { components } from "@/lib/api-schema";
 
-// From the generated client, never restated: a hand-written copy let `completed` and `no_show` reach
-// this screen with no colour and no compile error.
-export type ApplicationStatus = components["schemas"]["ApplicationOut"]["status"];
+export { APPLICATION_LOOK, type ApplicationStatus };
 export type Application = components["schemas"]["ApplicationOut"];
-
-type Look = { tone: "neutral" | "good" | "warn"; icon: typeof ClockIcon };
-
-/**
- * One row of tokens a status: its tone and its shape. A table over every status the server can say
- * (typed by `Record`, so a new one is a compile error here and not a chip with no shape).
- */
-export const APPLICATION_LOOK: Record<ApplicationStatus, Look> = {
-  applied: { tone: "neutral", icon: InboxIcon },
-  shortlisted: { tone: "good", icon: CheckCircleIcon },
-  hired: { tone: "good", icon: AwardIcon },
-  rejected: { tone: "neutral", icon: XCircleIcon },
-  withdrawn: { tone: "warn", icon: XCircleIcon },
-  completed: { tone: "good", icon: CheckCircleIcon },
-  no_show: { tone: "warn", icon: AlertTriangleIcon },
-};
 
 /**
  * One application on the list, on the same card as a vacancy (Sprint 87, BL-19.17): the employer's

@@ -1,0 +1,154 @@
+{
+  "sprint": 88,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000, dark colour scheme, English, signed in as the demonstration organisations' own accounts (recruiter@apollo-care.example for Apollo Care Hospitals, an employer; admin@nsdc-healthcare-academy.example for NSDC Healthcare Academy, a training provider). BEFORE = measured on main at the start of the sprint (the provider's before taken with web/src and web/e2e stashed); AFTER = this branch. NOT the capture script and NOT the sweep (no Chromium on the machine). A control under 44 px is an a/button/select/input/textarea/[role] narrower or shorter than 43.5 px, a checkbox by its label; a sentence's inline link is exempt, as in the sweep and in WCAG 2.5.8.",
+  "pages": {
+    "employer-home": {
+      "url": "/en/employer/apollo-care-hospitals",
+      "before": {
+        "pageHeight": 3793,
+        "screens": 4.7,
+        "smallControls": 0,
+        "svgs": 4
+      },
+      "after": {
+        "pageHeight": 4023,
+        "screens": 5.0,
+        "smallControls": 0,
+        "svgs": 33
+      }
+    },
+    "employer-applicants": {
+      "url": "/en/employer/apollo-care-hospitals/jobs/cssd-technician-chennai/applications",
+      "before": {
+        "pageHeight": 2057,
+        "screens": 2.5,
+        "smallControls": 0,
+        "svgs": 4
+      },
+      "after": {
+        "pageHeight": 2063,
+        "screens": 2.5,
+        "smallControls": 0,
+        "svgs": 6
+      },
+      "note": "one applicant"
+    },
+    "employer-team": {
+      "url": "/en/employer/apollo-care-hospitals/team",
+      "before": {
+        "pageHeight": 2241,
+        "screens": 2.8,
+        "smallControls": 0,
+        "svgs": 4
+      },
+      "after": {
+        "pageHeight": 2343,
+        "screens": 2.9,
+        "smallControls": 0,
+        "svgs": 8
+      }
+    },
+    "employer-upload": {
+      "url": "/en/employer/apollo-care-hospitals/jobs/upload",
+      "before": {
+        "pageHeight": 1963,
+        "screens": 2.4,
+        "smallControls": 1,
+        "smallExamples": [
+          "file input 293x22"
+        ],
+        "svgs": 4
+      },
+      "after": {
+        "pageHeight": 2023,
+        "screens": 2.5,
+        "smallControls": 0,
+        "fileInput": "44 px"
+      }
+    },
+    "provider-home": {
+      "url": "/en/employer/nsdc-healthcare-academy",
+      "before": {
+        "pageHeight": 6303,
+        "screens": 7.8,
+        "smallControls": 0,
+        "svgs": 5
+      },
+      "after": {
+        "pageHeight": 6465,
+        "screens": 8.0,
+        "smallControls": 0,
+        "svgs": 35
+      },
+      "note": "13 courses"
+    },
+    "provider-interests": {
+      "url": "/en/employer/nsdc-healthcare-academy/courses/infection-control-in-hospitals/interests",
+      "before": {
+        "pageHeight": 1529,
+        "screens": 1.9,
+        "smallControls": 0,
+        "svgs": 4
+      },
+      "after": {
+        "pageHeight": 1535,
+        "screens": 1.9,
+        "smallControls": 0,
+        "svgs": 5
+      },
+      "note": "one learner"
+    }
+  },
+  "layoutShift": "A PerformanceObserver read in the pane reported 0 on both workspace homes after the workspaces became lazy chunks, but it only counts shifts inside the viewport and the pane is not the sweep's check: not a substitute for it.",
+  "firstLoadJsBytes": {
+    "note": "build:e2e then route-bundle-stats.json; main (after Sprint 87) and this branch built the same way",
+    "routes": {
+      "/[locale]/profile": [
+        699013,
+        699013
+      ],
+      "/[locale]/employer/[org]": [
+        698703,
+        667428
+      ],
+      "/[locale]/employer/[org]/jobs/[job]/applications": [
+        675986,
+        676634
+      ],
+      "/[locale]/employer/[org]/team": [
+        670953,
+        674993
+      ],
+      "/[locale]/employer/[org]/courses/[course]/interests": [
+        668591,
+        669134
+      ],
+      "/[locale]/employer/[org]/jobs/upload": [
+        671465,
+        674852
+      ],
+      "/[locale]/employer/[org]/courses/upload": [
+        671465,
+        674852
+      ],
+      "/[locale]/employer/[org]/interests": [
+        662291,
+        662291
+      ]
+    },
+    "format": "[before, after]",
+    "firstAttempt": {
+      "/[locale]/employer/[org]": 703701,
+      "note": "with both workspaces still imported statically by OrgWorkspace the route was 3,701 bytes OVER the 700,000 ceiling; the CI web job's budget step would have failed"
+    },
+    "explanation": "OrgWorkspace imported both the employer's and the provider's workspace, so every organisation downloaded both. Each is a next/dynamic chunk now, with the memberships' own Skeleton as the placeholder."
+  },
+  "notRun": [
+    "make e2e (the existing journeys; 85, 86 and 87 passed in CI)",
+    "the sweep's axe contrast, layout shift and target ratchet",
+    "the capture script",
+    "Hindi, light mode, desktop",
+    "the candidate shortlist, organisation settings and the editors (not changed)"
+  ]
+}
