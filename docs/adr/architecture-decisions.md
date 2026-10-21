@@ -4557,3 +4557,44 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Verified:** `tsc`, `eslint`, **1,178 web tests (35 new)**: `AudiencePage`'s icons and the three pages' marks (by walking the page's returned element tree), the 404, the placeholder and the legal pages (including the 44 px link), the overview's tiles, each queue's chips and their shapes, `MessageForm`'s radio rows and the person's list per status (a shape equal to the table's, and four shapes that differ). **33 mutation checks, all killed** after the grievance icons, the overdue triangle and the person's list chip each first survived (asserted by presence, not by equality with the table's shape).
 - **Not verified, as in Sprints 85 to 88:** **nothing ran in Playwright** (no Chromium; the download was declined). The existing journeys' selectors on `/admin` and the contact pages, the sweep's axe contrast in light and dark, its layout-shift score and the target ratchet have not run against this change; CI's E2E is the first real run. The ratchet baseline is not re-recorded (the grievance and privacy counts only fall).
 - **Not done and not claimed:** the verification queue still renders up to a hundred cards at once (paging it needs its journeys run); the alias, programme and enrolment panels were not re-looked beyond their shared pieces; the invite page and the employers' demonstration page; Hindi, Malay and light mode; the new strings none (no message changed), but every page's Hindi look is the engineer's.
+
+
+## ADR-099: Text That Does Not Fit Is Wrapped or Broken and Never Cut Off, a Page Is Checked at Twice the Size in Every Language, and the Review Says What It Could Not Run
+
+**Status:** Accepted (October 2026). Sprint 90 (Epic B19, BL-19.25 and BL-19.26). Extends ADR-086 (the type scale: secondary text is 15 px and the floor is 12 px), ADR-077 (accessibility is held by the properties that produce it, and by saying what a test cannot see) and ADR-065 (a page that works at one size is not a page that works). Web only and frontend only: no migration, no API or contract change (54 operations), no new icon, no new message string.
+
+**Context:** Epic B19 changed how every page looks, and the language pass it ended with asked a simple question: does anything run off the screen or get cut off in Hindi or Malay at 360 px, at 200% text? Nothing had been asked at that size since Sprint 54. The test suite cannot answer it (jsdom has no layout) and the browser sweep checks English and Hindi at ordinary size only. So every page was loaded in the built-in browser at 360 px with `document.documentElement.style.fontSize = "200%"` (the layout's rem units follow it), signed out and as a job seeker, an employer, a provider and an operator, and a small checker was run on each: a page wider than the screen, a text node outside its box, an element with an ellipsis whose text is longer than it, a clipped box.
+
+**Findings:** At ordinary size, in either language, none (about 90 page loads). At 200%, ten: a long English word or code in a chip or a card (an alias chip holding "documents/instructions/correspondence" made a skill page 668 px wide; a qualification code overflowed a card; a place name overflowed a job card), the four-tab bar (the icon wrapper was wider than its cell and labels ended in "..."), the match score beside a title (the title was left 77 px), a chart label cut with an ellipsis, an applicant's three chips, a profile row's Edit and Remove and its confidence label, the language select in the sign-in header, a filter select in the back office, and the workspace control in the mobile menu (a label of two words ended in "...").
+
+**Decision:**
+
+- **`body { overflow-wrap: anywhere }`** in `globals.css`. Not `break-word`: both break a word that would otherwise overflow, but `anywhere` also counts the break in the element's minimum width, so a flex item holding "documents/instructions/correspondence" can shrink instead of widening the page. It acts only on a word that would overflow, so ordinary text is unchanged (checked: page heights identical with the rule on and off on `/hi/courses` and `/hi/privacy`).
+- **A group of chips wraps inside itself** (`flex-wrap max-w-full`), a row whose two halves cannot both fit drops the second under the first (`flex-wrap`, the title `min-w-0 grow basis-40`), and a select takes `max-w-full` or `min-w-0`.
+- **A label that is the information wraps; a label that is a convenience may be cut.** A chart's label (a standard's name) and the bottom bar's label wrap; the header's compact workspace control still truncates a long organisation name, and wraps only in the mobile menu where it has the row. The bar's cells may shrink (`min-w-0`), and its icon wrapper may be narrower than its width (`max-w-full`).
+- **`src/lib/text-fit.test.ts` holds the source of each fix** (jsdom cannot see layout) and proves its matcher can fail. 11 mutations of the fixes were run: ten were killed at once; one survived (the tab bar's `li` lost its `min-w-0` and a neighbouring `min-w-0` on the link stood in for it) and the test now asserts each of the bar's four classes by itself.
+
+**BL-19.26, the record:** `scripts/build_ui_review.py` was brought up to date: nine findings gained a status (UI-18, 20, 21, 22, 24, 25, 27, 28, 29), the "built so far" paragraph that still described Sprint 70 was rewritten from the data, and a table of the numbers each Epic B19 sprint recorded was added. **Two findings stay open and both are the owner's: UI-03 (no photograph, illustration or logo art) and UI-23 (the launcher icon and splash are still Expo's template art).** `tests/test_ui_review.py` now holds those two as the only open ones, and that every file the new table cites exists.
+
+**Options considered:**
+
+1. Cap the root font size, or let text overflow at 200% as a known limit
+2. **Make the layout survive it** (chosen)
+3. Break words everywhere with `word-break: break-all`
+4. **`overflow-wrap: anywhere` on the body** (chosen)
+5. Truncate everything with an ellipsis and a title
+6. **Wrap what is the information and truncate only what repeats elsewhere on the page** (chosen)
+
+**Trade-offs:**
+
+- Option 1: a person who sets their phone's text to the maximum is the person for whom the product is meant (a low-end phone, a first-time reader); a layout that works only at ordinary size is not a result.
+- Option 3 breaks ordinary words mid-word at ordinary size; option 4 breaks only the word that cannot fit.
+- Option 5: a `title` is invisible on a phone, so a cut label is a lost label.
+- The global rule can change a layout that sizes itself by its content (a table, an absolutely placed menu): none was found on the pages checked, and it is the first thing to try if a page is oddly narrow.
+
+**Consequences:**
+
+- **First load:** `/profile` **699,013 to 699,067 bytes (headroom 933)**, still the closest route; `/admin` 697,301 (headroom 2,699).
+- **Verified:** `tsc`, `eslint`, **1,187 web tests (9 new)**, `tests/test_ui_review.py` (10) and `tests/test_adr_register.py`. Every page that failed at 200% was loaded again and passed, in Hindi and in Malay.
+- **Not verified, and the reason:** **nothing ran in Playwright** (no Chromium; the download was declined in Sprint 85), so the sweep, axe and the layout-shift check have not run against these changes; **the 52-capture script was not re-run**, so the review's "after" figures for Epic B19 are the sprints' own (the built-in browser against the development server) and are not comparable page for page with the production-build tables above. 200% here is the root font size, not the operating system's font scaling, and nothing ran on a device. The phone app was not checked at 200% (it caps text at twice, `MAX_FONT_SCALE`).
+- **Not done:** a dialog open, the first-run wizard, the invitation page and light mode were not checked at 200%; **a native Hindi reader has not read the Hindi written in Epic B19 (BL-19.25's second criterion, the owner's to arrange)**; BL-19.24 (launcher art) waits on the owner.

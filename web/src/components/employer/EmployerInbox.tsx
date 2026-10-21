@@ -194,7 +194,7 @@ export function EmployerInbox({ org, jobSlug }: { org: string; jobSlug: string }
                           })}
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
                         {applicant.status === "applied" && (
                           <StatusChip tone="good" icon={InboxIcon}>
                             {t("newBadge")}

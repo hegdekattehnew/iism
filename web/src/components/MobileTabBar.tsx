@@ -42,20 +42,20 @@ export function MobileTabBar() {
           const Icon = ICONS[key];
           const here = href === current;
           return (
-            <li key={key}>
+            <li key={key} className="min-w-0">
               <Link
                 href={href}
                 aria-current={here ? "page" : undefined}
-                className={`flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-xs font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
+                className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
                   here ? "text-brand" : "text-muted"
                 }`}
               >
                 <span
-                  className={`grid h-7 w-12 place-items-center rounded-full transition-colors ${here ? "bg-accent-tint" : ""}`}
+                  className={`grid h-7 w-12 max-w-full place-items-center rounded-full transition-colors ${here ? "bg-accent-tint" : ""}`}
                 >
                   <Icon className="h-5 w-5" />
                 </span>
-                <span className="max-w-full truncate">{t(key)}</span>
+                <span className="max-w-full text-center leading-tight">{t(key)}</span>
               </Link>
             </li>
           );

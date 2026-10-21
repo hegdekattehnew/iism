@@ -63,7 +63,7 @@ export function RankedBarList({
         const body = (
           <>
             <div className="flex items-baseline justify-between gap-2 text-sm">
-              <span className="truncate font-medium">{item.label}</span>
+              <span className="min-w-0 font-medium">{item.label}</span>
               <span className="shrink-0 tabular-nums text-muted">
                 {item.valueLabel ?? fmt(item.value)}
               </span>

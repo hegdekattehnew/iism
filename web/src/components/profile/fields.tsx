@@ -46,7 +46,7 @@ export function EntryRow({
       {/* 44 px each (the row is the data's, the buttons are the page's), and named for their row: ten
           "Remove" buttons are ten identical names to a screen reader. The label contains the visible
           word, as a label must (WCAG 2.5.3). */}
-      <div className="ml-auto flex shrink-0 gap-1 text-sm">
+      <div className="ml-auto flex max-w-full shrink-0 flex-wrap gap-1 text-sm">
         <button
           type="button"
           onClick={onEdit}
