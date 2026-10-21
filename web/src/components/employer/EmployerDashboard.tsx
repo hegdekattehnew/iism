@@ -6,6 +6,8 @@ import { useState } from "react";
 import { RankedBarList } from "@/components/charts/ranked-bar-list";
 import { StatusFunnel } from "@/components/charts/status-funnel";
 import { Skeleton, StatTile } from "@/components/ui";
+import { AwardIcon, BriefcaseIcon, CheckCircleIcon } from "@/components/ui/icons";
+import { MetricTile } from "@/components/ui/metric-tile";
 import { useEmployerDashboard } from "@/lib/org";
 
 /**
@@ -42,12 +44,14 @@ export function EmployerDashboard({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="rounded-xl border border-border-token bg-surface p-5">
-      <div className="flex flex-wrap gap-x-8 gap-y-4">
-        <StatTile value={data.posted_jobs} label={t("postedJobs")} />
-        <StatTile value={data.open_jobs} label={t("openJobs")} />
+      <div className="grid grid-cols-2 gap-3">
+        <MetricTile icon={<BriefcaseIcon />} value={data.posted_jobs} label={t("postedJobs")} />
+        <MetricTile icon={<CheckCircleIcon />} value={data.open_jobs} label={t("openJobs")} />
         {/* Absent until a worker has rated this organisation, never a zero. */}
         {data.rating && (
-          <StatTile
+          <MetricTile
+            className="col-span-2"
+            icon={<AwardIcon />}
             value={data.rating.average}
             label={tr("asEmployer")}
             secondary={tr("count", { count: data.rating.count })}

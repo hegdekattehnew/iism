@@ -300,3 +300,65 @@ describe("TeamPanel — handing the organisation over", () => {
     expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
   });
 });
+
+/** Sprint 88, BL-19.18: a member has a mark and a role with a shape; an invitation's state has one too. */
+describe("TeamPanel -- the look of a member and an invitation", () => {
+  it("gives each member the first letter of their name on a mark a screen reader skips", async () => {
+    world_([member(), colleague]);
+    const { container } = renderUi(panel());
+    await screen.findByText("Rahul Verma");
+    const marks = [...container.querySelectorAll("li [aria-hidden='true']")].filter((e) => e.textContent?.length === 1).map((e) => e.textContent);
+    expect(marks).toEqual(expect.arrayContaining(["P", "R"]));
+  });
+
+  it.each([
+    ["owner", "Owner", "bg-success-surface"],
+    ["admin", "Admin", "bg-accent-soft"],
+    ["member", "Member", "bg-surface-muted"],
+  ])("draws a %s as %s on %s, with a shape", async (role, word, token) => {
+    world_([member({ role, is_you: false })]);
+    renderUi(panel());
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws the three roles in three different shapes", async () => {
+    const shapes: string[] = [];
+    for (const [role, word] of [["owner", "Owner"], ["admin", "Admin"], ["member", "Member"]] as const) {
+      world_([member({ role, is_you: false })]);
+      const { unmount } = renderUi(panel());
+      shapes.push(((await screen.findByText(word, { selector: "span" })) as HTMLElement).querySelector("svg")!.innerHTML);
+      unmount();
+    }
+    expect(new Set(shapes).size).toBe(3);
+  });
+
+  it.each([
+    ["pending", "Pending", "bg-success-surface"],
+    ["accepted", "Accepted", "bg-surface-muted"],
+    ["revoked", "Revoked", "bg-surface-muted"],
+    ["expired", "Expired", "bg-surface-muted"],
+  ])("draws an invitation that is %s as %s on %s, with a shape", async (state, word, token) => {
+    world_([member()], [{ id: "i1", email: "new@apollo-care.example", role: "member", state, invited_by: "Priya", expires_at: "2026-12-01T00:00:00Z" }]);
+    renderUi(panel());
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws pending, accepted and ended invitations in three different shapes", async () => {
+    const shapeOf = async (state: string, word: string) => {
+      world_([member()], [{ id: "i1", email: "new@apollo-care.example", role: "member", state, invited_by: "Priya", expires_at: "2026-12-01T00:00:00Z" }]);
+      const { unmount } = renderUi(panel());
+      const html = ((await screen.findByText(word, { selector: "span" })) as HTMLElement).querySelector("svg")!.innerHTML;
+      unmount();
+      return html;
+    };
+    const pending = await shapeOf("pending", "Pending");
+    const accepted = await shapeOf("accepted", "Accepted");
+    const revoked = await shapeOf("revoked", "Revoked");
+    expect(new Set([pending, accepted, revoked]).size).toBe(3);
+    expect(await shapeOf("expired", "Expired")).toBe(revoked);
+  });
+});

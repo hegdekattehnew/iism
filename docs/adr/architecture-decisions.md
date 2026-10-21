@@ -4480,3 +4480,42 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Verified:** `tsc`, `eslint`, **1,086 web tests (50 new)**: the chip, the three cards (every status has a look, a rejection is neutral, two states never share word, shape and tone, the employer's message and its date, a removed vacancy, the footer), the notice tile (hidden, every template drawn and drawn apart, the bell, bright then neutral), both notice lists (a tile per row, two 44 px actions), the account's marks and tones, `CredentialsSection`'s prop and its source guard, the budget field, and `SavedList` (which had no test). **48 mutation checks, all killed after three first survived** (the saved row's mark, the saved list's link target, the toggle's 44 px: each asserted by nothing).
 - **Not verified, and the reason is stated again:** **nothing ran in Playwright** (no Chromium on this machine; the download was declined for Sprint 85 and not asked again). Sprints 85 and 86 passed their CI E2E; this sprint's journeys, the sweep's axe contrast in light and dark, its layout shift and its target ratchet have not run against these pages, and `target-baseline.json` is not re-recorded. CI's E2E is the first real run.
 - **Not done and not claimed:** the matches page (already on the card), the career ladder's own step cards (unchanged), a light-mode or Hindi look at any of this (Hindi words are unchanged; a status word in Hindi may wrap onto a second line beside its shape), the notification rows seen live, no device.
+
+
+## ADR-097: A Workspace's Rows Say Where Things Stand With a Shape, a Dashboard Figure Has a Mark, and Neither Workspace Is in the Route's First Load
+
+**Status:** Accepted (October 2026). Sprint 88 (Epic B19, BL-19.18). Extends ADR-096 (a state is a word, a shape and a tone, one table per list), ADR-083 (one primary action per row, every control 44 px), ADR-087 and ADR-089 (the icon factory is paid for by every route that loads it), ADR-073's lesson about a ceiling and ADR-065 (a placeholder is the same shape as what replaces it). Web only and frontend only: no migration, no API or contract change (54 operations), no new icon, no new message string.
+
+**Context:** The hiring side's pages were already at the floors Sprint 73 set (every control 44 px, one action per row), so there was nothing small to raise; they were still the old look: a vacancy's state a grey or green word in a corner, a dashboard a run of bare numbers, an applicant's state and a learner's state a plain badge, a team of names with a text role, and a bulk upload's result a column of coloured words. Separately, `/employer/[org]` is one route that renders the employer's workspace **or** the provider's: `OrgWorkspace` imported both.
+
+**Decision:**
+
+- **A vacancy's and a course's state is `StatusChip` from `cards/listing-look`**: four states (`removed`, `draft`, `live`, `closed`), a tone and a shape each, decided by two small pure functions (`jobState`, `courseState`) so a takedown wins over a draft and a published-but-not-open vacancy is **closed, never "published"** (its page is still there, so "published" would call it open) and an `is_open` that is absent is not guessed open. The place and the counts (standards, mandatory) are icon chips. **A course has no closed state**, and its type says so.
+- **An applicant's and a learner's state use the tables the candidate sees**, moved into `cards/application-look` and `cards/interest-look` so a workspace can import a table without importing a card; the candidate's card re-exports them. The match score has a shape of its own. The words are the inbox's own (`New`, `Not suitable`, `Contacted`, `Enrolled`).
+- **A dashboard figure is a `MetricTile`** (`ui/metric-tile`): the figure and label exactly as `StatTile` draws them (a dash for a number that has not arrived, never a zero) beside a mark, two to a row on a phone, a lone rating tile taking the row. It is **not** `StatTile` with an icon: `StatTile` is in the `ui` barrel, on every route's first load, and `/profile` has under 1 KB left.
+- **The team's members have a mark and a role with a shape** (owner, admin, member; an invitation's pending, accepted, revoked and expired), the chip under the name, not beside it (beside it, "Apollo Care Hospitals team" wrapped onto two lines at 375 px). **The bulk upload's result rows are `ROW_LOOK`**, a `Record` over the server's row statuses (a new one is a compile error), five tones and five shapes; its file input and its update checkbox are 44 px (the file input was 22).
+- **`OrgWorkspace` loads each workspace with `next/dynamic`** at module level, with the memberships' own `Skeleton` as the placeholder. This was **forced by the budget, not planned**: the first version, with both still imported, made `/employer/[org]` **703,701 bytes, 3,701 over the ceiling**. `workspace-structure.test.ts` fails on a static import of either.
+
+**Options considered:**
+
+1. Raise the ceiling for this route
+2. **Lazy-load the two workspaces, which no visit needs both of** (chosen)
+3. Drop the icons from the dashboards and rows
+4. Lazy-load only the dashboards
+5. A `StatTile` with an `icon` prop
+6. **A separate `MetricTile` outside the barrel** (chosen)
+
+**Trade-offs:**
+
+- Option 1: the ceiling is the only thing that makes a phone on mobile data a fair test, and raising it for a route because it grew is how a ceiling stops meaning anything.
+- Option 2: ✅ the route lost **31,275 bytes** (698,703 to 667,428), far more than the sprint added ❌ a short second wait: after the memberships answer, the chunk for the right workspace is fetched (the same skeleton is shown, in the same place).
+- Option 4: saves less (the charts, not the unused kind's whole screen) and leaves the other kind's code in every organisation's first load.
+- Option 5: a prop with an element in it costs every route a few dozen bytes.
+
+**Consequences:**
+
+- **Measured** (the built-in browser at 375 x 812, the demonstration database, signed in as the demonstration employer and provider, before and after the same way; `docs/design/screens/measurements.sprint88.json`): employer home **4.7 to 5.0 screens**, applicants 2.5 to 2.5, team 2.8 to 2.9, provider home 7.8 to 8.0, learners 1.9 to 1.9, bulk upload 2.4 to 2.5; **controls under 44 px: the upload page 1 to 0 (the file input, 293 x 22), every other page 0 to 0**; icons on the employer home 4 to 33 and the provider home 5 to 35. A layout-shift reading in the pane was 0 on both homes after the lazy loading, which is **not** the sweep's check.
+- **First load:** `/employer/[org]` **698,703 to 667,428**; applicants +648, team +4,040, a course's learners +543, the two upload pages +3,387; **`/profile` is unchanged at 699,013 (headroom 987) and is again the closest route** (admin 695,554). Measured by building `main` and this branch the same way.
+- **Verified:** `tsc`, `eslint`, **1,143 web tests (57 new)**: `MetricTile`, the listing states (a truth table and the looks), both dashboards' tiles, a vacancy's and a course's chip (each state's tone and a different shape each), the counts, both inboxes' chips (and the score's shape differing from the New chip's), the team's marks, roles and invitation states, `ROW_LOOK` and the upload's two controls, and a source guard for the lazy workspaces. **43 mutation checks, all killed** after five first survived (a course chip's icon, the score's icon, two invitation shapes: each asserted by presence of a drawing and never by its difference; and one mutant that was not a mutant, a class that did nothing).
+- **Not verified, and the reason is stated again:** **nothing ran in Playwright** (no Chromium; the download was declined for Sprint 85). Sprints 85 to 87 passed their CI E2E; the existing journeys' selectors on these pages, the sweep's axe contrast in light and dark, its layout-shift score (**the two-stage placeholder is exactly what it measures**) and the target ratchet have not run against this change. The criterion "no browser journey selector breaks" is therefore **not verified**.
+- **Not done and not claimed:** the candidate shortlist, the sponsor panel, organisation settings and the two editors (the editors were migrated to the field library in Sprint 79 and are unchanged); the employer's applicant name still shows when the person applied (a de-identified reference otherwise; no avatar, because a mark made of a reference's letter would be a fact about nobody); Hindi and light mode.

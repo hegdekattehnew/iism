@@ -152,3 +152,40 @@ describe("ProviderWorkspace: a row's actions", () => {
     }
   });
 });
+
+/** Sprint 88, BL-19.18: a course's state is a word with a shape and a tone, and what it teaches an icon chip. */
+describe("ProviderWorkspace -- the look of a course's state", () => {
+  it.each([
+    [{ status: "draft" }, "Draft", "bg-warning-surface"],
+    [{ status: "published" }, "Published", "bg-success-surface"],
+    [{ status: "published", taken_down_at: "2026-10-01T00:00:00Z", takedown_reason: "x" }, "Removed", "bg-danger-surface"],
+  ])("draws %j as %s on %s, with a shape", async (over, word, token) => {
+    serving(null, [course(over)]);
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("shows how many standards it teaches as an icon chip", async () => {
+    serving(null, [course({ skills: [{ skill_slug: "a", name: "A", level_taught: 3 }] })]);
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    const chip = await screen.findByText("Teaches 1 standard");
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws the three states in three different shapes", async () => {
+    const shapes: string[] = [];
+    for (const [over, word] of [
+      [{ status: "draft" }, "Draft"],
+      [{ status: "published" }, "Published"],
+      [{ status: "published", taken_down_at: "2026-10-01T00:00:00Z", takedown_reason: "x" }, "Removed"],
+    ] as const) {
+      serving(null, [course(over)]);
+      const { unmount } = renderUi(<ProviderWorkspace orgSlug="inst" />);
+      shapes.push(((await screen.findByText(word, { selector: "span" })) as HTMLElement).querySelector("svg")!.innerHTML);
+      unmount();
+    }
+    expect(new Set(shapes).size).toBe(3);
+  });
+});

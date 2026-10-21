@@ -336,3 +336,52 @@ describe("EmployerWorkspace: a row's actions", () => {
     expect(li.querySelector("summary")!.className).toMatch(/min-h-11/);
   });
 });
+
+/** Sprint 88, BL-19.18: each state of a vacancy is a word with its own shape and tone. */
+describe("EmployerWorkspace -- the look of a vacancy's state", () => {
+  const chip = async (word: string) => (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+
+  it.each([
+    [{}, "Published", "bg-success-surface"],
+    [{ status: "draft", is_open: false }, "Draft", "bg-warning-surface"],
+    [{ is_open: false, close_reason: "filled" }, "Filled", "bg-surface-muted"],
+    [{ taken_down_at: "2026-10-01T00:00:00Z", takedown_reason: "x" }, "Removed", "bg-danger-surface"],
+  ])("draws %j as %s on %s, with a shape", async (over, word, token) => {
+    world_([job(over)]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const el = await chip(word);
+    expect(el.className).toContain(token);
+    expect(el.querySelector("svg")).toBeTruthy();
+  });
+
+  it("gives the four states four different shapes", async () => {
+    const shapes: string[] = [];
+    for (const [over, word] of [
+      [{}, "Published"],
+      [{ status: "draft", is_open: false }, "Draft"],
+      [{ is_open: false, close_reason: "filled" }, "Filled"],
+      [{ taken_down_at: "2026-10-01T00:00:00Z", takedown_reason: "x" }, "Removed"],
+    ] as const) {
+      world_([job(over)]);
+      const { unmount } = renderUi(<EmployerWorkspace orgSlug="acme" />);
+      shapes.push((await chip(word)).querySelector("svg")!.innerHTML);
+      unmount();
+    }
+    expect(new Set(shapes).size).toBe(4);
+  });
+
+  it("shows the place and the counts with an icon each, and no mandatory chip when none is", async () => {
+    world_([job({ skills: [{ skill_slug: "till", name: "Till", importance: 5, is_mandatory: false }] })]);
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const standards = await screen.findByText("1 required standard");
+    expect(standards.querySelector("svg")).toBeTruthy();
+    expect(screen.queryByText(/mandatory/)).toBeNull();
+    expect(screen.getByText(/Bengaluru Urban, Karnataka/).parentElement!.querySelector("svg")).toBeTruthy();
+  });
+
+  it("shows the mandatory count as its own chip when there is one", async () => {
+    renderUi(<EmployerWorkspace orgSlug="acme" />);
+    const mandatory = await screen.findByText(/1 mandatory/);
+    expect(mandatory.querySelector("svg")).toBeTruthy();
+  });
+});

@@ -3,7 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 
+import { INTEREST_LOOK } from "@/components/cards/interest-look";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
+import { InboxIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { providerDashboardKey } from "@/lib/counts";
@@ -117,10 +120,20 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
                         </p>
                       </div>
                       {learner.status === "registered" && (
-                        <Badge tone="good">{t("newBadge")}</Badge>
+                        <StatusChip tone="good" icon={InboxIcon}>
+                          {t("newBadge")}
+                        </StatusChip>
                       )}
-                      {learner.status === "contacted" && <Badge>{t("contactedBadge")}</Badge>}
-                      {learner.status === "enrolled" && <Badge tone="good">{t("enrolledBadge")}</Badge>}
+                      {learner.status === "contacted" && (
+                        <StatusChip tone="neutral" icon={INTEREST_LOOK.contacted.icon}>
+                          {t("contactedBadge")}
+                        </StatusChip>
+                      )}
+                      {learner.status === "enrolled" && (
+                        <StatusChip tone="good" icon={INTEREST_LOOK.enrolled.icon}>
+                          {t("enrolledBadge")}
+                        </StatusChip>
+                      )}
                     </div>
 
                     {withdrawn ? (

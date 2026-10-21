@@ -4,25 +4,14 @@ import { useFormatter, useTranslations } from "next-intl";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody } from "@/components/ui/card";
-import { AwardIcon, CalendarIcon, CheckIcon, ClockIcon, XCircleIcon } from "@/components/ui/icons";
+import { CalendarIcon } from "@/components/ui/icons";
+import { INTEREST_LOOK, type InterestStatus } from "@/components/cards/interest-look";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Link } from "@/i18n/navigation";
 import type { components } from "@/lib/api-schema";
 
-// From the generated client, never restated: a hand-written three-value copy let `enrolled` reach this
-// screen with no colour and no wording, so a learner who had been enrolled saw a raw message key.
-export type InterestStatus = components["schemas"]["InterestOut"]["status"];
+export { INTEREST_LOOK, type InterestStatus };
 export type Interest = components["schemas"]["InterestOut"];
-
-type Look = { tone: "neutral" | "good" | "warn"; icon: typeof ClockIcon };
-
-/** A shape and a tone for every state a provider can set (typed by `Record`: a new one fails to compile). */
-export const INTEREST_LOOK: Record<InterestStatus, Look> = {
-  registered: { tone: "neutral", icon: ClockIcon },
-  contacted: { tone: "good", icon: CheckIcon },
-  enrolled: { tone: "good", icon: AwardIcon },
-  withdrawn: { tone: "warn", icon: XCircleIcon },
-};
 
 /** One course the learner asked about, on the same card as a vacancy or an application. */
 export function InterestCard({ interest }: { interest: Interest }) {
