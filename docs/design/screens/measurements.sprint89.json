@@ -1,0 +1,27 @@
+{
+  "sprint": 89,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000, dark colour scheme, English; /admin signed in as the demonstration operator (hiring@apollo-care.example). BEFORE = main at the start of the sprint (web/src and web/e2e stashed, every changed file copied first and compared after the pop); AFTER = this branch. NOT the capture script and NOT the sweep (no Chromium on the machine). A control under 44 px is an a/button/select/input/textarea/summary narrower or shorter than 43.5 px, a checkbox or radio by its label; a sentence's inline link is exempt, as in the sweep and in WCAG 2.5.8. The /admin before-values are from the sprint's first measurement on main; the admin 'after' was taken before the later MessageForm, GrievanceForm and LegalPage edits, which do not touch /admin.",
+  "pages": {
+    "admin": {"url": "/en/admin", "before": {"pageHeight": 23652, "screens": 29.1, "smallControls": 0, "svgs": 6}, "after": {"pageHeight": 24618, "screens": 30.3, "smallControls": 0, "svgs": 112}, "note": "a hundred queue rows each carry a shape"},
+    "about": {"url": "/en/about", "before": {"pageHeight": 2877, "svgs": 4}, "after": {"pageHeight": 3033, "svgs": 7}},
+    "employers": {"url": "/en/employers", "before": {"pageHeight": 2903, "svgs": 4}, "after": {"pageHeight": 3059, "svgs": 7}},
+    "providers": {"url": "/en/providers", "before": {"pageHeight": 2791, "screens": 3.4, "svgs": 4}, "after": {"pageHeight": 2947, "screens": 3.6, "svgs": 7}},
+    "grievance": {"url": "/en/grievance", "before": {"pageHeight": 2967, "screens": 3.7, "smallControls": 1, "smallExamples": ["account link 177x18"], "svgs": 4}, "after": {"pageHeight": 3033, "screens": 3.7, "smallControls": 0, "svgs": 6}, "note": "an interim reading before the radio rows were fixed had 4 small controls"},
+    "privacy": {"url": "/en/privacy", "before": {"pageHeight": 6335, "screens": 7.8, "svgs": 4}, "after": {"pageHeight": 6357, "screens": 7.8, "svgs": 5, "accountLinkHeight": 44}},
+    "careers": {"url": "/en/careers", "before": {"pageHeight": 1451, "svgs": 4}, "after": {"pageHeight": 1451, "svgs": 5}},
+    "not-found": {"url": "/en/no-such-page", "before": {"pageHeight": 1377, "svgs": 4}, "after": {"pageHeight": 1433, "svgs": 5}}
+  },
+  "firstLoadBytes": {
+    "method": "npm run build:e2e then .next-e2e/diagnostics/route-bundle-stats.json (firstLoadUncompressedJsBytes); ceiling 700000",
+    "/admin": {"before": 695554, "after": 697221, "headroom": 2779},
+    "/profile": {"before": 699013, "after": 699013, "headroom": 987},
+    "/grievance": {"after": 671499},
+    "/about": {"after": 664247},
+    "/employers": {"after": 663326},
+    "/providers": {"after": 663326},
+    "/privacy": {"after": 660821},
+    "/careers": {"after": 660821},
+    "/employer/[org]": {"after": 667428}
+  }
+}

@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GrievanceQueue } from "@/components/ops/GrievanceQueue";
+import { GRIEVANCE_LOOK, GrievanceQueue } from "@/components/ops/GrievanceQueue";
+import { AlertTriangleIcon } from "@/components/ui/icons";
 import { renderUi, resetWorld } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -177,5 +178,61 @@ describe("the grievance queue", () => {
   it("keeps its filter at the 44 px floor (Sprint 73)", async () => {
     const { container } = renderUi(<GrievanceQueue />);
     expect(container.querySelector("#grievance-filter")!.className).toMatch(/min-h-11/);
+  });
+});
+
+/** Sprint 89, BL-19.19: a message's status and what is overdue are words with shapes. */
+describe("the grievance queue -- the look of a message", () => {
+  it.each([
+    ["open", "Waiting", "bg-warning-surface"],
+    ["acknowledged", "Acknowledged", "bg-accent-soft"],
+    ["resolved", "Resolved", "bg-success-surface"],
+    ["dismissed", "Dismissed", "bg-surface-muted"],
+  ])("draws %s as %s on %s, with a shape", async (status, word, token) => {
+    queue([{ ...ITEM, status }]);
+    renderUi(<GrievanceQueue />);
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("has a shape for every status, and no two alike", () => {
+    expect(Object.keys(GRIEVANCE_LOOK).sort()).toEqual(["acknowledged", "dismissed", "open", "resolved"]);
+    const seen = new Set(Object.values(GRIEVANCE_LOOK).map((l) => `${l.tone}:${l.icon.displayName ?? l.icon.name}`));
+    expect(seen.size).toBe(4);
+  });
+
+  it("draws each overdue flag as a danger chip with a warning shape", async () => {
+    queue([{ ...ITEM, overdue_acknowledge: true, overdue_resolve: true }], { open: 1, overdue: 1 });
+    renderUi(<GrievanceQueue />);
+    for (const word of ["Not acknowledged in time", "Past the resolve date"]) {
+      const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+      expect(chip.className).toContain("bg-danger-surface");
+      expect(chip.querySelector("svg")).toBeTruthy();
+    }
+  });
+
+  it("shows no overdue chip for a message that is on time", async () => {
+    renderUi(<GrievanceQueue />);
+    await screen.findByText("GRV-ABC234");
+    expect(screen.queryByText("Not acknowledged in time")).toBeNull();
+    expect(screen.queryByText("Past the resolve date")).toBeNull();
+  });
+});
+
+describe("the grievance queue -- shapes", () => {
+  it("draws the four statuses with four different shapes (a swap that keeps the tone unique is not enough)", () => {
+    const icons = new Set(Object.values(GRIEVANCE_LOOK).map((l) => l.icon));
+    expect(icons.size).toBe(4);
+  });
+
+  it("draws both overdue flags with the warning triangle", async () => {
+    const triangle = render(<AlertTriangleIcon />).container.querySelector("svg")!.innerHTML;
+    queue([{ ...ITEM, overdue_acknowledge: true, overdue_resolve: true }], { open: 1, overdue: 1 });
+    renderUi(<GrievanceQueue />);
+    for (const word of ["Not acknowledged in time", "Past the resolve date"]) {
+      const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+      expect(chip.querySelector("svg")!.innerHTML, word).toBe(triangle);
+    }
   });
 });

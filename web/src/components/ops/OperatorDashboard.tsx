@@ -1,9 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { RankedBarList } from "@/components/charts/ranked-bar-list";
-import { Skeleton, StatTile } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
+import { AwardIcon, BookOpenIcon, BriefcaseIcon, BuildingIcon, InboxIcon, UsersIcon } from "@/components/ui/icons";
+import { MetricTile } from "@/components/ui/metric-tile";
 import { useOperatorDashboard } from "@/lib/ops";
 
 /**
@@ -31,20 +34,20 @@ export function OperatorDashboard() {
   // the scarce-skills list, is behind a row of fixed height that is there before and after.
   const data = dashboard.data;
   const scarce = data?.scarce_skills ?? [];
-  const tile = (value: number | undefined, label: string) => (
-    <StatTile value={value ?? null} label={label} />
+  const tile = (icon: ReactNode, value: number | undefined, label: string) => (
+    <MetricTile icon={icon} value={value ?? null} label={label} />
   );
 
   return (
     <div>
       <h2 className="text-lg font-semibold">{t("title")}</h2>
-      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
-        {tile(data?.unverified_organisations, t("unverifiedOrganisations"))}
-        {tile(data?.unverified_certifications, t("unverifiedCertifications"))}
-        {tile(data?.organisations, t("organisations"))}
-        {tile(data?.candidates, t("candidates"))}
-        {tile(data?.published_jobs, t("publishedJobs"))}
-        {tile(data?.published_courses, t("publishedCourses"))}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {tile(<InboxIcon />, data?.unverified_organisations, t("unverifiedOrganisations"))}
+        {tile(<AwardIcon />, data?.unverified_certifications, t("unverifiedCertifications"))}
+        {tile(<BuildingIcon />, data?.organisations, t("organisations"))}
+        {tile(<UsersIcon />, data?.candidates, t("candidates"))}
+        {tile(<BriefcaseIcon />, data?.published_jobs, t("publishedJobs"))}
+        {tile(<BookOpenIcon />, data?.published_courses, t("publishedCourses"))}
       </div>
 
       {data ? (

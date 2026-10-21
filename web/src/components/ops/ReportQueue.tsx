@@ -3,6 +3,8 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { AlertTriangleIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import {
   Alert,
   Badge,
@@ -143,11 +145,15 @@ function Row({ item }: { item: ListingReports }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold">{item.title}</span>
           <Badge>{t(`kind.${item.target_type}`)}</Badge>
-          {removed && <Badge tone="bad">{t("removed")}</Badge>}
+          {removed && (
+            <StatusChip tone="bad" icon={AlertTriangleIcon}>
+              {t("removed")}
+            </StatusChip>
+          )}
           {item.open_reports > 0 && (
-            <Badge tone="warn">
+            <StatusChip tone="warn" icon={AlertTriangleIcon}>
               {t("reportsCount", { count: item.open_reports })}
-            </Badge>
+            </StatusChip>
           )}
         </div>
         {item.organisation && (

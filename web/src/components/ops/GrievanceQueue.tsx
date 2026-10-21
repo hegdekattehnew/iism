@@ -3,6 +3,9 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { GRIEVANCE_LOOK } from "@/components/cards/grievance-look";
+import { AlertTriangleIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import {
   Alert,
   Badge,
@@ -22,12 +25,7 @@ import {
 import { detailOf } from "@/lib/http";
 import { EmptyState } from "@/components/ui/empty-state";
 
-const TONE: Record<GrievanceStatus, "warn" | "brand" | "good" | "neutral"> = {
-  open: "warn",
-  acknowledged: "brand",
-  resolved: "good",
-  dismissed: "neutral",
-};
+export { GRIEVANCE_LOOK };
 
 type Filter = GrievanceStatus | "all";
 const FILTERS: Filter[] = [
@@ -150,13 +148,19 @@ function Row({ item }: { item: QueueItem }) {
           <span className="font-mono text-sm font-semibold">
             {item.reference}
           </span>
-          <Badge tone={TONE[item.status]}>{t(`status.${item.status}`)}</Badge>
+          <StatusChip tone={GRIEVANCE_LOOK[item.status].tone} icon={GRIEVANCE_LOOK[item.status].icon}>
+            {t(`status.${item.status}`)}
+          </StatusChip>
           <Badge>{t(`kind.${item.kind}`)}</Badge>
           {item.overdue_acknowledge && (
-            <Badge tone="bad">{t("overdueAcknowledge")}</Badge>
+            <StatusChip tone="bad" icon={AlertTriangleIcon}>
+              {t("overdueAcknowledge")}
+            </StatusChip>
           )}
           {item.overdue_resolve && (
-            <Badge tone="bad">{t("overdueResolve")}</Badge>
+            <StatusChip tone="bad" icon={AlertTriangleIcon}>
+              {t("overdueResolve")}
+            </StatusChip>
           )}
         </div>
 

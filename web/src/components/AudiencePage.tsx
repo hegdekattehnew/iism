@@ -1,7 +1,9 @@
 import { getTranslations } from "next-intl/server";
+import type { ReactNode } from "react";
 
 import { StatsBand } from "@/components/StatsBand";
 import { ButtonLink, Card, CardBody, CardTitle } from "@/components/ui";
+import { IconTile } from "@/components/ui/icon-tile";
 
 /**
  * A real content page for one audience.
@@ -10,6 +12,10 @@ import { ButtonLink, Card, CardBody, CardTitle } from "@/components/ui";
  * open first. Everything it claims is something the product does today; where a
  * surface is a demonstration rather than a product, it says so on the page
  * rather than in a footnote.
+ *
+ * `icons` (Sprint 89, BL-19.20) is one mark per point, in order, passed in as elements by the page that
+ * knows what each point is about: the page is a server component, so the marks cost no JavaScript, and
+ * this module imports no icon. A point with no mark draws none.
  */
 export async function AudiencePage({
   namespace,
@@ -17,12 +23,14 @@ export async function AudiencePage({
   showStats = false,
   primaryHref,
   secondaryHref,
+  icons,
 }: {
   namespace: string;
   points: string[];
   showStats?: boolean;
   primaryHref: string;
   secondaryHref?: string;
+  icons?: ReactNode[];
 }) {
   const t = await getTranslations(namespace);
 
@@ -43,9 +51,10 @@ export async function AudiencePage({
       </div>
 
       <div className="mt-12 grid gap-4 sm:grid-cols-3">
-        {points.map((key) => (
+        {points.map((key, i) => (
           <Card key={key}>
             <CardBody>
+              {icons?.[i] && <IconTile className="mb-3">{icons[i]}</IconTile>}
               <CardTitle>{t(`${key}.title`)}</CardTitle>
               <p className="mt-2 text-sm text-muted">{t(`${key}.body`)}</p>
             </CardBody>

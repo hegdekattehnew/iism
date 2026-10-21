@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReportQueue } from "@/components/ops/ReportQueue";
+import { AlertTriangleIcon } from "@/components/ui/icons";
 import { renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -213,5 +214,43 @@ describe("the report queue", () => {
   it("keeps its filter at the 44 px floor (Sprint 73)", async () => {
     const { container } = renderUi(<ReportQueue />);
     expect(container.querySelector("#report-view")!.className).toMatch(/min-h-11/);
+  });
+});
+
+/** Sprint 89, BL-19.19: a listing's reports and a takedown are chips with a warning shape. */
+describe("the report queue -- the look of a listing", () => {
+  it("draws the open-report count as a warning chip with a shape", async () => {
+    renderUi(<ReportQueue />);
+    const chip = (await screen.findByText("2 reports", { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain("bg-warning-surface");
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws a taken-down listing as a danger chip with a shape, and no report-count chip when none is open", async () => {
+    queue([{ ...LISTING, open_reports: 0, taken_down_at: "2026-10-03T00:00:00Z", takedown_reason: "asked for money" }]);
+    renderUi(<ReportQueue />);
+    const chip = (await screen.findByText("Removed", { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain("bg-danger-surface");
+    expect(chip.querySelector("svg")).toBeTruthy();
+    expect(screen.queryByText(/reports?$/, { selector: "span" })).toBeNull();
+  });
+
+  it("draws neither for a live listing with no reports", async () => {
+    queue([{ ...LISTING, open_reports: 0 }]);
+    renderUi(<ReportQueue />);
+    await screen.findByText("Ward assistant");
+    expect(screen.queryByText("Removed", { selector: "span" })).toBeNull();
+  });
+});
+
+describe("the report queue -- the warning shape", () => {
+  it("is the triangle on both the report count and the takedown chip", async () => {
+    const triangle = render(<AlertTriangleIcon />).container.querySelector("svg")!.innerHTML;
+    queue([{ ...LISTING, taken_down_at: "2026-10-03T00:00:00Z", takedown_reason: "asked for money" }]);
+    renderUi(<ReportQueue />);
+    const count = (await screen.findByText("2 reports", { selector: "span" })) as HTMLElement;
+    const removed = screen.getByText("Removed", { selector: "span" }) as HTMLElement;
+    expect(count.querySelector("svg")!.innerHTML).toBe(triangle);
+    expect(removed.querySelector("svg")!.innerHTML).toBe(triangle);
   });
 });

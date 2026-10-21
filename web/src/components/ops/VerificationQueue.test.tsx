@@ -123,3 +123,18 @@ describe("the verification queue", () => {
     expect(link.className).toMatch(/min-h-11/);
   });
 });
+
+/** Sprint 89, BL-19.19: the kind of organisation is a word with a shape. */
+describe("the verification queue -- the kind of organisation", () => {
+  it("draws an employer and a provider as different words, shapes and tones", async () => {
+    answer([ROW, { ...ROW, slug: "nsdc", name: "NSDC Healthcare Academy", tenant_type: "course_provider" }]);
+    renderUi(<VerificationQueue />);
+    const hiring = (await screen.findByText("Hiring", { selector: "span" })) as HTMLElement;
+    const training = screen.getByText("Training", { selector: "span" }) as HTMLElement;
+    expect(hiring.querySelector("svg")).toBeTruthy();
+    expect(training.querySelector("svg")).toBeTruthy();
+    expect(hiring.querySelector("svg")!.innerHTML).not.toBe(training.querySelector("svg")!.innerHTML);
+    expect(hiring.className).toContain("bg-accent-soft");
+    expect(training.className).toContain("bg-surface-muted");
+  });
+});

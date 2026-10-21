@@ -181,3 +181,35 @@ describe("who may decide", () => {
     expect(screen.getAllByText(/NABH accreditation confirmed/).length).toBeTruthy();
   });
 });
+
+/** Sprint 89, BL-19.19: whether an organisation is verified, and what each past decision was, are chips with shapes. */
+describe("the organisation review -- the look of a verdict", () => {
+  it("draws 'verified' in the good tone with a shield and 'not verified' neutral with a different shape", async () => {
+    detail(VERIFIED);
+    const first = renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    const yes = (await screen.findAllByText("Verified", { selector: "span" }))[0] as HTMLElement;
+    expect(yes.className).toContain("bg-success-surface");
+    const yesShape = yes.querySelector("svg")!.innerHTML;
+    first.unmount();
+    detail(UNVERIFIED);
+    renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    const no = (await screen.findByText("Not verified", { selector: "span" })) as HTMLElement;
+    expect(no.className).toContain("bg-surface-muted");
+    expect(no.querySelector("svg")!.innerHTML).not.toBe(yesShape);
+  });
+
+  it("draws a granted decision and a withdrawn one with different shapes and tones", async () => {
+    detail({
+      ...VERIFIED,
+      history: [
+        ...VERIFIED.history,
+        { id: "2", decision: "revoked", note: "Registration lapsed.", created_at: "2026-09-24T10:00:00Z", actor_name: "Priya" },
+      ],
+    });
+    renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    const withdrawn = (await screen.findByText("Withdrawn", { selector: "span" })) as HTMLElement;
+    expect(withdrawn.className).toContain("bg-warning-surface");
+    const granted = screen.getAllByText("Verified", { selector: "span" }).find((s) => s.closest("li")) as HTMLElement;
+    expect(granted.querySelector("svg")!.innerHTML).not.toBe(withdrawn.querySelector("svg")!.innerHTML);
+  });
+});

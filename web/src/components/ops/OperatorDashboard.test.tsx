@@ -103,3 +103,47 @@ describe("OperatorDashboard", () => {
     expect(row.querySelector("summary")!.className).toMatch(/min-h-11/);
   });
 });
+
+/** Sprint 89, BL-19.19: the overview's figures are tiles with a mark each, and the same shape while they load. */
+describe("OperatorDashboard -- the tiles", () => {
+  const FULL = {
+    unverified_organisations: 3,
+    unverified_certifications: 5,
+    organisations: 40,
+    candidates: 400,
+    published_jobs: 20,
+    published_courses: 50,
+    scarce_skills: [],
+  };
+
+  it("draws six tiles with six different marks", async () => {
+    GET.mockResolvedValue({ data: FULL, error: undefined, response: { status: 200 } });
+    const { container } = renderUi(<OperatorDashboard />);
+    await screen.findByText("400");
+    const tiles = [...container.querySelectorAll(".grid > div")] as HTMLElement[];
+    expect(tiles.length).toBe(6);
+    const shapes = tiles.map((t) => t.querySelector("[aria-hidden='true'] svg")!.innerHTML);
+    expect(new Set(shapes).size).toBe(6);
+    expect(tiles[0].textContent).toContain("Awaiting verification");
+  });
+
+  it("is the same six tiles, with a dash each, before the figures arrive (so nothing moves when they do)", async () => {
+    GET.mockImplementation(() => new Promise(() => undefined));
+    const { container } = renderUi(<OperatorDashboard />);
+    const tiles = [...container.querySelectorAll(".grid > div")] as HTMLElement[];
+    expect(tiles.length).toBe(6);
+    for (const t of tiles) {
+      expect(t.textContent).toContain("—");
+      expect(t.querySelector("[aria-hidden='true'] svg")).toBeTruthy();
+    }
+    expect(screen.queryByText("0")).toBeNull();
+  });
+
+  it("shows a true zero as 0 and not a dash", async () => {
+    GET.mockResolvedValue({ data: { ...FULL, unverified_organisations: 0 }, error: undefined, response: { status: 200 } });
+    const { container } = renderUi(<OperatorDashboard />);
+    await screen.findByText("400");
+    expect((container.querySelectorAll(".grid > div")[0] as HTMLElement).textContent).toContain("0");
+    expect((container.querySelectorAll(".grid > div")[0] as HTMLElement).textContent).not.toContain("—");
+  });
+});

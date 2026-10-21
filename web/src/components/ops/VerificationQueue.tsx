@@ -2,7 +2,9 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { BookOpenIcon, BuildingIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { Link } from "@/i18n/navigation";
 import { useVerificationQueue } from "@/lib/ops";
 
@@ -65,9 +67,12 @@ export function VerificationQueue() {
                   >
                     {row.name}
                   </Link>
-                  <Badge tone={row.tenant_type === "employer" ? "brand" : "neutral"}>
+                  <StatusChip
+                    tone={row.tenant_type === "employer" ? "brand" : "neutral"}
+                    icon={row.tenant_type === "employer" ? BuildingIcon : BookOpenIcon}
+                  >
                     {t(row.tenant_type === "employer" ? "employer" : "provider")}
-                  </Badge>
+                  </StatusChip>
                 </div>
 
                 <p className="mt-1 text-sm text-muted">

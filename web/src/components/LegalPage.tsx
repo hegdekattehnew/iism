@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { Fragment, type ReactNode } from "react";
 
+import { AlertTriangleIcon, ShieldCheckIcon } from "@/components/ui/icons";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Link } from "@/i18n/navigation";
 import { GRIEVANCE_OFFICER, PRIVACY_NOTICE_VERSION } from "@/lib/legal";
 
@@ -30,7 +32,8 @@ export async function LegalPage({ doc, children }: { doc: Doc; children?: ReactN
 
   return (
     <article className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
-      <p className="inline-flex items-center rounded-full border border-warning-border bg-warning-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warning-text">
+      <p className="inline-flex items-center gap-1.5 rounded-full border border-warning-border bg-warning-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warning-text">
+        <AlertTriangleIcon className="h-4 w-4" />
         {t("draftBadge")}
       </p>
       <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -49,9 +52,14 @@ export async function LegalPage({ doc, children }: { doc: Doc; children?: ReactN
           aria-labelledby="officer"
           className="mt-8 rounded-xl border border-border-token bg-surface p-5"
         >
-          <h2 id="officer" className="text-lg font-semibold">
-            {t("officerHeading")}
-          </h2>
+          <div className="flex items-center gap-3">
+            <IconTile tone="good">
+              <ShieldCheckIcon />
+            </IconTile>
+            <h2 id="officer" className="text-lg font-semibold">
+              {t("officerHeading")}
+            </h2>
+          </div>
           <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
             {officer.map(([label, value]) => (
               <Fragment key={label}>
@@ -79,7 +87,7 @@ export async function LegalPage({ doc, children }: { doc: Doc; children?: ReactN
       <p className="mt-12 text-sm">
         <Link
           href="/account"
-          className="text-brand underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 items-center text-brand underline-offset-4 hover:underline"
         >
           {t("accountLink")}
         </Link>

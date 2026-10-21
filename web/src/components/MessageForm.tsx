@@ -129,14 +129,14 @@ export function MessageForm({ kinds }: { kinds: GrievanceKind[] }) {
           <legend className="text-sm font-medium">{t("kindLegend")}</legend>
           <div className="mt-2 space-y-2">
             {kinds.map((option) => (
-              <label key={option} className="flex items-start gap-2 text-sm">
+              <label key={option} className="flex min-h-11 items-start gap-2 py-2 text-sm">
                 <input
                   type="radio"
                   name="kind"
                   value={option}
                   checked={kind === option}
                   onChange={() => setKind(option)}
-                  className="mt-0.5 h-4 w-4 accent-brand"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
                 />
                 <span>
                   <span className="font-medium">{t(`kind.${option}`)}</span>

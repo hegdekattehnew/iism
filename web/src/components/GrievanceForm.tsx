@@ -3,16 +3,12 @@
 import { useFormatter, useTranslations } from "next-intl";
 
 import { MessageForm } from "@/components/MessageForm";
-import { Badge, Skeleton } from "@/components/ui";
+import { GRIEVANCE_LOOK } from "@/components/cards/grievance-look";
+import { Skeleton } from "@/components/ui";
+import { StatusChip } from "@/components/ui/status-chip";
 import { useIsSignedIn } from "@/lib/auth";
-import { useMyGrievances, type GrievanceStatus } from "@/lib/grievances";
+import { useMyGrievances } from "@/lib/grievances";
 
-const TONE: Record<GrievanceStatus, "warn" | "brand" | "good" | "neutral"> = {
-  open: "warn",
-  acknowledged: "brand",
-  resolved: "good",
-  dismissed: "neutral",
-};
 
 /**
  * `/grievance`: raise a grievance or ask something about your own data (Sprint 57, BL-14.3).
@@ -63,9 +59,9 @@ function MyMessages() {
               <span className="font-mono text-sm font-semibold">
                 {item.reference}
               </span>
-              <Badge tone={TONE[item.status]}>
+              <StatusChip tone={GRIEVANCE_LOOK[item.status].tone} icon={GRIEVANCE_LOOK[item.status].icon}>
                 {t(`status.${item.status}`)}
-              </Badge>
+              </StatusChip>
               <span className="text-sm text-muted">
                 {t(`kind.${item.kind}`)}
               </span>
