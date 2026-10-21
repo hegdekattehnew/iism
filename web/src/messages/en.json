@@ -326,7 +326,9 @@
     "verifiedProvider": "Verified provider",
     "notVerifiedYet": "Provider not yet verified",
     "interestFree": "Registering interest is free. Ask the provider what any fee covers before you pay anyone.",
-    "reportThis": "Report this course if it asks you for money."
+    "reportThis": "Report this course if it asks you for money.",
+    "startedLabel": "Started",
+    "startedAsk": "This group has begun. Ask the provider whether you can still join, or when the next one starts."
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -723,7 +725,7 @@
   },
   "employerWorkspace": {
     "title": "Your workspace",
-    "subtitle": "Post a vacancy against the National Occupational Standards it actually requires, and see who can do the work.",
+    "subtitle": "Post a vacancy and see who can already do the work.",
     "yourVacancies": "Your vacancies",
     "yourVacanciesNote": "Drafts are visible only here. A vacancy reaches candidates when you publish it.",
     "noVacancies": "No vacancies yet. Create one and describe it with the standards it needs.",
@@ -813,7 +815,15 @@
     "removedExplain": "It cannot be published until we restore it. You can still edit it. If you think this is a mistake, contact us.",
     "closed_taken_down": "Removed",
     "more": "More",
-    "descriptionHint": "Say what the work is and what a day involves, in a sentence or two. The page already lists the standards; this is what they do not say."
+    "descriptionHint": "Say what the work is and what a day involves, in a sentence or two. The page already lists the standards; this is what they do not say.",
+    "roleStartTitle": "Start from a job role",
+    "roleStartHint": "Type the job, such as “ward boy” or “electrician”. We add the skills that job needs, and you can change them.",
+    "roleStartPlaceholder": "e.g. ward boy, electrician, cashier",
+    "roleStartAdded": "{count, plural, =0 {Everything for {role} is already on the vacancy.} one {Added # skill for {role}. Change them below.} other {Added # skills for {role}. Change them below.}}",
+    "roleStartNone": "No job by that name. Try another word, or add skills yourself below.",
+    "roleStartLoading": "Looking up the skills…",
+    "roleStartError": "Could not load the skills for this job. Try again.",
+    "roleStartUseTitle": "Use “{role}” as the title"
   },
   "context": {
     "jobSeeker": "Job seeker",
@@ -1037,7 +1047,16 @@
     "providerMeta": "Work email",
     "note": "One account. You can add another role whenever you need it.",
     "pageTitle": "Create your account",
-    "pageSubtitle": "Pick what you came here to do. You are not locked into it."
+    "pageSubtitle": "Pick what you came here to do. You are not locked into it.",
+    "welcomeTitle": "Welcome back",
+    "welcomeSeekerLabel": "Your matches",
+    "welcomeSeekerMeta": "Jobs ranked for what you can do",
+    "welcomeOrgMeta": {
+      "employer": "Hiring · open your workspace",
+      "course_provider": "Training · open your workspace"
+    },
+    "welcomeMore": "{count, plural, one {# more workspace is} other {# more workspaces are}} in the menu at the top.",
+    "welcomeNote": "You are signed in. What you manage is one tap away."
   },
   "workspace": {
     "jobSeeker": "Job seeker",
@@ -1482,7 +1501,10 @@
     "errorDuplicate": "You have already registered interest in this course.",
     "errorCap": "You have registered interest in a lot of courses today. Try again tomorrow.",
     "errorSeeker": "Only a job seeker account can register interest.",
-    "errorGeneric": "That did not work. Please try again."
+    "errorGeneric": "That did not work. Please try again.",
+    "replyBy": "Reply expected by {date}",
+    "replyHelp": "Providers are asked to reply within {days} days.",
+    "notHeard": "Not heard back? Tell us"
   },
   "providerInbox": {
     "summaryTitle": "Interested learners",
@@ -1504,7 +1526,8 @@
     "saving": "Saving…",
     "withdrawnTitle": "A learner withdrew their interest",
     "withdrawnNote": "Withdrawn by the learner. Their contact details are no longer shared.",
-    "errorGeneric": "That could not be saved. Try again."
+    "errorGeneric": "That could not be saved. Try again.",
+    "waitingDays": "{count, plural, one {Waiting # day} other {Waiting # days}}"
   },
   "team": {
     "heading": "Team",

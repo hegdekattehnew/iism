@@ -190,3 +190,41 @@ describe("ContextSwitcher — the order", () => {
     expect(names()[0]).toBe("Apollo Care Hospitals");
   });
 });
+
+
+/**
+ * Sprint 91, B22.1. Outside a workspace (the front page, a job list) an organisation-only account
+ * has no context in the URL, and the control's first word was "Choose workspace": an instruction
+ * where a name belonged, so a signed-in person could not tell who they were acting as.
+ */
+describe("ContextSwitcher — what the control says outside a workspace", () => {
+  const trigger = () => screen.getByRole("button", { expanded: false });
+
+  it("names the organisation when the account runs just one", () => {
+    world.pathname = "/";
+    world.memberships = [org("nsdc", "course_provider", "NSDC Healthcare Academy")];
+    renderUi(<ContextSwitcher />);
+    expect(trigger().textContent).toContain("NSDC Healthcare Academy");
+    expect(trigger().textContent).not.toContain("Choose workspace");
+  });
+
+  it("names the one used last when there are several", () => {
+    world.memberships = [org("a", "employer", "Alpha Hospital"), org("b", "employer", "Beta Clinic")];
+    localStorage.setItem("iism.recent_contexts", JSON.stringify(["b"]));
+    renderUi(<ContextSwitcher />);
+    expect(trigger().textContent).toContain("Beta Clinic");
+  });
+
+  it("asks which one only when there are several and none was used last", () => {
+    world.memberships = [org("a", "employer", "Alpha Hospital"), org("b", "employer", "Beta Clinic")];
+    renderUi(<ContextSwitcher />);
+    expect(trigger().textContent).toContain("Choose workspace");
+  });
+
+  it("keeps saying Job seeker for somebody who looks for work", () => {
+    world.memberships = [personal(), org("a", "employer", "Alpha Hospital")];
+    renderUi(<ContextSwitcher />);
+    expect(trigger().textContent).toContain("Job seeker");
+    expect(trigger().textContent).not.toContain("Alpha Hospital");
+  });
+});

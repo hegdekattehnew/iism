@@ -202,3 +202,31 @@ describe("ProviderInbox -- the look of a learner's state", () => {
     expect(screen.queryByText("Contacted", { selector: "span" })).toBeNull();
   });
 });
+
+
+/** Sprint 91, B22.2: the provider's side of the reply date the learner was shown. */
+describe("ProviderInbox — waiting", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
+
+  it("says how long a learner has waited once the reply date has passed", async () => {
+    answer([learner({ registered_at: ago(5) })]);
+    renderUi(inbox());
+    const chip = await screen.findByText("Waiting 5 days");
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("says nothing while the reply date is still ahead", async () => {
+    answer([learner({ registered_at: ago(1) })]);
+    renderUi(inbox());
+    await screen.findByText("Priya Sharma");
+    expect(screen.queryByText(/^Waiting/)).toBeNull();
+  });
+
+  it("says nothing about a learner who has been contacted or has withdrawn", async () => {
+    answer([learner({ interest_id: "a", status: "contacted", registered_at: ago(9) }), learner({ interest_id: "b", status: "withdrawn", contact: null, registered_at: ago(9) })]);
+    renderUi(inbox());
+    await screen.findAllByText(/Registered on/);
+    expect(screen.queryByText(/^Waiting/)).toBeNull();
+  });
+});

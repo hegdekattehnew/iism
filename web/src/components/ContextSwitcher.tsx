@@ -130,15 +130,24 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
       )
     : ordered;
   const showFilter = organisations.length >= FILTER_THRESHOLD;
+  // An organisation-only account outside a workspace (the front page, the jobs list) has no context in
+  // the URL. If it runs **one** organisation, or the one it used last is plain, say that name rather
+  // than "Choose workspace": the control's first word was an instruction on every page that is not
+  // a workspace, and a signed-in person could not tell from the header who they were acting as
+  // (Sprint 91, the designer's review). With several and no clear last-used, choosing is the truth.
+  const lead = ordered[0];
+  const knownOrg =
+    lead && (organisations.length === 1 || recentContexts()[0] === lead.tenant.slug) ? lead : null;
   const label = current
     ? current.tenant.name
     : isJobSeeker
       ? t("jobSeeker")
-      : // An organisation-only account standing outside any `/employer/` path
-        // genuinely has no current context. This names the thing being chosen;
-        // it used to read "Switch", a verb with no object, which said neither
-        // where you were nor where you could go.
-        t("chooseContext");
+      : knownOrg
+        ? knownOrg.tenant.name
+        : // An organisation-only account standing outside any `/employer/` path with several
+          // organisations and no clear last one genuinely has no current context. This names the
+          // thing being chosen; it used to read "Switch", a verb with no object.
+          t("chooseContext");
 
   const go = (slug: string | null) => {
     setOpen(false);

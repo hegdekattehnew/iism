@@ -63,14 +63,14 @@ export default async function CourseDetailPage({
       ? null
       : [data.location_district, data.location_state].filter(Boolean).join(", ") ||
         t("placeNotStated");
-  const intake = data.starts_on
-    ? t(data.started ? "startedOn" : "startsOn", {
-        date: format.dateTime(new Date(`${data.starts_on}T00:00:00Z`), {
-          dateStyle: "long",
-          timeZone: "UTC",
-        }),
-      })
-    : t("startNotStated");
+  // A date that has passed is not an "intake" and "40 seats left" beside it is not an offer: the page
+  // said "Next intake: Started September 29, 2026 . 40 seats left" for a course three weeks in
+  // (Sprint 91, the designer's review). A started group says so, and sends the learner to ask.
+  const started = data.starts_on != null && data.started;
+  const when = data.starts_on
+    ? format.dateTime(new Date(`${data.starts_on}T00:00:00Z`), { dateStyle: "long", timeZone: "UTC" })
+    : null;
+  const intake = when === null ? t("startNotStated") : started ? when : t("startsOn", { date: when });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:py-16">
@@ -121,8 +121,11 @@ export default async function CourseDetailPage({
             <FactValue large>{place}</FactValue>
           </Fact>
         )}
-        <Fact icon={<CalendarIcon />} label={t("intakeLabel")}>
-          <FactValue large>{intake}</FactValue>
+        <Fact icon={<CalendarIcon />} label={started ? t("startedLabel") : t("intakeLabel")}>
+          <FactValue large>
+            {intake}
+            {started && <span className="mt-0.5 block text-xs font-normal text-muted">{t("startedAsk")}</span>}
+          </FactValue>
         </Fact>
         {data.qualification_name && (
           <Fact icon={<AwardIcon />} label={t("qualificationLabel")} wide>
@@ -139,7 +142,7 @@ export default async function CourseDetailPage({
             </FactValue>
           </Fact>
         )}
-        {data.seats_left != null && (
+        {data.seats_left != null && !(started && data.seats_left > 0) && (
           <Fact icon={<UsersIcon />} label={t("seatsLabel")}>
             <FactValue large>
               {data.seats_left === 0 ? t("full") : t("seatsLeft", { count: data.seats_left })}

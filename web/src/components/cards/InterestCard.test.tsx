@@ -46,3 +46,22 @@ describe("InterestCard", () => {
     expect(INTEREST_LOOK.registered.icon).not.toBe(INTEREST_LOOK.enrolled.icon);
   });
 });
+
+
+/** Sprint 91, B22.2: while nobody has answered, the card says when to expect one and what to do if it passes. */
+describe("InterestCard — when to expect an answer", () => {
+  it("gives a registered interest its reply date, three days after, and the way to say nobody replied", () => {
+    renderUi(<InterestCard interest={row({ status: "registered", registered_at: "2026-09-21T10:00:00Z" })} />);
+    expect(screen.getByText("Reply expected by Sep 24, 2026")).toBeTruthy();
+    expect(screen.getByText("Providers are asked to reply within 3 days.")).toBeTruthy();
+    const link = screen.getByRole("link", { name: "Not heard back? Tell us" });
+    expect(link.getAttribute("href")).toBe("/contact");
+    expect(link.className).toContain("min-h-11");
+  });
+
+  it.each(["contacted", "enrolled", "withdrawn"] as const)("says nothing about a reply once it is %s", (status) => {
+    renderUi(<InterestCard interest={row({ status })} />);
+    expect(screen.queryByText(/Reply expected/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Not heard back? Tell us" })).toBeNull();
+  });
+});

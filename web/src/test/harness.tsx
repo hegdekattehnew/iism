@@ -33,6 +33,9 @@ export const world = {
   pathname: "/",
   signedIn: true,
   pending: false,
+  // A sign-in the server refuses (an expired or revoked token): the token is still stored, so the
+  // browser reads as signed in, but `/auth/me` answered an error (Sprint 91).
+  meError: false,
   // Operator authority (ADR-042). Global, granted by nothing a membership can
   // give, so it is a field of its own rather than a role in `memberships`.
   isStaff: false,
@@ -58,6 +61,7 @@ export function resetWorld(): void {
   world.pathname = "/";
   world.signedIn = true;
   world.pending = false;
+  world.meError = false;
   world.isStaff = false;
   world.staffTier = "admin";
   world.memberships = [];
@@ -101,7 +105,7 @@ function derived() {
   // here until Sprint 29, which made every signed-out branch untestable
   // through this seam: a component reading `me.data` saw a populated account
   // for somebody who was not signed in.
-  const signedOut = !world.signedIn;
+  const signedOut = !world.signedIn || world.meError;
   const memberships = world.pending || signedOut ? [] : world.memberships;
   return {
     data:
