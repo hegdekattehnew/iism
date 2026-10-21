@@ -239,9 +239,12 @@ def test_the_sprint_73_remeasurement_is_the_same_captures_and_shows_the_fix() ->
 
 
 def test_what_is_still_open_is_the_owners_and_the_epic_b19_table_cites_real_files() -> None:
-    """Sprint 90 (BL-19.26): the review says UI-03 and UI-23 are the two findings left, because both need
-    art only the owner can supply; the paragraph is built from the data, so this holds the data to it, and
-    every file the Epic B19 table cites is on disk (a row citing a measurement nobody wrote is invented)."""
+    """Sprint 90 (BL-19.26): UI-03 and UI-23 are the only findings left open.
+
+    Both need art only the owner can supply. The paragraph is built from the data, so this holds the
+    data to it; and every file the Epic B19 table cites is on disk (a row citing a measurement
+    nobody wrote is invented).
+    """
     m = _builder()
     still_open = sorted({f[0] for f in m.F} - set(m.FIXED))
     assert still_open == ["UI-03", "UI-23"], still_open
