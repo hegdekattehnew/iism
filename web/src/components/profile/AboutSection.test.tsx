@@ -69,6 +69,20 @@ describe("AboutSection", () => {
     expect(await screen.findByText(/Could not save\. Please check the fields/)).toBeTruthy();
   });
 
+  it("keeps what the person typed when the save fails (Sprint 86: a failed save never loses it)", async () => {
+    PUT.mockResolvedValue({ data: undefined, error: {}, response: { status: 500 } });
+    renderUi(<AboutSection profile={profile} />);
+    const name = screen.getByLabelText("Full name") as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "Asha Rao" } });
+    const headline = screen.getByLabelText("Headline") as HTMLInputElement;
+    fireEvent.change(headline, { target: { value: "Ward attendant, five years" } });
+    save();
+
+    await screen.findByText(/Could not save\. Please check the fields/);
+    expect((screen.getByLabelText("Full name") as HTMLInputElement).value).toBe("Asha Rao");
+    expect((screen.getByLabelText("Headline") as HTMLInputElement).value).toBe("Ward attendant, five years");
+  });
+
   it("says saved, and nothing about a failure, when it worked", async () => {
     renderUi(<AboutSection profile={profile} />);
     save();

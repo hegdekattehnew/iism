@@ -99,7 +99,9 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
             <button
               type="button"
               onClick={() => removeSkill.mutate(s.skill.slug)}
-              className="ml-auto text-xs text-muted hover:text-danger-text hover:underline"
+              // 44 px, and named for its skill: a profile can hold sixty identical "Remove"s.
+              aria-label={`${t("remove")}: ${s.skill.name}`}
+              className="-my-1 ml-auto inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-muted hover:text-danger-text hover:underline"
             >
               {t("remove")}
             </button>

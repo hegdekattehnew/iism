@@ -1,0 +1,145 @@
+{
+  "sprint": 86,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000, dark colour scheme, English. BEFORE = measured at the start of the sprint on main; AFTER = this branch, same pages, same function, same accounts (+919000000006 and +919000000012/13, none of them golden). NOT the capture script and NOT the sweep (no Chromium on the machine); comparable with each other, not with earlier sprints' files. A control under 44 px is an a/button/select/input/textarea/[role] narrower or shorter than 43.5 px; a checkbox or radio is measured by its label (as the sweep does); a sentence's inline link is listed but is exempt in the sweep's own rule and in WCAG 2.5.8.",
+  "pages": {
+    "signin": {
+      "url": "/en/signin",
+      "before": {
+        "pageHeight": 1411,
+        "smallTargets": [
+          "Sign up link, 54x18, inline in a sentence (exempt)"
+        ]
+      },
+      "after": {
+        "pageHeight": 1411,
+        "identifierInputHeight": 50,
+        "smallTargets": [
+          "Sign up link, 54x18, inline in a sentence (exempt)"
+        ]
+      },
+      "note": "the code step (not measured live) is covered by unit tests: both ways back and the unregistered link are 44 px"
+    },
+    "signup-seeker": {
+      "url": "/en/signup/seeker",
+      "before": {
+        "pageHeight": 1728,
+        "smallTargets": [
+          "consent checkbox 16x16 (its label was one line at desktop width)",
+          "privacy notice and terms links, inline in the consent sentence (exempt)",
+          "Sign in link, inline (exempt)"
+        ]
+      },
+      "after": {
+        "pageHeight": 1744,
+        "consentRow": "335x60",
+        "checkbox": 20,
+        "smallTargets": [
+          "privacy notice and terms links, inline in the consent sentence (exempt)",
+          "Sign in link, inline (exempt)"
+        ]
+      }
+    },
+    "profile-onboarding": {
+      "url": "/en/profile (first visit)",
+      "before": {
+        "smallTargets": [
+          "My matches link 88x22",
+          "Skip for now button 77x18"
+        ]
+      },
+      "after": {
+        "smallTargets": []
+      }
+    },
+    "profile-editor": {
+      "url": "/en/profile (+919000000006, 6 history entries, 8 skills)",
+      "before": {
+        "pageHeight": 6091,
+        "screens": 7.5,
+        "smallControls": 17,
+        "kinds": [
+          "My matches 88x22",
+          "tag remove x 10x22 (2)",
+          "skill Remove 49x18 (4)",
+          "history Remove 49x18 (5)",
+          "history Edit 23x18 (5)"
+        ]
+      },
+      "afterFirstVersion": {
+        "pageHeight": 6279,
+        "note": "row buttons beside the title squeezed it into a column four lines tall"
+      },
+      "after": {
+        "pageHeight": 6471,
+        "screens": 8.0,
+        "smallControls": 0,
+        "note": "+380 px: each history row's two 44 px buttons now drop under its title"
+      }
+    },
+    "apply-confirmation": {
+      "url": "/en/jobs/technician-room-air-conditioner-home-appliances-electronics (signed in, confirmation open, nothing submitted)",
+      "after": {
+        "group": "335x444",
+        "buttons": [
+          "Yes, apply 301x44",
+          "Cancel 301x44"
+        ],
+        "noteField": "88 px tall",
+        "aria": "group named by its heading"
+      }
+    }
+  },
+  "firstLoadJsBytes": {
+    "note": "build:e2e then route-bundle-stats.json; main (after the dependency bump) and this branch built the same way",
+    "routes": {
+      "/[locale]/profile": [
+        698376,
+        698914
+      ],
+      "/[locale]/employer/[org]": [
+        698302,
+        698604
+      ],
+      "/[locale]/matches": [
+        690244,
+        690580
+      ],
+      "/[locale]/jobs": [
+        678066,
+        678475
+      ],
+      "/[locale]/jobs/[slug]": [
+        667898,
+        671753
+      ],
+      "/[locale]/signin": [
+        665696,
+        665710
+      ],
+      "/[locale]/signup/[type]": [
+        668457,
+        668869
+      ],
+      "/[locale]/search": [
+        676021,
+        676448
+      ],
+      "/[locale]/courses": [
+        673977,
+        674386
+      ]
+    },
+    "format": "[before, after]",
+    "profileAfterSprint85": 698043,
+    "profileAfterDependencyBump": 698376,
+    "explanation": "Sprint 85 left /profile at 698,043. The merged Dependabot web group (next 16.4.2, react 19.3.1, ...) took it to 698,376 (+333) before this sprint began. This sprint adds 538 (about 400 of it a new shared chunk's bookkeeping, seen on routes that import none of the changed files; about 140 the profile's own classes and names)."
+  },
+  "notRun": [
+    "make e2e (the existing journeys)",
+    "the sweep's axe contrast, layout shift and target ratchet",
+    "the capture script",
+    "Hindi, dark/light switch, desktop",
+    "the live code step of sign-in and the live sign-up code step"
+  ]
+}

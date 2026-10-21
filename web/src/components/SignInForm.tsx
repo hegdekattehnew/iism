@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Button } from "@/components/ui";
+import { Field, Input } from "@/components/ui/field";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { setTokens } from "@/lib/auth";
@@ -141,21 +142,18 @@ export function SignInForm() {
             request.mutate();
           }}
         >
-          <div>
-            <label htmlFor="phone" className="text-sm font-medium">
-              {t("identifierLabel")}
-            </label>
-            <input
-              id="phone"
+          <Field label={t("identifierLabel")}>
+            <Input
+              name="identifier"
               type="text"
               autoComplete="username"
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder={t("identifierPlaceholder")}
-              className="mt-1.5 w-full rounded-lg border border-input-border bg-surface px-4 py-3 text-base tracking-wide placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className="px-4 py-3 text-base tracking-wide placeholder:text-muted"
             />
-          </div>
+          </Field>
           <Button
             type="submit"
             size="lg"
@@ -184,12 +182,9 @@ export function SignInForm() {
             verify.mutate();
           }}
         >
-          <div>
-            <label htmlFor="code" className="text-sm font-medium">
-              {t("codeLabel")}
-            </label>
-            <input
-              id="code"
+          <Field label={t("codeLabel")}>
+            <Input
+              name="code"
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -197,9 +192,9 @@ export function SignInForm() {
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="mt-1.5 w-full rounded-lg border border-input-border bg-surface px-4 py-3 text-center text-2xl font-semibold tracking-[0.4em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className="px-4 py-3 text-center text-2xl font-semibold tracking-[0.4em]"
             />
-          </div>
+          </Field>
 
           {/* Development only: the API returns the code when no SMS provider is
               configured, so the flow is exercisable without one. */}
@@ -218,7 +213,7 @@ export function SignInForm() {
             {verify.isPending ? t("verifying") : t("verify")}
           </Button>
 
-          <div className="flex justify-between text-sm">
+          <div className="-mx-2 flex justify-between text-sm">
             <button
               type="button"
               onClick={() => {
@@ -228,7 +223,7 @@ export function SignInForm() {
                 setError(null);
                 setUnregistered(false);
               }}
-              className="text-muted hover:text-foreground hover:underline"
+              className="inline-flex min-h-11 items-center rounded-lg px-2 text-muted hover:text-foreground hover:underline"
             >
               {t("changeNumber")}
             </button>
@@ -236,7 +231,7 @@ export function SignInForm() {
               type="button"
               onClick={() => request.mutate()}
               disabled={request.isPending || wait.remaining > 0}
-              className="text-brand hover:underline disabled:opacity-50 disabled:no-underline"
+              className="inline-flex min-h-11 items-center rounded-lg px-2 text-brand hover:underline disabled:opacity-50 disabled:no-underline"
             >
               {wait.remaining > 0
                 ? t("resendIn", { seconds: wait.remaining })
@@ -263,7 +258,7 @@ export function SignInForm() {
           <p>{t("unregistered")}</p>
           <Link
             href="/signup/seeker"
-            className="mt-1 inline-block font-medium underline underline-offset-4"
+            className="mt-1 inline-flex min-h-11 items-center font-medium underline underline-offset-4"
           >
             {t("unregisteredAction")}
           </Link>

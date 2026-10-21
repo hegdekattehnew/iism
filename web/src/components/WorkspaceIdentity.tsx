@@ -55,7 +55,7 @@ export function WorkspaceIdentity({
       </span>
       <Link
         href={sibling === "matches" ? "/matches" : "/profile"}
-        className="font-medium text-brand underline-offset-4 hover:underline"
+        className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline"
       >
         {t(sibling === "matches" ? "goToMatches" : "goToProfile")}
       </Link>
