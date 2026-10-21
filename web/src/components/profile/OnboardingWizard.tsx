@@ -89,7 +89,7 @@ export function OnboardingWizard({ profile }: { profile: Profile | null }) {
           <button
             type="button"
             onClick={() => finishOnboarding.mutate()}
-            className="text-xs text-muted hover:text-foreground hover:underline"
+            className="-my-2 inline-flex min-h-11 items-center px-1 text-xs text-muted hover:text-foreground hover:underline"
           >
             {t("skip")}
           </button>

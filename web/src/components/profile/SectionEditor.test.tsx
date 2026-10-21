@@ -88,7 +88,7 @@ describe("a certification's linked standard", () => {
     // The list row names it too.
     expect(screen.getByText(/Perform sample collection activities/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit: / }));
     expect(await screen.findByRole("button", { name: "Remove link" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -99,7 +99,7 @@ describe("a certification's linked standard", () => {
 
   it("is unlinked only when the person removes it", async () => {
     renderUi(<Certifications entries={[SAVED]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit: / }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove link" }));
     expect(screen.getByRole("searchbox")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

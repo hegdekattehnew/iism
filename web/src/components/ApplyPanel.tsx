@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Area } from "@/components/profile/fields";
 import { Alert, Button, ButtonLink } from "@/components/ui";
+import { Field, Textarea } from "@/components/ui/field";
+import { IconTile } from "@/components/ui/icon-tile";
+import { ShieldCheckIcon } from "@/components/ui/icons";
 import { api } from "@/lib/api";
 import { useIsSignedIn } from "@/lib/auth";
 import { invalidatePublicCounts } from "@/lib/counts";
@@ -217,28 +219,53 @@ export function ApplyPanel({
       </div>
 
       {confirming && !live && (
-        <div className="mt-4 rounded-xl border border-border-token bg-surface p-4">
-          <h2 className="text-base font-semibold">{t("confirmHeading")}</h2>
-          {/* The disclosure, named in full, before the act that makes it. */}
-          <p className="mt-2 text-sm">{t("confirmShare", { organisation })}</p>
-          <p className="mt-1 text-sm text-muted">{t("confirmWithdrawNote")}</p>
+        <div
+          role="group"
+          aria-labelledby="apply-confirm-heading"
+          className="mt-4 rounded-xl border border-border-token bg-surface p-4 shadow-card"
+        >
+          {/* The disclosure, named in full, before the act that makes it. The words are the ones this
+              step has always said (Sprint 86 changed the layout, not what it tells the person). */}
+          <div className="flex items-start gap-3">
+            <IconTile tone="info">
+              <ShieldCheckIcon />
+            </IconTile>
+            <div className="min-w-0 flex-1">
+              <h2 id="apply-confirm-heading" className="text-base font-semibold">
+                {t("confirmHeading")}
+              </h2>
+              <p className="mt-1 text-sm">{t("confirmShare", { organisation })}</p>
+              <p className="mt-1 text-sm text-muted">{t("confirmWithdrawNote")}</p>
+            </div>
+          </div>
 
-          <label className="mt-4 block text-sm">
-            <span className="font-medium">{t("messageLabel")}</span>
-            <Area
+          {/* What the person typed stays when the request fails or the step is closed and reopened:
+              `message` is cleared only by a success. */}
+          <Field label={t("messageLabel")} className="mt-4">
+            <Textarea
+              name="message"
               value={message}
               maxLength={1000}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={t("messagePlaceholder")}
             />
-          </label>
+          </Field>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button onClick={() => apply.mutate()} disabled={apply.isPending}>
+          {/* Beside the buttons that caused it: the bar this sits in scrolls on a short phone, and an
+              error under the box was out of sight. */}
+          {error && (
+            <Alert className="mt-3" role="alert">
+              {error}
+            </Alert>
+          )}
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
+            <Button className="w-full sm:w-auto" onClick={() => apply.mutate()} disabled={apply.isPending}>
               {apply.isPending ? t("applying") : t("confirmCta")}
             </Button>
             <Button
               variant="ghost"
+              className="w-full sm:w-auto"
               onClick={() => {
                 setConfirming(false);
                 setError(null);
@@ -250,7 +277,7 @@ export function ApplyPanel({
         </div>
       )}
 
-      {error && (
+      {error && !(confirming && !live) && (
         <Alert className="mt-3">
           {error}
         </Alert>

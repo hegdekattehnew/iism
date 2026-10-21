@@ -75,4 +75,11 @@ describe("WorkspaceIdentity — no cross-link to a side the account does not hav
       screen.getByRole("link", { name: "My matches" }).getAttribute("href"),
     ).toBe("/matches");
   });
+
+  it("makes the link across a 44 px target (Sprint 86: it was 22 px beside a badge)", () => {
+    world.memberships = [personal()];
+    world.pathname = "/profile";
+    renderUi(<WorkspaceIdentity sibling="matches" />);
+    expect(screen.getByRole("link", { name: "My matches" }).className).toContain("min-h-11");
+  });
 });

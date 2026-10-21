@@ -350,13 +350,13 @@ function ColdSignUp({ type }: { type: SignUpType }) {
           {/* Required, and recorded server-side with the notice's version and
               the time: a checkbox the API never hears about proves nothing.
               The links open a new tab so reading them loses no typing. */}
-          <label className="mt-5 flex items-start gap-2.5 text-sm">
+          <label className="mt-5 flex min-h-11 items-start gap-2.5 py-2 text-sm">
             <input
               type="checkbox"
               required
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input-border accent-brand"
+              className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-input-border accent-brand"
             />
             <span>
               {t.rich("consent", {
@@ -435,7 +435,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
             type="button"
             onClick={() => resend.mutate()}
             disabled={resend.isPending || wait.remaining > 0}
-            className="mt-3 w-full rounded-sm text-sm text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:no-underline"
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg text-sm text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:no-underline"
           >
             {wait.remaining > 0 ? ta("resendIn", { seconds: wait.remaining }) : ta("resend")}
           </button>
@@ -445,7 +445,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
               setSent(false);
               request.reset();
             }}
-            className="mt-3 w-full rounded-sm text-sm text-muted underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg text-sm text-muted underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             {t("changeDetails")}
           </button>

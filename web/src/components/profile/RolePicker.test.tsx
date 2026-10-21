@@ -295,7 +295,7 @@ describe("SkillsSection — saying why a standard could not be added or removed"
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
     renderUi(<SkillsSection profile={profile} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Remove: / }));
 
     expect(await screen.findByText("That standard is not on your profile")).toBeTruthy();
   });

@@ -111,9 +111,10 @@ export function TagSection({
           {entries.map((e) => (
             <li
               key={e.id}
-              className="inline-flex items-center gap-2 rounded-lg border border-border-token bg-background px-3 py-1.5 text-sm"
+              className="inline-flex items-center gap-1 rounded-lg border border-border-token bg-background pl-3 text-sm"
             >
               {render(e)}
+              {/* The whole chip's height is the target: a 10 px "x" was the smallest control on the page. */}
               <button
                 type="button"
                 aria-label={t("delete")}
@@ -126,7 +127,7 @@ export function TagSection({
                     { onError: (err) => setError(detailOf(err) ?? te("generic")) },
                   );
                 }}
-                className="text-muted hover:text-danger-text"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:text-danger-text"
               >
                 ×
               </button>

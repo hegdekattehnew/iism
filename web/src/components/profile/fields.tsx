@@ -36,19 +36,30 @@ export function EntryRow({
 }) {
   return (
     <li className="flex flex-wrap items-start gap-3 rounded-lg border border-border-token bg-background px-3 py-2.5">
-      <div className="min-w-0 flex-1">
+      {/* `basis-48`, not `flex-1`: on a phone the two 44 px buttons would squeeze the title into a column
+          four lines tall; this lets them drop below it instead. */}
+      <div className="min-w-0 grow basis-48">
         <p className="text-sm font-medium">{title}</p>
         {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
         {meta && <p className="mt-0.5 text-xs text-muted">{meta}</p>}
       </div>
-      <div className="flex shrink-0 gap-3 text-xs">
-        <button type="button" onClick={onEdit} className="text-brand hover:underline">
+      {/* 44 px each (the row is the data's, the buttons are the page's), and named for their row: ten
+          "Remove" buttons are ten identical names to a screen reader. The label contains the visible
+          word, as a label must (WCAG 2.5.3). */}
+      <div className="ml-auto flex shrink-0 gap-1 text-sm">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`${editLabel}: ${title}`}
+          className="inline-flex min-h-11 items-center rounded-lg px-3 text-brand hover:underline"
+        >
           {editLabel}
         </button>
         <button
           type="button"
           onClick={onRemove}
-          className="text-muted hover:text-danger-text hover:underline"
+          aria-label={`${removeLabel}: ${title}`}
+          className="inline-flex min-h-11 items-center rounded-lg px-3 text-muted hover:text-danger-text hover:underline"
         >
           {removeLabel}
         </button>
