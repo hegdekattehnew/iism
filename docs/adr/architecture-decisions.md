@@ -4519,3 +4519,41 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Verified:** `tsc`, `eslint`, **1,143 web tests (57 new)**: `MetricTile`, the listing states (a truth table and the looks), both dashboards' tiles, a vacancy's and a course's chip (each state's tone and a different shape each), the counts, both inboxes' chips (and the score's shape differing from the New chip's), the team's marks, roles and invitation states, `ROW_LOOK` and the upload's two controls, and a source guard for the lazy workspaces. **43 mutation checks, all killed** after five first survived (a course chip's icon, the score's icon, two invitation shapes: each asserted by presence of a drawing and never by its difference; and one mutant that was not a mutant, a class that did nothing).
 - **Not verified, and the reason is stated again:** **nothing ran in Playwright** (no Chromium; the download was declined for Sprint 85). Sprints 85 to 87 passed their CI E2E; the existing journeys' selectors on these pages, the sweep's axe contrast in light and dark, its layout-shift score (**the two-stage placeholder is exactly what it measures**) and the target ratchet have not run against this change. The criterion "no browser journey selector breaks" is therefore **not verified**.
 - **Not done and not claimed:** the candidate shortlist, the sponsor panel, organisation settings and the two editors (the editors were migrated to the field library in Sprint 79 and are unchanged); the employer's applicant name still shows when the person applied (a de-identified reference otherwise; no avatar, because a mark made of a reference's letter would be a fact about nobody); Hindi and light mode.
+
+
+## ADR-098: The Back Office and the Static Pages Say Where Things Stand With a Shape, a Complaint's State Is One Table for Both Its Readers, and the Error Page Has No Picture
+
+**Status:** Accepted (October 2026). Sprint 89 (Epic B19, BL-19.19 and BL-19.20). Extends ADR-096 and ADR-097 (a state is a word, a shape and a tone, one table per list; a figure has a mark), ADR-083 (the back office's structure and the 44 px floor), ADR-089 (the barrel puts what it names on every route) and ADR-087 (an icon is paid for by every route that loads it). Web only and frontend only: no migration, no API or contract change (54 operations), no new icon, no new message string.
+
+**Context:** The back office was already folded, tiered and at the 44 px floor (Sprint 73) and its queues' structure is not what this story changes. What it still had was the old look: an overview of six bare numbers, a queue card whose state was a coloured word, an overdue complaint shown as a word with no mark, a verification badge as text. The static pages (about, employers, providers, the legal pages, the contact and grievance forms, 404 and error) had text and nothing else, and a grievance's state was drawn **twice, by two different local tables**: once in the operator's queue and once in the list the person who complained sees.
+
+**Decision:**
+
+- **A complaint's state is one table**, `cards/grievance-look` (`GRIEVANCE_LOOK`: open, acknowledged, resolved, dismissed, each a tone and a shape), read by the operator's queue **and** by the sender's own list. Before, each had its own tone map and the person's list had no shape at all.
+- **The overview's six figures are `MetricTile`s** (ADR-097), each with a mark and a dash while the number has not arrived, the same shape before and after (ADR-065).
+- **Every state in the queues has a shape**: a verification request's kind (employer or provider), a complaint's overdue marks (a triangle on each overdue stage), a reported listing's removed and report-count chips, an organisation's verified badge and each decision in its history. **The queues' structure, the folded panels and `admin-sections` are untouched.**
+- **The static pages' audience cards take an optional `icons` prop** (`AudiencePage`), an `IconTile` before each card title on About, Employers and Providers. The 404 has a search mark, a placeholder page a clock in its "Drafting" badge, a legal page a warning in its draft badge and a shield beside the grievance officer.
+- **The error page has no picture.** `error.tsx` is in every route's first load; a mark there would be paid for by all of them, and `/profile` has under 1 KB left. The 404 is not in the shared graph and has one.
+- **Controls on these pages are 44 px**: the grievance form's radio rows (22 px) and a legal page's account link (18 px).
+
+**Options considered:**
+
+1. Give the queues pagination while restyling them
+2. **Leave their structure alone and change what each row says** (chosen)
+3. Keep the two local grievance tables and add shapes to each
+4. **One table for both readers** (chosen)
+5. An icon on the error page
+
+**Trade-offs:**
+
+- Option 1: a hundred cards still render in the verification queue, but the browser journeys look organisations up in that queue, and none of them can be run here; a structural change nobody can test is the wrong kind of change to ship in a visual sprint.
+- Option 4: ✅ the operator and the person describe a state in the same shape, and a new status is a compile error (`Record<GrievanceStatus, ...>`) in one place ❌ the person's list now imports a module the queue also imports, which is the point.
+- Option 5: ✅ consistent ❌ every route pays for the factory and the icon; refused for the reason ADR-089 gives.
+
+**Consequences:**
+
+- **Measured** (the built-in browser at 375 x 812, the demonstration database, before and after the same way; `docs/design/screens/measurements.sprint89.json`): `/admin` **29.1 to 30.3 screens** (23,652 to 24,618 px; icons 6 to 112, because the queue holds a hundred rows), About 2,877 to 3,033 px, Employers 2,903 to 3,059, Providers 2,791 to 2,947, the grievance page 2,967 to 3,033, privacy 6,335 to 6,357, careers unchanged at 1,451, the 404 1,377 to 1,433; **controls under 44 px: `/admin` 0 to 0, the grievance page 1 to 0 (before the radio rows were fixed: 4), privacy 1 to 0** (the account link).
+- **First load:** `/admin` **695,554 to 697,221** (headroom 2,779); **`/profile` is unchanged at 699,013 (headroom 987) and is still the closest route**; About 664,247, Employers and Providers 663,326, grievance 671,499 (sprint-start figures were not all taken: only `/admin` and `/profile` were compared against `main`).
+- **Verified:** `tsc`, `eslint`, **1,178 web tests (35 new)**: `AudiencePage`'s icons and the three pages' marks (by walking the page's returned element tree), the 404, the placeholder and the legal pages (including the 44 px link), the overview's tiles, each queue's chips and their shapes, `MessageForm`'s radio rows and the person's list per status (a shape equal to the table's, and four shapes that differ). **33 mutation checks, all killed** after the grievance icons, the overdue triangle and the person's list chip each first survived (asserted by presence, not by equality with the table's shape).
+- **Not verified, as in Sprints 85 to 88:** **nothing ran in Playwright** (no Chromium; the download was declined). The existing journeys' selectors on `/admin` and the contact pages, the sweep's axe contrast in light and dark, its layout-shift score and the target ratchet have not run against this change; CI's E2E is the first real run. The ratchet baseline is not re-recorded (the grievance and privacy counts only fall).
+- **Not done and not claimed:** the verification queue still renders up to a hundred cards at once (paging it needs its journeys run); the alias, programme and enrolment panels were not re-looked beyond their shared pieces; the invite page and the employers' demonstration page; Hindi, Malay and light mode; the new strings none (no message changed), but every page's Hindi look is the engineer's.

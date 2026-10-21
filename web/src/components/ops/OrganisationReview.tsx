@@ -3,7 +3,9 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { CheckCircleIcon, InfoIcon, ShieldCheckIcon, XCircleIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
 import { statusOf } from "@/lib/http";
 import { detailOf } from "@/lib/http";
 import { NOTE_MAX, NOTE_MIN, useSetVerification, useVerificationDetail } from "@/lib/ops";
@@ -55,9 +57,9 @@ export function OrganisationReview({ slug }: { slug: string }) {
     <>
       <div className="mt-2 flex flex-wrap items-baseline gap-3">
         <h1 className="text-3xl font-bold tracking-tight">{data.name}</h1>
-        <Badge tone={data.is_verified ? "good" : "neutral"}>
+        <StatusChip tone={data.is_verified ? "good" : "neutral"} icon={data.is_verified ? ShieldCheckIcon : InfoIcon}>
           {t(data.is_verified ? "verified" : "notVerified")}
-        </Badge>
+        </StatusChip>
       </div>
 
       {data.is_verified && data.verified_at ? (
@@ -139,9 +141,12 @@ export function OrganisationReview({ slug }: { slug: string }) {
               className="border-t border-border-token py-3 first:border-t-0"
             >
               <div className="flex flex-wrap items-baseline gap-2">
-                <Badge tone={event.decision === "granted" ? "good" : "warn"}>
+                <StatusChip
+                  tone={event.decision === "granted" ? "good" : "warn"}
+                  icon={event.decision === "granted" ? CheckCircleIcon : XCircleIcon}
+                >
                   {t(event.decision === "granted" ? "granted" : "revoked")}
-                </Badge>
+                </StatusChip>
                 <span className="text-sm text-muted">
                   {format.dateTime(new Date(event.created_at), { dateStyle: "medium" })}
                   {" · "}

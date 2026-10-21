@@ -1,8 +1,9 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContactForm } from "@/components/ContactForm";
 import { GrievanceForm } from "@/components/GrievanceForm";
+import { GRIEVANCE_LOOK } from "@/components/cards/grievance-look";
 import { renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -240,5 +241,52 @@ describe("the grievance form", () => {
       screen.queryByRole("heading", { name: "What you have sent" }),
     ).toBeNull();
     expect(GET).not.toHaveBeenCalled();
+  });
+});
+
+/** Sprint 89, BL-19.19/19.20: the kind chooser's rows are 44 px, and what a person has sent has a shape per status. */
+describe("the grievance form -- targets and the person's own list", () => {
+  it("makes each kind a 44 px row with a 20 px radio", () => {
+    renderUi(<GrievanceForm />);
+    for (const radio of screen.getAllByRole("radio")) {
+      expect((radio.closest("label") as HTMLElement).className).toContain("min-h-11");
+      expect(radio.className).toContain("h-5 w-5");
+    }
+  });
+
+  it.each([
+    ["open", "Received", "bg-warning-surface"],
+    ["acknowledged", "Being looked at", "bg-accent-soft"],
+    ["resolved", "Resolved", "bg-success-surface"],
+    ["dismissed", "Closed", "bg-surface-muted"],
+  ])("draws a message that is %s as %s on %s, with a shape", async (status, word, token) => {
+    GET.mockResolvedValue({
+      data: [{ reference: "GRV-ABC234", kind: "grievance", status, created_at: "2026-10-01T08:00:00Z", acknowledged_at: null, resolved_at: null }],
+      error: undefined,
+      response: { status: 200 },
+    });
+    renderUi(<GrievanceForm />);
+    const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+    expect(chip.className).toContain(token);
+    expect(chip.querySelector("svg")).toBeTruthy();
+  });
+
+  it("draws each status in the shape its look names, and the four are four different shapes", async () => {
+    const shapes: string[] = [];
+    for (const [status, word] of [["open", "Received"], ["acknowledged", "Being looked at"], ["resolved", "Resolved"], ["dismissed", "Closed"]] as const) {
+      GET.mockResolvedValue({
+        data: [{ reference: "GRV-ABC234", kind: "grievance", status, created_at: "2026-10-01T08:00:00Z", acknowledged_at: null, resolved_at: null }],
+        error: undefined,
+        response: { status: 200 },
+      });
+      const { unmount } = renderUi(<GrievanceForm />);
+      const chip = (await screen.findByText(word, { selector: "span" })) as HTMLElement;
+      const Icon = GRIEVANCE_LOOK[status].icon;
+      const expected = render(<Icon />).container.querySelector("svg")!.innerHTML;
+      expect(chip.querySelector("svg")!.innerHTML).toBe(expected);
+      shapes.push(expected);
+      unmount();
+    }
+    expect(new Set(shapes).size).toBe(4);
   });
 });

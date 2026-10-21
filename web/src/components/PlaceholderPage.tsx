@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 
 import { ButtonLink } from "@/components/ui";
+import { ClockIcon } from "@/components/ui/icons";
 
 /** Every not-yet-built route renders this, so navigation is complete from day
  *  one and content can be dropped in without touching layout. */
@@ -23,7 +24,8 @@ export async function PlaceholderPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:py-28">
-      <p className="inline-flex items-center rounded-full border border-border-token bg-surface-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
+      <p className="inline-flex items-center gap-1.5 rounded-full border border-border-token bg-surface-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
+        <ClockIcon className="h-4 w-4" />
         {tp("badge")}
       </p>
       <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
