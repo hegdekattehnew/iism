@@ -1,0 +1,167 @@
+{
+  "sprint": 87,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000, dark colour scheme, English, signed in as +919000000006 (a demonstration seeker with one application, one course interest and, for the after run, one saved job; not a golden account). BEFORE = measured at the start of the sprint on main; AFTER = this branch, same pages, same function. NOT the capture script and NOT the sweep (no Chromium on the machine). A control under 44 px is an a/button/select/input/textarea/[role] narrower or shorter than 43.5 px, a checkbox by its label; a sentence's inline link is exempt, as in the sweep and in WCAG 2.5.8.",
+  "pages": {
+    "applications": {
+      "url": "/en/applications",
+      "before": {
+        "pageHeight": 1467,
+        "screens": 1.8,
+        "smallControls": 0,
+        "svgs": 8
+      },
+      "after": {
+        "pageHeight": 1513,
+        "screens": 1.9,
+        "smallControls": 0,
+        "svgs": 10
+      },
+      "note": "one application; the state is now a chip with a shape beside a dated icon chip, on the employer's mark"
+    },
+    "interests": {
+      "url": "/en/interests",
+      "before": {
+        "pageHeight": 1501,
+        "screens": 1.8,
+        "smallControls": 0,
+        "svgs": 8
+      },
+      "after": {
+        "pageHeight": 1507,
+        "screens": 1.9,
+        "smallControls": 0,
+        "svgs": 10
+      }
+    },
+    "saved": {
+      "url": "/en/saved",
+      "before": {
+        "pageHeight": 1557,
+        "screens": 1.9,
+        "note": "the empty state: the account had nothing saved"
+      },
+      "after": {
+        "pageHeight": 1455,
+        "screens": 1.8,
+        "savedRow": "335x128 (three-line title)",
+        "smallControls": 0,
+        "svgs": 9,
+        "note": "one saved job: not comparable with the empty state"
+      }
+    },
+    "account": {
+      "url": "/en/account",
+      "before": {
+        "pageHeight": 2718,
+        "screens": 3.3,
+        "smallControls": 1,
+        "smallExamples": [
+          "Read the privacy notice 167x18"
+        ],
+        "svgs": 9
+      },
+      "after": {
+        "pageHeight": 2800,
+        "screens": 3.4,
+        "smallControls": 0,
+        "svgs": 13,
+        "sectionsWithMark": 4
+      }
+    },
+    "career-paths": {
+      "url": "/en/career-paths",
+      "before": {
+        "pageHeight": 3991,
+        "screens": 4.9,
+        "smallControls": 1,
+        "smallExamples": [
+          "course budget input 144x40"
+        ]
+      },
+      "after": {
+        "pageHeight": 4003,
+        "screens": 4.9,
+        "smallControls": 0,
+        "budgetInput": "144x44"
+      }
+    },
+    "notifications": {
+      "url": "/en/notifications",
+      "before": {
+        "pageHeight": 1537,
+        "screens": 1.9,
+        "note": "the empty state"
+      },
+      "after": "not measured live: the demonstration account has no notices; the rows (a tile per kind, two 44 px actions) are held by unit tests only"
+    },
+    "matches": {
+      "url": "/en/matches",
+      "before": {
+        "pageHeight": 3597,
+        "screens": 4.4,
+        "smallControls": 0,
+        "svgs": 8
+      },
+      "after": "not changed this sprint (already on the shared card since Sprints 70 and 84)"
+    }
+  },
+  "firstLoadJsBytes": {
+    "note": "build:e2e then route-bundle-stats.json; main (after Sprint 86) and this branch built the same way",
+    "routes": {
+      "/[locale]/profile": [
+        698914,
+        699013
+      ],
+      "/[locale]/employer/[org]": [
+        698604,
+        698703
+      ],
+      "/[locale]/matches": [
+        690580,
+        690576
+      ],
+      "/[locale]/applications": [
+        682093,
+        685397
+      ],
+      "/[locale]/saved": [
+        678995,
+        680901
+      ],
+      "/[locale]/interests": [
+        667161,
+        668683
+      ],
+      "/[locale]/notifications": [
+        670636,
+        672421
+      ],
+      "/[locale]/account": [
+        675444,
+        679678
+      ],
+      "/[locale]/career-paths": [
+        676937,
+        676933
+      ],
+      "/[locale]/jobs": [
+        678475,
+        678950
+      ],
+      "/[locale]/courses": [
+        674386,
+        674861
+      ]
+    },
+    "format": "[before, after]",
+    "explanation": "+99 on routes that import none of the changed files is the shared chunk's bookkeeping again (Sprints 85 and 86 saw +98 and about +400). /profile imports CredentialsSection, which gained an optional icon prop but does not import the icon module (a test holds that), so the profile's own change is about nothing. The candidate routes that now draw icons pay for them: /applications +3,304 (the card, the status shapes, the mark, a notice tile), /account +4,234 (the icon module and four tiles), /notifications +1,785 and /saved +1,906 and /interests +1,522. /matches and /career-paths are unchanged (-4): the budget field moved onto the field library those pages already load."
+  },
+  "notRun": [
+    "make e2e (the existing journeys and Sprint 85/86's, which passed in CI)",
+    "the sweep's axe contrast, layout shift and target ratchet",
+    "the capture script",
+    "Hindi, light mode, desktop",
+    "live notification rows"
+  ]
+}

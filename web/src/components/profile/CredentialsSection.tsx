@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Field, Text } from "@/components/profile/fields";
 import { Alert, Badge, Button, Skeleton } from "@/components/ui";
@@ -36,14 +36,17 @@ type Mode = "idle" | "typing" | "code" | "removing";
  * asked to add an email, the one recovery that works before SMS is registered and the place a
  * notice of a change can be sent.
  */
-export function CredentialsSection() {
+export function CredentialsSection({ icon }: { icon?: ReactNode } = {}) {
   const t = useTranslations("credentials");
   const { data: me, isPending } = useMemberships();
 
   if (isPending) {
     return (
       <section className="rounded-xl border border-border-token bg-surface p-6">
-        <h2 className="text-base font-semibold">{t("title")}</h2>
+        <div className="flex items-center gap-3">
+          {icon}
+          <h2 className="text-base font-semibold">{t("title")}</h2>
+        </div>
         <Skeleton className="mt-4 h-28 w-full" />
       </section>
     );
@@ -55,7 +58,12 @@ export function CredentialsSection() {
 
   return (
     <section className="rounded-xl border border-border-token bg-surface p-6">
-      <h2 className="text-base font-semibold">{t("title")}</h2>
+      {/* The account page passes a mark; the profile passes nothing, so the icon factory stays off
+          the profile's first load (it has about 1 KB left). */}
+      <div className="flex items-center gap-3">
+        {icon}
+        <h2 className="text-base font-semibold">{t("title")}</h2>
+      </div>
       <p className="mt-1 text-sm text-muted">{t("subtitle")}</p>
       {me.phone && !me.email && (
         <Alert tone="info" role={undefined} className="mt-3">

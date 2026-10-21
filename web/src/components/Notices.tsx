@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 
+import { NoticeTile } from "@/components/NoticeTile";
 import { Alert, Button } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -90,16 +91,24 @@ export function Notices() {
           // A status notice is shown on the page its link would open.
           const path = ON_THIS_PAGE.includes(notice.template) ? null : noticePath(notice);
           return (
-            <li key={notice.id} className="text-sm">
-              <span>{describe(notice)}</span>{" "}
-              {path && (
-                <Link href={path} className="text-brand underline underline-offset-2 hover:text-brand-strong">
-                  {t("open")}
-                </Link>
-              )}{" "}
-              <span className="text-xs text-muted">
-                {format.relativeTime(new Date(notice.created_at), now)}
-              </span>
+            <li key={notice.id} className="flex items-start gap-3 text-sm">
+              <NoticeTile template={notice.template} unread />
+              <div className="min-w-0 flex-1">
+                <span>{describe(notice)}</span>{" "}
+                <span className="text-xs text-muted">
+                  {format.relativeTime(new Date(notice.created_at), now)}
+                </span>
+                {path && (
+                  <div>
+                    <Link
+                      href={path}
+                      className="-ml-2 inline-flex min-h-11 items-center rounded-lg px-2 text-brand underline underline-offset-2 hover:text-brand-strong"
+                    >
+                      {t("open")}
+                    </Link>
+                  </div>
+                )}
+              </div>
             </li>
           );
         })}

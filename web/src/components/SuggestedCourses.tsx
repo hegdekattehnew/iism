@@ -4,6 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Badge, Button } from "@/components/ui";
+import { Field, Input } from "@/components/ui/field";
 import { Link } from "@/i18n/navigation";
 import type { components } from "@/lib/api-schema";
 import {
@@ -145,9 +146,8 @@ export function CourseBudgetControl() {
         apply();
       }}
     >
-      <label className="block text-xs font-medium">
-        {t("budgetLabel")}
-        <input
+      <Field label={t("budgetLabel")}>
+        <Input
           type="number"
           name="budget_inr"
           inputMode="numeric"
@@ -157,9 +157,9 @@ export function CourseBudgetControl() {
           value={shown}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={apply}
-          className="mt-1 block w-36 rounded-lg border border-input-border bg-background px-3 py-2 text-sm"
+          className="w-36"
         />
-      </label>
+      </Field>
       {budget !== null && (
         <Button
           type="button"

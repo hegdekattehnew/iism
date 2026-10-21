@@ -1,31 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
-import { ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
+import { InterestCard } from "@/components/cards/InterestCard";
+import { ButtonLink, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { components } from "@/lib/api-schema";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BookOpenIcon } from "@/components/ui/icons";
-
-// From the generated client, never restated: the hand-written three-value copy
-// plus a cast let `enrolled` reach this screen with no colour and no wording,
-// so a learner who had been enrolled saw a raw message key.
-type Status = components["schemas"]["InterestOut"]["status"];
-
-const TONE: Record<Status, string> = {
-  registered: "bg-surface-muted text-foreground",
-  contacted: "bg-success-surface text-success-text",
-  enrolled: "bg-success-surface text-success-text",
-  withdrawn: "bg-warning-surface text-warning-text",
-};
 
 /** Which courses the learner has asked about, and where each stands. */
 export function InterestList() {
   const t = useTranslations("courseInterest");
-  const format = useFormatter();
   const { data, isPending, isError } = useQuery({
     queryKey: ["me", "course-interests"],
     queryFn: async () => {
@@ -50,41 +36,11 @@ export function InterestList() {
 
   return (
     <ul className="mt-8 space-y-4">
-      {data.map((interest) => {
-        const status: Status = interest.status;
-        return (
-          <li key={interest.id}>
-            <Card>
-              <CardBody>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    {/* The title the API resolved for this locale (ADR-041). */}
-                    <Link
-                      href={`/courses/${interest.course.slug}`}
-                      className="text-base font-semibold hover:underline"
-                    >
-                      {interest.course.title}
-                    </Link>
-                    <p className="mt-0.5 text-sm text-muted">{interest.course.tenant.name}</p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${TONE[status]}`}
-                  >
-                    {t(`status.${status}`)}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-muted">
-                  {t("registeredOn", {
-                    date: format.dateTime(new Date(interest.registered_at), {
-                      dateStyle: "medium",
-                    }),
-                  })}
-                </p>
-              </CardBody>
-            </Card>
-          </li>
-        );
-      })}
+      {data.map((interest) => (
+        <li key={interest.id}>
+          <InterestCard interest={interest} />
+        </li>
+      ))}
     </ul>
   );
 }

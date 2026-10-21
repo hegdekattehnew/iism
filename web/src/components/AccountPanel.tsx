@@ -7,6 +7,8 @@ import { useState } from "react";
 import { ConsentSection } from "@/components/ConsentSection";
 import { CredentialsSection } from "@/components/profile/CredentialsSection";
 import { Alert, Button } from "@/components/ui";
+import { IconTile } from "@/components/ui/icon-tile";
+import { AlertTriangleIcon, InboxIcon, UserIcon } from "@/components/ui/icons";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { clearTokens, useIsSignedIn } from "@/lib/auth";
@@ -93,7 +95,13 @@ function SignedIn() {
     <div className="mt-8 space-y-6">
       {/* Every signed-in person, not only a candidate: an organisation-only account has no profile
           page, and its owner signs in by email, so this is where a lost address is dealt with. */}
-      <CredentialsSection />
+      <CredentialsSection
+        icon={
+          <IconTile>
+            <UserIcon />
+          </IconTile>
+        }
+      />
 
       <ConsentSection />
 
@@ -101,9 +109,14 @@ function SignedIn() {
         aria-labelledby="export-heading"
         className="rounded-xl border border-border-token bg-surface p-5"
       >
-        <h2 id="export-heading" className="text-base font-semibold">
-          {t("exportTitle")}
-        </h2>
+        <div className="flex items-center gap-3">
+          <IconTile>
+            <InboxIcon />
+          </IconTile>
+          <h2 id="export-heading" className="text-base font-semibold">
+            {t("exportTitle")}
+          </h2>
+        </div>
         <p className="mt-1 text-sm text-muted">{t("exportBody")}</p>
         <Button
           variant="secondary"
@@ -124,9 +137,14 @@ function SignedIn() {
         aria-labelledby="delete-heading"
         className="rounded-xl border border-border-token bg-surface p-5"
       >
-        <h2 id="delete-heading" className="text-base font-semibold">
-          {t("deleteTitle")}
-        </h2>
+        <div className="flex items-center gap-3">
+          <IconTile tone="warn">
+            <AlertTriangleIcon />
+          </IconTile>
+          <h2 id="delete-heading" className="text-base font-semibold">
+            {t("deleteTitle")}
+          </h2>
+        </div>
         <p className="mt-1 text-sm text-muted">{t("deleteBody")}</p>
 
         {!confirming ? (
