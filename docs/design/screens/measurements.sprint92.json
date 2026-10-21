@@ -1,0 +1,31 @@
+{
+  "sprint": 92,
+  "captured": "2026-10-21",
+  "method": "Computed from the tokens in web/src/app/globals.css (WCAG 2 contrast; CIELAB distance, D65) and read from the production build's route-bundle-stats.json. The in-app browser was used to look at the home, a vacancy, a workspace and the logo in light and dark. NOT the sweep (no Chromium on the machine).",
+  "brand": {"ramp": ["#ecf8f8", "#d1eeef", "#a5dde0", "#6cc4c9", "#35a5ac", "#1b868e", "#136d75", "#0f5c63", "#0a3f44", "#062629"], "light": "700 #0f5c63", "dark": "400 #35a5ac", "greys": "unchanged"},
+  "contrast": {
+    "brand700 on page / white / tint50 (light)": [7.3, 7.7, 7.1],
+    "white on brand700 (button)": 7.7,
+    "brand400 on dark page / surface / tint900": [6.3, 5.8, 5.4],
+    "on-brand900 on brand400 (dark button)": 5.4,
+    "highlight-on on highlight fill": 8.5,
+    "highlight fill on white (why it is a fill only)": 2.0,
+    "highlight fill vs warning solid (why it never marks a state)": 1.07
+  },
+  "successMovedFromEmeraldToGreen": {
+    "why": "beside teal the emerald (hue 160) was a neighbour",
+    "cielabDistanceBefore": {"light brand text vs success text": 18.4, "light brand soft vs success surface": 15.1, "dark brand soft vs success surface": 10.7},
+    "cielabDistanceAfter": {"light brand text vs success text": 42.5, "light brand soft vs success surface": 17.8, "dark brand soft vs success surface": 20.6},
+    "tokens": {"light": {"surface": "#d6f5d6", "border": "#7dd47d", "text": "#0d4a0d", "solid": "#2e9e44"}, "dark": {"surface": "#092509", "border": "#206020", "text": "#87e887", "solid": "#5ad85a"}}
+  },
+  "firstLoadBytes": {
+    "method": "npm run build:e2e then .next-e2e/diagnostics/route-bundle-stats.json; ceiling 700000",
+    "/profile": {"before": 699148, "after": 699172, "headroom": 828},
+    "/admin": {"before": 697382, "after": 697406, "headroom": 2594},
+    "/": {"before": 670034, "after": 670058},
+    "/jobs/[slug]": {"after": 672713},
+    "/courses/[slug]": {"before": 667998, "after": 668022}
+  },
+  "phoneBundle": {"android_bytes": 3734536, "ceiling": 3800000},
+  "tests": {"backend": 2114, "web": 1241, "mobile": 814}
+}

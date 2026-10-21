@@ -4639,3 +4639,43 @@ the condition for enforcing it had been met for two sprints with no one assigned
 - **Verified:** `tsc`, `eslint`, **1,226 web tests (39 new)**: `HomeAccess` (nine states), the switcher's label (four), the reply rule, the interest card and panel, the provider's chip, the course page's started and not-started facts, `RoleStarter` (eight, including the race), and the words and the stylesheet rule in `first-fixes.test.ts`. **28 mutation checks**; two survived and both were closed (a condition made redundant by the order of the branches around it was removed from the code; a defensive de-duplication got a test that races two lookups).
 - **Not verified, as in Sprints 85 to 90:** nothing ran in Playwright (no Chromium). The sweep, axe and the layout-shift score on the home for a signed-in browser have not run against this change.
 - **Not done and not claimed:** the reminder to a provider; the other thirteen findings (BL-22.4 to BL-22.9, and the two that are the owner's: status reaching a learner outside the app, and a native Hindi read); the Hindi in the new strings is the engineer's and needs a native reader, and the Malay catalogue carries English for them as it does elsewhere; **the palette is decided (deep teal, marigold highlight) and not yet built**: nothing in the product's colour has changed until BL-21.2.
+
+
+## ADR-101: The Brand Is Deep Teal, Success Is Moved to a True Green Because Hue Is Measured and Not Guessed, the Highlight Is Decoration Only, and the Public Sees a Score Only From Three Ratings
+
+**Status:** Accepted (October 2026). Sprint 92 (Epic B21, BL-21.2 to BL-21.5; Epic B22, BL-22.4 in part and BL-22.6). Supersedes the part of ADR-086 that fixed brand-700 at the product's old blue (`#1f4e79`, "the colour the product has always used"); everything else in ADR-086 stands (the look is a token, a ramp step is never a class, text is never translucent). Extends ADR-096 (a state is a word, a shape and a tone). Web and phone, frontend only: no migration, no API or contract change (54 operations), no new icon.
+
+**Context:** The owner chose deep teal with a marigold highlight on 2026-10-21 (ADR-100; aqua, sky and indigo were asked for and not taken). The system was built so that a brand change is mostly one file, and it was: the ramp and four semantic tokens in `globals.css` (once for light, twice for dark), a regeneration of the phone's tokens, the manifest's theme colour, an icon and four images, the adaptive icon's background. About 73 components use `brand-*` and `accent-*` classes and none was edited.
+
+**Decision:**
+
+- **Deep teal.** Brand ramp `#ecf8f8` to `#062629`, 700 is `#0f5c63` (7.7:1 on white, 7.3 on the page, white on it 7.7), dark brand is 400 `#35a5ac` (6.3:1 on the dark page). **The neutral greys are unchanged** (the owner kept them), so the address bar's colours, the manifest's background, the offline page and the phone's splash did not move. The mapping of each semantic token to a ramp step is unchanged, which is why every mapping test passed untouched; the one pin on a value (`brand-700`) was rewritten with its reason.
+- **Success moved from emerald (hue 160) to a true green (hue 120).** Found by measuring distance in CIELAB, not by looking: beside teal the emerald was a neighbour (surfaces 15 apart and texts 18 apart in light; the pale dark surfaces 10.7), and a contrast ratio says nothing about hue. At hue 120 the texts are 42 apart, the light surfaces 18, the dark surfaces 21 (about 20 is what is told apart at a glance). "Verified" must never read as "brand". `tests/test_design_tokens.py` holds the distances and the hue (105 to 140), and a mutation that put one emerald token back was caught.
+- **The highlight is `--highlight-*`, decoration only.** A fill `#f2a900` with `--highlight-on` `#181c20` (8.5:1) and a tint and text pair per theme. It is the warning colour (1.07:1 against `--warning-solid`) and 2:1 on white, so it is never a state and never text on white. It has two uses: the bottom node of the logo mark (the web header, the four app images, `icon.svg`) and a small tile beside the home page's reassurance line. `web/src/lib/highlight.test.ts` names every file that may use it and forbids it in the status chip, badge, alert, the look tables and the phone's notice and badge.
+- **The icons are rendered from sources that are kept.** `scripts/icons/*.svg` and `make_icons.sh` (`qlmanage`) produce the four PNGs; `icon.svg`, the sources, the manifest, the adaptive-icon background and the stylesheet are held to the same brand and highlight by `test_design_tokens.py`. The offline page's secondary text, `#94a3b8` (a slate that matched no token and that nothing guarded), is now the dark `muted` token and is guarded.
+- **A public rating needs three** (BL-22.4, in part). The vacancy page showed "4 out of 5 from 1 rating". `lib/reputation.ts` shows a score from three ratings, says "not enough ratings yet to show a score" for one or two, and says nothing for none; the person's own dashboard still shows its own. A verified employer or provider also gets one line saying what the mark is ("Reviewed by our team").
+- **The apply bar says what signing in costs** (BL-22.6): "Free. Sign in with your mobile number. No password." under the button (a longer sentence wrapped to two lines and cost 38 px of the phone's fold). **The chips row fades its right edge** on a phone, by less than the gutter so the last chip is whole at the end of the scroll.
+
+**Options considered:**
+
+1. Keep the emerald success and accept brand and success as neighbours
+2. **Move success to a true green** (chosen)
+3. Move the brand toward blue to put distance back
+4. Give the highlight a state role (a "new" or "recommended" chip)
+5. **Decoration only, with a guard** (chosen)
+6. Recolour the PNG icons by hand
+7. **Render them from kept sources** (chosen)
+
+**Trade-offs:**
+
+- Option 3 was the bluer teal in the preview; the owner chose the deep teal.
+- Option 2 changes every green in the product at once; they are all tokens, and the phone's tokens are regenerated.
+- Option 4 would put a warning-coloured chip beside real warnings.
+- The marigold on the logo is small enough to read as a mark and not a caution; if it reads as one on real pages the fallback is saffron (`#e8710a`), one token change.
+
+**Consequences:**
+
+- **Measured:** `docs/design/screens/measurements.sprint92.json`. First load: `/profile` **699,148 to 699,172 (headroom 828)**, `/admin` 697,406 (2,594); the phone's Android bundle 3,734,536 of 3,800,000.
+- **Verified:** `tsc`, `eslint`, `ruff`, **2,114 backend tests**, **1,241 web tests (15 new)**, **814 phone tests**; **23 mutation checks across this sprint's guards**, one survivor (a light success fill reverted to emerald, which the distance tests passed) closed by the hue test.
+- **Not verified, as in Sprints 85 to 91:** nothing ran in Playwright (no Chromium): the sweep's axe contrast in light and dark, the layout-shift score on the home and the vacancy page, and the target ratchet have not run against this change; CI's E2E is the first real run. The browser pane was used to look at the logo, the home, a vacancy and a workspace, not to measure.
+- **Not done and not claimed:** BL-22.4's other half (the unverified strip as one quiet line, wording that escalates only for a listing with reports: the public payload carries no report count); BL-22.6's "never hides the first line of the description" (a sticky bar covers what is under it by design; the page rests it above the footer); the phone's launcher icon and splash are still the Expo template's (BL-19.24, the owner's art); the phone does not yet use the highlight; the Hindi in the new strings is the engineer's and the Malay carries English.

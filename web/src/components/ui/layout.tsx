@@ -59,7 +59,8 @@ export function Logo({ withWordmark = true }: { withWordmark?: boolean }) {
         <g fill="none" stroke="var(--brand-contrast)" strokeWidth="3.2" strokeLinecap="round">
           <circle cx="20" cy="20" r="5.5" />
           <circle cx="44" cy="20" r="5.5" />
-          <circle cx="32" cy="45" r="5.5" />
+          {/* The one warm note in the mark (Sprint 92): the highlight, decoration only. */}
+          <circle cx="32" cy="45" r="5.5" fill="var(--highlight)" />
           <path d="M25 22.5 39 22.5M23 25 30 40M41 25 34 40" />
         </g>
       </svg>

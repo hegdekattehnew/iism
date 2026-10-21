@@ -16,7 +16,7 @@
     "android": {
       "package": "in.iism.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1f4e79",
+        "backgroundColor": "#0f5c63",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

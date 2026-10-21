@@ -274,7 +274,8 @@
     "sortLabel": "Sort by",
     "sortTitle": "A to Z",
     "sortNewest": "Newest first",
-    "filters": "Filters"
+    "filters": "Filters",
+    "verifiedBy": "Reviewed by our team."
   },
   "coursesPage": {
     "title": "Courses",
@@ -328,7 +329,8 @@
     "interestFree": "Registering interest is free. Ask the provider what any fee covers before you pay anyone.",
     "reportThis": "Report this course if it asks you for money.",
     "startedLabel": "Started",
-    "startedAsk": "This group has begun. Ask the provider whether you can still join, or when the next one starts."
+    "startedAsk": "This group has begun. Ask the provider whether you can still join, or when the next one starts.",
+    "verifiedBy": "Reviewed by our team."
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -1379,7 +1381,8 @@
     "vacancyClosed": "This vacancy is closed and is no longer taking applications.",
     "errorWithdrawDecided": "A decision has been made on this application, so it cannot be withdrawn here. Contact the employer.",
     "removed": "Removed by our team",
-    "fromEmployer": "A message from {organisation}"
+    "fromEmployer": "A message from {organisation}",
+    "signInToApplyHint": "Free. Sign in with your mobile number. No password."
   },
   "employerInbox": {
     "title": "Applicants",
@@ -1752,7 +1755,8 @@
     "count": "{count, plural, one {# rating} other {# ratings}}",
     "asEmployer": "Workers rate you",
     "asWorker": "Employers rate you",
-    "ofPoster": "Rated by workers"
+    "ofPoster": "Rated by workers",
+    "notEnough": "not enough ratings yet to show a score"
   },
   "sponsor": {
     "open": "Train and hire",

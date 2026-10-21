@@ -159,6 +159,7 @@ export default async function CourseDetailPage({
           verified={data.tenant.is_verified}
           statement={data.tenant.is_verified ? t("verifiedProvider") : t("notVerifiedYet")}
         >
+          {data.tenant.is_verified && <p className="mt-1 text-muted">{t("verifiedBy")}</p>}
           <p className="mt-1 text-muted">{t("interestFree")}</p>
           {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
           <a

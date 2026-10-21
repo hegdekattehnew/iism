@@ -8,6 +8,7 @@ theme, a size under the 12 px floor, a Hindi line shorter than the English one, 
 Contrast is computed here, from the file, because jsdom has no layout and cannot.
 """
 
+import colorsys
 import json
 import re
 from pathlib import Path
@@ -72,8 +73,14 @@ class TestTheRamps:
         assert LIGHT["neutral-850"] and LIGHT["neutral-950"]
         assert _lum(LIGHT["neutral-950"]) < _lum(LIGHT["neutral-900"]) < _lum(LIGHT["neutral-850"])
 
-    def test_700_is_the_colour_the_product_has_always_used(self) -> None:
-        assert LIGHT["brand-700"].lower() == "#1f4e79"
+    def test_700_is_deep_teal(self) -> None:
+        """The brand is deep teal (Sprint 92, ADR-101), chosen by the owner on 2026-10-21.
+
+        Until then this pinned `#1f4e79`, "the colour the product has always used". The pin is kept,
+        on the new colour, because a ramp step that moves by accident moves every button, link and
+        focus ring at once; a deliberate change edits this line and says why.
+        """
+        assert LIGHT["brand-700"].lower() == "#0f5c63"
 
 
 class TestSemanticTokensNameAStepInEachTheme:
@@ -190,6 +197,121 @@ class TestTheCopiesOfAColour:
     def test_the_offline_page_is_the_dark_page(self) -> None:
         html = (ROOT / "web" / "public" / "offline.html").read_text("utf-8")
         assert f"background: {DARK['background']}; color: {DARK['foreground']}" in html
+
+
+class TestTheHighlight:
+    """The marigold (Sprint 92, ADR-101): decoration only, so what is pinned is that it is readable
+    where it carries a label and that it is the same in the three places that draw it."""
+
+    NAMES = ("highlight", "highlight-on", "highlight-tint", "highlight-text")
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_it_exists_in_both_themes(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        for name in self.NAMES:
+            assert re.fullmatch(r"#[0-9a-f]{6}", tokens[name].lower()), name
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_a_label_on_the_fill_is_readable(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        assert contrast(tokens["highlight-on"], tokens["highlight"]) >= 4.5
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_its_text_is_readable_on_its_tint(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        assert contrast(tokens["highlight-text"], tokens["highlight-tint"]) >= 4.5
+
+    def test_the_fill_is_never_text_on_white(self) -> None:
+        """2:1: the reason it is a fill. Fails if it is darkened into text without a reason."""
+        assert contrast(LIGHT["highlight"], LIGHT["surface"]) < 3.0
+
+    def test_it_is_not_the_warning_colour_by_accident(self) -> None:
+        """It *is* near the warning solid (1.07:1), the standing reason it never marks a state.
+
+        If the two ever drift apart, this is the test to revisit that rule at.
+        """
+        assert contrast(LIGHT["highlight"], LIGHT["warning-solid"]) < 1.2
+
+    def test_the_icons_and_the_phone_use_the_same_two_colours(self) -> None:
+        icon = (ROOT / "web" / "public" / "icon.svg").read_text("utf-8").lower()
+        assert LIGHT["brand"].lower() in icon
+        assert LIGHT["highlight"].lower() in icon
+        for source in sorted((ROOT / "scripts" / "icons").glob("*.svg")):
+            text = source.read_text("utf-8").lower()
+            assert LIGHT["brand"].lower() in text, source.name
+            assert LIGHT["highlight"].lower() in text, source.name
+        app = json.loads((ROOT / "mobile" / "app.json").read_text("utf-8"))
+        background = app["expo"]["android"]["adaptiveIcon"]["backgroundColor"]
+        assert background.lower() == LIGHT["brand"].lower()
+
+    def test_the_offline_pages_secondary_text_is_the_dark_muted_token(self) -> None:
+        """Was `#94a3b8`, a slate that matched no token and that nothing guarded (Sprint 92)."""
+        html = (ROOT / "web" / "public" / "offline.html").read_text("utf-8")
+        assert f"color: {DARK['muted']}" in html
+
+
+def _lab(hex_: str) -> tuple[float, float, float]:
+    """CIELAB (D65), to measure how different two colours look rather than how light they are."""
+
+    def linear(v: float) -> float:
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (linear(v) for v in _rgb(hex_))
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+
+    def f(t: float) -> float:
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    return (116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z)))
+
+
+def _delta_e(a: str, b: str) -> float:
+    return sum((p - q) ** 2 for p, q in zip(_lab(a), _lab(b), strict=True)) ** 0.5
+
+
+class TestTheBrandIsNotTheSuccessColour:
+    """Deep teal and an emerald were neighbours (Sprint 92, ADR-101): "verified" read as "brand".
+
+    A contrast ratio says nothing about hue, so the distance is measured in CIELAB (about 20 is the
+    least that is told apart at a glance). Written against the product's own pairings: a brand chip
+    sits beside a verified mark, a brand tint beside a success surface.
+    """
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_text_is_told_apart(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        assert _delta_e(tokens["brand"], tokens["success-text"]) >= 25
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_the_fills_are_told_apart(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        assert _delta_e(tokens["brand"], tokens["success-solid"]) >= 40
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_the_pale_surfaces_are_as_far_apart_as_pale_can_be(self, theme: str) -> None:
+        tokens = LIGHT if theme == "light" else DARK
+        assert _delta_e(tokens["accent-soft"], tokens["success-surface"]) >= 15
+        if theme == "light":  # the dark tint is a deep surface, a different comparison
+            assert _delta_e(tokens["accent-tint"], tokens["success-surface"]) >= 15
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    @pytest.mark.parametrize(
+        "token", ["success-surface", "success-border", "success-text", "success-solid"]
+    )
+    def test_success_is_a_true_green_not_an_emerald(self, theme: str, token: str) -> None:
+        """Hue 105 to 140. The emerald it was (hue 160) sat beside teal and read as the brand."""
+        tokens = LIGHT if theme == "light" else DARK
+        hue = colorsys.rgb_to_hls(*_rgb(tokens[token]))[0] * 360
+        assert 105 <= hue <= 140, f"{theme}: --{token} has hue {hue:.0f}"
+
+    def test_the_measure_can_fail(self) -> None:
+        assert _delta_e("#ffffff", "#000000") > 90
+        assert (
+            _delta_e("#10b981", "#0f5c63") < 60
+        )  # the old emerald against the brand text (a smaller gap)
+        assert _delta_e("#336699", "#336699") == pytest.approx(0.0)
 
 
 class TestTheTypeScale:

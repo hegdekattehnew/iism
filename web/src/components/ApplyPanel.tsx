@@ -166,9 +166,13 @@ export function ApplyPanel({
   }
   if (!signedIn) {
     return (
-      <ButtonLink href="/signin" size="lg">
-        {t("signInToApply")}
-      </ButtonLink>
+      <div>
+        <ButtonLink href="/signin" size="lg">
+          {t("signInToApply")}
+        </ButtonLink>
+        {/* What signing in costs, said before it is pressed (Sprint 92). */}
+        <p className="mt-1.5 text-xs text-muted">{t("signInToApplyHint")}</p>
+      </div>
     );
   }
   // Nothing at all for an organisation-only account, and nothing while we do

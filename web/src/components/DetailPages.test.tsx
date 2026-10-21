@@ -97,9 +97,9 @@ function tileOf(statement: string): HTMLElement {
   return screen.getByText(statement).parentElement!.parentElement!.firstElementChild as HTMLElement;
 }
 
-function serve(data: unknown) {
+function serve(data: unknown, rating: { average: number; count: number } | null = null) {
   GET.mockImplementation(async (path: string) => {
-    if (path.endsWith("poster-rating")) return { data: { rating: null }, response: { status: 200 } };
+    if (path.endsWith("poster-rating")) return { data: { rating }, response: { status: 200 } };
     return { data, response: { status: 200 } };
   });
 }
@@ -161,6 +161,36 @@ describe("the vacancy page", () => {
     }
     expect(within(rows[0]).getByText("Must have")).toBeTruthy();
     expect(within(rows[1]).queryByText("Must have")).toBeNull();
+  });
+
+  /** Sprint 92, B22.4: "4 out of 5 from 1 rating" read as a verdict on an organisation. */
+  it("shows the employer's score from three ratings", async () => {
+    serve(JOB, { average: 4.3, count: 3 });
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.getByText("Rated by workers: 4.3 out of 5 from 3 ratings")).toBeTruthy();
+  });
+
+  it("withholds the score below three ratings, and says why", async () => {
+    serve(JOB, { average: 4, count: 1 });
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.getByText("Rated by workers: not enough ratings yet to show a score")).toBeTruthy();
+    expect(screen.queryByText(/out of 5/)).toBeNull();
+  });
+
+  it("says nothing about ratings when there are none", async () => {
+    serve(JOB, null);
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.queryByText(/Rated by workers/)).toBeNull();
+  });
+
+  it("says what the verified mark means, only for a verified employer", async () => {
+    serve(JOB);
+    const a = await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.getByText("Reviewed by our team.")).toBeTruthy();
+    a.unmount();
+    serve({ ...JOB, tenant: { name: "Apollo Care", is_verified: false } });
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.queryByText("Reviewed by our team.")).toBeNull();
   });
 
   it("is a 404 for an unknown vacancy", async () => {
@@ -226,6 +256,16 @@ describe("the course page", () => {
     const { container } = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
     const labels = [...container.querySelectorAll("dl dt")].map((t) => t.textContent);
     expect(labels.some((l) => l?.startsWith("Where"))).toBe(false);
+  });
+
+  it("says what a provider's verified mark means, and only for a verified provider", async () => {
+    serve({ ...COURSE, tenant: { name: "NSDC Academy", is_verified: true } });
+    const a = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    expect(screen.getByText("Reviewed by our team.")).toBeTruthy();
+    a.unmount();
+    serve(COURSE);
+    await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    expect(screen.queryByText("Reviewed by our team.")).toBeNull();
   });
 
   it("has the provider's strip: not yet verified, free to register, a 44 px report link", async () => {

@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { HomeAccess } from "@/components/HomeAccess";
 import { RoleChooser } from "@/components/RoleChooser";
 import { buttonVariants } from "@/components/ui";
+import { CheckCircleIcon } from "@/components/ui/icons";
 import { Link, getPathname } from "@/i18n/navigation";
 import { EXAMPLE_JOBS } from "@/lib/example-jobs";
 
@@ -113,7 +114,13 @@ export async function Hero() {
               </Link>
             </p>
 
-            <p className="mt-6 text-xs text-muted">{t("trust")}</p>
+            {/* The highlight, as a small mark beside the reassurance (Sprint 92): decoration, not a state. */}
+            <p className="mt-6 flex items-center gap-2 text-xs text-muted">
+              <span aria-hidden className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-md bg-highlight text-highlight-on">
+                <CheckCircleIcon className="h-3.5 w-3.5" />
+              </span>
+              {t("trust")}
+            </p>
           </div>
 
           {/* `max-w-md` while stacked, or at tablet this is a 728px-wide card
