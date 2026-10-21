@@ -27,7 +27,7 @@ export function LocaleSwitcher() {
   const [pending, startTransition] = useTransition();
 
   return (
-    <label className="inline-flex items-center gap-2">
+    <label className="inline-flex min-w-0 items-center gap-2">
       {/* Visible to a screen reader, not to a sighted user: the globe and the
           language name already say what this is. */}
       <span className="sr-only">{t("language")}</span>
@@ -44,7 +44,7 @@ export function LocaleSwitcher() {
         // `font-system`: see the token's note in globals.css. One `हिंदी`
         // here would otherwise pull the Devanagari webfont onto every
         // English page.
-        className="min-h-11 rounded-lg border border-input-border bg-surface px-2.5 py-1.5 font-system text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        className="min-h-11 min-w-0 max-w-full rounded-lg border border-input-border bg-surface px-2.5 py-1.5 font-system text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >
         {VISIBLE_LOCALES.map((l) => (
           <option key={l.code} value={l.code} lang={l.code}>

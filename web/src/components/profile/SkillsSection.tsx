@@ -48,8 +48,8 @@ export function SkillsSection({ profile }: { profile: Profile | null }) {
       <div className="mt-6 border-t border-border-token pt-5">
         <h3 className="text-sm font-medium">{t("roles.fallbackTitle")}</h3>
         <p className="mt-1 text-xs text-muted">{t("roles.fallbackBody")}</p>
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <span className="whitespace-nowrap text-muted">{t("proficiencyLabel")}</span>
+        <label className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">{t("proficiencyLabel")}</span>
           <Select
             value={proficiency}
             onChange={(e) => setProficiency(Number(e.target.value))}

@@ -174,8 +174,8 @@ export function RolePicker({ held }: { held: Set<string> }) {
 
         {list.length > 0 && (
           <div className="mt-5 space-y-3 border-t border-border-token pt-4">
-            <label className="flex items-center gap-2 text-sm">
-              <span className="whitespace-nowrap text-muted">{tp("proficiencyLabel")}</span>
+            <label className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted">{tp("proficiencyLabel")}</span>
               <Select
                 value={proficiency}
                 onChange={(e) => setProficiency(Number(e.target.value))}

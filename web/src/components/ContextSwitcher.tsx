@@ -158,7 +158,9 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
         aria-haspopup="menu"
         className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border-token px-3 py-1.5 text-sm transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >
-        <span className="max-w-[12rem] truncate">{label}</span>
+        {/* Truncated in the header's compact control, wrapped in the mobile menu where there is the whole
+            row: a short label ("Choose workspace") was cut at 200% text (Sprint 90). */}
+        <span className={stacked ? "min-w-0 text-left" : "max-w-[12rem] truncate"}>{label}</span>
         <svg
           viewBox="0 0 20 20"
           className="h-3.5 w-3.5 shrink-0 opacity-60"

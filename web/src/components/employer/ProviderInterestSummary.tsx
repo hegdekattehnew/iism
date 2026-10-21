@@ -44,7 +44,7 @@ export function ProviderInterestSummary({ org }: { org: string }) {
                 >
                   {row.course_title}
                 </Link>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
                   <Badge tone={row.live > 0 ? "good" : undefined}>
                     {t("liveCount", { count: row.live })}
                   </Badge>

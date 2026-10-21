@@ -337,6 +337,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  /* A word longer than its box breaks rather than runs off the screen: a long English name or code
+     in a Hindi page, or any word at 200% text on a 360 px phone (Sprint 90). `anywhere`, not
+     `break-word`: it also lets a flex item shrink below its longest word, so a chip holding
+     "documents/instructions/correspondence" wraps instead of widening the page. It only acts when
+     the word would otherwise overflow, so ordinary text is unchanged. */
+  overflow-wrap: anywhere;
 }
 
 /* A person who asked their device for less movement gets none: no transition, no animation (the

@@ -149,8 +149,8 @@ export function MatchBrowser() {
             key={m.job.slug}
             className="rounded-xl border border-border-token bg-surface p-5"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 grow basis-40">
                 <h2 className="text-base font-semibold">
                   {m.job.title}
                 </h2>

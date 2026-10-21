@@ -8,6 +8,7 @@ workbook are rebuilt from the data (a hand-edited or stale copy fails).
 
 import importlib.util
 import json
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -111,15 +112,13 @@ def test_every_finding_marked_fixed_is_a_finding_and_says_what_was_done() -> Non
     assert m.FIXED, "no finding is marked fixed"
     assert set(m.FIXED) <= ids, f"marked fixed but not a finding: {sorted(set(m.FIXED) - ids)}"
     for fid, what in m.FIXED.items():
-        assert what.startswith(
-            ("Fixed in Sprint 69", "Fixed in Sprint 70", "Fixed in Sprint 73")
-        ), fid
+        assert re.match(r"Fixed (in part, )?in Sprints? (6[89]|[7-9]\d)\b", what), fid
         assert len(what) > 60, fid  # says what was done, not just that something was
     # And the markdown shows it: the status column is not dropped on the way to the reader.
     markdown = (DESIGN / "ui-review.md").read_text(encoding="utf-8")
     for fid in m.FIXED:
         row = next(line for line in markdown.splitlines() if line.startswith(f"| **{fid}**"))
-        assert "Fixed in Sprint 6" in row or "Fixed in Sprint 7" in row, fid
+        assert re.search(r"Fixed (in part, )?in Sprints? \d", row), fid
     open_row = next(line for line in markdown.splitlines() if line.startswith("| **UI-03**"))
     assert open_row.rstrip().endswith("| Open |")
 
@@ -237,3 +236,21 @@ def test_the_sprint_73_remeasurement_is_the_same_captures_and_shows_the_fix() ->
         "sprint73.provider-home.light.en.jpg",
     ):
         assert (SCREENS / pictured).is_file(), pictured
+
+
+def test_what_is_still_open_is_the_owners_and_the_epic_b19_table_cites_real_files() -> None:
+    """Sprint 90 (BL-19.26): the review says UI-03 and UI-23 are the two findings left, because both need
+    art only the owner can supply; the paragraph is built from the data, so this holds the data to it, and
+    every file the Epic B19 table cites is on disk (a row citing a measurement nobody wrote is invented)."""
+    m = _builder()
+    still_open = sorted({f[0] for f in m.F} - set(m.FIXED))
+    assert still_open == ["UI-03", "UI-23"], still_open
+    markdown = (DESIGN / "ui-review.md").read_text(encoding="utf-8")
+    assert "**Still open:** UI-03, UI-23" in markdown
+    assert m.EPIC_B19_ROWS, "the Epic B19 table is empty"
+    for _sprint, _page, _before, _after, source in m.EPIC_B19_ROWS:
+        if source.endswith(".json"):
+            assert (SCREENS / source).is_file(), source
+        else:
+            assert source.startswith("CLAUDE.md, Sprint "), source
+    assert "not the 52-capture re-run" in markdown.replace("**", "")

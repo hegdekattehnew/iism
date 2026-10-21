@@ -1,0 +1,36 @@
+{
+  "sprint": 90,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane emulating 360 x 640, the Next.js development server on :3000 against the demonstration API on :8000, dark colour scheme. Every page was loaded, waited for 3.5 s, then checked twice: as it is, and with document.documentElement.style.fontSize = '200%' (the layout's rem units follow the root font). The checker flags: the document wider than 360 px; an element whose box ends outside 360 px (not inside a scroller, not fixed or absolute); a text node whose rendered range ends outside 360 px (this finds text running out of a box that does not grow); an element with text-overflow: ellipsis whose content is longer than it; a box with overflow hidden and content taller than it (a line-clamp is exempt, an sr-only element is exempt). The checker was proved able to fail on a 600 px div, a clipped paragraph and an ellipsis span, and its first version was wrong (it read innerWidth, which grows with the page, so a page that overflowed reported nothing): it uses 360. NOT the sweep and NOT a device.",
+  "locales": ["hi", "ms"],
+  "pagesLoaded": {
+    "signedOut": ["", "jobs", "courses", "search?q=nurse", "skills", "about", "employers", "providers", "grievance", "contact", "privacy", "terms", "careers", "signin", "signup/seeker", "signup/employer", "employers/demo", "no-such-page", "jobs/cssd-technician-chennai", "courses/infection-control-in-hospitals", "skills/employability-skills-60-hours-dgt-vsq-n0102"],
+    "operatorAndEmployer": ["employer/apollo-care-hospitals", ".../team", ".../jobs/upload", ".../settings", ".../jobs/cssd-technician-chennai/applications", ".../candidates/cssd-technician-chennai", "admin", "account"],
+    "jobSeeker": ["matches", "applications", "saved", "interests", "notifications", "profile", "account", "career-paths"],
+    "provider": ["employer/nsdc-healthcare-academy", ".../interests", ".../courses/infection-control-in-hospitals/interests", ".../courses/upload"],
+    "menuOpen": ["jobs with the mobile menu open"]
+  },
+  "ordinarySize": {"hindi": "no defect on any page", "malay": "no defect on any page"},
+  "at200Percent": {
+    "before": [
+      {"page": "/hi/jobs", "what": "place chip 'Visakhapatnam, Andhra Pradesh' 384 px right edge (page 398 px)"},
+      {"page": "/hi/courses", "what": "organisation names in cards ran to 364 px (page 384 px)"},
+      {"page": "/hi/search, /hi/skills", "what": "qualification codes '(MSU/HSS/CRS0049)' to 506 px (page 506 and 428 px)"},
+      {"page": "/hi/about", "what": "the figure '14,405' to 372 px"},
+      {"page": "/hi/signin, signup", "what": "the language select to 386 px"},
+      {"page": "/hi/skills/[slug]", "what": "alias chips holding 'documents/instructions/correspondence' to 668 px"},
+      {"page": "/hi/admin", "what": "the filter select to 528 px; chart labels ended in an ellipsis"},
+      {"page": "/hi/employer/.../applications", "what": "three chips beside a name to 544 px"},
+      {"page": "/hi/matches (seeker)", "what": "the score 191 px wide left the title 77 px; the tab bar 364 px wide with labels ending in an ellipsis"},
+      {"page": "/hi/profile (seeker)", "what": "Edit and Remove to 403 px; the confidence label and select to 443 px (page 443 px)"},
+      {"page": "/ms/jobs, menu open", "what": "'Choose workspace' ended in an ellipsis"}
+    ],
+    "after": "no defect on any page loaded, in Hindi or Malay"
+  },
+  "pageHeightsAtOrdinarySize": {
+    "note": "unchanged by the global rule: /hi/courses 8115 with it and 8115 with it off; /hi/privacy 5974 and 5974",
+    "/hi/jobs": 7075, "/hi/search": 4819, "/hi/skills/[slug]": 8325, "/hi/signin": 1444
+  },
+  "bottomBarAt200Percent": {"before": "364 px wide, labels ellipsised", "after": "360 px wide, 130 px tall (the page reserves 128 px), no label cut"},
+  "firstLoadBytes": {"/profile": {"before": 699013, "after": 699067, "headroom": 933}, "/admin": {"before": 697221, "after": 697301, "headroom": 2699}, "/matches": 690689}
+}

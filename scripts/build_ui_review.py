@@ -414,6 +414,27 @@ F = [
 ]
 F.sort(key=lambda f: int(f[0].split("-")[1]))
 
+# Headline numbers from each Epic B19 sprint (Sprints 77 to 90), as the sprint recorded them: the built-in
+# browser at 375 x 812 against the development server and the demonstration database, before and after the
+# same way. NOT the 52-capture script (it needs Chromium, which this machine does not have), so these are
+# not comparable page for page with the tables above, which are the production build. The file each row
+# comes from is `docs/design/screens/measurements.sprintNN.json`; a row with no file is from the sprint's
+# entry in CLAUDE.md.
+EPIC_B19_ROWS = [
+    ("86", "/profile, an established account", "17 controls under 44 px", "0", "measurements.sprint86.json"),
+    ("86", "/profile first run (the wizard)", "2 under 44 px", "0", "measurements.sprint86.json"),
+    ("85", "search", "5.3 screens, 6 small controls", "5.7 screens, 0", "measurements.sprint85.json"),
+    ("85", "vacancy page", "2.9 screens, 2 small controls", "3.0 screens, 1", "measurements.sprint85.json"),
+    ("85", "a standard's page", "2 small controls", "0", "measurements.sprint85.json"),
+    ("87", "account", "1 small control", "0", "measurements.sprint87.json"),
+    ("88", "bulk upload page", "1 small control (the file input, 22 px)", "0", "measurements.sprint88.json"),
+    ("88", "employer home / provider home", "4.7 / 7.8 screens", "5.0 / 8.0", "measurements.sprint88.json"),
+    ("89", "grievance and privacy pages", "1 small control each", "0", "measurements.sprint89.json"),
+    ("89", "/admin", "29.1 screens", "30.3 (a hundred queue rows now carry a shape)", "measurements.sprint89.json"),
+    ("83", "the phone's signed-in home, layout shift", "0.169", "0.002", "CLAUDE.md, Sprint 83"),
+    ("84", "/jobs and /courses", "7.9 and 9.4 screens", "8.5 and 9.8", "CLAUDE.md, Sprint 84"),
+]
+
 # What Sprint 69 ("scannable jobs") did about a finding. A finding with no entry is open. Kept beside
 # the findings, as data, so the markdown and the workbook cannot disagree about what is fixed, and
 # `tests/test_ui_review.py` can check that every id named here is a finding.
@@ -436,6 +457,15 @@ FIXED = {
     "UI-26": "Fixed in Sprint 73 (the finding was mis-stated): bulk upload never inherited a generated description (a blank cell stores none). The boilerplate was 129 job and 129 course descriptions in the demonstration seed, which now writes none for them; the bulk check says once, for the file, how many rows have no description or a very short one; the editors say what to write. Not built: refusing to publish with none (a new 422 on a released operation).",
     "UI-13": "Fixed in Sprint 70 (web and phone): each match says in a sentence what the person has and lacks, with one main action; the lists, codes and level scale are behind Details. The sentence leaves out the generic standards the score still counts, and says so.",
     "UI-19": "Fixed in Sprint 70 (phone): a signed-in seeker's home shows the best match with its sentence, profile completeness and the next step, new updates, and the applications an employer acted on in the last 14 days. Applying is not offered there: the match summary has no employer name for the consent step to name.",
+    "UI-29": "Fixed in Sprint 68 (phone), the one product change the review made: the courses section and the budget field show only when something is missing, with a test that fails without it.",
+    "UI-25": "Fixed in Sprint 77 (web and phone): a six-step named type scale (caption 13, small 15, body 16, lead 18, title 24, display 30) in globals.css, mapped onto Tailwind's own text-* names so no call site changed, with taller Devanagari line heights, shared with the phone through the token sync. Secondary text is 15 px and the floor stays 12 px.",
+    "UI-24": "Fixed in Sprint 80 and used in Sprints 84 to 89 (web): Card levels (default, raised, inset, interactive), a tinted page with white cards, a primary and a soft button, and every card family on one shape (job, course, standard, application, interest, saved job). The rule 'an inset is a box inside a card, never a Card in a Card' is held by the gallery and the reviews of each family; nothing mechanical forbids a nested Card.",
+    "UI-27": "Fixed in Sprint 80, in part (web): EmptyState (an icon in a tinted disc, a sentence, a reason and the next step) on the ten page-level empty lists, a Spinner, and no toast. Not done: an illustration (the slot exists; the art is the owner's) and the small inline empties, which are still one sentence.",
+    "UI-18": "Fixed in Sprint 82 (phone): five icons beside the words (Home, Briefcase, BookOpen, Target, User), the unread count a badge on the Me icon, and the spoken name still carries the exact number. The bar is 64 dp plus the inset because the navigator's default cut the labels off.",
+    "UI-20": "Fixed in Sprint 82 (phone): Me is two groups of rows with an icon, a chevron and at least 56 dp each, named by the title; Sign out is not the same weight as My applications.",
+    "UI-21": "Fixed in Sprints 78 and 83 (phone): the browser run scores layout shift (capture-app.mjs, CHECK=1), the signed-in home waits for its four queries and is held at a measured height, and the shift went from 0.169 to 0.002 with every screen held to 0.1. Measured in a browser build, not on a device.",
+    "UI-22": "Fixed in Sprint 83 (phone): a progress header (a progressbar with its value) and four sections, each form section with its own Save named for the section ('Save: About you') and its own saved notice. Not built: a single 'Next' action; the history sections are rows that open the editor.",
+    "UI-28": "Fixed in Sprints 79, 81 and 86 (web): a reduced header on sign-in and sign-up (logo and language), 44 px controls ('Skip for now', the back links, the consent row), and the page you are on marked in the navigation. The language select is 44 px.",
 }
 
 GOOD = [
@@ -496,13 +526,14 @@ def build_markdown() -> str:
         + ", ".join(f"{counts.get(s, 0)} {s}" for s in SEVERITIES)
         + ".\n",
         "## The short version\n",
+        "*Written at Sprint 68, when the review was made. The next section says what has been built since, and the Status column of the findings is current.*\n",
         "1. **The product is correct and accessible, but it is built as an expert's tool, not a job seeker's.** The first thing a seeker meets is a brochure (UI-01), jargon (UI-02), cards that read as database rows (UI-04, UI-13) and standards pasted in capitals (UI-09).",
         "2. **Three cheap, high-value fixes sit on the core loop:** monthly pay (UI-05), a sticky apply bar (UI-08) and 44 px targets (UI-11).",
         "3. **Three lists silently cap what they show** (UI-06 jobs and courses at 200; UI-17 the operator's verification queue at 100, printed as '100 waiting' against 162): a correctness defect that is also a design one.",
         "4. **The brand is missing** (UI-03, UI-23): no imagery anywhere, one blue, and the app's own icon is still Expo's. That is the owner's decision, and everything else waits less on it than it seems.",
         "5. **The back office and employer screens are tidy but long**: the operator's page is one 31-screen scroll (UI-16).\n",
         "## Built so far, and what is next\n",
-        f"**Sprints 69 ('scannable jobs') and 70 ('a candidate's first minute') are done** ({len(FIXED)} of {len(F)} findings fixed; the Status column says how far each went). Sprint 69: UI-04 to 11 and UI-17 (job cards, monthly pay, paging with a total, the 12 px and 44 px floors, the apply bar, the standards list, the trust strip, the operator's totals). Sprint 70: UI-01, 02, 12, 13, 19 (the homepage, plain words, the matches page, a match said in a sentence, the signed-in phone home). **Still open:** {', '.join(i for i in (f[0] for f in F) if i not in FIXED)}; of these UI-03, 18, 20, 23, 24 and 27 wait on the owner's brand decision, and BL-16.4 (a five-person usability check) would settle which of the rest matter most.\n",
+        f"**Sprints 69 to 73 fixed the content and structure findings and Epic B19 (Sprints 76 to 90) fixed the look** ({len(FIXED)} of {len(F)} findings fixed; the Status column says how far each went). Sprint 69: UI-04 to 11 and UI-17. Sprint 70: UI-01, 02, 12, 13, 19. Sprint 73: UI-14, 15, 16, 26. Epic B19: UI-18, 20, 21, 22 (the phone's bar, Me, layout shift and profile), UI-24, 25, 27 (surfaces, a named type scale, empty states) and UI-28 (a reduced header, 44 px controls). **Still open:** {', '.join(i for i in (f[0] for f in F) if i not in FIXED)}: UI-03 (no photograph, illustration or logo art; the icons, the avatar mark and the colour ramp are in, the brand is the owner's) and UI-23 (the launcher icon and splash are still Expo's template art; `make check-release PROFILE=production` fails on it). BL-16.4 (a five-person usability check on a cheap Android phone, in Hindi) would settle which of what was built matters most, and no part of this has been run on a device.\n",
         "## Findings\n",
         "| " + " | ".join(HEAD[:6] + ["Finding", "Evidence", "Proposed fix", "Status"]) + " |",
         "|" + "---|" * 10,
@@ -553,6 +584,14 @@ def build_markdown() -> str:
                     f"| {pid} | {b['screens']} | {r['screens']} | {b['smallTargets']} | {r['smallTargets']} | {b['textUnder12px']} | {r['textUnder12px']} |"
                 )
     out += [
+        "\n## Epic B19: what the revamp measured (Sprints 77 to 90)\n",
+        "Each row is a figure the sprint recorded in the built-in browser at phone width, before and after the same way. **This is not the 52-capture re-run the plan asked for**: that script needs Chromium, which this machine does not have, so it was not run and these figures are not page-for-page comparable with the tables above. Pages came out a little longer (more icons and chips on each card) and the small controls fell.\n",
+        "| Sprint | Page | Before | After | Source |",
+        "|---|---|---|---|---|",
+        *[f"| {sp} | {page} | {b} | {a} | {src} |" for sp, page, b, a, src in EPIC_B19_ROWS],
+        "\n**Text that does not fit (Sprint 90).** Every page was loaded at 360 px in Hindi and Malay, at ordinary size and with the root font at 200%, signed out and as a job seeker, an employer, a provider and an operator (about 90 page loads; the checker flags a page wider than the screen, text outside its box, an ellipsis and a clipped box). At ordinary size none had a defect. At 200% ten did (a long English word or code in a chip or a card, the four-tab bar, the match score beside a title, a chart label cut with an ellipsis, an applicant's chips, a profile row's two buttons and its confidence label, the language select, a filter select, the workspace control in the mobile menu), all fixed and held by `src/lib/text-fit.test.ts`. **Not covered:** a dialog open, the first-run wizard, the invitation page, light mode, and any real device or the operating system's own font scaling (200% here is the root font size, which is what the layout's rem units follow).\n",
+    ]
+    out += [
         "\n## What is already good\n",
         *[f"- {g}" for g in GOOD],
         "\n## What only users can settle\n",
@@ -593,7 +632,7 @@ def build_workbook() -> None:
         ["Severity", ", ".join(f"{counts.get(s, 0)} {s}" for s in SEVERITIES)],
         [
             "Recommended first build",
-            f"Sprints 69 ('scannable jobs') and 70 ('a candidate's first minute') are done ({len(FIXED)} findings; see the Status column). Brand-dependent and open: UI-03, 18, 20, 23, 24, 27.",
+            f"Sprints 69 to 73 and Epic B19 (Sprints 76 to 90) are done ({len(FIXED)} of {len(F)} findings; see the Status column). Open, and the owner's: UI-03 (imagery and brand art) and UI-23 (launcher art).",
         ],
         [
             "Owner decisions",

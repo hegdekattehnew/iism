@@ -76,7 +76,7 @@ export function GrievanceQueue() {
           id="grievance-filter"
           value={filter}
           onChange={(event) => setFilter(event.target.value as Filter)}
-          className="min-h-11 rounded-lg border border-input-border bg-background px-3 py-2 text-sm"
+          className="min-h-11 max-w-full rounded-lg border border-input-border bg-background px-3 py-2 text-sm"
         >
           {FILTERS.map((value) => (
             <option key={value} value={value}>
