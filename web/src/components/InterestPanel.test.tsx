@@ -118,6 +118,7 @@ describe("InterestPanel — the consent moment", () => {
         {
           id: "i1",
           status: "registered",
+          registered_at: "2026-09-21T10:00:00Z",
           course: { slug: "phlebotomy-refresher", title: "Phlebotomy Refresher" },
         },
       ],
@@ -126,10 +127,29 @@ describe("InterestPanel — the consent moment", () => {
     renderUi(panel());
 
     expect(await screen.findByText("Interest registered")).toBeTruthy();
+    // Sprint 91: and what to expect, right under the proof that it worked.
+    expect(screen.getByText("Reply expected by Sep 24, 2026")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Withdraw" })).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "I'm interested in this course" }),
     ).toBeNull();
+  });
+
+  it("promises no reply to somebody whose interest has been answered", async () => {
+    GET.mockResolvedValue({
+      data: [
+        {
+          id: "i1",
+          status: "contacted",
+          registered_at: "2026-09-21T10:00:00Z",
+          course: { slug: "phlebotomy-refresher", title: "Phlebotomy Refresher" },
+        },
+      ],
+      error: undefined,
+    });
+    renderUi(panel());
+    await screen.findByText("Interest registered");
+    expect(screen.queryByText(/Reply expected/)).toBeNull();
   });
 
   it("offers the button again after a withdrawal", async () => {

@@ -194,6 +194,33 @@ describe("the course page", () => {
     expect(chip.className).toContain("min-h-11");
   });
 
+  it("does not call a started group an intake, or offer its seats", async () => {
+    // Sprint 91: "Next intake: Started September 29, 2026 . 40 seats left", for a course three weeks in.
+    serve({ ...COURSE, starts_on: "2026-09-29", started: true, seats_left: 40 });
+    const { container } = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    const labels = [...container.querySelectorAll("dl dt")].map((t) => t.textContent);
+    expect(labels).not.toContain("Next intake");
+    expect(labels).toContain("Started");
+    expect(labels).not.toContain("Places");
+    expect(screen.getByText("September 29, 2026")).toBeTruthy();
+    expect(screen.getByText(/Ask the provider whether you can still join/)).toBeTruthy();
+    expect(screen.queryByText(/seats left/)).toBeNull();
+  });
+
+  it("still says Full for a started group with no places left", async () => {
+    serve({ ...COURSE, starts_on: "2026-09-29", started: true, seats_left: 0 });
+    await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    expect(screen.getByText("Full")).toBeTruthy();
+  });
+
+  it("keeps Next intake, the start date and the seats for a group that has not begun", async () => {
+    serve(COURSE);
+    const { container } = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    expect(screen.getByText("Starts December 1, 2026")).toBeTruthy();
+    expect(screen.getByText("8 seats left")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Ask the provider whether you can still join/);
+  });
+
   it("never lists a place for an online course", async () => {
     serve({ ...COURSE, mode: "online" });
     const { container } = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));

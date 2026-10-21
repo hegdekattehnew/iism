@@ -9,6 +9,7 @@ import { INTEREST_LOOK, type InterestStatus } from "@/components/cards/interest-
 import { StatusChip } from "@/components/ui/status-chip";
 import { Link } from "@/i18n/navigation";
 import type { components } from "@/lib/api-schema";
+import { REPLY_WITHIN_DAYS, replyBy } from "@/lib/interest-reply";
 
 export { INTEREST_LOOK, type InterestStatus };
 export type Interest = components["schemas"]["InterestOut"];
@@ -42,6 +43,23 @@ export function InterestCard({ interest }: { interest: Interest }) {
             {t("registeredOn", { date: format.dateTime(new Date(interest.registered_at), { dateStyle: "medium" }) })}
           </span>
         </div>
+        {/* What to expect, while nobody has answered: the date, and the way to say so if it passes. A
+            provider is asked to reply, not made to, so the sentence says expected and the link is
+            to us (Sprint 91). */}
+        {interest.status === "registered" && (
+          <div className="mt-3 text-sm">
+            <p className="font-medium">
+              {t("replyBy", { date: format.dateTime(replyBy(interest.registered_at), { dateStyle: "medium" }) })}
+            </p>
+            <p className="text-muted">{t("replyHelp", { days: REPLY_WITHIN_DAYS })}</p>
+            <Link
+              href="/contact"
+              className="inline-flex min-h-11 items-center text-brand underline underline-offset-2"
+            >
+              {t("notHeard")}
+            </Link>
+          </div>
+        )}
       </CardBody>
     </Card>
   );

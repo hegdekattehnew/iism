@@ -1,9 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Area, Field, FormErrors, Select, Text } from "@/components/profile/fields";
+import { RoleStarter } from "@/components/employer/RoleStarter";
 import { type Standard, StandardPicker } from "@/components/StandardPicker";
 import { Badge, Button, Card, CardBody } from "@/components/ui";
 import { fieldsOf } from "@/lib/http";
@@ -66,6 +67,23 @@ export function JobEditor({
   const isGig = employmentType === "gig";
 
   const chosen = new Set(requirements.map((r) => r.skill_slug));
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // The role's standards, as the bulk upload's `job_role` makes them: importance 3, mandatory off.
+  const addMany = (list: Standard[]) =>
+    setRequirements((rs) => [
+      ...rs,
+      ...list
+        .filter((s) => !rs.some((r) => r.skill_slug === s.slug))
+        .map((s) => ({
+          skill_slug: s.slug,
+          name: s.name,
+          nos_code: s.nos_code,
+          importance: 3,
+          is_mandatory: false,
+        })),
+    ]);
+  const titleBox = () => formRef.current?.elements.namedItem("title") as HTMLInputElement | null;
 
   const add = (s: Standard) =>
     setRequirements((rs) => [
@@ -124,7 +142,7 @@ export function JobEditor({
     <Card>
       <CardBody>
         <FormErrors fields={fieldsOf(error)}>
-          <form onSubmit={submit} key={job?.slug ?? "new"}>
+          <form onSubmit={submit} key={job?.slug ?? "new"} ref={formRef}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("titleEn")} className="sm:col-span-2">
                 {/* `minLength` mirrors `JobIn.title`'s `min_length=3`. Without
@@ -249,6 +267,18 @@ export function JobEditor({
             <div className="mt-8 border-t border-border-token pt-6">
               <h3 className="text-base font-semibold">{t("standardsTitle")}</h3>
               <p className="mt-1 text-sm text-muted">{t("standardsSubtitle")}</p>
+
+              <div className="mt-4">
+                <RoleStarter
+                  chosen={chosen}
+                  titleIsEmpty={() => !(titleBox()?.value ?? "").trim()}
+                  onAdd={addMany}
+                  onUseTitle={(title) => {
+                    const box = titleBox();
+                    if (box) box.value = title;
+                  }}
+                />
+              </div>
 
               <div className="mt-4">
                 <StandardPicker

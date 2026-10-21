@@ -235,6 +235,16 @@ body {
   padding-bottom: var(--tabbar);
 }
 
+/* The home page's sign-up chooser is for a visitor (Sprint 91). A browser that holds a sign-in is hidden
+   from it before the first paint, at the height the "Welcome back" card starts at, so the chooser does
+   not flicker in and the page below does not jump when the card arrives. `data-shown` is set by the
+   component when it decides the sign-in is dead and the chooser is the right thing to show. */
+html[data-auth] [data-home-chooser]:not([data-shown]) {
+  height: 11rem;
+  overflow: hidden;
+  visibility: hidden;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

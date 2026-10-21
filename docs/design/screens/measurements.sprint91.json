@@ -1,0 +1,22 @@
+{
+  "sprint": 91,
+  "captured": "2026-10-21",
+  "method": "The built-in browser pane at 375 x 812 (mobile emulation), the Next.js dev server on :3000 against the demonstration API on :8000, English, light scheme, signed in as the demonstration provider (admin@nsdc-healthcare-academy.example) and employer (hiring@apollo-care.example). BEFORE values for the home and the course page are from the designer's review earlier in the same session on the same code (main after Sprint 90). NOT the sweep and NOT a device.",
+  "findings": {
+    "home-chooser-for-a-signed-in-person": {"before": "the sign-up chooser ('I'm here to...') shown to a signed-in provider, card 348 px", "after": "'Welcome back' with the organisation as a link, card 194 px"},
+    "header-workspace-control": {"before": "'Choose workspace' outside a workspace", "after": "'NSDC Healthcare Academy' (the mobile menu's control)"},
+    "course-page-started": {"before": "'Next intake: Started September 29, 2026' and '40 seats left'", "after": "'Started: September 29, 2026' with 'This group has begun. Ask the provider whether you can still join, or when the next one starts.' and no seats"},
+    "provider-interest-list": {"before": "a registered learner shown as New, nothing about how long", "after": "New and 'Waiting 29 days' (the demonstration learner registered on 2026-09-21)"},
+    "vacancy-form-role-start": {"before": "standards could only be found one at a time", "after": "'ward boy' finds General Duty Assistant (9 required standards); choosing it adds 9 skills at importance 3, none mandatory, and offers the role as the title"}
+  },
+  "firstLoadBytes": {
+    "method": "npm run build:e2e then .next-e2e/diagnostics/route-bundle-stats.json (firstLoadUncompressedJsBytes); ceiling 700000",
+    "/profile": {"before": 699067, "after": 699148, "headroom": 852},
+    "/admin": {"before": 697301, "after": 697382, "headroom": 2618},
+    "/": {"after": 670034},
+    "/employer/[org]": {"after": 667579},
+    "/courses/[slug]": {"after": 667998},
+    "/interests": {"after": 669746}
+  },
+  "themePreview": {"file": "docs/design/theme-preview.html", "palettes": ["current blue", "deep teal + marigold", "bluer teal + marigold", "teal + saffron", "aqua (light)", "sky (light)", "indigo (light)"], "lightPalettesNeedASplit": "a light fill with dark text for buttons, the logo and rings; a deeper step for links and the focus ring; aqua and sky fills are 1.8 and 2.4 against a white page so the button carries an edge", "status": "waiting for the Product Owner's decision (BL-21.1)"}
+}

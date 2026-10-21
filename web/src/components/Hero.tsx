@@ -1,5 +1,6 @@
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { HomeAccess } from "@/components/HomeAccess";
 import { RoleChooser } from "@/components/RoleChooser";
 import { buttonVariants } from "@/components/ui";
 import { Link, getPathname } from "@/i18n/navigation";
@@ -118,7 +119,9 @@ export async function Hero() {
           {/* `max-w-md` while stacked, or at tablet this is a 728px-wide card
               holding three short labels. */}
           <div className="w-full max-w-md lg:max-w-none">
-            <RoleChooser />
+            <HomeAccess>
+              <RoleChooser />
+            </HomeAccess>
             {/* The other two audiences, one line each, where the three "audience" cards used to be a
                 whole section. Hiring and training have their own pages; the chooser above is how
                 either starts an account. */}

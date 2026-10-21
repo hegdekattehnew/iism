@@ -2,15 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
+import { useState } from "react";
 
 import { INTEREST_LOOK } from "@/components/cards/interest-look";
 import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { InboxIcon } from "@/components/ui/icons";
+import { ClockIcon, InboxIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { api } from "@/lib/api";
 import type { components } from "@/lib/api-schema";
 import { providerDashboardKey } from "@/lib/counts";
 import { apiErrorFrom, detailOf } from "@/lib/http";
+import { daysWaiting, isReplyOverdue } from "@/lib/interest-reply";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UsersIcon } from "@/components/ui/icons";
 
@@ -37,6 +39,8 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
   const t = useTranslations("providerInbox");
   const format = useFormatter();
   const qc = useQueryClient();
+  // Read once, not in render: the clock is not a render input.
+  const [now] = useState(() => Date.now());
 
   const key = ["org", org, "interests", courseSlug];
   const { data, isPending, isError } = useQuery({
@@ -120,9 +124,18 @@ export function ProviderInbox({ org, courseSlug }: { org: string; courseSlug: st
                         </p>
                       </div>
                       {learner.status === "registered" && (
-                        <StatusChip tone="good" icon={InboxIcon}>
-                          {t("newBadge")}
-                        </StatusChip>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusChip tone="good" icon={InboxIcon}>
+                            {t("newBadge")}
+                          </StatusChip>
+                          {/* The learner was shown a reply date (Sprint 91); this is the provider's side of
+                              the same number, said only once it has passed. */}
+                          {isReplyOverdue(learner.registered_at, now) && (
+                            <StatusChip tone="warn" icon={ClockIcon}>
+                              {t("waitingDays", { count: daysWaiting(learner.registered_at, now) })}
+                            </StatusChip>
+                          )}
+                        </div>
                       )}
                       {learner.status === "contacted" && (
                         <StatusChip tone="neutral" icon={INTEREST_LOOK.contacted.icon}>

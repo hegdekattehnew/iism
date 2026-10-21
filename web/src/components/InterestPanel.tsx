@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Area } from "@/components/profile/fields";
 import { Alert, Button, ButtonLink } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useIsSignedIn } from "@/lib/auth";
+import { REPLY_WITHIN_DAYS, replyBy } from "@/lib/interest-reply";
 import { useMemberships } from "@/lib/org";
 
 /**
@@ -48,6 +49,7 @@ export function InterestPanel({
   organisation: string;
 }) {
   const t = useTranslations("courseInterest");
+  const format = useFormatter();
   const signedIn = useIsSignedIn();
   const { isJobSeeker, isPending: membershipsPending } = useMemberships();
   const qc = useQueryClient();
@@ -137,6 +139,17 @@ export function InterestPanel({
           </Button>
         )}
       </div>
+
+      {/* Right under the proof that it worked: when to expect an answer, and what to do if none comes
+          (Sprint 91). Only while it is still unanswered. */}
+      {live && mine?.status === "registered" && (
+        <p className="mt-3 text-sm" role="status">
+          <span className="font-medium">
+            {t("replyBy", { date: format.dateTime(replyBy(mine.registered_at), { dateStyle: "medium" }) })}
+          </span>
+          <span className="block text-muted">{t("replyHelp", { days: REPLY_WITHIN_DAYS })}</span>
+        </p>
+      )}
 
       {confirming && !live && (
         <div className="mt-4 rounded-xl border border-border-token bg-surface p-4">

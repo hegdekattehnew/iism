@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IISM theme preview (Sprint 91, B21.1)</title>
+<!--
+  A throwaway preview for the owner's sign-off, not part of the product: it draws today's screens with
+  today's tokens swapped for each candidate palette, in light and dark. The shapes and spacing copy the
+  real components (cards, chips, status chips, tab bar); the numbers in "contrast" are computed (WCAG).
+  Nothing here is imported by the app. Open it in a browser and use the two switches at the top.
+-->
+<style>
+  :root { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9edf0; color: #181c20; }
+  .bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; padding: 12px 20px; background: #101418; color: #fff; font-size: 14px; }
+  @media (max-width: 760px) { .bar { position: static; } }
+  .bar b { font-weight: 600; }
+  .bar label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; padding: 6px 10px; border-radius: 8px; border: 1px solid #3a444d; }
+  .bar input:checked + span { font-weight: 700; text-decoration: underline; }
+  .wrap { display: grid; gap: 24px; padding: 24px 20px 60px; max-width: 1180px; margin: 0 auto; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+
+  /* ---- the palettes: a brand ramp and a highlight, in each theme --------------------------------- */
+  [data-palette="blue"] {
+    --b50:#eff5fa;--b100:#dce9f4;--b200:#b9d2ea;--b300:#89b7e1;--b400:#5497d3;--b500:#3078bb;--b600:#266196;--b700:#1f4e79;--b800:#153451;--b900:#0c1f31;
+    --sl:var(--b700);--sol:#ffffff;--sd:var(--b400);--sod:var(--b900);--bd:var(--b400);--bds:var(--b300);--edge:transparent;--edge-d:transparent;
+    --hl:#1f4e79; --hl-on:#ffffff; --hl-tint:#dce9f4; --hl-text:#153451;
+  }
+  [data-palette="teal"] {
+    --b50:#ecf8f8;--b100:#d1eeef;--b200:#a5dde0;--b300:#6cc4c9;--b400:#35a5ac;--b500:#1b868e;--b600:#136d75;--b700:#0f5c63;--b800:#0a3f44;--b900:#062629;
+    --sl:var(--b700);--sol:#ffffff;--sd:var(--b400);--sod:var(--b900);--bd:var(--b400);--bds:var(--b300);--edge:transparent;--edge-d:transparent;
+    --hl:#f2a900; --hl-on:#181c20; --hl-tint:#fff1cc; --hl-text:#8a5d00;
+  }
+  [data-palette="bluer"] {
+    --b50:#ecf7fa;--b100:#d0ecf2;--b200:#a3d9e5;--b300:#67bed3;--b400:#31a0ba;--b500:#1a819b;--b600:#126a82;--b700:#0e5870;--b800:#093c4d;--b900:#05242e;
+    --hl:#f2a900; --hl-on:#181c20; --hl-tint:#fff1cc; --hl-text:#8a5d00;
+    --sl:var(--b700);--sol:#ffffff;--sd:var(--b400);--sod:var(--b900);--bd:var(--b400);--bds:var(--b300);--edge:transparent;--edge-d:transparent;
+  }
+  [data-palette="saffron"] {
+    --b50:#ecf8f8;--b100:#d1eeef;--b200:#a5dde0;--b300:#6cc4c9;--b400:#35a5ac;--b500:#1b868e;--b600:#136d75;--b700:#0f5c63;--b800:#0a3f44;--b900:#062629;
+    --hl:#e8710a; --hl-on:#181c20; --hl-tint:#fde6d2; --hl-text:#8f3f05;
+    --sl:var(--b700);--sol:#ffffff;--sd:var(--b400);--sod:var(--b900);--bd:var(--b400);--bds:var(--b300);--edge:transparent;--edge-d:transparent;
+  }
+  [data-palette="aqua"] {
+    --b50:#f1f8f8;--b100:#e0eef0;--b200:#b9e9ef;--b300:#8bdbe4;--b400:#62ceda;--b500:#30bfcf;--b600:#2799a5;--b700:#1e7680;--b800:#145057;--b900:#0c2e32;
+    --sl:var(--b400);--sol:var(--b900);--sd:var(--b300);--sod:var(--b900);--bd:var(--b300);--bds:var(--b200);--edge:var(--b600);--edge-d:transparent;
+    --hl:#f2a900; --hl-on:#181c20; --hl-tint:#fff1cc; --hl-text:#8a5d00;
+  }
+  [data-palette="sky"] {
+    --b50:#f0f6f9;--b100:#deeaf2;--b200:#b2dcf5;--b300:#80c5ef;--b400:#53b0ea;--b500:#1c97e3;--b600:#1679b6;--b700:#115d8d;--b800:#0c3f5f;--b900:#072436;
+    --sl:var(--b400);--sol:var(--b900);--sd:var(--b300);--sod:var(--b900);--bd:var(--b300);--bds:var(--b200);--edge:var(--b600);--edge-d:transparent;
+    --hl:#f2a900; --hl-on:#181c20; --hl-tint:#fff1cc; --hl-text:#8a5d00;
+  }
+  [data-palette="indigo"] {
+    --b50:#f1f2f9;--b100:#dfe2f1;--b200:#b5bdf2;--b300:#8693ea;--b400:#6c7de8;--b500:#263ed9;--b600:#1f32ad;--b700:#182686;--b800:#101a5b;--b900:#090f34;
+    --sl:var(--b400);--sol:var(--b900);--sd:var(--b300);--sod:var(--b900);--bd:var(--b300);--bds:var(--b200);--edge:var(--b600);--edge-d:transparent;
+    --hl:#f2a900; --hl-on:#181c20; --hl-tint:#fff1cc; --hl-text:#8a5d00;
+  }
+  /* semantic tokens: the same mapping the product uses (light: brand 700, strong 800, soft 50, tint 100;
+     dark: brand 400, strong 300, on-brand 900, soft 900, tint 800, text 200) */
+  .scene { --bg:#f8f9fa; --surface:#fff; --muted-surface:#eff1f3; --fg:#181c20; --muted:#586774; --border:#dfe3e7; --input:#6e8091;
+    --brand:var(--b700); --strong:var(--b800); --solid:var(--sl); --solid-on:var(--sol); --edge-now:var(--edge); --soft:var(--b50); --tint:var(--b100); --atext:var(--b800);
+    --ok-s:#d1fae5;--ok-b:#6ee7b7;--ok-t:#064e3b;--ok-x:#10b981;
+    --wn-s:#fef3c7;--wn-b:#fcd34d;--wn-t:#78350f;--wn-x:#f59e0b;
+    --bd-s:#ffe4e6;--bd-b:#fda4af;--bd-t:#881337;--bd-x:#f43f5e;
+    --in-s:#e0f2fe;--in-b:#7dd3fc;--in-t:#0c4a6e;
+    --shadow:0 1px 2px rgb(15 23 42/.06),0 2px 8px rgb(15 23 42/.06);
+    background: var(--bg); color: var(--fg); }
+  .scene[data-theme="dark"] { --bg:#111417; --surface:#181c20; --muted-surface:#20262b; --fg:#eff1f3; --muted:#96a4b0; --border:#2c333a; --input:#6e8091;
+    --brand:var(--bd); --strong:var(--bds); --solid:var(--sd); --solid-on:var(--sod); --edge-now:var(--edge-d); --soft:var(--b900); --tint:var(--b800); --atext:var(--b200);
+    --ok-s:#022c22;--ok-b:#065f46;--ok-t:#6ee7b7;--ok-x:#34d399;
+    --wn-s:#451a03;--wn-b:#92400e;--wn-t:#fcd34d;--wn-x:#fbbf24;
+    --bd-s:#4c0519;--bd-b:#9f1239;--bd-t:#fda4af;--bd-x:#fb7185;
+    --in-s:#082f49;--in-b:#075985;--in-t:#7dd3fc;
+    --shadow:0 1px 2px rgb(0 0 0/.4),0 2px 8px rgb(0 0 0/.35); }
+
+  /* the highlight's tint and text in the dark theme: a dark amber surface with light text, never the cream of the light theme */
+  .scene[data-theme="dark"][data-palette="blue"] { --hl-tint:#153451; --hl-text:#b9d2ea; }
+  .scene[data-theme="dark"][data-palette="teal"], .scene[data-theme="dark"][data-palette="bluer"] { --hl-tint:#3a2a00; --hl-text:#ffd470; }
+  .scene[data-theme="dark"][data-palette="saffron"] { --hl-tint:#3a1c05; --hl-text:#ffb27a; }
+
+  /* ---- a phone-width screen ---------------------------------------------------------------------- */
+  .phone { width: 100%; max-width: 375px; margin: 0 auto; border-radius: 22px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 6px 24px rgb(0 0 0/.18); }
+  .phone h3.cap { margin: 0; padding: 8px 14px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; background: #101418; color: #9fb0bd; font-weight: 600; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .logo { display:flex; gap:8px; align-items:center; font-weight:700; }
+  .mark { width:28px; height:28px; border-radius:8px; background: var(--solid); display:grid; place-items:center; color: var(--solid-on); font-size:15px; position:relative; }
+  .mark i { position:absolute; right:-3px; top:-3px; width:9px; height:9px; border-radius:50%; background: var(--hl); border:2px solid var(--surface); }
+  .menu { width:40px; height:40px; border:1px solid var(--border); border-radius:10px; display:grid; place-items:center; color: var(--fg); }
+  .hero { padding: 22px 16px 18px; background: var(--soft); border-bottom: 1px solid var(--border); }
+  .eyebrow { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--brand); background: var(--surface); border:1px solid var(--border); border-radius:99px; padding:3px 10px; }
+  h1 { font-size: 26px; line-height: 1.15; margin: 12px 0 8px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 15px; margin: 0 0 14px; }
+  .field { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--input); background: var(--surface); color: var(--muted); font-size: 15px; }
+  .btn { display:block; width:100%; text-align:center; margin-top:8px; padding:12px; border-radius:10px; border:1px solid var(--edge-now); font-size:15px; font-weight:600; background: var(--solid); color: var(--solid-on); }
+  .btn.soft { background: var(--tint); color: var(--atext); border-color: transparent; }
+  .btn.sec { background: transparent; color: var(--fg); border: 1px solid var(--input); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip { padding:9px 14px; border:1px solid var(--border); border-radius:99px; background: var(--surface); font-size:14px; font-weight:500; }
+  .sec-pad { padding: 14px 16px; }
+  .card { background: var(--surface); border:1px solid var(--border); border-radius:14px; padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .row { display:flex; gap:12px; align-items:flex-start; }
+  .av { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; font-weight:700; flex:none; background: var(--tint); color: var(--atext); }
+  .av.w { background: var(--wn-s); color: var(--wn-t); }
+  .ttl { font-weight:600; font-size:16px; line-height:1.25; }
+  .org { color: var(--muted); font-size:14px; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .pill { display:inline-flex; gap:6px; align-items:center; font-size:14px; padding:4px 10px; border-radius:8px; background: var(--muted-surface); color: var(--muted); }
+  .pill.pay { background: var(--soft); color: var(--brand); font-weight:600; }
+  .score { margin-left:auto; padding: 3px 10px; border-radius:9px; font-size:14px; font-weight:700; background: var(--ok-s); color: var(--ok-t); border:1px solid var(--ok-b); }
+  .sub2 { font-size:12px; color: var(--muted); margin-top:8px; }
+  .facts { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fl { font-size: 13px; color: var(--muted); display:flex; gap:6px; align-items:center; }
+  .fv { font-weight:700; font-size:17px; }
+  .trust { display:flex; gap:12px; background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px; }
+  .shield { width:36px; height:36px; border-radius:9px; display:grid; place-items:center; flex:none; background: var(--ok-s); color: var(--ok-t); }
+  .sc { display:inline-flex; gap:6px; align-items:center; padding:3px 9px; border-radius:99px; font-size:13px; font-weight:600; border:1px solid; }
+  .sc.good { background: var(--ok-s); color: var(--ok-t); border-color: var(--ok-b); }
+  .sc.warn { background: var(--wn-s); color: var(--wn-t); border-color: var(--wn-b); }
+  .sc.bad { background: var(--bd-s); color: var(--bd-t); border-color: var(--bd-b); }
+  .sc.info { background: var(--in-s); color: var(--in-t); border-color: var(--in-b); }
+  .sc.neutral { background: var(--muted-surface); color: var(--muted); border-color: var(--border); }
+  .sc.brand { background: var(--soft); color: var(--brand); border-color: var(--tint); }
+  .tiles { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .tile { display:flex; gap:10px; align-items:center; background: var(--muted-surface); border-radius:12px; padding:10px; }
+  .tile .ic { width:34px; height:34px; border-radius:9px; background: var(--tint); color: var(--atext); display:grid; place-items:center; flex:none; }
+  .tile b { font-size:22px; line-height:1; display:block; }
+  .tile small { font-size:12px; color: var(--muted); }
+  .ring { width:64px; height:64px; border-radius:50%; display:grid; place-items:center; font-weight:700; background: conic-gradient(var(--solid) 0 25%, var(--muted-surface) 25% 100%); position:relative; }
+  .ring::after { content:""; position:absolute; inset:7px; border-radius:50%; background: var(--surface); }
+  .ring span { position:relative; z-index:1; font-size:14px; }
+  .bar2 { height:8px; border-radius:99px; background: var(--muted-surface); overflow:hidden; margin-top:6px; }
+  .bar2 i { display:block; height:100%; background: var(--solid); }
+  .hlband { margin-top: 12px; display:flex; gap:10px; align-items:center; background: var(--hl-tint); color: var(--hl-text); border-radius:12px; padding: 10px 12px; font-size:14px; font-weight:600; }
+  .hlband .dot { width:26px; height:26px; border-radius:8px; background: var(--hl); color: var(--hl-on); display:grid; place-items:center; font-size:14px; flex:none; }
+  .tabs { display:grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); }
+  .tabs div { text-align:center; padding: 9px 2px 10px; font-size: 12px; font-weight:500; color: var(--muted); }
+  .tabs div.on { color: var(--brand); }
+  .tabs div .pillbg { display:block; width:48px; height:26px; margin: 0 auto 4px; border-radius:99px; line-height:26px; }
+  .tabs div.on .pillbg { background: var(--soft); }
+  .apply { display:flex; gap:10px; padding:10px 14px; background: var(--surface); border-top:1px solid var(--border); }
+  .apply .btn { margin:0; }
+  .alert { display:flex; gap:10px; border-radius:12px; padding:10px 12px; border:1px solid; font-size:14px; margin-bottom:8px; }
+  .alert.good { background: var(--ok-s); color: var(--ok-t); border-color: var(--ok-b); }
+  .alert.warn { background: var(--wn-s); color: var(--wn-t); border-color: var(--wn-b); }
+  .alert.bad { background: var(--bd-s); color: var(--bd-t); border-color: var(--bd-b); }
+  .alert.info { background: var(--in-s); color: var(--in-t); border-color: var(--in-b); }
+
+  /* ---- the palette sheet -------------------------------------------------------------------------- */
+  .sheet { background: #fff; color:#181c20; border-radius: 16px; padding: 18px; box-shadow: 0 6px 24px rgb(0 0 0/.12); grid-column: 1 / -1; }
+  .sheet h2 { margin: 0 0 4px; font-size: 18px; } .sheet p { margin: 0 0 12px; color:#586774; font-size: 14px; }
+  .ramp { display:grid; grid-template-columns: repeat(10, 1fr); gap:4px; margin-bottom: 10px; }
+  .ramp div { height:54px; border-radius:8px; display:flex; align-items:flex-end; padding:4px 6px; font-size:11px; font-weight:700; }
+  table { border-collapse: collapse; width:100%; font-size: 13px; } th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #e3e7ea; } th { color:#586774; font-weight:600; }
+  .ok { color:#067647; font-weight:700; } .no { color:#b42318; font-weight:700; }
+  .note { background:#fff8e1; border:1px solid #fcd34d; color:#5b3d00; border-radius:10px; padding:10px 12px; font-size:13px; margin-top:12px; }
+  svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>IISM theme preview</b>
+  <span>Palette:</span>
+  <label><input type="radio" name="p" value="aqua" hidden checked><span>Aqua (light)</span></label>
+  <label><input type="radio" name="p" value="sky" hidden><span>Sky (light)</span></label>
+  <label><input type="radio" name="p" value="indigo" hidden><span>Indigo (light)</span></label>
+  <label><input type="radio" name="p" value="teal" hidden><span>Deep teal</span></label>
+  <label><input type="radio" name="p" value="bluer" hidden><span>Bluer teal</span></label>
+  <label><input type="radio" name="p" value="saffron" hidden><span>Teal + saffron</span></label>
+  <label><input type="radio" name="p" value="blue" hidden><span>Current blue</span></label>
+  <span>Theme:</span>
+  <label><input type="radio" name="t" value="light" hidden checked><span>Light</span></label>
+  <label><input type="radio" name="t" value="dark" hidden><span>Dark</span></label>
+</div>
+
+<div class="scene" id="scene" data-palette="aqua" data-theme="light">
+<div class="wrap">
+
+  <!-- 1. home -->
+  <div class="phone">
+    <h3 class="cap">Home</h3>
+    <div class="hdr"><div class="logo"><span class="mark">⌘<i></i></span>IISM</div><div class="menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></div></div>
+    <div class="hero">
+      <span class="eyebrow">For people looking for work</span>
+      <h1>Find the work you want, and the training that gets you there</h1>
+      <p class="sub">Tell us the job you want. See what you are missing. Find the course that closes the gap.</p>
+      <div class="field">e.g. General Duty Assistant, welding…</div>
+      <div class="btn">Search</div>
+      <div class="chips"><span class="chip">Ward boy</span><span class="chip">Electrician</span><span class="chip">Security guard</span></div>
+      <div class="hlband"><span class="dot">★</span>Free to use · Hindi and English</div>
+    </div>
+    <div class="sec-pad">
+      <div class="tiles">
+        <div class="tile"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span><div><b>23</b><small>Job seekers</small></div></div>
+        <div class="tile"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3"/></svg></span><div><b>102</b><small>Employers</small></div></div>
+      </div>
+    </div>
+    <div class="tabs"><div class="on"><span class="pillbg">⌂</span>Home</div><div><span class="pillbg">▤</span>Jobs</div><div><span class="pillbg">◉</span>Matches</div><div><span class="pillbg">☺</span>Me</div></div>
+  </div>
+
+  <!-- 2. list + detail -->
+  <div class="phone">
+    <h3 class="cap">Jobs and a vacancy</h3>
+    <div class="hdr"><div class="logo"><span class="mark">⌘<i></i></span>IISM</div><div class="menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></div></div>
+    <div class="sec-pad">
+      <div class="card">
+        <div class="row"><span class="av">A</span><div style="flex:1"><div class="ttl">CSSD Technician</div><div class="org">Apollo Care Hospitals</div></div><span class="score">87</span></div>
+        <div class="meta"><span class="pill pay">₹ About ₹16,000–21,000 a month</span><span class="pill">⌖ Chennai, Tamil Nadu</span></div>
+        <div class="sub2">1–4 years · Posted 11 days ago</div>
+      </div>
+      <div class="card">
+        <div class="row"><span class="av w">S</span><div style="flex:1"><div class="ttl">Delivery Executive</div><div class="org">Swift Logistics · <span class="sc good" style="padding:1px 7px">✔ Verified</span></div></div></div>
+        <div class="meta"><span class="pill pay">₹ About ₹14,000–18,000 a month</span><span class="pill">⌖ Pune, Maharashtra</span></div>
+      </div>
+      <div class="card">
+        <div class="facts"><div><div class="fl">₹ Salary</div><div class="fv">₹16,000–21,000</div></div><div><div class="fl">◷ Experience</div><div class="fv">1–4 years</div></div></div>
+      </div>
+      <div class="trust"><span class="shield">✔</span><div style="font-size:14px"><b>Verified employer</b><div style="color:var(--muted)">Never pay to apply for a job.</div></div></div>
+    </div>
+    <div class="apply"><div class="btn">Apply with your phone number</div><div class="btn sec" style="width:90px">Save</div></div>
+  </div>
+
+  <!-- 3. workspace and states -->
+  <div class="phone">
+    <h3 class="cap">A workspace, and what the colours mean</h3>
+    <div class="hdr"><div class="logo"><span class="mark">⌘<i></i></span>IISM</div><div class="menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></div></div>
+    <div class="sec-pad">
+      <div class="tiles">
+        <div class="tile"><span class="ic">▤</span><div><b>13</b><small>Published courses</small></div></div>
+        <div class="tile"><span class="ic">☺</span><div><b>4</b><small>Learners interested</small></div></div>
+      </div>
+      <div class="row" style="margin:14px 0;align-items:center"><div class="ring"><span>25%</span></div><div><b>Enrolment conversion</b><div class="bar2" style="width:150px"><i style="width:25%"></i></div></div></div>
+      <div class="card">
+        <div class="ttl">Ward attendant, no infection control</div>
+        <div class="org">Chennai, Tamil Nadu</div>
+        <div class="meta"><span class="sc good">✉ New</span><span class="sc warn">◷ Waiting 4 days</span><span class="sc neutral">Contacted</span><span class="sc bad">✕ Removed</span><span class="sc info">ⓘ Info</span><span class="sc brand">Admin</span></div>
+      </div>
+      <div class="alert good">✔ Saved. Your vacancy is live.</div>
+      <div class="alert warn">⚠ This vacancy requires no standards yet, so it cannot be published.</div>
+      <div class="alert bad">✕ Could not save. Try again.</div>
+      <div class="alert info">ⓘ Providers are asked to reply within 3 days.</div>
+      <div class="btn">Publish</div><div class="btn soft">Edit</div><div class="btn sec">Cancel</div>
+    </div>
+  </div>
+
+  <!-- the sheet -->
+  <div class="sheet">
+    <h2>The palette on trial</h2>
+    <p id="sheetnote">Brand ramp, 50 to 900. Light uses 700 as the brand and 50 and 100 as tints; dark uses 400 as the brand on a near-black page.</p>
+    <div class="ramp" id="ramp"></div>
+    <table>
+      <tr><th>Pairing (WCAG)</th><th>Needs</th><th>Deep teal</th><th>Aqua</th><th>Sky</th><th>Indigo</th><th>Current blue</th></tr>
+      <tr><td>Link and brand text, light theme: on page / white / tint 50</td><td>4.5</td><td class="ok">7.3 / 7.7 / 7.1</td><td class="ok">5.0 / 5.3 / 4.9</td><td class="ok">6.7 / 7.1 / 6.5</td><td class="ok">12.0 / 12.6 / 11.3</td><td class="ok">8.2 / 8.7 / 7.9</td></tr>
+      <tr><td>Button label on its fill, light theme</td><td>4.5</td><td class="ok">7.7</td><td class="ok">7.8</td><td class="ok">6.7</td><td class="ok">5.1</td><td class="ok">8.7</td></tr>
+      <tr><td>Button fill against the white page (its edge)</td><td>3</td><td class="ok">7.7</td><td class="no">1.8</td><td class="no">2.4</td><td class="ok">3.7</td><td class="ok">8.7</td></tr>
+      <tr><td>Brand text, dark theme: on page / surface / tint 900</td><td>4.5</td><td class="ok">6.3 / 5.8 / 5.4</td><td class="ok">11.7 / 10.9 / 9.2</td><td class="ok">9.8 / 9.1 / 8.5</td><td class="ok">6.5 / 6.0 / 6.5</td><td class="ok">5.9 / 5.5 / 5.4</td></tr>
+      <tr><td>Button label on its fill, dark theme</td><td>4.5</td><td class="ok">5.4</td><td class="ok">9.2</td><td class="ok">8.5</td><td class="ok">6.5</td><td class="ok">5.4</td></tr>
+      <tr><td>Muted text (#586774) on tint 50 / 100</td><td>4.5</td><td class="ok">5.4 / 4.8</td><td class="ok">5.4 / 4.9</td><td class="ok">5.3 / 4.8</td><td class="ok">5.2 / 4.5</td><td class="ok">5.3 / 4.7</td></tr>
+      <tr><td>Strong text 800 on tint 50 / 100 (light chips)</td><td>4.5</td><td class="ok">10.7 / 9.5</td><td class="ok">8.4 / 7.6</td><td class="ok">10.2 / 9.1</td><td class="ok">14.2 / 12.3</td><td class="ok">11.6 / 10.4</td></tr>
+      <tr><td>Marigold (#f2a900) fill on white, as an outline or text</td><td>3 / 4.5</td><td colspan="5" class="no">2.0: a fill with dark text only (8.5), never a line or small text</td></tr>
+      <tr><td>Marigold vs the warning colour (#f59e0b)</td><td>distinct</td><td colspan="5" class="no">1.07: the same colour, so the highlight is decoration only and never a state</td></tr>
+    </table>
+    <div class="note"><b>Read this before choosing.</b> <b>A light brand cannot do two jobs with one colour.</b> The product uses its brand as the button fill <i>and</i> as the text of every link, and a colour light enough to look light fails as text on white (aqua and sky as fills are about 2:1 against the page, far under the 4.5:1 a link needs). So the three light palettes split the brand in two: a <b>light fill</b> (step 400, with dark text on it) for buttons, the logo and the progress ring, and a <b>deeper step</b> (700) for links, brand-coloured headings and the focus ring; the table shows each pairing. In the dark theme the light fill is the brand and needs no split. That is one new token pair (a solid and its label) and about thirteen places that today read the brand as a fill. <b>The cost is the button's edge:</b> where the fill is under 3:1 against a white page a shape cannot be seen without its label, so those buttons carry a one-pixel edge in the deeper step (drawn here). <b>Aqua is the lightest and the nearest to the teal you did not want; sky is a clear step away from it and closest to today's blue; indigo is the most distinct and the only one that reads as neither green nor blue.</b> The marigold highlight is the colour the product already uses for a warning, so it is decoration only (the band under the hero, the logo dot) and a test will keep it out of every status. The values are starting points: the tokens story finalises them against the product's own tests, and nothing changes in the product until you decide.</div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  const scene = document.getElementById('scene');
+  const ramp = document.getElementById('ramp');
+  function paintRamp() {
+    ramp.innerHTML = '';
+    const cs = getComputedStyle(scene);
+    [50,100,200,300,400,500,600,700,800,900].forEach(s => {
+      const d = document.createElement('div');
+      const hex = cs.getPropertyValue('--b' + s).trim();
+      d.style.background = hex; d.style.color = s <= 300 ? '#181c20' : '#fff'; d.textContent = s;
+      d.title = hex; ramp.appendChild(d);
+    });
+  }
+  document.querySelectorAll('input[name=p]').forEach(i => i.addEventListener('change', () => { scene.dataset.palette = i.value; paintRamp(); }));
+  document.querySelectorAll('input[name=t]').forEach(i => i.addEventListener('change', () => { scene.dataset.theme = i.value; document.body.style.background = i.value === 'dark' ? '#0b0e10' : '#e9edf0'; }));
+  paintRamp();
+</script>
+</body>
+</html>
