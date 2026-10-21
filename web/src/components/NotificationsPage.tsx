@@ -2,6 +2,7 @@
 
 import { useFormatter, useNow, useTranslations } from "next-intl";
 
+import { NoticeTile } from "@/components/NoticeTile";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Badge, Button, Skeleton } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
@@ -74,34 +75,39 @@ export function NotificationsPage() {
           return (
             <li
               key={notice.id}
-              className="border-t border-border-token py-3 first:border-t-0"
+              className="flex items-start gap-3 border-t border-border-token py-3 first:border-t-0"
             >
-              <div className="flex flex-wrap items-baseline gap-2">
-                {!notice.read_at && <Badge tone="brand">{t("new")}</Badge>}
-                <span className="text-sm">{describe(notice)}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted">
-                <span>
-                  {format.relativeTime(new Date(notice.created_at), now)}
-                </span>
-                {path && (
-                  <Link
-                    href={path}
-                    className="text-brand underline underline-offset-2"
-                  >
-                    {t("open")}
-                  </Link>
-                )}
-                {!notice.read_at && (
-                  <button
-                    type="button"
-                    disabled={readOne.isPending}
-                    onClick={() => readOne.mutate(notice.id)}
-                    className="rounded-sm text-brand underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    {t("markOne")}
-                  </button>
-                )}
+              <NoticeTile template={notice.template} unread={!notice.read_at} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  {!notice.read_at && <Badge tone="brand">{t("new")}</Badge>}
+                  <span className="text-sm">{describe(notice)}</span>
+                </div>
+                {/* The two actions are 44 px each, and the row is as tall as they make it: they were
+                    12 px text links, the smallest controls on the page. */}
+                <div className="flex flex-wrap items-center gap-x-1 text-xs text-muted">
+                  <span className="mr-2">
+                    {format.relativeTime(new Date(notice.created_at), now)}
+                  </span>
+                  {path && (
+                    <Link
+                      href={path}
+                      className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm text-brand underline underline-offset-2"
+                    >
+                      {t("open")}
+                    </Link>
+                  )}
+                  {!notice.read_at && (
+                    <button
+                      type="button"
+                      disabled={readOne.isPending}
+                      onClick={() => readOne.mutate(notice.id)}
+                      className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm text-brand underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    >
+                      {t("markOne")}
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           );

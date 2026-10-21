@@ -1,46 +1,23 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { ApplicationCard } from "@/components/cards/ApplicationCard";
+import { SavedJobRow } from "@/components/cards/SavedJobRow";
 import { GapPanel } from "@/components/GapPanel";
 import { ReviewControl } from "@/components/ReviewControl";
-import { Badge, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
-import { Link } from "@/i18n/navigation";
+import { ButtonLink, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { components } from "@/lib/api-schema";
 import { apiErrorFrom } from "@/lib/http";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BookmarkIcon, BriefcaseIcon } from "@/components/ui/icons";
 
-// From the generated client, never restated: a hand-written copy plus a cast
-// let `completed`/`no_show` reach this screen with no colour and no compile error.
-type Status = components["schemas"]["ApplicationOut"]["status"];
-
-/** The Hindi title when there is one. Every other listing does this; these two
- *  did not, so /hi/applications showed English titles on a Hindi page. */
-function useTitle() {
-  return (job: { title: string }) =>
-    job.title;
-}
-
-const TONE: Record<Status, string> = {
-  applied: "bg-surface-muted text-foreground",
-  shortlisted: "bg-success-surface text-success-text",
-  hired: "bg-success-surface text-success-text",
-  rejected: "bg-surface-muted text-muted",
-  withdrawn: "bg-warning-surface text-warning-text",
-  completed: "bg-success-surface text-success-text",
-  no_show: "bg-warning-surface text-warning-text",
-};
-
 /** Where each application stands, in the candidate's own words. */
 export function ApplicationList() {
   const t = useTranslations("applications");
-  const format = useFormatter();
   const tr = useTranslations("reviews");
-  const title = useTitle();
   const qc = useQueryClient();
   const [gapOpen, setGapOpen] = useState<string | null>(null);
   const { data, isPending, isError } = useQuery({
@@ -80,85 +57,44 @@ export function ApplicationList() {
   return (
     <ul className="mt-8 space-y-4">
       {data.map((application) => {
-        const status: Status = application.status;
+        const status = application.status;
         return (
           <li key={application.id}>
-            <Card>
-              <CardBody>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    {application.job.removed ? (
-                      // Removed by an operator: the page is gone, so there is nothing to link to.
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-semibold">{title(application.job)}</span>
-                        <Badge tone="bad">{t("removed")}</Badge>
-                      </span>
-                    ) : (
-                      <Link
-                        href={`/jobs/${application.job.slug}`}
-                        className="text-base font-semibold hover:underline"
+            <ApplicationCard
+              application={application}
+              footer={
+                <>
+                  {status === "rejected" && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        aria-expanded={gapOpen === application.id}
+                        aria-controls={`gap-${application.id}`}
+                        onClick={() => setGapOpen((cur) => (cur === application.id ? null : application.id))}
+                        className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                       >
-                        {title(application.job)}
-                      </Link>
-                    )}
-                    <p className="text-sm text-muted">{application.job.tenant.name}</p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-semibold ${TONE[status]}`}
-                  >
-                    {t(`status.${status}`)}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted">{t(`statusHint.${status}`)}</p>
-                {application.status_message && (
-                  <div className="mt-3 rounded-lg border border-border-token bg-surface-muted px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                      {t("fromEmployer", { organisation: application.job.tenant.name })}
-                      {application.status_message_at &&
-                        ` · ${format.dateTime(new Date(application.status_message_at), {
-                          dateStyle: "medium",
-                        })}`}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm">{application.status_message}</p>
-                  </div>
-                )}
-                <p className="mt-1 text-xs text-muted">
-                  {t("appliedOn", {
-                    date: format.dateTime(new Date(application.applied_at), {
-                      dateStyle: "medium",
-                    }),
-                  })}
-                </p>
-                {status === "rejected" && (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      aria-expanded={gapOpen === application.id}
-                      aria-controls={`gap-${application.id}`}
-                      onClick={() => setGapOpen((cur) => (cur === application.id ? null : application.id))}
-                      className="rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                    >
-                      {gapOpen === application.id ? t("hideGap") : t("whyNotMe")}
-                    </button>
-                    {gapOpen === application.id && (
-                      <div id={`gap-${application.id}`}>
-                        <GapPanel applicationId={application.id} />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {status === "completed" &&
-                  (application.reviewed ? (
-                    <p className="mt-3 text-sm text-muted">{tr("givenPoster")}</p>
-                  ) : (
-                    <ReviewControl
-                      prompt={tr("promptPoster", { organisation: application.job.tenant.name })}
-                      submit={ratePoster(application.id)}
-                      onSaved={() => qc.invalidateQueries({ queryKey: ["me", "applications"] })}
-                    />
-                  ))}
-              </CardBody>
-            </Card>
+                        {gapOpen === application.id ? t("hideGap") : t("whyNotMe")}
+                      </button>
+                      {gapOpen === application.id && (
+                        <div id={`gap-${application.id}`}>
+                          <GapPanel applicationId={application.id} />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {status === "completed" &&
+                    (application.reviewed ? (
+                      <p className="mt-3 text-sm text-muted">{tr("givenPoster")}</p>
+                    ) : (
+                      <ReviewControl
+                        prompt={tr("promptPoster", { organisation: application.job.tenant.name })}
+                        submit={ratePoster(application.id)}
+                        onSaved={() => qc.invalidateQueries({ queryKey: ["me", "applications"] })}
+                      />
+                    ))}
+                </>
+              }
+            />
           </li>
         );
       })}
@@ -169,7 +105,6 @@ export function ApplicationList() {
 /** Bookmarks. Saving tells the employer nothing, and this page says so. */
 export function SavedList() {
   const t = useTranslations("applications");
-  const title = useTitle();
   const { data, isPending, isError } = useQuery({
     queryKey: ["me", "saved-jobs"],
     queryFn: async () => {
@@ -196,17 +131,7 @@ export function SavedList() {
     <ul className="mt-8 space-y-3">
       {data.map((row) => (
         <li key={row.job.slug}>
-          <Card>
-            <CardBody>
-              <Link
-                href={`/jobs/${row.job.slug}`}
-                className="text-base font-semibold hover:underline"
-              >
-                {title(row.job)}
-              </Link>
-              <p className="text-sm text-muted">{row.job.tenant.name}</p>
-            </CardBody>
-          </Card>
+          <SavedJobRow slug={row.job.slug} title={row.job.title} employer={row.job.tenant.name} />
         </li>
       ))}
     </ul>

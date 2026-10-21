@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApplicationList } from "@/components/ApplicationList";
+import { ApplicationList, SavedList } from "@/components/ApplicationList";
 import { renderUi, resetWorld } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
@@ -107,6 +107,12 @@ describe("ApplicationList -- why not me", () => {
 
     await screen.findByText("Weekend shift rejected");
     expect(screen.getAllByRole("button", { name: "See what you were missing" })).toHaveLength(1);
+  });
+
+  it("makes the toggle a 44 px control (Sprint 87)", async () => {
+    answer([application("rejected")]);
+    renderUi(<ApplicationList />);
+    expect((await screen.findByRole("button", { name: "See what you were missing" })).className).toContain("min-h-11");
   });
 
   it("fetches nothing until it is opened", async () => {
@@ -260,3 +266,30 @@ describe("the employer's message (Sprint 60)", () => {
   });
 });
 
+
+/** Sprint 87, BL-19.17: a saved job is one card that is one link. */
+describe("SavedList", () => {
+  it("lists each saved vacancy as a single link to it, with the employer's mark, title and employer", async () => {
+    GET.mockImplementation(async () => ({
+      data: [
+        { job: { slug: "cashier-pune", title: "Cashier", tenant: { name: "Acme Retail" } } },
+        { job: { slug: "ward-attendant", title: "Ward Attendant", tenant: { name: "Apollo Care" } } },
+      ],
+      error: undefined,
+    }));
+    const { container } = renderUi(<SavedList />);
+    const first = await screen.findByRole("link", { name: /Cashier/ });
+    expect(first.getAttribute("href")).toBe("/jobs/cashier-pune");
+    expect(first.textContent).toContain("Acme Retail");
+    expect(screen.getByRole("link", { name: /Ward Attendant/ }).getAttribute("href")).toBe("/jobs/ward-attendant");
+    expect(container.querySelectorAll("li a").length).toBe(2);
+    expect(first.querySelector("[aria-hidden='true']")?.textContent).toBe("A");
+  });
+
+  it("says there is nothing saved, with a way on", async () => {
+    GET.mockImplementation(async () => ({ data: [], error: undefined }));
+    renderUi(<SavedList />);
+    expect(await screen.findByRole("link", { name: /./ })).toBeTruthy();
+    expect(screen.queryByText("Cashier")).toBeNull();
+  });
+});

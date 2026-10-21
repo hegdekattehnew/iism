@@ -214,4 +214,26 @@ describe("Notices", () => {
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/grievance");
   });
+
+  it("marks a notice with its kind's shape and makes its link 44 px (Sprint 87)", async () => {
+    GET.mockResolvedValue({
+      data: [
+        {
+          id: "n1",
+          template: "vacancy_closed",
+          payload: { vacancy: "Cashier", path: "/jobs/cashier" },
+          created_at: "2026-10-01T00:00:00Z",
+          read_at: null,
+        },
+      ],
+      error: undefined,
+      response: { status: 200 },
+    });
+    const { container } = renderUi(<Notices />);
+    const link = await screen.findByRole("link", { name: "Open" });
+    expect(link.className).toContain("min-h-11");
+    const tile = container.querySelector("li > [aria-hidden='true']") as HTMLElement;
+    expect(tile.querySelector("svg")).toBeTruthy();
+    expect(tile.className).toContain("bg-accent-soft");
+  });
 });

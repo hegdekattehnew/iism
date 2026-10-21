@@ -4,6 +4,8 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Alert, Button, Skeleton } from "@/components/ui";
+import { IconTile } from "@/components/ui/icon-tile";
+import { ShieldCheckIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
 import { useConfirmConsent, useConsentState, useWithdrawConsent } from "@/lib/consent";
 import { detailOf } from "@/lib/http";
@@ -33,9 +35,14 @@ export function ConsentSection() {
       aria-labelledby="consent-heading"
       className="rounded-xl border border-border-token bg-surface p-5"
     >
-      <h2 id="consent-heading" className="text-base font-semibold">
-        {t("consentTitle")}
-      </h2>
+      <div className="flex items-center gap-3">
+        <IconTile tone="good">
+          <ShieldCheckIcon />
+        </IconTile>
+        <h2 id="consent-heading" className="text-base font-semibold">
+          {t("consentTitle")}
+        </h2>
+      </div>
       {/* A line of text arrives late and is a different length: reserve it. */}
       {state.isPending ? (
         <Skeleton className="mt-1 h-5 w-3/4" />
@@ -50,8 +57,11 @@ export function ConsentSection() {
       ) : (
         <p className="mt-1 text-sm text-muted">{t("consentMissing")}</p>
       )}
-      <p className="mt-2 text-sm">
-        <Link href="/privacy" className="text-brand underline underline-offset-4 hover:text-brand-strong">
+      <p className="mt-1 text-sm">
+        <Link
+          href="/privacy"
+          className="inline-flex min-h-11 items-center text-brand underline underline-offset-4 hover:text-brand-strong"
+        >
           {t("readNotice")}
         </Link>
       </p>

@@ -97,6 +97,26 @@ describe("the notification page", () => {
     ).toBeTruthy();
   });
 
+  it("marks each notice with the shape of its kind, bright while new", async () => {
+    GET.mockResolvedValue(
+      page([notice(1), notice(2, { read_at: "2026-10-02T00:00:00Z", template: "grievance_update", payload: { reference: "GRV-ABC234", status: "resolved" } })]),
+    );
+    const { container } = renderUi(<NotificationsPage />);
+    await screen.findByText("Cashier 1 is no longer taking applications.");
+    const tiles = [...container.querySelectorAll("li > [aria-hidden='true']")] as HTMLElement[];
+    expect(tiles.length).toBe(2);
+    for (const t of tiles) expect(t.querySelector("svg")).toBeTruthy();
+    expect(tiles[0].className).toContain("bg-accent-soft");
+    expect(tiles[1].className).toContain("bg-surface-muted");
+  });
+
+  it("makes both actions on a notice 44 px", async () => {
+    GET.mockResolvedValue(page([notice(1)]));
+    renderUi(<NotificationsPage />);
+    expect((await screen.findByRole("link", { name: "Open" })).className).toContain("min-h-11");
+    expect(screen.getByRole("button", { name: "Mark as read" }).className).toContain("min-h-11");
+  });
+
   it("reads one notice, and reads them all", async () => {
     GET.mockResolvedValue(page([notice(1), notice(2)]));
     renderUi(<NotificationsPage />);

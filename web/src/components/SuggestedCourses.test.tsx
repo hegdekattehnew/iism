@@ -164,6 +164,16 @@ describe("the budget control", () => {
   const input = () =>
     screen.getByLabelText(/What would you pay/) as HTMLInputElement;
 
+  it("is the field library's: labelled, 44 px, narrow, with the number's limits at the control (Sprint 87)", () => {
+    renderUi(<CourseBudgetControl />);
+    const box = input();
+    expect(box.className).toContain("min-h-11");
+    expect(box.className).toContain("w-36");
+    expect(box.getAttribute("min")).toBe("0");
+    expect(box.getAttribute("max")).toBe("10000000");
+    expect(box.getAttribute("name")).toBe("budget_inr");
+  });
+
   it("applies a number when the person leaves the field, not on every keystroke", async () => {
     renderUi(
       <>
