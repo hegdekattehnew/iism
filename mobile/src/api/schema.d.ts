@@ -2474,7 +2474,10 @@ export interface paths {
         };
         /**
          * Verification Queue
-         * @description Organisations awaiting a verification decision, oldest first, and how many wait in all.
+         * @description Organisations awaiting a verification decision, oldest first, and how many match.
+         *
+         *     `q` searches name, slug and city; `kind` narrows to one organisation type (Sprint 93, BL-22.8).
+         *     Neither given, `total` is every organisation waiting, which is the overview tile's figure.
          */
         get: operations["verification_queue_ops_organisations_get"];
         put?: never;
@@ -11351,6 +11354,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
+                kind?: ("employer" | "course_provider") | null;
             };
             header?: never;
             path?: never;

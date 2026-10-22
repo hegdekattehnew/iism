@@ -1,6 +1,12 @@
 "use client";
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type { paths } from "./api-schema";
 import { api } from "./api";
@@ -42,19 +48,41 @@ const detailKey = (slug: string) => ["ops", "organisation", slug] as const;
 /** The queue's page size: the server's default, named so the screen and the test agree. */
 export const QUEUE_PAGE_SIZE = 100;
 
+/** What an operator can narrow the queue by (Sprint 93, BL-22.8): words, and one kind of organisation. */
+export type QueueFilters = {
+  q: string;
+  kind: Exclude<
+    NonNullable<paths["/ops/organisations"]["get"]["parameters"]["query"]>["kind"],
+    null | undefined
+  > | "";
+};
+export const NO_FILTERS: QueueFilters = { q: "", kind: "" };
+
 /**
  * Pages of the queue, each carrying the **queue's** size (`total`, counted in the database).
  * The screen used to print the length of the one page it asked for as "waiting", which the cap
- * of 100 turned into "100 waiting" beside an overview that said 162 (Sprint 69, UI-17).
+ * of 100 turned into "100 waiting" beside an overview that said 162 (Sprint 69, UI-17). With a
+ * filter, `total` is how many match: the filters are part of the key, so a change starts the list
+ * again, and the previous list stays on screen until the new one arrives (no flash of a skeleton
+ * per keystroke).
  */
-export function useVerificationQueue() {
+export function useVerificationQueue(filters: QueueFilters = NO_FILTERS) {
+  const q = filters.q.trim();
   return useInfiniteQuery({
-    queryKey: QUEUE,
+    queryKey: [...QUEUE, q, filters.kind] as const,
     retry: false,
     initialPageParam: 0,
+    placeholderData: keepPreviousData,
     queryFn: async ({ pageParam }) => {
       const { data, error, response } = await api.GET("/ops/organisations", {
-        params: { query: { limit: QUEUE_PAGE_SIZE, offset: pageParam } },
+        params: {
+          query: {
+            limit: QUEUE_PAGE_SIZE,
+            offset: pageParam,
+            q: q || undefined,
+            kind: filters.kind || undefined,
+          },
+        },
       });
       if (error || !data) throw apiErrorFrom(response.status, error);
       return data;

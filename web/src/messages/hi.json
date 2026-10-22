@@ -1725,6 +1725,15 @@
       "note": "{min} से कम निवासियों की संख्या नहीं दिखाई जाती, ताकि छोटा ज़िला किसी के बारे में कुछ न बताए। कमी हर मानक के हिसाब से है: एक निवासी के पास कई मानक होते हैं।"
     },
     "queueShowing": "प्रतीक्षा में {total} में से {shown} संगठन दिख रहे हैं।",
+    "queueSearchLabel": "कतार में खोजें",
+    "queueSearchPlaceholder": "नाम, पता या शहर",
+    "queueFiltersLabel": "कतार को छाँटें",
+    "queueKindLabel": "संगठन का प्रकार",
+    "queueKindAll": "सभी प्रकार",
+    "queueClear": "हटाएँ",
+    "queueNoMatch": "प्रतीक्षा में कोई संगठन इससे मेल नहीं खाता।",
+    "queueFilteredCount": "{count, plural, one {# संगठन मेल खाता है} other {# संगठन मेल खाते हैं}}।",
+    "queueFilteredShowing": "मेल खाने वाले {total} में से {shown} दिख रहे हैं।",
     "queueMore": "और दिखाएँ ({left} बाकी)",
     "queueMoreFailed": "कतार का अगला पृष्ठ लोड नहीं हो सका। फिर कोशिश करें।",
     "nav": {

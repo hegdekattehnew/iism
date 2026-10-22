@@ -47,12 +47,42 @@ from api.modules.operations.skill_gap import MIN_CELL_SIZE, suppress
 log = structlog.get_logger("iism.ops")
 
 
-def _waiting_organisations() -> ColumnElement[bool]:
-    return and_(Tenant.tenant_type.in_(ORGANISATION_TYPES), Tenant.verified_at.is_(None))
+def _like_escape(value: str) -> str:
+    """A person's search words are text, not a pattern: `%` and `_` must match themselves."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _waiting_organisations(*, q: str | None = None, kind: str | None = None) -> ColumnElement[bool]:
+    """Organisations waiting on a decision, optionally narrowed (Sprint 93, BL-22.8).
+
+    `q` matches the name, the address-like slug or the city, case-insensitively; `kind` is one
+    organisation type. **The dashboard tile calls this with neither**, so its figure is still the
+    whole queue; a filtered `total` answers "how many match", which the screen says out loud.
+    """
+    where: list[ColumnElement[bool]] = [
+        Tenant.tenant_type.in_(ORGANISATION_TYPES),
+        Tenant.verified_at.is_(None),
+    ]
+    if kind is not None:
+        where.append(Tenant.tenant_type == kind)
+    words = (q or "").strip()
+    if words:
+        pattern = f"%{_like_escape(words)}%"
+        where.append(
+            Tenant.name.ilike(pattern, escape="\\")
+            | Tenant.slug.ilike(pattern, escape="\\")
+            | Tenant.city.ilike(pattern, escape="\\")
+        )
+    return and_(*where)
 
 
 async def unverified_organisations(
-    db: AsyncSession, *, limit: int = 100, offset: int = 0
+    db: AsyncSession,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    q: str | None = None,
+    kind: str | None = None,
 ) -> tuple[list[tuple[Tenant, int, int, int]], int]:
     """Organisations waiting on a decision, oldest first, and **how many are waiting in all**.
 
@@ -87,13 +117,13 @@ async def unverified_organisations(
         .outerjoin(jobs, jobs.c.tenant_id == Tenant.id)
         .outerjoin(courses, courses.c.tenant_id == Tenant.id)
         .outerjoin(members, members.c.tenant_id == Tenant.id)
-        .where(_waiting_organisations())
+        .where(_waiting_organisations(q=q, kind=kind))
         .order_by(Tenant.created_at, Tenant.id)
         .limit(limit)
         .offset(offset)
     )
     total = await db.scalar(
-        select(func.count()).select_from(Tenant).where(_waiting_organisations())
+        select(func.count()).select_from(Tenant).where(_waiting_organisations(q=q, kind=kind))
     )
     rows = [(row[0], row[1], row[2], row[3]) for row in (await db.execute(stmt)).all()]
     return rows, total or 0

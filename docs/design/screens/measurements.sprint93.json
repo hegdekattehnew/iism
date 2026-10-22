@@ -1,0 +1,59 @@
+{
+  "sprint": 93,
+  "captured": "2026-10-22",
+  "method": "Read from the production build's route-bundle-stats.json (npm run build:e2e), the module breakdown from next experimental-analyze export, and the dialog checked in the in-app browser. NOT the sweep (no Chromium on the machine).",
+  "firstLoadBytes": {
+    "ceiling": 700000,
+    "/profile": {
+      "before": 699148,
+      "after": 663575,
+      "headroom": 36425
+    },
+    "/matches": {
+      "before": 690770,
+      "after": 658632
+    },
+    "/admin": {
+      "before": 697382,
+      "after": 658522,
+      "headroom": 41478
+    },
+    "/applications": {
+      "before": 685798,
+      "after": 654665
+    },
+    "every route": {
+      "saved": 35573
+    },
+    "shared by all 45 routes": 457430
+  },
+  "whatWasInEveryFirstLoad": "the Radix modal stack, imported only through ui/dialog by CreateOrgForm, which ContextSwitcher (in the header, on every route) imported statically: dialog, focus scope, dismissable layer, remove-scroll, presence, slot and context; 35,573 B after minifying",
+  "dialogChecked": {
+    "dialogBeforeClick": false,
+    "chunksFetchedOnClick": 3,
+    "dialogAfterClick": true
+  },
+  "queue": {
+    "endpoint": "GET /ops/organisations",
+    "newParams": [
+      "q",
+      "kind"
+    ],
+    "q": "name, slug, city; case-insensitive; percent and underscore are characters",
+    "kind": "employer | course_provider"
+  },
+  "phoneBundle": {
+    "android_bytes": 3735244,
+    "ceiling": 3800000,
+    "note": "the phone's catalogues gained nine strings"
+  },
+  "tests": {
+    "backend": 2094,
+    "web": 1253,
+    "mobile": 816
+  },
+  "mutationChecks": {
+    "run": 13,
+    "survivorsClosed": 2
+  }
+}

@@ -62,7 +62,9 @@ async def _candidate(client: AsyncClient) -> dict[str, str]:
     return {"authorization": f"Bearer {body['access_token']}"}
 
 
-async def _register_org(client: AsyncClient, name: str) -> tuple[dict[str, str], str]:
+async def _register_org(
+    client: AsyncClient, name: str, *, tenant_type: str = "employer"
+) -> tuple[dict[str, str], str]:
     address = _email()
     code = (
         await client.post(
@@ -70,7 +72,7 @@ async def _register_org(client: AsyncClient, name: str) -> tuple[dict[str, str],
             json={
                 "email": address,
                 "organisation_name": name,
-                "tenant_type": "employer",
+                "tenant_type": tenant_type,
                 "consent_version": CONSENT,
             },
         )
@@ -230,6 +232,81 @@ class TestTheQueue:
         # No row on both pages: the order is total (created_at, then id).
         slugs = [r["slug"] for r in first["items"] + rest["items"]]
         assert len(slugs) == len(set(slugs))
+
+    async def test_a_search_narrows_the_queue_and_its_total(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """Sprint 93, BL-22.8: a queue of hundreds is found by name, not by scrolling."""
+        headers = await _operator(client, db)
+        tag = uuid.uuid4().hex[:8]
+        _, wanted = await _register_org(client, f"Zq{tag} Harbour Care")
+        await _register_org(client, f"Zq{tag}x Other Works")
+        await _register_org(client, "Unrelated Ltd")
+
+        hit = (await client.get("/ops/organisations?q=harbour%20care", headers=headers)).json()
+        assert [r["slug"] for r in hit["items"] if f"zq{tag}" in r["slug"]] == [wanted]
+        # The total counts what matches, in the database.
+        mine = (await client.get(f"/ops/organisations?q=Zq{tag}", headers=headers)).json()
+        assert mine["total"] == 2 == len(mine["items"])
+        # And it matches the slug, which an operator may be reading off a URL.
+        by_slug = (await client.get(f"/ops/organisations?q={wanted}", headers=headers)).json()
+        assert [r["slug"] for r in by_slug["items"]] == [wanted]
+        # Nothing matched is an empty page with a true zero, not an error.
+        none = (
+            await client.get("/ops/organisations?q=no-such-organisation-xyz", headers=headers)
+        ).json()
+        assert (none["items"], none["total"]) == ([], 0)
+
+    async def test_search_words_are_text_not_a_pattern(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        """`%` and `_` are characters people type: `%` must not mean "everything"."""
+        headers = await _operator(client, db)
+        tag = uuid.uuid4().hex[:8]
+        await _register_org(client, f"Zq{tag} 100% Training")
+        await _register_org(client, f"Zq{tag} Plain Training")
+        for wildcard, name in (("%25", "100% Training"), ("_", None)):
+            body = (await client.get(f"/ops/organisations?q={wildcard}", headers=headers)).json()
+            names = [r["name"] for r in body["items"]]
+            if name:
+                assert f"Zq{tag} {name}" in names
+                assert f"Zq{tag} Plain Training" not in names
+            else:
+                # No organisation here has an underscore in its name, address-like slug or city.
+                assert not [n for n in names if n.startswith(f"Zq{tag}")]
+
+    async def test_the_queue_can_be_narrowed_to_one_kind_of_organisation(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _operator(client, db)
+        tag = uuid.uuid4().hex[:8]
+        _, employer = await _register_org(client, f"Zq{tag} Employer")
+        _, provider = await _register_org(
+            client, f"Zq{tag} Provider", tenant_type="course_provider"
+        )
+
+        both = (await client.get(f"/ops/organisations?q=Zq{tag}", headers=headers)).json()
+        assert {r["slug"] for r in both["items"]} == {employer, provider}
+        only = (
+            await client.get(f"/ops/organisations?q=Zq{tag}&kind=course_provider", headers=headers)
+        ).json()
+        assert [r["slug"] for r in only["items"]] == [provider]
+        assert only["total"] == 1
+        refused = await client.get("/ops/organisations?kind=personal", headers=headers)
+        assert refused.status_code == 422, "a personal workspace is not an organisation to verify"
+
+    async def test_a_filter_does_not_change_the_overview_tile(
+        self, client: AsyncClient, db: AsyncSession
+    ) -> None:
+        headers = await _operator(client, db)
+        await _register_org(client, "Tile Filter Ltd")
+        tile = (await client.get("/ops/dashboard", headers=headers)).json()[
+            "unverified_organisations"
+        ]
+        narrowed = (await client.get("/ops/organisations?q=Tile%20Filter", headers=headers)).json()
+        assert narrowed["total"] < tile or tile == 1
+        whole = (await client.get("/ops/organisations", headers=headers)).json()
+        assert whole["total"] == tile
 
     async def test_the_dashboard_tile_and_the_queue_total_are_one_number(
         self, client: AsyncClient, db: AsyncSession
