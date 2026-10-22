@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.authorization import OperatorContext, Permission, require_operator
 from api.core.database import get_db_session
 from api.modules import skills
-from api.modules.identity.schemas import OrgTenantType
 from api.modules.marketplace.bulk import BulkFileError, decode
 from api.modules.operations import enrolment, schemas, service, skill_gap
 
@@ -30,7 +29,7 @@ async def verification_queue(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: str | None = Query(None, max_length=100),
-    kind: OrgTenantType | None = Query(None),
+    kind: schemas.ReviewKind | None = Query(None),
     db: AsyncSession = Depends(get_db_session),
     context: OperatorContext = CanReadOrgs,
 ) -> schemas.OrganisationQueue:
@@ -42,6 +41,7 @@ async def verification_queue(
     rows, total = await service.unverified_organisations(
         db, limit=limit, offset=offset, q=q, kind=kind
     )
+    parents = await service.parents_of(db, [row[0] for row in rows])
     items = [
         schemas.UnverifiedOrganisation(
             slug=tenant.slug,
@@ -53,6 +53,11 @@ async def verification_queue(
             jobs=jobs,
             courses=courses,
             members=members,
+            parent_name=parents[tenant.id].name if tenant.id in parents else None,
+            parent_slug=parents[tenant.id].slug if tenant.id in parents else None,
+            address=tenant.address,
+            district=tenant.location_district,
+            state=tenant.location_state,
         )
         for tenant, jobs, courses, members in rows
     ]
@@ -96,7 +101,10 @@ async def verification_detail(
     tenant = await service.organisation_for_review(db, org_slug)
     if tenant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
-    return _detail(tenant, await service.verification_history(db, tenant.id))
+    parents = await service.parents_of(db, [tenant])
+    return _detail(
+        tenant, await service.verification_history(db, tenant.id), parents.get(tenant.id)
+    )
 
 
 @router.post(
@@ -121,7 +129,10 @@ async def decide_verification(
     await service.set_verification(
         db, tenant, decision=payload.decision, note=payload.note, actor=context.user
     )
-    return _detail(tenant, await service.verification_history(db, tenant.id))
+    parents = await service.parents_of(db, [tenant])
+    return _detail(
+        tenant, await service.verification_history(db, tenant.id), parents.get(tenant.id)
+    )
 
 
 @router.get("/candidates/certifications", response_model=schemas.CertificationQueue)
@@ -286,10 +297,16 @@ async def district_skill_gap(
     )
 
 
-def _detail(tenant, history) -> schemas.OrganisationVerificationOut:  # type: ignore[no-untyped-def]
+def _detail(tenant, history, parent=None) -> schemas.OrganisationVerificationOut:  # type: ignore[no-untyped-def]
     return schemas.OrganisationVerificationOut(
         slug=tenant.slug,
         name=tenant.name,
+        tenant_type=tenant.tenant_type,
+        parent_name=parent.name if parent is not None else None,
+        parent_slug=parent.slug if parent is not None else None,
+        address=tenant.address,
+        district=tenant.location_district,
+        state=tenant.location_state,
         is_verified=tenant.is_verified,
         verified_at=tenant.verified_at,
         verification_note=tenant.verification_note,

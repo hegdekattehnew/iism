@@ -75,6 +75,24 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "See your organisation profile:\n{link}\n\n"
             "If you think this is a mistake, please contact the IISM team.\n",
         ),
+        # Sprint 95. A centre's own mark says its **address** was checked, which is not what the
+        # organisation's Verified badge says, so it has its own words. Addressed to the organisation
+        # that runs the centre: a centre has no inbox and no members of its own yet.
+        "centre_verified": (
+            "The address of {organisation} has been checked on IISM",
+            'We checked the address of {organisation} on IISM. The "Address checked" mark now '
+            "appears next to it on your organisation's page, so learners can see that this "
+            "centre is where you say it is.\n\n"
+            "See your centres:\n{link}\n",
+        ),
+        "centre_verification_revoked": (
+            'The "Address checked" mark for {organisation} has been removed',
+            'The "Address checked" mark for {organisation} on IISM has been removed. The '
+            "centre is still listed, but it no longer carries the mark. If its address changed, "
+            "it is checked again once an operator has looked at the new one.\n\n"
+            "See your centres:\n{link}\n\n"
+            "If you think this is a mistake, please contact the IISM team.\n",
+        ),
         "ownership_received": (
             "You are now an owner of {organisation} on IISM",
             "You have been made an owner of {organisation} on IISM. Owners can "
@@ -158,6 +176,21 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "IISM पर {organisation} का “सत्यापित” निशान हटा दिया गया है। आपकी रिक्तियाँ और "
             "पाठ्यक्रम अब भी प्रकाशित हैं, पर उन पर यह निशान नहीं दिखेगा।\n\n"
             "अपने संगठन की प्रोफ़ाइल देखें:\n{link}\n\n"
+            "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम से संपर्क करें।\n",
+        ),
+        "centre_verified": (
+            "IISM पर {organisation} का पता जाँच लिया गया है",
+            "हमने IISM पर {organisation} का पता जाँच लिया है। अब आपके संगठन के पृष्ठ पर उसके "
+            "आगे “पता जाँचा गया” का निशान दिखता है, ताकि शिक्षार्थी देख सकें कि यह केंद्र "
+            "वहीं है जहाँ आप बताते हैं।\n\n"
+            "अपने केंद्र देखें:\n{link}\n",
+        ),
+        "centre_verification_revoked": (
+            "{organisation} का “पता जाँचा गया” निशान हटा दिया गया है",
+            "IISM पर {organisation} का “पता जाँचा गया” निशान हटा दिया गया है। केंद्र अब भी "
+            "सूचीबद्ध है, पर उस पर यह निशान नहीं दिखेगा। यदि उसका पता बदला है, तो ऑपरेटर के नया "
+            "पता देख लेने पर उसे फिर जाँचा जाता है।\n\n"
+            "अपने केंद्र देखें:\n{link}\n\n"
             "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम से संपर्क करें।\n",
         ),
         "ownership_received": (

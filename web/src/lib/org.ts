@@ -84,6 +84,18 @@ export function useOrgType(
   return (found?.tenant.tenant_type as "employer" | "course_provider") ?? null;
 }
 
+/**
+ * Whether this organisation delivers training (and so has centres), from data already on the wire.
+ * `false` while the memberships load or for a slug the caller does not hold, which is the safe
+ * answer for a navigation item: show nothing rather than something wrong.
+ */
+export function useOrgDelivers(orgSlug: string | null): boolean {
+  const { organisations } = useMemberships();
+  if (!orgSlug) return false;
+  const found = organisations.find((m) => m.tenant.slug === orgSlug);
+  return found?.tenant.delivers_training === true;
+}
+
 export function useOrgJobs(orgSlug: string | null) {
   return useQuery({
     queryKey: ["org-jobs", orgSlug],

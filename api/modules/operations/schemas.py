@@ -15,6 +15,9 @@ VerificationDecision = Literal["granted", "revoked"]
 # both to autogenerate and to the schema beside it.
 assert set(get_args(VerificationDecision)) == set(VERIFICATION_DECISIONS)  # noqa: S101
 
+# What the verification queue can be narrowed to (Sprint 95): an organisation's kind, or a centre.
+ReviewKind = Literal["employer", "course_provider", "training_centre"]
+
 AliasSource = Literal["seed", "operator"]
 AliasAction = Literal["added", "retired"]
 assert set(get_args(AliasSource)) == set(ALIAS_SOURCES)  # noqa: S101
@@ -37,6 +40,12 @@ class UnverifiedOrganisation(BaseModel):
     jobs: int
     courses: int
     members: int
+    # A centre only (Sprint 95): the organisation behind it and the place an operator is checking.
+    parent_name: str | None = None
+    parent_slug: str | None = None
+    address: str | None = None
+    district: str | None = None
+    state: str | None = None
 
 
 class OrganisationQueue(BaseModel):
@@ -102,6 +111,14 @@ class OrganisationVerificationOut(BaseModel):
     verified_at: datetime | None = None
     verification_note: str | None = None
     history: list[VerificationEventOut]
+    # What is being decided about (Sprint 95): an organisation, or a centre's address. A centre also
+    # carries whose it is and the address an operator is checking.
+    tenant_type: str | None = None
+    parent_name: str | None = None
+    parent_slug: str | None = None
+    address: str | None = None
+    district: str | None = None
+    state: str | None = None
 
 
 class UnverifiedCertification(BaseModel):

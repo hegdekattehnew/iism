@@ -8,6 +8,8 @@ class OrganisationFate(BaseModel):
     name: str
     # Vacancies and courses, published or not, that go with it.
     listings: int
+    # Training centres that go with it (Sprint 95).
+    centres: int = 0
 
 
 class DeletionPreview(BaseModel):
@@ -39,6 +41,8 @@ class OrganisationDeletionPreview(BaseModel):
     tenant_type: str
     jobs: int
     courses: int
+    # Training centres that go with it (Sprint 95).
+    centres: int = 0
     # People who applied or registered interest and will lose that record.
     # Shown because it is the part an owner does not think of, and the part
     # that belongs to somebody else.

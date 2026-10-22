@@ -108,6 +108,19 @@ describe("DeleteOrganisation — the confirmation", () => {
   });
 });
 
+describe("DeleteOrganisation — training centres (Sprint 95)", () => {
+  it("names the centres that go with the organisation, and only when there are some", async () => {
+    GET.mockResolvedValue({ data: preview({ centres: 3 }), error: undefined });
+    const a = renderUi(panel());
+    expect(await screen.findByText(/3 training centres/)).toBeTruthy();
+    a.unmount();
+    GET.mockResolvedValue({ data: preview({ centres: 0 }), error: undefined });
+    renderUi(panel());
+    await screen.findByText(/7 applications/);
+    expect(screen.queryByText(/training centre/)).toBeNull();
+  });
+});
+
 describe("DeleteOrganisation — who sees it", () => {
   it("renders nothing for an admin, who is a member but not an owner", async () => {
     // A button that always fails is worse than no button (Sprint 14).

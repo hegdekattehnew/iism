@@ -232,6 +232,24 @@ class ProviderSectorOut(BaseModel):
     courses: int
 
 
+class ProviderCentreOut(BaseModel):
+    """A training centre on its organisation's public page (Sprint 95, ADR-102).
+
+    Its own mark, `is_verified`, means **the address was checked**; it is never the organisation's
+    mark (a verified organisation does not make a centre verified, and the page shows both
+    separately). Closed centres are not listed.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    slug: str
+    name: str
+    address: str | None = None
+    location_state: str | None = None
+    location_district: str | None = None
+    is_verified: bool = False
+
+
 class ProviderPublicOut(BaseModel):
     """A training organisation's public page (Sprint 94, ADR-102).
 
@@ -258,6 +276,7 @@ class ProviderPublicOut(BaseModel):
     sectors: list[ProviderSectorOut] = Field(default_factory=list)
     courses: list["CourseOut"] = Field(default_factory=list)
     courses_total: int = 0
+    centres: list[ProviderCentreOut] = Field(default_factory=list)
 
 
 class CourseSkillIn(BaseModel):

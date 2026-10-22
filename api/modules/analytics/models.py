@@ -112,6 +112,11 @@ EVENT_NAMES = (
     # delivers training). Subject to the organisation; the payload is the capability and whether it
     # is now on, and nothing about a person beyond the `user_id` every event already carries.
     "organisation_capability_changed",
+    # Sprint 95, ADR-102. A training centre was created, closed, or a file of them was uploaded.
+    # Subject to the organisation; the payload is counts, never a name or an address.
+    "centre_created",
+    "centre_closed",
+    "centres_bulk_uploaded",
 )
 
 

@@ -19,9 +19,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.database import Base, one_of
 
+# `Tenant.state_id` and `district_id` name rows in `states` and `districts`. SQLAlchemy resolves a
+# `ForeignKey("states.id")` against the metadata, so a script that imports identity's models without
+# the geography models fails at mapper configuration (the lesson marketplace's models carry).
+from api.modules.geography.models import District, State  # noqa: F401
+
 # Organisations that own inventory. Sprint 3 needs the record; Sprint 4 layers
 # User and Membership on top of it (ADR-010).
-TENANT_TYPES = ("employer", "course_provider", "personal")
+TENANT_TYPES = ("employer", "course_provider", "personal", "training_centre")
 
 # Membership roles within a tenant. RBAC now, designed so ABAC can be layered
 # on later without restructuring (ADR-012, ADR-022).
@@ -60,6 +65,14 @@ class Tenant(Base):
         # added to the database by hand while this copy lagged, and Alembic does
         # not diff CHECK bodies, so nothing flagged the drift.
         CheckConstraint(one_of("tenant_type", TENANT_TYPES), name="ck_tenants_type"),
+        # A centre is always somebody's child and nothing else is (Sprint 95, ADR-102): the row
+        # that says "a centre of nobody" or "an employer inside an employer" cannot be written.
+        # Hand-written in 0059 as well as here: Alembic does not diff CHECK bodies.
+        CheckConstraint(
+            "(tenant_type = 'training_centre') = (parent_id IS NOT NULL)",
+            name="ck_tenants_centre_has_parent",
+        ),
+        Index("ix_tenants_parent_id", "parent_id"),
         # A badge carries its evidence or it does not exist. Hand-written in
         # 0028 as well as here: Alembic does not diff CHECK bodies.
         CheckConstraint(
@@ -109,6 +122,29 @@ class Tenant(Base):
     year_established: Mapped[int | None] = mapped_column(Integer, default=None)
     affiliations: Mapped[str | None] = mapped_column(Text, default=None)
     teaching_languages: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # A training centre (Sprint 95, ADR-102) is a child tenant of the organisation that delivers
+    # training: it has a parent, an address and a place, and **no members of its own yet** (the
+    # parent's owners and admins reach it through the parent, written once in
+    # `core.authorization.centre_for`). RESTRICT: a parent cannot be deleted from under its
+    # centres, so deleting an organisation deletes them first, explicitly (`privacy/`).
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="RESTRICT"), default=None
+    )
+    address: Mapped[str | None] = mapped_column(Text, default=None)
+    # The place as it was written, and the ids it resolved to (`geography.PlaceIndex`: a wrong id
+    # is worse than none, so both may be NULL while the text still reads correctly).
+    location_state: Mapped[str | None] = mapped_column(default=None)
+    location_district: Mapped[str | None] = mapped_column(default=None)
+    state_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("states.id", ondelete="SET NULL"), default=None
+    )
+    district_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("districts.id", ondelete="SET NULL"), default=None
+    )
+    # A centre that no longer runs is closed, not deleted: its history stays. NULL means active.
+    # Derived status, not a column that can disagree with it.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     # Set by an operator, never by the organisation (ADR-042). A self-asserted
     # badge is worse than none, because a candidate reads it as ours.

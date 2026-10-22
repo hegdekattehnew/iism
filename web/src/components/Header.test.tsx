@@ -36,6 +36,23 @@ describe("Header — the whole header switches, not half of it", () => {
     expect(link("Team")?.getAttribute("href")).toBe("/employer/tnt/team");
   });
 
+  it("offers Centres to an organisation that delivers training, and to nobody else (Sprint 95)", () => {
+    const delivers = org("tnt", "course_provider");
+    delivers.tenant.delivers_training = true;
+    world.memberships = [personal(), delivers, org("sells", "course_provider"), org("acme")];
+    world.pathname = "/employer/tnt";
+    const a = renderUi(<Header />);
+    expect(link("Centres")?.getAttribute("href")).toBe("/employer/tnt/centres");
+    a.unmount();
+    // A seller of courses has no centres page, and nor has an employer.
+    for (const slug of ["sells", "acme"]) {
+      world.pathname = `/employer/${slug}`;
+      const b = renderUi(<Header />);
+      expect(link("Centres")).toBeNull();
+      b.unmount();
+    }
+  });
+
   it("does not offer an employer the provider's inbox", () => {
     world.memberships = [personal(), org("acme")];
     world.pathname = "/employer/acme";

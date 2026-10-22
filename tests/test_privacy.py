@@ -205,7 +205,7 @@ class TestDeletion:
 
         preview = (await client.get("/me/account/deletion", headers=headers)).json()
         assert preview["organisations_deleted"] == [
-            {"slug": slug, "name": "Solo Clinic", "listings": 1}
+            {"slug": slug, "name": "Solo Clinic", "listings": 1, "centres": 0}
         ]
 
         assert (await client.delete("/me/account", headers=headers)).status_code == 204

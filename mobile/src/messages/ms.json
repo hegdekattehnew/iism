@@ -23,7 +23,8 @@
     "tabsLabel": "Tab utama",
     "candidateLabel": "Halaman anda",
     "tabMatches": "Padanan",
-    "tabProfile": "Profil"
+    "tabProfile": "Profil",
+    "centres": "Centres"
   },
   "hero": {
     "eyebrow": "For people looking for work",
@@ -894,7 +895,8 @@
     "teachingLanguagesHint": "For example: Hindi, English.",
     "affiliations": "Affiliations",
     "affiliationsHint": "For example a training-partner scheme or a sector skill council. Shown on your public page as your own statement; we do not check it.",
-    "viewPublicPage": "View your public page"
+    "viewPublicPage": "View your public page",
+    "deleteCentres": "{count, plural, one {# training centre} other {# training centres}}"
   },
   "credentials": {
     "title": "How you sign in",
@@ -1753,7 +1755,18 @@
       "aliases": "Aliases",
       "enrolment": "Enrolment"
     },
-    "verifyAdminOnly": "Only an admin-tier operator can verify or revoke an organisation. Ask an admin to act on this one."
+    "verifyAdminOnly": "Only an admin-tier operator can verify or revoke an organisation. Ask an admin to act on this one.",
+    "centre": "Centre",
+    "centreOf": "Centre of {organisation}",
+    "noAddress": "No address given",
+    "centreReview": {
+      "verified": "Address checked",
+      "notVerified": "Address not checked yet",
+      "grant": "Mark the address as checked",
+      "revoke": "Remove the mark",
+      "decideHeading": "Record a decision about this address",
+      "noteLabel": "What you checked at this address"
+    }
   },
   "reviews": {
     "ratingLabel": "Rating out of 5",
@@ -2195,6 +2208,84 @@
     "coursesTitle": "{count, plural, =0 {Courses it sells} one {Course it sells (#)} other {Courses it sells (#)}}",
     "noCourses": "It has no published courses yet.",
     "noCoursesDeliverer": "It delivers training and sells no courses of its own.",
-    "moreCourses": "Showing {shown} of {total} courses."
+    "moreCourses": "Showing {shown} of {total} courses.",
+    "centresTitle": "{count, plural, =0 {Centres} one {Centre (#)} other {Centres (#)}}",
+    "noCentres": "It has not listed any centres yet.",
+    "addressChecked": "Address checked"
+  },
+  "centres": {
+    "heading": "Centres",
+    "subheading": "Where {organisation} teaches. Learners find a centre by its place.",
+    "count": "{active} open of {total}",
+    "add": "Add a centre",
+    "uploadLink": "Add many from a file",
+    "name": "Centre name",
+    "nameHint": "For example: Hadapsar Skill Centre. It must be different from your other centres.",
+    "address": "Address",
+    "addressHint": "The street address a learner would go to.",
+    "state": "State",
+    "district": "District",
+    "create": "Add centre",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "editNamed": "Edit: {name}",
+    "close": "Close",
+    "closeNamed": "Close: {name}",
+    "reopen": "Reopen",
+    "reopenNamed": "Reopen: {name}",
+    "more": "More",
+    "status": {
+      "active": "Open",
+      "closed": "Closed"
+    },
+    "checked": "Address checked",
+    "notChecked": "Address not checked yet",
+    "noPlace": "No address given",
+    "placeNotFound": "We could not find this place in the national list, so it is kept as you wrote it. Learners searching by district may not find this centre.",
+    "closedNote": "A closed centre is not shown on your public page. You can reopen it.",
+    "checkedWarning": "An operator has checked this centre's address. If you change the address or the place, the \"Address checked\" mark is removed until it is checked again.",
+    "empty": "No centres yet",
+    "emptyHint": "Add the places where you teach. Each one can be checked by our team and shown on your public page.",
+    "notDelivering": "This organisation does not deliver training, so it has no centres. You can change what it does in settings.",
+    "toSettings": "Open settings",
+    "noAccess": "You do not have access to this organisation's centres.",
+    "failed": "Could not save the centre. Try again."
+  },
+  "centresUpload": {
+    "back": "Back to centres",
+    "title": "Add centres from a file",
+    "intro": "Check the file first. Nothing is added until you press the button at the end, and a name you already have is skipped, never changed.",
+    "step1": "1. Download the template",
+    "templateHelp": "It has the four columns: name, address, state and district. Name, state and district are required.",
+    "downloadTemplate": "Download the template",
+    "step2": "2. Choose your file",
+    "chooseFile": "A CSV file, up to 2 MB",
+    "tooBig": "That file is larger than 2 MB. Split it and upload the parts one at a time.",
+    "checking": "Checking the file…",
+    "failed": "Could not read that file. Check that it is a CSV and try again.",
+    "step3": "3. What would happen",
+    "step3Done": "Done",
+    "summary": "{ok} ready, {warnings} to look at, {errors} with a problem, {skipped} already there.",
+    "tableCaption": "What each row of the file would do",
+    "colRow": "Row",
+    "colName": "Centre",
+    "colResult": "Result",
+    "colDetails": "Details",
+    "status": {
+      "ok": "Ready",
+      "warning": "Warning",
+      "error": "Problem",
+      "skip": "Skipped",
+      "update": "Update"
+    },
+    "room": "You can add up to {remaining} more centres.",
+    "acknowledge": "{count, plural, one {# row has a problem and will not be added.} other {# rows have a problem and will not be added.}} Add the others.",
+    "downloadErrors": "Download the rows to fix",
+    "apply": "{count, plural, one {Add # centre} other {Add # centres}}",
+    "applying": "Adding…",
+    "created": "{count, plural, one {# centre added.} other {# centres added.}}",
+    "another": "Use another file",
+    "viewList": "See my centres"
   }
 }

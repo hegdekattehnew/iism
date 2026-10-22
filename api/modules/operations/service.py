@@ -46,6 +46,12 @@ from api.modules.operations.skill_gap import MIN_CELL_SIZE, suppress
 
 log = structlog.get_logger("iism.ops")
 
+# What an operator can verify: an organisation, or a training centre's address (Sprint 95, ADR-102).
+# **Not `ORGANISATION_TYPES`**: that is what a person can sign in to, act in and be a member of, and
+# a centre is none of those. The two lists are kept apart so a centre never becomes a workspace by
+# way of a convenient constant.
+VERIFIABLE_TYPES = (*ORGANISATION_TYPES, "training_centre")
+
 
 def _like_escape(value: str) -> str:
     """A person's search words are text, not a pattern: `%` and `_` must match themselves."""
@@ -60,8 +66,10 @@ def _waiting_organisations(*, q: str | None = None, kind: str | None = None) -> 
     whole queue; a filtered `total` answers "how many match", which the screen says out loud.
     """
     where: list[ColumnElement[bool]] = [
-        Tenant.tenant_type.in_(ORGANISATION_TYPES),
+        Tenant.tenant_type.in_(VERIFIABLE_TYPES),
         Tenant.verified_at.is_(None),
+        # A closed centre has nothing left to check.
+        Tenant.closed_at.is_(None),
     ]
     if kind is not None:
         where.append(Tenant.tenant_type == kind)
@@ -72,6 +80,7 @@ def _waiting_organisations(*, q: str | None = None, kind: str | None = None) -> 
             Tenant.name.ilike(pattern, escape="\\")
             | Tenant.slug.ilike(pattern, escape="\\")
             | Tenant.city.ilike(pattern, escape="\\")
+            | Tenant.location_district.ilike(pattern, escape="\\")
         )
     return and_(*where)
 
@@ -136,8 +145,17 @@ async def organisation_for_review(db: AsyncSession, slug: str) -> Tenant | None:
     absent from the queue.
     """
     return await db.scalar(
-        select(Tenant).where(Tenant.slug == slug, Tenant.tenant_type.in_(ORGANISATION_TYPES))
+        select(Tenant).where(Tenant.slug == slug, Tenant.tenant_type.in_(VERIFIABLE_TYPES))
     )
+
+
+async def parents_of(db: AsyncSession, tenants: list[Tenant]) -> dict[uuid.UUID, Tenant]:
+    """The organisation behind each centre in a page, in one query (`centre id -> parent`)."""
+    ids = {t.parent_id for t in tenants if t.parent_id is not None}
+    if not ids:
+        return {}
+    found = {t.id: t for t in (await db.scalars(select(Tenant).where(Tenant.id.in_(ids)))).all()}
+    return {t.id: found[t.parent_id] for t in tenants if t.parent_id in found}
 
 
 async def verification_history(
@@ -185,20 +203,31 @@ async def set_verification(
     # address is resolved at send time (ADR-023). Email only -- an organisation's
     # members have no in-app inbox. An owner who signed up by phone alone has no
     # address, so the row is marked skipped and that organisation is not told.
+    # A centre's mark is told to the organisation that runs it: the centre has no members and no
+    # address of its own (Sprint 95). The notice names the centre and links to the centres page.
+    is_centre = tenant.tenant_type == "training_centre"
+    kind = "centre" if is_centre else "organisation"
     if decision == "granted" and not was_verified:
-        template = "organisation_verified"
+        template: str | None = f"{kind}_verified"
     elif decision != "granted" and was_verified:
-        template = "organisation_verification_revoked"
+        template = f"{kind}_verification_revoked"
     else:
         template = None
     if template is not None:
+        recipient = tenant.parent_id if is_centre and tenant.parent_id is not None else tenant.id
+        parent = await db.get(Tenant, recipient) if is_centre else tenant
+        path = (
+            f"/employer/{parent.slug}/centres"
+            if is_centre and parent is not None
+            else f"/employer/{tenant.slug}/settings"
+        )
         await enqueue(
             db,
             recipient_kind="tenant",
-            recipient_id=tenant.id,
+            recipient_id=recipient,
             channel="email",
             template=template,
-            payload={"organisation": tenant.name, "path": f"/employer/{tenant.slug}/settings"},
+            payload={"organisation": tenant.name, "path": path},
         )
 
     if decision == "granted":

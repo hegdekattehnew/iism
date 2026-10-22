@@ -11,7 +11,7 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { SEEKER, rememberContext } from "@/lib/context";
 import { currentHref, isReducedHeader } from "@/lib/nav";
 import { useDismiss } from "@/lib/use-dismiss";
-import { useOrgType } from "@/lib/org";
+import { useOrgDelivers, useOrgType } from "@/lib/org";
 
 /** What a job seeker is here to do. Also what an anonymous visitor sees. */
 const SEEKER_NAV = [
@@ -50,6 +50,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const activeOrg = useActiveOrg();
   const orgType = useOrgType(activeOrg);
+  const delivers = useOrgDelivers(activeOrg);
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
   const closeNav = useCallback(() => setOpen(false), []);
@@ -62,7 +63,15 @@ export function Header() {
   // nothing rather than something wrong.
   const nav: { key: string; href: string }[] = activeOrg
     ? orgType
-      ? ORG_NAV[orgType].map(({ key, href }) => ({
+      ? [
+          ...ORG_NAV[orgType],
+          // An organisation that delivers training has centres (Sprint 95); one that only sells
+          // courses has no such page, so it is not offered. Only a training organisation can
+          // deliver (the server refuses an employer that does), so `delivers` is the whole test.
+          ...(delivers
+            ? [{ key: "centres", href: "/centres" }]
+            : []),
+        ].map(({ key, href }) => ({
           key,
           href: `/employer/${activeOrg}${href}`,
         }))

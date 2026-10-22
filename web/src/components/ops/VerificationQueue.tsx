@@ -6,7 +6,7 @@ import { useDeferredValue, useState } from "react";
 import { Text } from "@/components/profile/fields";
 import { Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { ChipRow, ChipSelect } from "@/components/ui/chip";
-import { BookOpenIcon, BuildingIcon } from "@/components/ui/icons";
+import { BookOpenIcon, BuildingIcon, MapPinIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Link } from "@/i18n/navigation";
 import { NO_FILTERS, type QueueFilters, useVerificationQueue } from "@/lib/ops";
@@ -53,6 +53,7 @@ export function VerificationQueue() {
           <option value="">{t("queueKindAll")}</option>
           <option value="employer">{t("employer")}</option>
           <option value="course_provider">{t("provider")}</option>
+          <option value="training_centre">{t("centre")}</option>
         </ChipSelect>
         {filtered && (
           <Button
@@ -120,7 +121,14 @@ export function VerificationQueue() {
             : t("queueCount", { count: total })}
       </p>
       <ul className="mt-4 space-y-3">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const isCentre = row.tenant_type === "training_centre";
+          const look = isCentre
+            ? { tone: "info" as const, icon: MapPinIcon, word: "centre" as const }
+            : row.tenant_type === "employer"
+              ? { tone: "brand" as const, icon: BuildingIcon, word: "employer" as const }
+              : { tone: "neutral" as const, icon: BookOpenIcon, word: "provider" as const };
+          return (
           <li key={row.slug}>
             <Card>
               <CardBody>
@@ -131,16 +139,23 @@ export function VerificationQueue() {
                   >
                     {row.name}
                   </Link>
-                  <StatusChip
-                    tone={row.tenant_type === "employer" ? "brand" : "neutral"}
-                    icon={row.tenant_type === "employer" ? BuildingIcon : BookOpenIcon}
-                  >
-                    {t(row.tenant_type === "employer" ? "employer" : "provider")}
+                  <StatusChip tone={look.tone} icon={look.icon}>
+                    {t(look.word)}
                   </StatusChip>
                 </div>
 
+                {isCentre && (
+                  // A centre is judged by its address, and by whose it is: what an operator
+                  // checks is that this place belongs to that organisation.
+                  <p className="mt-1 text-sm">
+                    {t("centreOf", { organisation: row.parent_name ?? "—" })}
+                    {" · "}
+                    {[row.address, row.district, row.state].filter(Boolean).join(", ") ||
+                      t("noAddress")}
+                  </p>
+                )}
                 <p className="mt-1 text-sm text-muted">
-                  {row.city ?? t("noCity")} ·{" "}
+                  {isCentre ? null : <>{row.city ?? t("noCity")} ·{" "}</>}
                   {t("registered", {
                     date: format.dateTime(new Date(row.created_at), {
                       dateStyle: "medium",
@@ -150,23 +165,28 @@ export function VerificationQueue() {
 
                 {/* What they have actually done here. An operator verifying an
                     organisation with nothing behind it is verifying nothing. */}
-                <p className="mt-3 text-sm tabular-nums">
-                  {t("activity", {
-                    jobs: row.jobs,
-                    courses: row.courses,
-                    members: row.members,
-                  })}
-                </p>
+                {!isCentre && (
+                  <>
+                    <p className="mt-3 text-sm tabular-nums">
+                      {t("activity", {
+                        jobs: row.jobs,
+                        courses: row.courses,
+                        members: row.members,
+                      })}
+                    </p>
 
-                {row.website ? (
-                  <p className="mt-1 truncate text-sm text-muted">{row.website}</p>
-                ) : (
-                  <p className="mt-1 text-sm text-muted">{t("noWebsite")}</p>
+                    {row.website ? (
+                      <p className="mt-1 truncate text-sm text-muted">{row.website}</p>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted">{t("noWebsite")}</p>
+                    )}
+                  </>
                 )}
               </CardBody>
             </Card>
           </li>
-        ))}
+          );
+        })}
       </ul>
       {queue.isFetchNextPageError && (
         <p className="mt-4 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">

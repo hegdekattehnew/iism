@@ -14,7 +14,7 @@ from pydantic import (
 
 from api.core.config import get_settings
 
-TenantType = Literal["employer", "course_provider", "personal"]
+TenantType = Literal["employer", "course_provider", "personal", "training_centre"]
 MembershipRole = Literal["owner", "admin", "member"]
 
 # What an invitation may offer -- `owner` deliberately absent, because

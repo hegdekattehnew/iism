@@ -92,6 +92,11 @@ TEMPLATES = (
     # *that* there is one: the words are read from the application, never copied into the outbox,
     # which holds no free text that may carry a phone number.
     "application_status_message",
+    # Sprint 95, ADR-102. An operator checked a training centre's address, or took the mark away.
+    # Email to the organisation that runs it (a centre has no members yet), only when the mark
+    # actually changes; the payload is the centre's name and a link, never the operator's note.
+    "centre_verified",
+    "centre_verification_revoked",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

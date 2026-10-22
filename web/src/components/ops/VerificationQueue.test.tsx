@@ -212,3 +212,58 @@ describe("the verification queue -- search and kind", () => {
     expect(screen.getByText("Apollo Care Hospitals")).toBeTruthy();
   });
 });
+
+/** Sprint 95, ADR-102: a training centre waits for its address to be checked. */
+describe("the verification queue -- a training centre", () => {
+  const CENTRE = {
+    ...ROW,
+    slug: "acme-hadapsar",
+    name: "Hadapsar",
+    tenant_type: "training_centre",
+    city: null,
+    website: null,
+    jobs: 0,
+    courses: 0,
+    members: 0,
+    parent_name: "Acme Training",
+    parent_slug: "acme",
+    address: "12 Main Road",
+    district: "Pune",
+    state: "Maharashtra",
+  };
+
+  it("shows whose it is and the address to be checked, and none of an organisation's activity", async () => {
+    answer([CENTRE]);
+    renderUi(<VerificationQueue />);
+    expect(await screen.findByText(/Centre of Acme Training/)).toBeTruthy();
+    expect(screen.getByText(/12 Main Road, Pune, Maharashtra/)).toBeTruthy();
+    expect(screen.queryByText(/vacancies/)).toBeNull();
+    expect(screen.queryByText("No website given")).toBeNull();
+    expect(screen.queryByText(/No city given/)).toBeNull();
+  });
+
+  it("is its own word, shape and tone, apart from an employer and a provider", async () => {
+    answer([ROW, { ...ROW, slug: "p", name: "Provider Co", tenant_type: "course_provider" }, CENTRE]);
+    renderUi(<VerificationQueue />);
+    await screen.findByText(/Centre of Acme Training/);
+    const chips = ["Hiring", "Training", "Centre"].map(
+      (w) => screen.getByText(w, { selector: "span" }) as HTMLElement,
+    );
+    const shapes = new Set(chips.map((c) => c.querySelector("svg")!.innerHTML));
+    expect(shapes.size).toBe(3);
+    const tones = new Set(chips.map((c) => c.className));
+    expect(tones.size).toBe(3);
+  });
+
+  it("can be asked for on its own", async () => {
+    answer([CENTRE]);
+    renderUi(<VerificationQueue />);
+    await screen.findByText(/Centre of Acme Training/);
+    GET.mockClear();
+    const kind = screen.getByRole("combobox", { name: /Kind/i });
+    fireEvent.change(kind, { target: { value: "training_centre" } });
+    await waitFor(() => expect(GET).toHaveBeenCalled());
+    const query = (GET.mock.calls[0][1] as { params: { query: { kind?: string } } }).params.query;
+    expect(query.kind).toBe("training_centre");
+  });
+});

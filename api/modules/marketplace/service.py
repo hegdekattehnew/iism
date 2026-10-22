@@ -327,6 +327,26 @@ async def get_provider_by_slug(db: AsyncSession, slug: str) -> Tenant | None:
     )
 
 
+async def provider_centres(db: AsyncSession, tenant: Tenant) -> list[Tenant]:
+    """The centres an organisation shows publicly: the open ones.
+
+    Read from the tenant rows themselves (the `centres` module is a leaf that marketplace must not
+    import); a closed centre is history and is not on the page. No check that the organisation
+    delivers training: it cannot stop while a centre is open (`delivery_in_progress`), and a closed
+    one cannot be reopened without it.
+    """
+    rows = await db.scalars(
+        select(Tenant)
+        .where(
+            Tenant.parent_id == tenant.id,
+            Tenant.tenant_type == "training_centre",
+            Tenant.closed_at.is_(None),
+        )
+        .order_by(func.lower(Tenant.name), Tenant.id)
+    )
+    return list(rows.all())
+
+
 async def provider_sectors(db: AsyncSession, tenant_id: uuid.UUID) -> list[tuple[str, int]]:
     """The sectors an organisation trains in, **read from its published courses, never stored**.
 

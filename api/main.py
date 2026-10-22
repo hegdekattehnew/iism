@@ -31,6 +31,7 @@ from api.modules.applications import public_router as applications_public_router
 from api.modules.applications import router as applications_router
 from api.modules.assessment import router as assessment_router
 from api.modules.careers import router as careers_router
+from api.modules.centres import router as centres_router
 from api.modules.geography import router as geography_router
 from api.modules.grievances import me_router as grievances_me_router
 from api.modules.grievances import ops_router as grievances_ops_router
@@ -165,6 +166,7 @@ app.include_router(profile_router)
 # Before `publishing_router`: `/jobs/bulk/publish` would otherwise be captured by
 # `/jobs/{slug}/publish` with `bulk` as the slug.
 app.include_router(bulk_router)
+app.include_router(centres_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)

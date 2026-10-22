@@ -335,6 +335,34 @@ describe("the training organisation's page", () => {
     expect(screen.getByText("Read from the courses it has published.")).toBeTruthy();
   });
 
+  it("lists its open centres, each with its own address mark only when it has one", async () => {
+    serve({
+      ...PROVIDER,
+      centres: [
+        { slug: "nsdc-hadapsar", name: "Hadapsar", address: "12 Main Road", location_district: "Pune", location_state: "Maharashtra", is_verified: true },
+        { slug: "nsdc-nagpur", name: "Nagpur", address: null, location_district: "Nagpur", location_state: "Maharashtra", is_verified: false },
+      ],
+    });
+    await show(page());
+    expect(screen.getByText("Centres (2)")).toBeTruthy();
+    expect(screen.getByText("Hadapsar")).toBeTruthy();
+    expect(screen.getByText("12 Main Road · Pune, Maharashtra")).toBeTruthy();
+    // One checked centre, one mark: a card never says an address is unchecked.
+    expect(screen.getAllByText("Address checked")).toHaveLength(1);
+    expect(screen.queryByText(/address not checked|unchecked/i)).toBeNull();
+  });
+
+  it("says it has listed no centres when it delivers training and has none, and nothing when it does not", async () => {
+    serve({ ...PROVIDER, centres: [] });
+    const a = await show(page());
+    expect(screen.getByText("It has not listed any centres yet.")).toBeTruthy();
+    a.unmount();
+    serve({ ...PROVIDER, delivers_training: false, centres: [] });
+    await show(page());
+    expect(screen.queryByText("It has not listed any centres yet.")).toBeNull();
+    expect(screen.queryByText(/^Centres/)).toBeNull();
+  });
+
   it("lists its published courses on the same card as the list", async () => {
     serve(PROVIDER);
     await show(page());

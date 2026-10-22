@@ -108,6 +108,18 @@ async def _listings_by_tenant(
     return counts
 
 
+async def _centres_by_tenant(db: AsyncSession, tenant_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """Training centres per organisation (Sprint 95), one grouped query."""
+    if not tenant_ids:
+        return {}
+    rows = await db.execute(
+        select(Tenant.parent_id, func.count())
+        .where(Tenant.parent_id.in_(tenant_ids))
+        .group_by(Tenant.parent_id)
+    )
+    return {parent_id: count for parent_id, count in rows.all() if parent_id is not None}
+
+
 async def consent_state(db: AsyncSession, user: User) -> ConsentState:
     """Consent as it stands, and what withdrawing would take back. Changes nothing.
 
@@ -171,12 +183,16 @@ async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
     tenant_ids = [t.id for _, t in memberships]
     counts = await _membership_counts(db, tenant_ids, user.id)
     listings = await _listings_by_tenant(db, tenant_ids)
+    centres = await _centres_by_tenant(db, tenant_ids)
 
     deleted: list[OrganisationFate] = []
     blocked: list[OrganisationFate] = []
     for membership, tenant in memberships:
         fate = OrganisationFate(
-            slug=tenant.slug, name=tenant.name, listings=listings.get(tenant.id, 0)
+            slug=tenant.slug,
+            name=tenant.name,
+            listings=listings.get(tenant.id, 0),
+            centres=centres.get(tenant.id, 0),
         )
         others, other_owners = counts.get(tenant.id, (0, 0))
         if not others:
@@ -187,6 +203,13 @@ async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
 
 
 async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
+    # An organisation's centres go first (Sprint 95): `tenants.parent_id` is RESTRICT, so a parent
+    # cannot be deleted from under them, and a centre has rows of its own (its verification
+    # history). Through this same function, so a centre's rows are removed by the one list that
+    # knows what a tenant owns, and a table added to it later covers centres too.
+    centre_ids = (await db.scalars(select(Tenant.id).where(Tenant.parent_id == tenant_id))).all()
+    for centre_id in centre_ids:
+        await _delete_tenant(db, centre_id)
     job_ids = select(Job.id).where(Job.tenant_id == tenant_id)
     course_ids = select(Course.id).where(Course.tenant_id == tenant_id)
     # What people did with this organisation's listings, deleted explicitly.
@@ -253,6 +276,7 @@ async def organisation_deletion_preview(
         tenant_type=tenant.tenant_type,
         jobs=await count(Job, Job.tenant_id == tenant.id),
         courses=await count(Course, Course.tenant_id == tenant.id),
+        centres=await count(Tenant, Tenant.parent_id == tenant.id),
         applications=await count(Application, Application.job_id.in_(job_ids)),
         course_interests=await count(CourseInterest, CourseInterest.course_id.in_(course_ids)),
         # **Excluding the caller.** They are about to delete it; counting
