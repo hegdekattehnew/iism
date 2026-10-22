@@ -70,6 +70,16 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/employer/CentresPanel.tsx",
+    label: "CentreIn",
+    expect: {
+      name: ["minLength={2}", "maxLength={120}"],
+      address: ["maxLength={500}"],
+      state: ["minLength={2}", "maxLength={120}"],
+      district: ["minLength={2}", "maxLength={120}"],
+    },
+  },
+  {
     file: "components/employer/OrgSettings.tsx",
     label: "OrganisationIn",
     expect: {

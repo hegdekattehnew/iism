@@ -1321,6 +1321,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/centres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Centres */
+        get: operations["list_centres_org__org_slug__centres_get"];
+        put?: never;
+        /** Create Centre */
+        post: operations["create_centre_org__org_slug__centres_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/bulk/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Centres Template */
+        get: operations["centres_template_org__org_slug__centres_bulk_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/bulk/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Centres
+         * @description Validate every row and say what an apply would do. Writes nothing.
+         */
+        post: operations["check_centres_org__org_slug__centres_bulk_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/bulk/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Centres */
+        post: operations["apply_centres_org__org_slug__centres_bulk_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Centre */
+        get: operations["get_centre_org__org_slug__centres__centre_slug__get"];
+        /** Update Centre */
+        put: operations["update_centre_org__org_slug__centres__centre_slug__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Centre */
+        post: operations["close_centre_org__org_slug__centres__centre_slug__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Centre */
+        post: operations["reopen_centre_org__org_slug__centres__centre_slug__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/jobs": {
         parameters: {
             query?: never;
@@ -3751,6 +3875,120 @@ export interface components {
             courses?: components["schemas"]["CourseSuggestionOut"][];
             entry?: components["schemas"]["EntryRouteOut"] | null;
         };
+        /** CentreBulkReportOut */
+        CentreBulkReportOut: {
+            /** Applied */
+            applied: boolean;
+            /** Rows */
+            rows: components["schemas"]["CentreBulkRowOut"][];
+            /** Notes */
+            notes?: string[];
+            /** Ok */
+            ok: number;
+            /** Warnings */
+            warnings: number;
+            /** Errors */
+            errors: number;
+            /** Skipped */
+            skipped: number;
+            /** Created */
+            created: number;
+            /** Remaining */
+            remaining: number;
+            /** Errors Csv */
+            errors_csv?: string | null;
+        };
+        /** CentreBulkRowOut */
+        CentreBulkRowOut: {
+            /** Row */
+            row: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "skip";
+            /** Name */
+            name?: string | null;
+            /** Messages */
+            messages?: string[];
+            /** Slug */
+            slug?: string | null;
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+        };
+        /**
+         * CentreIn
+         * @description A centre as an organisation writes it.
+         *
+         *     The place is **required and written as text** (`state`, `district`): where a centre is decides
+         *     which learners it can reach, so it is asked for; and it is resolved against the geography master
+         *     by the service, where an unresolvable name is kept as written and flagged rather than guessed
+         *     (no id is better than a wrong one). The address is the street address a learner would walk to.
+         */
+        CentreIn: {
+            /** Name */
+            name: string;
+            /** Address */
+            address?: string | null;
+            /** State */
+            state: string;
+            /** District */
+            district: string;
+        };
+        /** CentreList */
+        CentreList: {
+            /** Items */
+            items: components["schemas"]["CentreOut"][];
+            /** Total */
+            total: number;
+            /** Active */
+            active: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * CentreOut
+         * @description One centre, as its organisation sees it.
+         *
+         *     `status` is **derived** from `closed_at`, never stored beside it. `is_verified` is **the
+         *     centre's own mark** ("address checked"), not its organisation's: they are different claims
+         *     (ADR-102), and a verified organisation never makes a centre verified.
+         */
+        CentreOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Place Resolved
+             * @default false
+             */
+            place_resolved: boolean;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "closed";
+            /** Closed At */
+            closed_at?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** CertificationOut */
         CertificationOut: {
             /**
@@ -5830,6 +6068,11 @@ export interface components {
             jobs: number;
             /** Courses */
             courses: number;
+            /**
+             * Centres
+             * @default 0
+             */
+            centres: number;
             /** Applications */
             applications: number;
             /** Course Interests */
@@ -5845,6 +6088,11 @@ export interface components {
             name: string;
             /** Listings */
             listings: number;
+            /**
+             * Centres
+             * @default 0
+             */
+            centres: number;
         };
         /**
          * OrganisationIn
@@ -5892,7 +6140,7 @@ export interface components {
              * Tenant Type
              * @enum {string}
              */
-            tenant_type: "employer" | "course_provider" | "personal";
+            tenant_type: "employer" | "course_provider" | "personal" | "training_centre";
             /** City */
             city?: string | null;
             /** Description */
@@ -5967,6 +6215,18 @@ export interface components {
             verification_note?: string | null;
             /** History */
             history: components["schemas"]["VerificationEventOut"][];
+            /** Tenant Type */
+            tenant_type?: string | null;
+            /** Parent Name */
+            parent_name?: string | null;
+            /** Parent Slug */
+            parent_slug?: string | null;
+            /** Address */
+            address?: string | null;
+            /** District */
+            district?: string | null;
+            /** State */
+            state?: string | null;
         };
         /** OtpRequest */
         OtpRequest: {
@@ -6120,6 +6380,31 @@ export interface components {
             hired: number;
         };
         /**
+         * ProviderCentreOut
+         * @description A training centre on its organisation's public page (Sprint 95, ADR-102).
+         *
+         *     Its own mark, `is_verified`, means **the address was checked**; it is never the organisation's
+         *     mark (a verified organisation does not make a centre verified, and the page shows both
+         *     separately). Closed centres are not listed.
+         */
+        ProviderCentreOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+        };
+        /**
          * ProviderDashboardOut
          * @description A course provider's landing numbers (Sprint 39, BL-10.3).
          */
@@ -6192,6 +6477,8 @@ export interface components {
              * @default 0
              */
             courses_total: number;
+            /** Centres */
+            centres?: components["schemas"]["ProviderCentreOut"][];
         };
         /**
          * ProviderSectorOut
@@ -6876,7 +7163,7 @@ export interface components {
              * Tenant Type
              * @enum {string}
              */
-            tenant_type: "employer" | "course_provider" | "personal";
+            tenant_type: "employer" | "course_provider" | "personal" | "training_centre";
             /** City */
             city?: string | null;
             /** Description */
@@ -7011,6 +7298,16 @@ export interface components {
             courses: number;
             /** Members */
             members: number;
+            /** Parent Name */
+            parent_name?: string | null;
+            /** Parent Slug */
+            parent_slug?: string | null;
+            /** Address */
+            address?: string | null;
+            /** District */
+            district?: string | null;
+            /** State */
+            state?: string | null;
         };
         /** UserOut */
         UserOut: {
@@ -9416,6 +9713,305 @@ export interface operations {
             };
         };
     };
+    list_centres_org__org_slug__centres_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_centre_org__org_slug__centres_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CentreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    centres_template_org__org_slug__centres_bulk_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_centres_org__org_slug__centres_bulk_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreBulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_centres_org__org_slug__centres_bulk_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreBulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_centre_org__org_slug__centres__centre_slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_centre_org__org_slug__centres__centre_slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CentreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_centre_org__org_slug__centres__centre_slug__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_centre_org__org_slug__centres__centre_slug__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_jobs_org__org_slug__jobs_get: {
         parameters: {
             query?: never;
@@ -11596,7 +12192,7 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 q?: string | null;
-                kind?: ("employer" | "course_provider") | null;
+                kind?: ("employer" | "course_provider" | "training_centre") | null;
             };
             header?: never;
             path?: never;

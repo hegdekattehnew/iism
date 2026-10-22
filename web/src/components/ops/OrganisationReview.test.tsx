@@ -213,3 +213,55 @@ describe("the organisation review -- the look of a verdict", () => {
     expect(granted.querySelector("svg")!.innerHTML).not.toBe(withdrawn.querySelector("svg")!.innerHTML);
   });
 });
+
+/** Sprint 95, ADR-102: the same decision about a centre is about its address, in its own words. */
+describe("reviewing a training centre", () => {
+  const CENTRE = {
+    ...UNVERIFIED,
+    slug: "acme-hadapsar",
+    name: "Hadapsar",
+    tenant_type: "training_centre",
+    parent_name: "Acme Training",
+    parent_slug: "acme",
+    address: "12 Main Road",
+    district: "Pune",
+    state: "Maharashtra",
+  };
+
+  it("says whose it is and what address is being checked, and calls the mark the address's", async () => {
+    detail(CENTRE);
+    renderUi(<OrganisationReview slug="acme-hadapsar" />);
+    expect(await screen.findByText("Centre of Acme Training")).toBeTruthy();
+    expect(screen.getByText("12 Main Road, Pune, Maharashtra")).toBeTruthy();
+    expect(screen.getByText("Address not checked yet")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mark the address as checked" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Verify this organisation/ })).toBeNull();
+    expect(screen.getByLabelText(/What you checked at this address/)).toBeTruthy();
+  });
+
+  it("still holds the decision until there is evidence, and sends the same decision", async () => {
+    detail(CENTRE);
+    renderUi(<OrganisationReview slug="acme-hadapsar" />);
+    const grant = await screen.findByRole("button", { name: "Mark the address as checked" });
+    expect(grant.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(screen.getByLabelText(/What you checked at this address/), {
+      target: { value: "Signboard and landlord's receipt seen on site." },
+    });
+    fireEvent.click(grant);
+    await waitFor(() => expect(POST).toHaveBeenCalled());
+    expect(POST.mock.calls[0][1].body.decision).toBe("granted");
+  });
+
+  it("offers removing the mark only once there is one", async () => {
+    detail({ ...CENTRE, is_verified: true, verified_at: "2026-09-23T10:00:00Z", verification_note: "Seen on site." });
+    renderUi(<OrganisationReview slug="acme-hadapsar" />);
+    expect(await screen.findByRole("button", { name: "Remove the mark" })).toBeTruthy();
+    expect(screen.getByText("Address checked")).toBeTruthy();
+  });
+
+  it("an organisation keeps its own words", async () => {
+    renderUi(<OrganisationReview slug="apollo-care-hospitals" />);
+    expect(await screen.findByRole("button", { name: /Verify this organisation/ })).toBeTruthy();
+    expect(screen.queryByText(/Centre of/)).toBeNull();
+  });
+});

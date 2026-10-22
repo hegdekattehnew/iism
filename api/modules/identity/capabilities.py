@@ -10,8 +10,8 @@ holds the rules about changing them:
 - **Always at least one.** An organisation that neither sells nor delivers can do nothing.
 - **Never from under live work.** Turning off *sells courses* is refused while the organisation has
   published courses (they would be live and unmanageable); turning off *delivers training* is
-  refused while it has anything that delivery means. Centres (Sprint 95) and batches (Sprint 98)
-  add their reasons to `delivery_in_progress`; today there is none, so it is always allowed.
+  refused while it has anything that delivery means: open centres (Sprint 95) today, batches
+  (Sprint 98) later, each added to `delivery_in_progress`.
 - **Recorded.** One `organisation_capability_changed` event per capability that changed, after
   the commit and subjected to the organisation (`record()` commits).
 """
@@ -44,10 +44,23 @@ async def _published_courses(db: AsyncSession, tenant: Tenant) -> int:
 async def delivery_in_progress(db: AsyncSession, tenant: Tenant) -> str | None:
     """Why this organisation cannot stop delivering training, or `None` if it can.
 
-    Nothing delivers yet: centres arrive in Sprint 95 and batches in Sprint 98, and each adds its
-    own reason here (active centres; open or running batches). The seam exists now so the rule is
-    written once and the guard cannot be forgotten when those land.
+    Active centres (Sprint 95) keep it delivering; batches (Sprint 98) add their own reason here:
+    the rule is written once so the guard cannot be forgotten when they land. A closed centre is
+    history and holds nothing.
     """
+    active = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Tenant)
+            .where(
+                Tenant.parent_id == tenant.id,
+                Tenant.tenant_type == "training_centre",
+                Tenant.closed_at.is_(None),
+            )
+        )
+    ) or 0
+    if active:
+        return "This organisation has centres that are open. Close them first"
     return None
 
 

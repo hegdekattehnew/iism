@@ -1,0 +1,60 @@
+{
+  "sprint": 95,
+  "captured": "2026-10-22",
+  "method": "Read from the production build's route-bundle-stats.json (npm run build:e2e); the pages checked against the dev API in the in-app browser. NOT the sweep (no Chromium on the machine).",
+  "firstLoadBytes": {
+    "ceiling": 700000,
+    "/profile": {
+      "before": 663575,
+      "after": 663792,
+      "headroom": 36208
+    },
+    "/admin": {
+      "before": 664439,
+      "after": 665084,
+      "headroom": 34916
+    },
+    "/employer/[org]/centres": {
+      "after": 642361
+    },
+    "/employer/[org]/centres/upload": {
+      "after": 648355
+    },
+    "/providers/[slug]": {
+      "before": 634572,
+      "after": 634789
+    },
+    "/employer/[org]": {
+      "after": 629026
+    }
+  },
+  "phoneBundle": {
+    "android_bytes": 3747008,
+    "before": 3739176,
+    "ceiling": 3800000
+  },
+  "migration0059": {
+    "upDownUpRun": true,
+    "alembicCheckClean": true
+  },
+  "inAppBrowser": {
+    "centresPageHindiAt360pxAnd200PercentText": {
+      "documentWidth": 360,
+      "textOutsideTheScreen": 0,
+      "controlsUnder44px": 0
+    },
+    "operatorQueueShowsCentreWithOrganisationAndAddress": true,
+    "publicProviderPageListsOpenCentre": true
+  },
+  "tests": {
+    "backend": 2195,
+    "web": 1324,
+    "mobile": 816
+  },
+  "mutationChecks": {
+    "run": 45,
+    "backend": 23,
+    "web": 22,
+    "survivorsClosed": 4
+  }
+}

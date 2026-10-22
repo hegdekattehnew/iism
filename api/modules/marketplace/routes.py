@@ -178,6 +178,7 @@ async def get_provider(
     overrides = await overrides_for(db, "course", items, ("title", "description"), locale)
     qualifications = await service.qualification_for(db, items)
     sectors = await service.provider_sectors(db, tenant.id)
+    centres = await service.provider_centres(db, tenant)
     return schemas.ProviderPublicOut.model_validate(tenant).model_copy(
         update={
             "sectors": [schemas.ProviderSectorOut(name=n, courses=c) for n, c in sectors],
@@ -188,6 +189,7 @@ async def get_provider(
                 for c in items
             ],
             "courses_total": total,
+            "centres": [schemas.ProviderCentreOut.model_validate(c) for c in centres],
         }
     )
 

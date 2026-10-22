@@ -46,10 +46,18 @@ export async function organisation(
   request: APIRequestContext,
   tenantType: "employer" | "course_provider",
   name: string,
+  // What a training organisation does (Sprint 94): a provider defaults to selling courses only.
+  capabilities: { sells_courses?: boolean; delivers_training?: boolean } = {},
 ): Promise<{ slug: string; email: string; tokens: Tokens }> {
   const email = uniqueEmail(tenantType === "employer" ? "hiring" : "academy");
   const asked = await request.post(api("/auth/org/register"), {
-    data: { email, organisation_name: name, tenant_type: tenantType, consent_version: CONSENT_VERSION },
+    data: {
+      email,
+      organisation_name: name,
+      tenant_type: tenantType,
+      consent_version: CONSENT_VERSION,
+      ...capabilities,
+    },
   });
   const { debug_code } = await asked.json();
   const verified = await request.post(api("/auth/email/otp/verify"), { data: { email, code: debug_code } });

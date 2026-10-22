@@ -74,6 +74,12 @@ class Permission(StrEnum):
     MEMBER_READ = "member:read"
     MEMBER_INVITE = "member:invite"
     MEMBER_MANAGE = "member:manage"
+    # Sprint 95, ADR-102. The centres of an organisation that delivers training. Reading them is
+    # every member's (a centre is a place, not a person); creating, editing and closing them is an
+    # admin's and an owner's: all of it reverses (a closed centre reopens) and none of it discloses
+    # a person.
+    CENTRE_READ = "centre:read"
+    CENTRE_MANAGE = "centre:manage"
 
     # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
     # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
@@ -111,7 +117,9 @@ class Permission(StrEnum):
 # Seeing who else works here is the one thing every member may do. It names
 # colleagues, not candidates: no contact detail, no listing, nothing about
 # anybody outside the organisation.
-_MEMBER: frozenset[Permission] = frozenset({Permission.ORG_READ, Permission.MEMBER_READ})
+_MEMBER: frozenset[Permission] = frozenset(
+    {Permission.ORG_READ, Permission.MEMBER_READ, Permission.CENTRE_READ}
+)
 # Roles stay type-agnostic: an admin of any organisation holds both publishing
 # sets, and the `publishes` half of `require()` decides which one their tenant
 # may actually use. Splitting the role map by tenant type instead would mean two
@@ -126,6 +134,7 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.COURSE_PUBLISH,
     Permission.CANDIDATE_SHORTLIST,
     Permission.LEARNER_CONTACT,
+    Permission.CENTRE_MANAGE,
     # An admin may bring someone in, and `invite()` decides at what role: a
     # `member` only. That ceiling is enforced in the service, once, rather
     # than by a fourth permission -- it is a rule about the *argument*, and a
@@ -247,6 +256,9 @@ def capability_for(tenant: "Tenant", capability: str) -> bool:
     """May this organisation do `capability`? The one function that answers it."""
     if capability not in CAPABILITIES:
         raise ValueError(f"unknown capability {capability!r}")
+    if tenant.tenant_type == "training_centre":
+        # A centre runs batches and has nothing else to do (ADR-102). It has no centres of its own.
+        return capability == "batch"
     if capability == "job":
         return tenant.tenant_type == "employer"
     if tenant.tenant_type != "course_provider":
@@ -438,3 +450,33 @@ def require_operator(
     # (`tests/test_authorization_matrix.py`).
     dependency.permission = permission  # type: ignore[attr-defined]
     return dependency
+
+
+async def centre_for(db: AsyncSession, context: TenantContext, centre_slug: str) -> "Tenant":
+    """The centre `centre_slug` **if it belongs to the organisation the caller is acting in**.
+
+    This is **the** inherited-access rule of ADR-102, written once: an owner or an admin of a
+    delivering organisation has its permissions on every one of its centres, and a centre is reached
+    only through its parent's slug (`/org/{org_slug}/centres/{centre_slug}`), where the caller's
+    membership of the parent has already been resolved. So access to a centre is exactly access to
+    its parent plus this one check, and nobody holds a membership row for a centre that could be
+    mistaken for a separate grant.
+
+    **One answer for a missing centre and for another organisation's centre**: 404, with the same
+    body, so a caller cannot use the route to learn which centre slugs exist elsewhere (ADR-038).
+    """
+    from sqlalchemy import select
+
+    from api.modules.identity.models import Tenant  # local: avoids a cycle
+
+    centre = await db.scalar(
+        select(Tenant).where(
+            Tenant.slug == centre_slug,
+            Tenant.tenant_type == "training_centre",
+            Tenant.parent_id == context.tenant.id,
+        )
+    )
+    if centre is None:
+        log.warning("authz.centre_denied", org_slug=context.tenant.slug, centre_slug=centre_slug)
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Centre not found")
+    return centre

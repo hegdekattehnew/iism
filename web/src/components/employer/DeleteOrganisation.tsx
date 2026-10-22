@@ -89,6 +89,7 @@ export function DeleteOrganisation({ orgSlug }: { orgSlug: string }) {
         <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">
           <li>{t("deleteJobs", { count: counts.jobs })}</li>
           <li>{t("deleteCourses", { count: counts.courses })}</li>
+          {(counts.centres ?? 0) > 0 && <li>{t("deleteCentres", { count: counts.centres ?? 0 })}</li>}
           {/* The part that belongs to other people, named separately. */}
           <li>{t("deleteApplications", { count: counts.applications })}</li>
           <li>{t("deleteInterests", { count: counts.course_interests })}</li>

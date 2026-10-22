@@ -26,7 +26,13 @@ type TenantType = "personal" | "employer" | "course_provider";
 
 export type TestMembership = {
   role: string;
-  tenant: { slug: string; name: string; tenant_type: TenantType };
+  tenant: {
+    slug: string;
+    name: string;
+    tenant_type: TenantType;
+    // What a training organisation does (Sprint 94/95); absent on every other kind.
+    delivers_training?: boolean;
+  };
 };
 
 export const world = {
@@ -128,6 +134,11 @@ function derived() {
 
 export const orgMock = {
   useMemberships: derived,
+  useOrgDelivers: (slug: string | null) => {
+    if (!slug) return false;
+    const found = derived().organisations.find((m) => m.tenant.slug === slug);
+    return found?.tenant.delivers_training === true;
+  },
   useOrgType: (slug: string | null) => {
     if (!slug) return null;
     const found = derived().organisations.find((m) => m.tenant.slug === slug);

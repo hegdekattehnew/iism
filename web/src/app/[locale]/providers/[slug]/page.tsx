@@ -13,6 +13,7 @@ import {
   CalendarIcon,
   GlobeIcon,
   MapPinIcon,
+  ShieldCheckIcon,
   TargetIcon,
 } from "@/components/ui/icons";
 import { TrustStrip } from "@/components/ui/trust-strip";
@@ -31,8 +32,10 @@ const webAddress = (url: string | null | undefined) =>
  * what it **does** is two badges, what it **says about itself** (affiliations, year established,
  * languages) is labelled as its own claim and never sorted or filtered on (ADR-085), what it **trains
  * in** is read from its published courses by the server and never stored, and its **courses** are the
- * published ones on the same card as the list. Its centres and the courses it delivers for others
- * arrive with the sprints that build them. The contact address is not here: the server never sends it.
+ * published ones on the same card as the list. Its **centres** (Sprint 95) are listed by place, each with its
+ * own "Address checked" mark when an operator has checked it: never the organisation's mark, and a
+ * card never says an address is unchecked. The courses it delivers for others arrive with the sprint
+ * that builds them. The contact address is not here: the server never sends it.
  */
 export default async function ProviderPage({
   params,
@@ -56,6 +59,7 @@ export default async function ProviderPage({
   const sectors = data.sectors ?? [];
   const courses = data.courses ?? [];
   const coursesTotal = data.courses_total ?? 0;
+  const centres = data.centres ?? [];
   const website = webAddress(data.website);
   const claims = data.year_established != null || data.teaching_languages || data.affiliations;
 
@@ -153,6 +157,40 @@ export default async function ProviderPage({
             ))}
           </ul>
           <p className="mt-2 text-xs text-muted">{t("sectorsNote")}</p>
+        </section>
+      )}
+
+      {data.delivers_training && (
+        <section className="mt-10">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("centresTitle", { count: centres.length })}
+          </h2>
+          {centres.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">{t("noCentres")}</p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {centres.map((c) => {
+                const place = [c.location_district, c.location_state].filter(Boolean).join(", ");
+                return (
+                  <li key={c.slug} className="rounded-xl border border-border-token bg-surface p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="min-w-0 grow basis-48 text-base font-semibold">{c.name}</h3>
+                      {c.is_verified && (
+                        <Badge tone="good" size="md">
+                          <ShieldCheckIcon className="h-4 w-4" />
+                          {t("addressChecked")}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-2 flex items-start gap-1.5 text-sm text-muted">
+                      <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{[c.address, place].filter(Boolean).join(" · ")}</span>
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       )}
 

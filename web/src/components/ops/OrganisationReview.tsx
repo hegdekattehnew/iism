@@ -47,6 +47,11 @@ export function OrganisationReview({ slug }: { slug: string }) {
   }
 
   const data = detail.data;
+  // A centre's mark attests its address, so the page says "address" where an organisation's says
+  // "organisation" (Sprint 95): same decision, same evidence, its own words.
+  const isCentre = data.tenant_type === "training_centre";
+  const word = (key: "verified" | "notVerified" | "grant" | "revoke" | "decideHeading" | "noteLabel") =>
+    t(isCentre ? `centreReview.${key}` : key);
   const ready = note.trim().length >= NOTE_MIN;
 
   const submit = (decision: "granted" | "revoked") => {
@@ -58,9 +63,24 @@ export function OrganisationReview({ slug }: { slug: string }) {
       <div className="mt-2 flex flex-wrap items-baseline gap-3">
         <h1 className="text-3xl font-bold tracking-tight">{data.name}</h1>
         <StatusChip tone={data.is_verified ? "good" : "neutral"} icon={data.is_verified ? ShieldCheckIcon : InfoIcon}>
-          {t(data.is_verified ? "verified" : "notVerified")}
+          {word(data.is_verified ? "verified" : "notVerified")}
         </StatusChip>
       </div>
+
+      {isCentre && (
+        // What is being checked, and whose it is.
+        <Card className="mt-6">
+          <CardBody>
+            <p className="text-sm text-muted">
+              {t("centreOf", { organisation: data.parent_name ?? "—" })}
+            </p>
+            <p className="mt-2 text-sm font-medium">
+              {[data.address, data.district, data.state].filter(Boolean).join(", ") ||
+                t("noAddress")}
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       {data.is_verified && data.verified_at ? (
         <Card className="mt-6 border-success-border">
@@ -77,13 +97,13 @@ export function OrganisationReview({ slug }: { slug: string }) {
 
       <Card className="mt-6">
         <CardBody>
-          <h2 className="text-base font-semibold">{t("decideHeading")}</h2>
+          <h2 className="text-base font-semibold">{word("decideHeading")}</h2>
           <p className="mt-1 text-sm text-muted">{t("noteHelp")}</p>
 
           {canDecide ? (
             <>
             <label className="mt-4 block text-sm font-medium" htmlFor="ops-note">
-              {t("noteLabel")}
+              {word("noteLabel")}
             </label>
             <textarea
               id="ops-note"
@@ -102,7 +122,7 @@ export function OrganisationReview({ slug }: { slug: string }) {
                 onClick={() => submit("granted")}
                 disabled={!ready || decide.isPending}
               >
-                {t("grant")}
+                {word("grant")}
               </Button>
               {data.is_verified ? (
                 <Button
@@ -110,7 +130,7 @@ export function OrganisationReview({ slug }: { slug: string }) {
                   onClick={() => submit("revoked")}
                   disabled={!ready || decide.isPending}
                 >
-                  {t("revoke")}
+                  {word("revoke")}
                 </Button>
               ) : null}
             </div>
