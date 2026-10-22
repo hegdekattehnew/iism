@@ -25,6 +25,13 @@ describe("ApplyPanel — who is offered the button", () => {
     expect(screen.queryByRole("button", { name: /Apply/ })).toBeNull();
   });
 
+  it("says what signing in costs before it is pressed", () => {
+    // Sprint 92: the bar said only "Sign in to apply".
+    world.signedIn = false;
+    renderUi(panel());
+    expect(screen.getByText("Free. Sign in with your mobile number. No password.")).toBeTruthy();
+  });
+
   it("offers a job seeker the button", () => {
     world.memberships = [personal()];
     renderUi(panel());

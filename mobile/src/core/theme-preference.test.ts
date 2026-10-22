@@ -11,16 +11,17 @@ function fakeStorage(initial: Record<string, string> = {}) {
 }
 
 describe("parsePreference", () => {
-  it("only light and dark are choices", () => {
+  it("dark and system are choices; everything else is the default, light", () => {
     expect(parsePreference("light")).toBe("light");
     expect(parsePreference("dark")).toBe("dark");
-    for (const odd of [null, undefined, "", "system", "Dark", "auto", 1, {}]) expect(parsePreference(odd)).toBe("system");
+    expect(parsePreference("system")).toBe("system");
+    for (const odd of [null, undefined, "", "Dark", "auto", 1, {}]) expect(parsePreference(odd)).toBe("light");
   });
 });
 
 describe("the theme store", () => {
-  it("starts on the phone's own setting", () => {
-    expect(createThemeStore(fakeStorage()).get()).toBe("system");
+  it("starts light, whatever the phone is set to", () => {
+    expect(createThemeStore(fakeStorage()).get()).toBe("light");
   });
 
   it("remembers a choice and tells subscribers", () => {
@@ -34,26 +35,37 @@ describe("the theme store", () => {
     expect(seen).toEqual(["dark"]);
   });
 
-  it("choosing the phone's own setting forgets the choice on disk", () => {
+  it("choosing light forgets the choice on disk, because light is the default", () => {
     const storage = fakeStorage({ [THEME_STORAGE_KEY]: "dark" });
     const store = createThemeStore(storage);
-    store.set("system");
+    store.set("light");
     expect(storage.data.has(THEME_STORAGE_KEY)).toBe(false);
+  });
+
+  it("matching the phone is its own remembered choice", () => {
+    const storage = fakeStorage();
+    const store = createThemeStore(storage);
+    store.set("system");
+    expect(store.get()).toBe("system");
+    expect(storage.data.get(THEME_STORAGE_KEY)).toBe("system");
   });
 
   it("an unknown value cannot be set", () => {
     const store = createThemeStore(fakeStorage());
     store.set("purple" as never);
-    expect(store.get()).toBe("system");
+    expect(store.get()).toBe("light");
   });
 
-  it("is read back at the next launch, and an unreadable value is the phone's own", async () => {
+  it("is read back at the next launch, and an unreadable value is light", async () => {
     const store = createThemeStore(fakeStorage({ [THEME_STORAGE_KEY]: "light" }));
     await store.restore();
     expect(store.get()).toBe("light");
+    const kept = createThemeStore(fakeStorage({ [THEME_STORAGE_KEY]: "dark" }));
+    await kept.restore();
+    expect(kept.get()).toBe("dark");
     const odd = createThemeStore(fakeStorage({ [THEME_STORAGE_KEY]: "neon" }));
     await odd.restore();
-    expect(odd.get()).toBe("system");
+    expect(odd.get()).toBe("light");
     const broken = createThemeStore({
       getItem: async () => {
         throw new Error("unreadable");
@@ -63,15 +75,15 @@ describe("the theme store", () => {
     });
     broken.set("dark");
     await broken.restore();
-    expect(broken.get()).toBe("system");
+    expect(broken.get()).toBe("light");
   });
 
-  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts on its own setting", async () => {
+  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts on the default", async () => {
     const storage = fakeStorage();
     const store = createThemeStore(storage);
     store.set("dark");
     await store.clear();
-    expect(store.get()).toBe("system");
+    expect(store.get()).toBe("light");
     expect(storage.data.has(THEME_STORAGE_KEY)).toBe(false);
   });
 

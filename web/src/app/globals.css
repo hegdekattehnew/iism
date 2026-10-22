@@ -11,6 +11,7 @@
    did this correctly; these tokens are that pattern, extended rather than
    replaced. */
 :root {
+  color-scheme: light;
   /* The ramps (Sprint 77, ADR-086, BL-19.4). The brand ramp is today's blue with a scale around it
      (700 is the colour the product has always used); the neutral ramp is a grey tinted to the same
      hue so the greys sit with the blue. **Components never name a ramp step.** They use the
@@ -128,12 +129,12 @@
   --type-display-lh: 2.25rem;
 }
 
-/* Dark follows the device unless the person chose light (Sprint 78, BL-19.8): `data-theme` is set on
+/* Light is the default and dark is a choice (Sprint 78, BL-19.8; light by default since Sprint 92): `data-theme` is set on
    <html> by `lib/theme.ts` and, before the first paint, by the script in the layout's <head>.
    The dark tokens are written twice because CSS cannot share a declaration list between a media
    query and an attribute selector; `tests/test_design_tokens.py` fails when the two differ. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-theme="system"] {
     color-scheme: dark;
     --background: #111417;
     --surface: #181c20;

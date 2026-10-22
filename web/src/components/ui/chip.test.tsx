@@ -67,3 +67,20 @@ describe("the row", () => {
     expect(group.className).toContain("sm:flex-wrap");
   });
 });
+
+
+/** Sprint 92, B22.6: a half-cut chip alone did not say that the row of filters moves. */
+describe("the row of chips", () => {
+  it("fades its right edge on a phone, by less than the gutter so the last chip is whole at the end", () => {
+    const { container } = render(
+      <ChipRow label="Filters">
+        <ChipButton active={false}>One</ChipButton>
+      </ChipRow>,
+    );
+    const row = container.firstElementChild as HTMLElement;
+    expect(row.className).toContain("max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1rem),transparent)]");
+    expect(row.className).toContain("px-5"); // the 1.25 rem gutter is wider than the 1 rem fade
+    expect(row.className).toContain("sm:flex-wrap"); // from tablet it wraps and nothing fades
+    expect(row.className).not.toMatch(/(^|\s)\[mask-image/);
+  });
+});

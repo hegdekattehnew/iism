@@ -122,16 +122,17 @@ describe("light, dark or follow the phone (BL-19.8)", () => {
   it("is remembered across a launch", async () => {
     setThemePreference("dark");
     expect(fake().data.get(THEME_STORAGE_KEY)).toBe("dark");
-    themePreference.set("system");
+    themePreference.set("light");
     fake().data.set(THEME_STORAGE_KEY, "dark");
     await restoreThemePreference();
     expect(themePreference.get()).toBe("dark");
   });
 
-  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts on its own setting", async () => {
-    setThemePreference("light");
+  it("is forgotten, in memory and on disk, when the session ends, so a shared phone starts on the default", async () => {
+    setThemePreference("dark");
+    expect(themePreference.get()).toBe("dark");
     await forgetPersistedCache();
-    expect(themePreference.get()).toBe("system");
+    expect(themePreference.get()).toBe("light");
     expect(fake().data.has(THEME_STORAGE_KEY)).toBe(false);
   });
 

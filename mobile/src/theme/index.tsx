@@ -7,7 +7,7 @@ import { dark, light, radius as radiusTokens, type as typeTokens, type Colours }
  * The colours for the phone's current appearance. One rule, carried over from the web: **no screen
  * names a colour**. Every colour is a token from `tokens.ts`, which is generated from the web's
  * `globals.css`, so a colour cannot exist for one theme and be missing in the other. The person's
- * choice (light or dark, Sprint 78) wins; with none, the phone's own setting decides, as it always did.
+ * choice wins; with none it is light (Sprint 92), and only "match the phone" follows the phone's own setting.
  */
 export function useColours(): Colours {
   const system = useColorScheme();

@@ -185,11 +185,13 @@ export async function checkPage(page: Page, label: string, options: Options = {}
 
   const schemes = options.light ? (["light"] as const) : (["light", "dark"] as const);
   for (const scheme of schemes) {
-    await page.emulateMedia({ colorScheme: scheme });
+    // Light is the default whatever the device says (Sprint 92), so a scheme is chosen the way a
+    // person chooses it: the attribute the head script would set. The device's own setting is not used.
+    await page.evaluate((s) => document.documentElement.setAttribute("data-theme", s), scheme);
     const violations = await axe(page);
     expect.soft(violations, `${label}: accessibility (${scheme})`).toEqual([]);
   }
-  await page.emulateMedia({ colorScheme: null });
+  await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
 }
 
 /**
