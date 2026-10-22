@@ -1,4 +1,5 @@
 import { checkPage, expect, test } from "./support/test";
+import { E2E } from "../playwright.config";
 import { organisation, signInAs, suffix } from "./support/identities";
 
 /**
@@ -57,4 +58,32 @@ test("an organisation that only sells courses has no centres page to use", async
   await page.goto(`/en/employer/${org.slug}/centres`);
   await expect(page.getByText(/does not deliver training/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Centres" })).toHaveCount(0);
+});
+
+test("an organisation asks somebody to run a centre and sees the invitation waiting", async ({
+  page,
+  request,
+}) => {
+  const id = suffix();
+  const org = await organisation(request, "course_provider", `E2E Staff ${id}`, {
+    sells_courses: true,
+    delivers_training: true,
+  });
+  const created = await request.post(`${E2E.API}/org/${org.slug}/centres`, {
+    headers: { authorization: `Bearer ${org.tokens.access_token}` },
+    data: { name: `Staffed ${id}`, state: "Maharashtra", district: "Pune" },
+  });
+  expect(created.ok()).toBeTruthy();
+  await signInAs(page, org.tokens);
+
+  await page.goto(`/en/employer/${org.slug}/centres`);
+  const card = page.getByRole("listitem").filter({ hasText: `Staffed ${id}` });
+  // The staff list is fetched only when the fold is first opened.
+  await card.locator("summary", { hasText: "Who runs it" }).click();
+  await expect(card.getByText(/Nobody has been asked to run this centre yet/)).toBeVisible();
+  await card.getByLabel("Ask somebody to run it").fill(`manager-${id}@iism-fixtures.co.in`);
+  await card.getByRole("button", { name: "Send the invitation" }).click();
+  await expect(card.getByText(`manager-${id}@iism-fixtures.co.in`)).toBeVisible();
+  await expect(card.getByText("Waiting", { exact: true })).toBeVisible();
+  await checkPage(page, "centres list with staff");
 });

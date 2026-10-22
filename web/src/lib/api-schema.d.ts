@@ -1445,6 +1445,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/centre": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Centre
+         * @description The centre this manager runs, and the organisation it belongs to.
+         */
+        get: operations["my_centre_org__org_slug__centre_get"];
+        /**
+         * Update My Centre
+         * @description Change the centre's name, address or place. A checked address that changes loses its mark.
+         */
+        put: operations["update_my_centre_org__org_slug__centre_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}/managers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Managers
+         * @description The centre's managers and every invitation it has had.
+         */
+        get: operations["list_managers_org__org_slug__centres__centre_slug__managers_get"];
+        put?: never;
+        /**
+         * Invite Manager
+         * @description Ask somebody to run this centre.
+         *
+         *     **Identical whether or not that address already has an account**, as the organisation's own
+         *     invitations are (Sprint 12's lesson): the difference reaches the mailbox, not the caller.
+         */
+        post: operations["invite_manager_org__org_slug__centres__centre_slug__managers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}/managers/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invitation
+         * @description Withdraw an invitation that has not been accepted (409 if it has).
+         */
+        delete: operations["revoke_invitation_org__org_slug__centres__centre_slug__managers_invitations__invitation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/centres/{centre_slug}/managers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Manager
+         * @description Take a manager out of the centre. The centre and the organisation are untouched.
+         */
+        delete: operations["remove_manager_org__org_slug__centres__centre_slug__managers__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/jobs": {
         parameters: {
             query?: never;
@@ -3989,6 +4080,16 @@ export interface components {
             /** Created At */
             created_at?: string | null;
         };
+        /**
+         * CentreStaffOut
+         * @description Who runs a centre, and who has been asked to (Sprint 96, ADR-102).
+         */
+        CentreStaffOut: {
+            /** Managers */
+            managers: components["schemas"]["MemberOut"][];
+            /** Invitations */
+            invitations: components["schemas"]["InvitationOut"][];
+        };
         /** CertificationOut */
         CertificationOut: {
             /**
@@ -5080,7 +5181,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "owner" | "admin" | "member";
+            role: "owner" | "admin" | "member" | "manager";
         };
         /**
          * InvitationClaimed
@@ -5121,7 +5222,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "admin" | "member";
+            role: "admin" | "member" | "manager";
             /**
              * State
              * @enum {string}
@@ -5157,12 +5258,14 @@ export interface components {
              * Tenant Type
              * @enum {string}
              */
-            tenant_type: "employer" | "course_provider";
+            tenant_type: "employer" | "course_provider" | "training_centre";
             /**
              * Role
              * @enum {string}
              */
-            role: "admin" | "member";
+            role: "admin" | "member" | "manager";
+            /** Centre Of */
+            centre_of?: string | null;
         };
         /**
          * InvitationVerify
@@ -5604,6 +5707,61 @@ export interface components {
             takedown_reason?: string | null;
         };
         /**
+         * ManagedCentreOut
+         * @description A centre as **its own manager** sees it: the record, and whose it is.
+         *
+         *     The organisation's name and slug are the one thing about the organisation a manager is told:
+         *     they run a place that belongs to somebody, and a person with two centres of two organisations
+         *     needs to tell them apart. Nothing else of the organisation travels here.
+         */
+        ManagedCentreOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Place Resolved
+             * @default false
+             */
+            place_resolved: boolean;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "closed";
+            /** Closed At */
+            closed_at?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Organisation */
+            organisation: string;
+            /** Organisation Slug */
+            organisation_slug: string;
+        };
+        /**
+         * ManagerInviteIn
+         * @description Ask somebody to run a centre. Only the address: the role is the one a centre has.
+         */
+        ManagerInviteIn: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /**
          * MarketplaceCounts
          * @description The homepage panels' figures.
          *
@@ -5733,7 +5891,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "owner" | "admin" | "member";
+            role: "owner" | "admin" | "member" | "manager";
             /** Full Name */
             full_name?: string | null;
             /** Email */
@@ -5755,7 +5913,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "owner" | "admin" | "member";
+            role: "owner" | "admin" | "member" | "manager";
         };
         /** MembershipOut */
         MembershipOut: {
@@ -5763,7 +5921,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "owner" | "admin" | "member";
+            role: "owner" | "admin" | "member" | "manager";
             tenant: components["schemas"]["TenantOut"];
         };
         /** MissingSkillOut */
@@ -10000,6 +10158,202 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CentreOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_centre_org__org_slug__centre_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedCentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_my_centre_org__org_slug__centre_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CentreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedCentreOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_managers_org__org_slug__centres__centre_slug__managers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CentreStaffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_manager_org__org_slug__centres__centre_slug__managers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagerInviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invitation_org__org_slug__centres__centre_slug__managers_invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                invitation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_manager_org__org_slug__centres__centre_slug__managers__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                centre_slug: string;
+                user_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

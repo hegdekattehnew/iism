@@ -88,3 +88,15 @@ class CentreBulkReportOut(BaseModel):
 
 # Re-exported so a route and a test name one type.
 CentreId = uuid.UUID
+
+
+class ManagedCentreOut(CentreOut):
+    """A centre as **its own manager** sees it: the record, and whose it is.
+
+    The organisation's name and slug are the one thing about the organisation a manager is told:
+    they run a place that belongs to somebody, and a person with two centres of two organisations
+    needs to tell them apart. Nothing else of the organisation travels here.
+    """
+
+    organisation: str
+    organisation_slug: str

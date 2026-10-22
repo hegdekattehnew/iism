@@ -1,7 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CENTRE_STATE_LOOK, CentresPanel } from "@/components/employer/CentresPanel";
+import { CENTRE_STATE_LOOK } from "@/components/cards/centre-look";
+import { CentresPanel } from "@/components/employer/CentresPanel";
 import { CheckCircleIcon, XCircleIcon } from "@/components/ui/icons";
 import { renderUi, resetWorld } from "@/test/harness";
 

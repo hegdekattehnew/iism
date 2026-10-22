@@ -120,13 +120,20 @@ export function InvitePanel({ token }: { token: string }) {
   }
 
   const roleWord = t(invitation.data.role === "admin" ? "roleAdmin" : "roleMember");
+  // A centre's invitation says whose centre it is and what the person is being asked to do.
+  const forCentre = invitation.data.tenant_type === "training_centre";
 
   return (
     <Card>
       <CardBody>
         <h2 className="text-lg font-semibold">{t("title")}</h2>
         <p className="mt-2">
-          {t("body", { organisation: invitation.data.organisation, role: roleWord })}
+          {forCentre
+            ? t("bodyCentre", {
+                centre: invitation.data.organisation,
+                organisation: invitation.data.centre_of ?? "",
+              })
+            : t("body", { organisation: invitation.data.organisation, role: roleWord })}
         </p>
 
         {signedIn ? (

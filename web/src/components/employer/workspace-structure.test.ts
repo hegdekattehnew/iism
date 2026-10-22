@@ -15,17 +15,20 @@ describe("OrgWorkspace keeps both workspaces out of the route's first load", () 
   it("imports neither workspace statically", () => {
     expect(source).not.toMatch(/^import \{[^}]*\bEmployerWorkspace\b[^}]*\} from/m);
     expect(source).not.toMatch(/^import \{[^}]*\bProviderWorkspace\b[^}]*\} from/m);
+    // The centre manager's page is the third (Sprint 96): nobody else downloads it.
+    expect(source).not.toMatch(/^import \{[^}]*\bCentreWorkspace\b[^}]*\} from/m);
   });
 
   it("loads each with next/dynamic, at module level, from its own file", () => {
     expect(source).toMatch(/^import dynamic from "next\/dynamic";/m);
     expect(source).toMatch(/^const EmployerWorkspace = dynamic\(\s*\(\) => import\("@\/components\/employer\/EmployerWorkspace"\)/m);
     expect(source).toMatch(/^const ProviderWorkspace = dynamic\(\s*\(\) => import\("@\/components\/employer\/ProviderWorkspace"\)/m);
+    expect(source).toMatch(/^const CentreWorkspace = dynamic\(\s*\(\) => import\("@\/components\/employer\/CentreWorkspace"\)/m);
   });
 
   it("shows a Skeleton while a workspace loads, so nothing moves when it arrives", () => {
     expect(source).toMatch(/const loading = \(\) => <Skeleton className="h-64 w-full rounded-xl" \/>;/);
-    expect((source.match(/\{ loading \}/g) ?? []).length).toBe(2);
+    expect((source.match(/\{ loading \}/g) ?? []).length).toBe(3);
   });
 
   it("and the guard can fail: a static import is found by its pattern", () => {

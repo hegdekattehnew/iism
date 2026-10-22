@@ -93,6 +93,15 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "See your centres:\n{link}\n\n"
             "If you think this is a mistake, please contact the IISM team.\n",
         ),
+        "centre_manager_invitation": (
+            "You have been asked to run {centre} on IISM",
+            "{organisation} has asked you to be the manager of its training centre {centre} "
+            "on IISM.\n\n"
+            "As manager you can see the centre and keep its address up to date. Open this link "
+            "to accept. It expires in seven days, and it works only once:\n{link}\n\n"
+            "If you were not expecting this, you can ignore it -- nothing happens until you "
+            "open the link.\n",
+        ),
         "ownership_received": (
             "You are now an owner of {organisation} on IISM",
             "You have been made an owner of {organisation} on IISM. Owners can "
@@ -192,6 +201,16 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "पता देख लेने पर उसे फिर जाँचा जाता है।\n\n"
             "अपने केंद्र देखें:\n{link}\n\n"
             "यदि आपको लगता है कि यह गलती है, तो कृपया IISM टीम से संपर्क करें।\n",
+        ),
+        "centre_manager_invitation": (
+            "आपसे IISM पर {centre} चलाने के लिए कहा गया है",
+            "{organisation} ने IISM पर अपने प्रशिक्षण केंद्र {centre} का प्रबंधक बनने के लिए "
+            "आपसे कहा है।\n\n"
+            "प्रबंधक के रूप में आप केंद्र देख सकते हैं और उसका पता अद्यतन रख सकते हैं। "
+            "स्वीकार करने के लिए यह लिंक खोलें। यह सात दिन में समाप्त हो जाएगा, और केवल एक "
+            "बार काम करता है:\n{link}\n\n"
+            "यदि आपको इसकी अपेक्षा नहीं थी, तो इसे अनदेखा कर सकते हैं — लिंक खोलने तक कुछ "
+            "नहीं होता।\n",
         ),
         "ownership_received": (
             "अब आप IISM पर {organisation} के स्वामी हैं",

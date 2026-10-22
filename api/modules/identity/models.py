@@ -30,13 +30,22 @@ TENANT_TYPES = ("employer", "course_provider", "personal", "training_centre")
 
 # Membership roles within a tenant. RBAC now, designed so ABAC can be layered
 # on later without restructuring (ADR-012, ADR-022).
-MEMBERSHIP_ROLES = ("owner", "admin", "member")
+# `manager` (Sprint 96, ADR-102) is the one role that exists **only on a training centre**: the
+# person who runs a centre day to day. It is held on the centre's own tenant row, never on the
+# organisation, and the organisation's owners and admins reach the centre through the organisation
+# as before.
+MEMBERSHIP_ROLES = ("owner", "admin", "member", "manager")
+CENTRE_ROLES = ("manager",)
 
 # What an invitation may offer. **`owner` is deliberately absent**: ownership is
 # transferred between people who are already here, which is a different act with
 # a different guard. An invitation that could mint an owner would also be a way
 # to hand the organisation to a stranger who never accepted anything else.
 INVITABLE_ROLES = ("admin", "member")
+# What an invitation row may hold: the two an organisation hands out, and the one a centre does.
+# Kept apart from `INVITABLE_ROLES` so the organisation's own invite route can never offer
+# `manager`.
+INVITATION_ROLES = (*INVITABLE_ROLES, *CENTRE_ROLES)
 
 # Operator tiers (ADR-044, Sprint 37, BL-7.3) -- the closed set the database
 # enforces. What each tier actually grants lives in `core/authorization.py`
@@ -307,7 +316,7 @@ class Invitation(Base):
 
     __tablename__ = "invitations"
     __table_args__ = (
-        CheckConstraint(one_of("role", INVITABLE_ROLES), name="ck_invitation_role"),
+        CheckConstraint(one_of("role", INVITATION_ROLES), name="ck_invitation_role"),
         # The token is the capability, so it is looked up on every acceptance.
         Index("ix_invitations_token_hash", "token_hash", unique=True),
         Index("ix_invitations_tenant_id", "tenant_id"),

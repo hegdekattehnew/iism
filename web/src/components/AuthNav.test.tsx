@@ -46,6 +46,15 @@ describe("AuthNav — the header's profile slot follows the context", () => {
     expect(link("My matches")).toBeNull();
   });
 
+  it("offers a centre's manager no organisation profile, which is not theirs", () => {
+    world.memberships = [org("hadapsar", "training_centre", "Hadapsar")];
+    world.pathname = "/employer/hadapsar";
+    renderUi(<AuthNav />);
+    expect(link("Organisation profile")).toBeNull();
+    expect(link("My profile")).toBeNull();
+    expect(link("My matches")).toBeNull();
+  });
+
   it("offers matches and profile to a job seeker outside any organisation", () => {
     world.memberships = [personal(), org("tnt")];
     world.pathname = "/jobs";

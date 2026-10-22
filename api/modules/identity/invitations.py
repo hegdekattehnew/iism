@@ -208,7 +208,6 @@ async def invite(
     returned in the API response, and cannot be recovered afterwards. Losing it
     means revoking and inviting again, which is the correct trade.
     """
-    address = _normalise(email)
     if not _may_grant(actor_role, role):
         # 403 rather than 422: the request is well-formed, and what refuses it
         # is who is asking. The message names the ceiling, because the caller
@@ -217,7 +216,35 @@ async def invite(
             status.HTTP_403_FORBIDDEN,
             f"Your role ({actor_role}) cannot invite somebody as {role}",
         )
+    return await offer(
+        db,
+        tenant=tenant,
+        actor=actor,
+        email=email,
+        role=role,
+        template="organisation_invitation",
+        payload={"organisation": tenant.name, "role": role},
+    )
 
+
+async def offer(
+    db: AsyncSession,
+    *,
+    tenant: Tenant,
+    actor: User,
+    email: str,
+    role: str,
+    template: str,
+    payload: dict[str, object],
+) -> tuple[Invitation, str]:
+    """Write the invitation and queue its mail. **Who may offer which role is the caller's rule.**
+
+    `invite()` asks `_may_grant` (the escalation ceiling for an organisation's own team); a centre's
+    manager is offered by `centre_staff.invite_manager`, whose rule is different (the person
+    offering holds a role in the *parent*), so the part that is the same for both -- the duplicate
+    and cap checks, the token, the queued mail, the event -- is here once.
+    """
+    address = _normalise(email)
     now = datetime.now(UTC)
 
     # Already one of us? A 409 here is safe and is not an oracle: the caller is
@@ -288,10 +315,9 @@ async def invite(
         recipient_kind="invitation",
         recipient_id=invitation.id,
         channel="email",
-        template="organisation_invitation",
+        template=template,
         payload={
-            "organisation": tenant.name,
-            "role": role,
+            **payload,
             # The token reaches the invitee and nobody else. It is in the
             # payload because it *is* the message; `redaction.py` never sees
             # this row, and the outbox is not a log sink.
@@ -414,6 +440,13 @@ async def invitation_for_token(db: AsyncSession, token: str) -> Invitation:
             f"That invitation has been {invitation.state(datetime.now(UTC))}",
         )
     return invitation
+
+
+async def parent_name_of(db: AsyncSession, tenant: Tenant) -> str | None:
+    """The name of the organisation behind a centre, for the invitation page; `None` otherwise."""
+    if tenant.parent_id is None:
+        return None
+    return await db.scalar(select(Tenant.name).where(Tenant.id == tenant.parent_id))
 
 
 def mask_address(address: str) -> str:

@@ -15,13 +15,16 @@ from pydantic import (
 from api.core.config import get_settings
 
 TenantType = Literal["employer", "course_provider", "personal", "training_centre"]
-MembershipRole = Literal["owner", "admin", "member"]
+MembershipRole = Literal["owner", "admin", "member", "manager"]
 
 # What an invitation may offer -- `owner` deliberately absent, because
 # ownership is transferred rather than invited. Closed on the way out so the
 # generated TypeScript client types a role as a union rather than `string`;
 # `tests/test_enumerations.py` holds both of these to their CHECKs.
 InvitableRole = Literal["admin", "member"]
+# What an invitation row may say it offers (Sprint 96): the two above and a centre's `manager`.
+# **Input stays `InvitableRole`**: the organisation's own invite route can never be asked for one.
+InvitationRole = Literal["admin", "member", "manager"]
 
 # Derived from three timestamps by `Invitation.state`, never stored, so there
 # is no column for this union to disagree with -- and therefore deliberately
@@ -426,7 +429,7 @@ class InvitationOut(BaseModel):
 
     id: uuid.UUID
     email: str
-    role: InvitableRole
+    role: InvitationRole
     state: InvitationState
     expires_at: datetime
     created_at: datetime
@@ -443,8 +446,11 @@ class InvitationPreview(BaseModel):
 
     organisation: str
     organisation_slug: str
-    tenant_type: OrgTenantType
-    role: InvitableRole
+    # A training centre too (Sprint 96): then `organisation` is the centre and `centre_of` names the
+    # organisation that runs it, so the page can say whose centre this is.
+    tenant_type: Literal["employer", "course_provider", "training_centre"]
+    role: InvitationRole
+    centre_of: str | None = None
 
 
 class InvitationClaimed(BaseModel):
@@ -507,3 +513,16 @@ class OwnershipTransferIn(BaseModel):
 
     user_id: uuid.UUID
     then: Literal["admin", "leave"] = "admin"
+
+
+class CentreStaffOut(BaseModel):
+    """Who runs a centre, and who has been asked to (Sprint 96, ADR-102)."""
+
+    managers: list[MemberOut]
+    invitations: list[InvitationOut]
+
+
+class ManagerInviteIn(BaseModel):
+    """Ask somebody to run a centre. Only the address: the role is the one a centre has."""
+
+    email: EmailStr

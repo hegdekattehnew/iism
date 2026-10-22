@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.slugs import add_with_unique_slug
 from api.core.text import slugify
 from api.modules.analytics import record
-from api.modules.centres.schemas import CentreIn, CentreOut
+from api.modules.centres.schemas import CentreIn, CentreOut, ManagedCentreOut
 from api.modules.geography import resolve_location
 from api.modules.identity.models import Tenant, User
 from api.modules.operations.models import TenantVerificationEvent
@@ -269,3 +269,42 @@ async def reopen_centre(db: AsyncSession, centre: Tenant) -> Tenant:
     await db.commit()
     await db.refresh(centre)
     return centre
+
+
+async def managed_centre(db: AsyncSession, tenant: Tenant) -> tuple[Tenant, Tenant]:
+    """`(centre, its organisation)` for the centre a manager is acting in.
+
+    The route has already resolved a membership with `MANAGED_CENTRE_*` in this tenant, so this is
+    a second statement of the shape (only a training centre has a parent), not the guard.
+    """
+    parent = await db.get(Tenant, tenant.parent_id) if tenant.parent_id is not None else None
+    if tenant.tenant_type != "training_centre" or parent is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Centre not found")
+    return tenant, parent
+
+
+def managed_out(centre: Tenant, parent: Tenant) -> ManagedCentreOut:
+    base = out(centre)
+    return ManagedCentreOut(
+        **base.model_dump(), organisation=parent.name, organisation_slug=parent.slug
+    )
+
+
+async def update_managed_centre(
+    db: AsyncSession, tenant: Tenant, actor: User, data: CentreIn
+) -> ManagedCentreOut:
+    """A manager keeps their own centre's details true.
+
+    The same writer the organisation uses (`update_centre`), so the rules are the same ones: a name
+    unique within the organisation, a resolved place, and **a checked address that changes loses its
+    mark**. A closed centre is not edited from inside: whoever closed it reopens it, and a manager
+    editing a place that is not running would be news to nobody.
+    """
+    centre, parent = await managed_centre(db, tenant)
+    if centre.closed_at is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This centre is closed. The organisation has to reopen it before it can be changed",
+        )
+    updated = await update_centre(db, parent, centre, actor, data)
+    return managed_out(updated, parent)

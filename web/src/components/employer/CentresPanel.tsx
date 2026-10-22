@@ -1,114 +1,49 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Area, Field, FormErrors, Text } from "@/components/profile/fields";
+import { CentreForm } from "@/components/employer/CentreForm";
 import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { EmptyState } from "@/components/ui/empty-state";
-import { CheckCircleIcon, ClockIcon, MapPinIcon, XCircleIcon } from "@/components/ui/icons";
+import { CENTRE_STATE_LOOK } from "@/components/cards/centre-look";
+import { CheckCircleIcon, ClockIcon, MapPinIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useCentreMutations, useCentres, type Centre } from "@/lib/centres";
-import { detailOf, fieldsOf, isSignedOut } from "@/lib/http";
+import { detailOf, isSignedOut } from "@/lib/http";
 
 /**
- * A centre's state and its address mark, as shapes (Sprint 95, ADR-102). Two different claims, each a
- * word, a shape and a tone: **open or closed** is the organisation's own doing; **address checked** is
- * an operator's, and is never the organisation's mark (a verified organisation does not make a centre
- * checked). Typed over the server's union, so a new status is a compile error.
+ * Who runs a centre is **not in this route's first load**: it is fetched the first time the fold is
+ * opened (`next/dynamic` at module level; `centres-structure.test.ts` fails on a static import), with
+ * a placeholder of its own so nothing moves when it arrives.
  */
-export const CENTRE_STATE_LOOK: Record<
-  Centre["status"],
-  { tone: "good" | "neutral"; icon: typeof CheckCircleIcon }
-> = {
-  active: { tone: "good", icon: CheckCircleIcon },
-  closed: { tone: "neutral", icon: XCircleIcon },
-};
+const CentreStaff = dynamic(
+  () => import("@/components/employer/CentreStaff").then((m) => m.CentreStaff),
+  { loading: () => <Skeleton className="h-24 w-full rounded-xl" /> },
+);
 
-/** One form for adding and for changing: the same four fields, the same limits as `CentreIn`. */
-function CentreForm({
-  centre,
-  pending,
-  error,
-  onSubmit,
-  onCancel,
-}: {
-  centre?: Centre;
-  pending: boolean;
-  error: unknown;
-  onSubmit: (body: {
-    name: string;
-    address: string | null;
-    state: string;
-    district: string;
-  }) => void;
-  onCancel?: () => void;
-}) {
+/** "Who runs it": a closed fold that mounts its content the first time it is opened. */
+function StaffFold({ org, centre }: { org: string; centre: Centre }) {
   const t = useTranslations("centres");
+  const [opened, setOpened] = useState(false);
   return (
-    <FormErrors fields={fieldsOf(error)}>
-      <form
-        className="grid gap-4 sm:grid-cols-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          const s = (k: string) => String(f.get(k) ?? "").trim();
-          onSubmit({
-            name: s("name"),
-            address: s("address") || null,
-            state: s("state"),
-            district: s("district"),
-          });
-        }}
-      >
-        <Field label={t("name")} hint={t("nameHint")} className="sm:col-span-2">
-          <Text name="name" minLength={2} maxLength={120} required defaultValue={centre?.name ?? ""} />
-        </Field>
-        <Field label={t("address")} hint={t("addressHint")} className="sm:col-span-2">
-          <Area name="address" rows={2} maxLength={500} defaultValue={centre?.address ?? ""} />
-        </Field>
-        <Field label={t("state")}>
-          <Text
-            name="state"
-            minLength={2}
-            maxLength={120}
-            required
-            defaultValue={centre?.location_state ?? ""}
-          />
-        </Field>
-        <Field label={t("district")}>
-          <Text
-            name="district"
-            minLength={2}
-            maxLength={120}
-            required
-            defaultValue={centre?.location_district ?? ""}
-          />
-        </Field>
-        {centre?.is_verified && (
-          <Alert tone="warning" role={undefined} className="sm:col-span-2">
-            {t("checkedWarning")}
-          </Alert>
-        )}
-        {error != null && Object.keys(fieldsOf(error) ?? {}).length === 0 && (
-          <Alert role="alert" className="sm:col-span-2">
-            {detailOf(error) ?? t("failed")}
-          </Alert>
-        )}
-        <div className="flex flex-wrap gap-2 sm:col-span-2">
-          <Button type="submit" disabled={pending}>
-            {centre ? t("saveChanges") : t("create")}
-          </Button>
-          {onCancel && (
-            <Button type="button" variant="ghost" onClick={onCancel}>
-              {t("cancel")}
-            </Button>
-          )}
+    <details
+      className="mt-4 border-t border-border-token pt-2"
+      // The first toggle can only be an opening, and once opened it stays mounted.
+      onToggle={() => setOpened(true)}
+    >
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">
+        {t("staffSummary")}
+      </summary>
+      {opened && (
+        <div className="pb-2 pt-2">
+          <CentreStaff org={org} centre={centre.slug} closed={centre.status === "closed"} />
         </div>
-      </form>
-    </FormErrors>
+      )}
+    </details>
   );
 }
 
@@ -201,6 +136,7 @@ function CentreCard({ org, centre }: { org: string; centre: Centre }) {
             }
           />
         )}
+        {!editing && <StaffFold org={org} centre={centre} />}
         {(close.error ?? reopen.error) != null && (
           <Alert role="alert" className="mt-3">
             {detailOf(close.error ?? reopen.error) ?? t("failed")}

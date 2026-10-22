@@ -97,6 +97,9 @@ TEMPLATES = (
     # actually changes; the payload is the centre's name and a link, never the operator's note.
     "centre_verified",
     "centre_verification_revoked",
+    # Sprint 96. Somebody was asked to run a training centre. Email, to the address the
+    # invitation was written to (resolved at send time, so revoking it stops the mail).
+    "centre_manager_invitation",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

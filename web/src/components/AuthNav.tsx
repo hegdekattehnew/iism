@@ -111,7 +111,14 @@ export function AuthNav({ stacked = false }: { stacked?: boolean }) {
     const onlyOrg = organisations.length === 1 ? organisations[0] : null;
 
     // The one destination worth a button. Everything else is in the menu.
-    const primary = isPending ? null : inOrg ? (
+    // A centre has no organisation profile to edit, and its manager's one page is already the
+    // header's navigation item: a second link to the same place would only make it ambiguous.
+    const inCentre =
+      inOrg &&
+      organisations.some(
+        (m) => m.tenant.slug === active && m.tenant.tenant_type === "training_centre",
+      );
+    const primary = isPending || inCentre ? null : inOrg ? (
       <ButtonLink href={`/employer/${active}/settings`} variant="secondary" size={size}>
         {t("orgProfile")}
       </ButtonLink>

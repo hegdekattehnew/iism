@@ -40,6 +40,28 @@ beforeEach(() => {
   });
 });
 
+describe("InvitePanel — a centre's invitation (Sprint 96)", () => {
+  it("says whose centre it is and what the person is being asked to do", async () => {
+    GET.mockResolvedValue({
+      data: {
+        organisation: "Hadapsar",
+        organisation_slug: "acme-hadapsar",
+        tenant_type: "training_centre",
+        role: "manager",
+        centre_of: "Acme Training",
+      },
+      error: undefined,
+      response: { status: 200 },
+    });
+    renderUi(panel());
+    expect(
+      await screen.findByText("Acme Training has asked you to run its training centre, Hadapsar."),
+    ).toBeTruthy();
+    // Not the organisation's wording: nobody is being made "a member".
+    expect(screen.queryByText(/to join as/)).toBeNull();
+  });
+});
+
 describe("InvitePanel — signed in", () => {
   beforeEach(() => {
     world.signedIn = true;

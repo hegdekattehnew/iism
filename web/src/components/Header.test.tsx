@@ -53,6 +53,16 @@ describe("Header — the whole header switches, not half of it", () => {
     }
   });
 
+  it("gives a centre's manager their one page and none of an organisation's (Sprint 96)", () => {
+    world.memberships = [org("hadapsar", "training_centre", "Hadapsar")];
+    world.pathname = "/employer/hadapsar";
+    renderUi(<Header />);
+    expect(link("Your centre")?.getAttribute("href")).toBe("/employer/hadapsar");
+    for (const name of ["Vacancies", "Courses", "Team", "Interested learners", "Centres"]) {
+      expect(link(name), name).toBeNull();
+    }
+  });
+
   it("does not offer an employer the provider's inbox", () => {
     world.memberships = [personal(), org("acme")];
     world.pathname = "/employer/acme";

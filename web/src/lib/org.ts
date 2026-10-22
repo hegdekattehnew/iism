@@ -77,11 +77,11 @@ export function useMemberships() {
 /** The kind of organisation a slug refers to, from data already on the wire. */
 export function useOrgType(
   orgSlug: string | null,
-): "employer" | "course_provider" | null {
+): "employer" | "course_provider" | "training_centre" | null {
   const { organisations } = useMemberships();
   if (!orgSlug) return null;
   const found = organisations.find((m) => m.tenant.slug === orgSlug);
-  return (found?.tenant.tenant_type as "employer" | "course_provider") ?? null;
+  return (found?.tenant.tenant_type as "employer" | "course_provider" | "training_centre") ?? null;
 }
 
 /**

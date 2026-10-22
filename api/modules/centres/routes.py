@@ -20,12 +20,19 @@ from api.modules.centres.schemas import (
     CentreIn,
     CentreList,
     CentreOut,
+    ManagedCentreOut,
 )
 
 router = APIRouter(prefix="/org/{org_slug}/centres", tags=["centres"])
 
+# A centre's own manager, acting in the centre's slug (Sprint 96). Nothing here is reachable from an
+# organisation's role: `MANAGED_CENTRE_*` is held by `manager` alone.
+manager_router = APIRouter(prefix="/org/{org_slug}/centre", tags=["centres"])
+
 CanReadCentres = Depends(require(Permission.CENTRE_READ, "centre"))
 CanManageCentres = Depends(require(Permission.CENTRE_MANAGE, "centre"))
+CanSeeMyCentre = Depends(require(Permission.MANAGED_CENTRE_READ, "batch"))
+CanEditMyCentre = Depends(require(Permission.MANAGED_CENTRE_EDIT, "batch"))
 
 _CSV_BODY: dict[str, object] = {
     "requestBody": {
@@ -163,3 +170,23 @@ async def reopen_centre(
 ) -> CentreOut:
     centre = await centre_for(db, context, centre_slug)
     return service.out(await service.reopen_centre(db, centre))
+
+
+@manager_router.get("", response_model=ManagedCentreOut)
+async def my_centre(
+    context: TenantContext = CanSeeMyCentre,
+    db: AsyncSession = Depends(get_db_session),
+) -> ManagedCentreOut:
+    """The centre this manager runs, and the organisation it belongs to."""
+    centre, parent = await service.managed_centre(db, context.tenant)
+    return service.managed_out(centre, parent)
+
+
+@manager_router.put("", response_model=ManagedCentreOut)
+async def update_my_centre(
+    payload: CentreIn,
+    context: TenantContext = CanEditMyCentre,
+    db: AsyncSession = Depends(get_db_session),
+) -> ManagedCentreOut:
+    """Change the centre's name, address or place. A checked address that changes loses its mark."""
+    return await service.update_managed_centre(db, context.tenant, context.user, payload)

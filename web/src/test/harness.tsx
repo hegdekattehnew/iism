@@ -22,7 +22,7 @@ import { vi } from "vitest";
 
 import messages from "@/messages/en.json";
 
-type TenantType = "personal" | "employer" | "course_provider";
+type TenantType = "personal" | "employer" | "course_provider" | "training_centre";
 
 export type TestMembership = {
   role: string;

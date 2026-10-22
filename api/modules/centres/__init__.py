@@ -5,6 +5,6 @@ verification event a changed address writes); nothing depends on it except the a
 its router. Operations and privacy read centres through the tenant rows themselves.
 """
 
-from api.modules.centres.routes import router
+from api.modules.centres.routes import manager_router, router
 
-__all__ = ["router"]
+__all__ = ["manager_router", "router"]

@@ -31,6 +31,7 @@ from api.modules.identity import schemas as identity_schemas
 from api.modules.identity.models import Invitation, Membership, Tenant
 from api.modules.identity.schemas import (
     InvitableRole,
+    InvitationRole,
     InvitationState,
     MembershipRole,
     OrgTenantType,
@@ -81,7 +82,7 @@ BACKED: list[tuple[Any, Any, str]] = [
     (SkillType, Skill, "skill_type"),
     (AliasScript, SkillAlias, "script"),
     (InterestStatus, CourseInterest, "status"),
-    (InvitableRole, Invitation, "role"),
+    (InvitationRole, Invitation, "role"),
 ]
 
 
@@ -136,7 +137,10 @@ class TestEachUnionMatchesItsConstraint:
         # nowhere, so there is no CHECK for it to agree with -- which is the
         # point of storing it nowhere; `JobSort` (Sprint 75) is a **query
         # parameter** (`GET /jobs?sort=`), an ordering and not a column.
+        # `InvitableRole` (Sprint 96) is what an organisation's own invite route may *ask for*: a
+        # narrowing of the invitation column, which also holds a centre's `manager`.
         assert declared - {u for u, _, _ in BACKED} == {
+            InvitableRole,
             OrgTenantType,
             QpRequirement,
             InvitationState,
