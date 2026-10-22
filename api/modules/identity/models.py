@@ -2,11 +2,13 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     ColumnElement,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Text,
     UniqueConstraint,
     func,
@@ -67,6 +69,15 @@ class Tenant(Base):
         ),
     )
 
+    def __init__(self, **kwargs: object) -> None:
+        # A course provider sells courses unless told otherwise: every one that existed before
+        # the capabilities did does, and the seeds and tests that build a `Tenant` directly
+        # should not have to know the flag exists. Anything else starts with neither. Set here
+        # rather than left to the column default so the value is right **before the flush** too.
+        kwargs.setdefault("publishes_courses", kwargs.get("tenant_type") == "course_provider")
+        kwargs.setdefault("delivers_training", False)
+        super().__init__(**kwargs)
+
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(unique=True, index=True)
     name: Mapped[str] = mapped_column()
@@ -81,6 +92,23 @@ class Tenant(Base):
     # Deliberately NOT on the public `TenantOut`: an organisation's own inbox is
     # not something a job listing should broadcast to scrapers.
     contact_email: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # What a training organisation does (Sprint 94, ADR-102). Two capabilities on **one**
+    # organisation, never two tenants for one real organisation (ADR-038): it may sell courses,
+    # deliver training at centres, or both. Only meaningful for `course_provider`; `capability_for`
+    # in `core/authorization.py` is the one place that reads them. `server_default` is false and
+    # `__init__` below makes a new `course_provider` a seller, which is what every existing one is.
+    publishes_courses: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    delivers_training: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    # What an organisation says about itself, shown as its own claim and never sorted or filtered on
+    # (ADR-085). All three are optional and plain.
+    year_established: Mapped[int | None] = mapped_column(Integer, default=None)
+    affiliations: Mapped[str | None] = mapped_column(Text, default=None)
+    teaching_languages: Mapped[str | None] = mapped_column(Text, default=None)
 
     # Set by an operator, never by the organisation (ADR-042). A self-asserted
     # badge is worse than none, because a candidate reads it as ours.

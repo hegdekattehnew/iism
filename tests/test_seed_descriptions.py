@@ -85,3 +85,52 @@ def test_both_seed_loops_route_the_description_through_the_filter() -> None:
     assert source.count("None if generic else d_hi") == 2  # the Hindi twin goes with it
     # ...and a stale Hindi one from an earlier run is dropped:
     assert source.count("await _forget_description_translation(db,") == 2
+
+
+# --- Sprint 94, BL-22.9: a demonstration vacancy is called what the job is called ---------
+
+from api.modules.marketplace.listings import title_reads_like_a_course  # noqa: E402
+
+TITLE, TITLE_HI = 2, 3
+
+# What the demonstration had before the suffix came off was 42 of 129 vacancies; 19 remain, each a
+# qualification's whole name that only a person who knows the work can rename. A ratchet: it may go
+# down (a rename, or a row removed), never up.
+STILL_READ_LIKE_A_COURSE = 19
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("Mushroom Grower (Small Unit) — Trainee Programme", "Mushroom Grower (Small Unit)"),
+        ("Diamond Assorter - Trainee Programme", "Diamond Assorter"),
+        ("मशरूम उत्पादक (लघु इकाई) — प्रशिक्षु कार्यक्रम", "मशरूम उत्पादक (लघु इकाई)"),
+        ("Cook", "Cook"),
+        ("Trainee Programme", "Trainee Programme"),  # never leaves nothing
+        ("Programme Manager", "Programme Manager"),
+    ],
+)
+def test_the_programme_suffix_comes_off_a_vacancy_title_and_nothing_else(
+    given: str, expected: str
+) -> None:
+    assert expansion.as_a_job_title(given) == expected
+
+
+def test_no_demonstration_vacancy_is_called_a_trainee_programme() -> None:
+    assert len(expansion.JOBS) >= 100  # found them first
+    left = [
+        row[TITLE]
+        for row in expansion.JOBS
+        if "Trainee Programme" in expansion.as_a_job_title(row[TITLE])
+        or "प्रशिक्षु कार्यक्रम" in expansion.as_a_job_title(row[TITLE_HI])
+    ]
+    assert left == []
+
+
+def test_the_vacancies_that_still_read_like_a_course_do_not_grow_in_number() -> None:
+    like = [
+        expansion.as_a_job_title(row[TITLE])
+        for row in expansion.JOBS
+        if title_reads_like_a_course(expansion.as_a_job_title(row[TITLE]))
+    ]
+    assert len(like) <= STILL_READ_LIKE_A_COURSE, like[:5]

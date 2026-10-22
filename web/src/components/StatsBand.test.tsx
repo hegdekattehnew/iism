@@ -81,7 +81,7 @@ describe("StatsBand: who is here and what has been done", () => {
 
     expect(within(figure("Job seekers")).getByText("22")).toBeTruthy();
     expect(within(figure("Employers")).getByText("102")).toBeTruthy();
-    expect(within(figure("Training providers")).getByText("60")).toBeTruthy();
+    expect(within(figure("Training organisations")).getByText("60")).toBeTruthy();
     expect(within(figure("Applications made")).getByText("18")).toBeTruthy();
     expect(within(figure("Hires")).getByText("1")).toBeTruthy();
     expect(
@@ -100,7 +100,7 @@ describe("StatsBand: who is here and what has been done", () => {
     ).toBeTruthy();
     expect(within(figure("Employers")).getByText("97 hiring now")).toBeTruthy();
     expect(
-      within(figure("Training providers")).queryByText(
+      within(figure("Training organisations")).queryByText(
         /with a published course/,
       ),
     ).toBeNull();

@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
-from api.modules.identity import schemas, service
+from api.core.security import get_current_user
+from api.modules.identity import capabilities, schemas, service
+from api.modules.identity.models import User
 
 router = APIRouter(prefix="/org/{org_slug}", tags=["organisations"])
 
@@ -42,5 +44,27 @@ async def update_organisation(
     """
     tenant = await service.update_organisation(
         db, context.tenant, payload.model_dump(exclude_unset=True)
+    )
+    return schemas.OrganisationOut.model_validate(tenant)
+
+
+@router.put("/capabilities", response_model=schemas.OrganisationOut)
+async def set_capabilities(
+    payload: schemas.CapabilitiesIn,
+    context: TenantContext = CanUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> schemas.OrganisationOut:
+    """Owner only: whether this training organisation sells courses, delivers training, or both.
+
+    Refused (409) for an employer, for a change that would leave it doing neither, and while it has
+    published courses or anything that delivering means (ADR-102). The change is recorded.
+    """
+    tenant = await capabilities.set_capabilities(
+        db,
+        tenant=context.tenant,
+        actor=user,
+        sells_courses=payload.sells_courses,
+        delivers_training=payload.delivers_training,
     )
     return schemas.OrganisationOut.model_validate(tenant)

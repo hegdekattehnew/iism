@@ -27,6 +27,7 @@ from api.modules.analytics.models import AnalyticsEvent
 from api.modules.geography.models import District, State
 from api.modules.identity.models import Membership, Tenant
 from api.modules.marketplace import bulk, course_publishing, publishing
+from api.modules.marketplace.listings import title_reads_like_a_course
 from api.modules.marketplace.models import Course, Job
 from api.modules.marketplace.schemas import CourseIn, CourseSkillIn, JobIn, JobSkillIn
 from api.modules.skills.hierarchy import RoleAlias
@@ -2211,3 +2212,110 @@ class TestACourseQualificationColumn:
         header = bulk.COLUMNS["courses"]
         assert "qualification" in header and "job_role" in header
         assert header.index("qualification") != header.index("job_role")
+
+
+class TestTitleNotes:
+    """Sprint 94, BL-22.9: a vacancy's title is the job; a file that reads like a catalogue says so.
+
+    The demonstration database led its job list with "Advanced Certificate in Quality and Industrial
+    Engineering". The check says it **once for the file**, as a note: never a refusal, never one per
+    row, and only for vacancies (a course may be called a certificate).
+    """
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Certificate in Airport Management",
+            "Advanced Certificate in Quality and Industrial Engineering",
+            "Professional Diploma in Medical Cosmetology Skills",
+            "Senior Certificate in Professional Makeup Artistry",
+            "Mushroom Grower (Small Unit) — Trainee Programme",
+            "Certificate Course in Web Designing",
+            "  diploma in welding",
+        ],
+    )
+    def test_a_qualification_or_programme_name_is_found(self, title: str) -> None:
+        assert title_reads_like_a_course(title)
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Ward Attendant",
+            "Certified Welder",
+            "CNC Programmer (Entry Level)",
+            "Diploma Holder Supervisor",  # a job that asks for a diploma is still a job
+            "Training Coordinator",
+            "Senior Staff Nurse",
+            "Apprentice Electrician",
+        ],
+    )
+    def test_a_job_is_not(self, title: str) -> None:
+        assert not title_reads_like_a_course(title)
+
+    async def test_the_file_is_told_once_how_many_and_for_example(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Catalogue Hospital")
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/check",
+                _csv(
+                    f",Certificate in Ward Care,{LONG},,,,HC/N0001,",
+                    f",Cook,{LONG},,,,HC/N0001,",
+                    f",Cook Helper — Trainee Programme,{LONG},,,,HC/N0001,",
+                ),
+                headers,
+            )
+        ).json()
+        notes = [n for n in body["notes"] if "title" in n]
+        assert len(notes) == 1
+        assert notes[0].startswith("2 of 3 titles read like a course or a qualification")
+        assert '"Certificate in Ward Care"' in notes[0]
+        # A note, not a warning on the row and not an error: nothing is blocked.
+        assert [r["status"] for r in body["rows"]] == ["ok", "ok", "ok"]
+        assert all(r["messages"] == [] for r in body["rows"])
+
+    async def test_a_file_of_real_job_titles_says_nothing(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Honest Hospital")
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/check",
+                _csv(f",Ward Attendant,{LONG},,,,HC/N0001,", f",Cook,{LONG},,,,HC/N0001,"),
+                headers,
+            )
+        ).json()
+        assert [n for n in body["notes"] if "title" in n] == []
+
+    async def test_a_row_that_will_not_be_saved_is_not_counted(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Broken Catalogue Hospital")
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/jobs/bulk/check",
+                _csv(f",Certificate in Nothing,{LONG},,,,NO/SUCH,", f",Cook,{LONG},,,,HC/N0001,"),
+                headers,
+            )
+        ).json()
+        assert body["rows"][0]["status"] == "error"
+        assert [n for n in body["notes"] if "title" in n] == []
+
+    async def test_a_course_may_be_called_a_certificate(
+        self, client: AsyncClient, corpus: None
+    ) -> None:
+        headers, org = await _org(client, "Certificate Academy", "course_provider")
+        header = "title,standards"
+        body = (
+            await _post(
+                client,
+                f"/org/{org}/courses/bulk/check",
+                _csv("Certificate in Ward Care,HC/N0001", header=header),
+                headers,
+            )
+        ).json()
+        assert [n for n in body["notes"] if "title" in n] == []

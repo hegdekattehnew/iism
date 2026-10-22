@@ -1,0 +1,71 @@
+{
+  "sprint": 94,
+  "captured": "2026-10-22",
+  "method": "Read from the production build's route-bundle-stats.json (npm run build:e2e); the page checked against the dev API in the in-app browser. NOT the sweep (no Chromium on the machine).",
+  "firstLoadBytes": {
+    "ceiling": 700000,
+    "/profile": {
+      "before": 663575,
+      "after": 663575,
+      "headroom": 36425
+    },
+    "/admin": {
+      "after": 664439,
+      "headroom": 35561,
+      "note": "Sprint 93 recorded 658,522, measured before the verification queue's filter row was written; 664,439 is the figure for the end of Sprint 93 and for this sprint"
+    },
+    "/matches": {
+      "after": 658632
+    },
+    "/signup/[type]": {
+      "after": 639651
+    },
+    "/courses/[slug]": {
+      "after": 636844
+    },
+    "/providers/[slug]": {
+      "after": 634572
+    },
+    "/employer/[org]": {
+      "after": 628809
+    }
+  },
+  "phoneBundle": {
+    "android_bytes": 3739176,
+    "ceiling": 3800000
+  },
+  "migration0058": {
+    "devDatabase": {
+      "course_provider": {
+        "publishes_courses": true,
+        "delivers_training": false,
+        "rows": 60
+      },
+      "employer": {
+        "rows": 102,
+        "flags": false
+      },
+      "personal": {
+        "rows": 45,
+        "flags": false
+      }
+    },
+    "downgradeThenUpgradeRun": true
+  },
+  "demonstrationSeed": {
+    "vacancyTitlesReadingLikeACourse": {
+      "before": 42,
+      "after": 19,
+      "of": 129
+    }
+  },
+  "tests": {
+    "backend": 2165,
+    "web": 1291,
+    "mobile": 816
+  },
+  "mutationChecks": {
+    "run": 29,
+    "survivorsClosed": 3
+  }
+}

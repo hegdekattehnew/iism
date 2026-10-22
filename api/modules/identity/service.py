@@ -315,7 +315,15 @@ async def verify_email_and_sign_in(
         # They asked for this organisation at registration and have now proved
         # the address is theirs. One identity, one more membership (ADR-038).
         wanted = json.loads(pending)
-        tenant = await provision_organisation(db, user, wanted["name"], wanted["tenant_type"])
+        tenant = await provision_organisation(
+            db,
+            user,
+            wanted["name"],
+            wanted["tenant_type"],
+            # Held before the capabilities existed: a provider registered then sold courses.
+            sells_courses=wanted.get("sells_courses", True),
+            delivers_training=wanted.get("delivers_training", False),
+        )
         organisation_slug = tenant.slug
 
     if invitation_id is not None:
@@ -457,7 +465,13 @@ async def _within_organisation_cap(db: AsyncSession, user: User) -> None:
 
 
 async def provision_organisation(
-    db: AsyncSession, user: User, name: str, tenant_type: str
+    db: AsyncSession,
+    user: User,
+    name: str,
+    tenant_type: str,
+    *,
+    sells_courses: bool = True,
+    delivers_training: bool = False,
 ) -> Tenant:
     """Create an organisation owned by an **existing** user.
 
@@ -470,14 +484,30 @@ async def provision_organisation(
     `/auth/org/register`, and the pending-organisation hand-off inside
     `verify_email_and_sign_in`. A check in one handler is a check the other two
     do not make (Sprint 15).
+
+    **What a training organisation does is fixed here** (Sprint 94, ADR-102): a `course_provider`
+    gets the two capabilities it asked for, and a provider that asks for neither is refused (it
+    would be an organisation that can do nothing). An employer has neither, whatever was sent, so
+    the flags mean something only where the organisation type does.
     """
+    if tenant_type == "course_provider" and not (sells_courses or delivers_training):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "A training organisation sells courses, delivers training, or both",
+        )
     await _refuse_duplicate_organisation(db, user, name)
     await _within_organisation_cap(db, user)
     tenant = await add_with_unique_slug(
         db,
         Tenant.slug,
         lambda: _unique_tenant_slug(db, name),
-        lambda slug: Tenant(slug=slug, name=name.strip(), tenant_type=tenant_type),
+        lambda slug: Tenant(
+            slug=slug,
+            name=name.strip(),
+            tenant_type=tenant_type,
+            publishes_courses=tenant_type == "course_provider" and sells_courses,
+            delivers_training=tenant_type == "course_provider" and delivers_training,
+        ),
         # Losing the slug may mean this person's *other tap* won it: a double-tap on
         # "Create organisation" is one organisation, not `x` and `x-2`. Asked again
         # now that the winner's membership is committed, the duplicate refusal
@@ -518,7 +548,15 @@ async def update_organisation(
     return tenant
 
 
-async def add_organisation(db: AsyncSession, user: User, name: str, tenant_type: str) -> Tenant:
+async def add_organisation(
+    db: AsyncSession,
+    user: User,
+    name: str,
+    tenant_type: str,
+    *,
+    sells_courses: bool = True,
+    delivers_training: bool = False,
+) -> Tenant:
     """Provision an organisation for a signed-in caller, and commit it.
 
     The thin wrapper `provision_organisation` deliberately is not.
@@ -528,7 +566,14 @@ async def add_organisation(db: AsyncSession, user: User, name: str, tenant_type:
     there would split one sign-in into two. The two *request* paths that end
     here do want a commit, and it used to sit in both handlers.
     """
-    tenant = await provision_organisation(db, user, name, tenant_type)
+    tenant = await provision_organisation(
+        db,
+        user,
+        name,
+        tenant_type,
+        sells_courses=sells_courses,
+        delivers_training=delivers_training,
+    )
     await db.commit()
     await db.refresh(tenant)
     return tenant
@@ -558,6 +603,8 @@ async def register_or_add_organisation(
     name: str,
     tenant_type: str,
     consent_version: str,
+    sells_courses: bool = True,
+    delivers_training: bool = False,
 ) -> OrgRegistration:
     """`POST /auth/org/register`, both cases, in the layer that owns the rule.
 
@@ -576,10 +623,25 @@ async def register_or_add_organisation(
     takeover-by-typo `confirm_link` exists to refuse.
     """
     if user is not None:
-        tenant = await add_organisation(db, user, name, tenant_type)
+        tenant = await add_organisation(
+            db,
+            user,
+            name,
+            tenant_type,
+            sells_courses=sells_courses,
+            delivers_training=delivers_training,
+        )
         return OrgRegistration(sent=False, expires_in_seconds=0, organisation_slug=tenant.slug)
 
-    ttl, debug_code = await register_organisation(db, email, name, tenant_type, consent_version)
+    ttl, debug_code = await register_organisation(
+        db,
+        email,
+        name,
+        tenant_type,
+        consent_version,
+        sells_courses=sells_courses,
+        delivers_training=delivers_training,
+    )
     return OrgRegistration(
         sent=True,
         expires_in_seconds=ttl,
@@ -589,7 +651,14 @@ async def register_or_add_organisation(
 
 
 async def register_organisation(
-    db: AsyncSession, address: str, name: str, tenant_type: str, consent_version: str
+    db: AsyncSession,
+    address: str,
+    name: str,
+    tenant_type: str,
+    consent_version: str,
+    *,
+    sells_courses: bool = True,
+    delivers_training: bool = False,
 ) -> tuple[int, str | None]:
     """Cold registration: an email address that may or may not already exist.
 
@@ -620,14 +689,28 @@ async def register_organisation(
         record_consent(user, consent_version)
         db.add(user)
         await db.flush()
-        await provision_organisation(db, user, name, tenant_type)
+        await provision_organisation(
+            db,
+            user,
+            name,
+            tenant_type,
+            sells_courses=sells_courses,
+            delivers_training=delivers_training,
+        )
         await db.commit()
         body = _CODE_MESSAGE
     else:
         # The address owner learns what happened; the caller learns nothing.
         await get_redis().set(
             _PENDING_ORG_KEY.format(address=address.lower()),
-            json.dumps({"name": name.strip(), "tenant_type": tenant_type}),
+            json.dumps(
+                {
+                    "name": name.strip(),
+                    "tenant_type": tenant_type,
+                    "sells_courses": sells_courses,
+                    "delivers_training": delivers_training,
+                }
+            ),
             ex=settings.otp_ttl_seconds,
         )
         body = _ALREADY_REGISTERED + " " + _CODE_MESSAGE

@@ -77,6 +77,10 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
       city: ["maxLength={120}"],
       website: ["maxLength={500}"],
       logo_url: ["maxLength={500}"],
+      // What a training organisation says about itself (Sprint 94, ADR-102).
+      affiliations: ["maxLength={500}"],
+      teaching_languages: ["maxLength={200}"],
+      year_established: ["min={1800}"],
     },
   },
   {

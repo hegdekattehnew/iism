@@ -65,6 +65,7 @@ from api.core.config import get_settings
 from api.core.text import csv_safe
 from api.modules.geography import resolve_location
 from api.modules.marketplace import course_publishing, publishing
+from api.modules.marketplace.listings import title_reads_like_a_course
 from api.modules.marketplace.models import (
     COURSE_LANGUAGES,
     COURSE_MODES,
@@ -1335,6 +1336,33 @@ def _description_notes(plans: Sequence[_Plan], reports: Sequence[RowReport]) -> 
     return notes
 
 
+def _title_notes(kind: Kind, plans: Sequence[_Plan], reports: Sequence[RowReport]) -> list[str]:
+    """What a whole file says about its vacancy titles, once (Sprint 94, BL-22.9).
+
+    A vacancy's title is the job. A file whose titles read like qualifications ("Certificate in
+    ...", "... Trainee Programme") would put a list of courses where vacancies belong, which is
+    what the demonstration database did. **A note for the file, never one per row and never a
+    refusal**: a job can honestly be called "Certified Welder", and the match is by the words the
+    national qualification names use. Jobs only; a course is allowed to be called a certificate.
+    """
+    if kind != "jobs":
+        return []
+    live = [
+        plan
+        for plan, report in zip(plans, reports, strict=True)
+        if report.status in ("ok", "warning", "update") and plan.title
+    ]
+    like = [p for p in live if title_reads_like_a_course(p.title or "")]
+    if not like:
+        return []
+    example = (like[0].title or "").strip()
+    return [
+        f"{len(like)} of {len(live)} titles read like a course or a qualification (for example "
+        f'"{example}"). A vacancy\'s title is the job, such as "Ward Attendant": people looking '
+        "for work search for the role."
+    ]
+
+
 def _report_row(plan: _Plan) -> RowReport:
     if plan.problems:
         return RowReport(
@@ -1465,7 +1493,7 @@ async def run(
     report_out = BulkReport(
         kind=kind,
         rows=reports,
-        notes=[*notes, *_description_notes(plans, reports)],
+        notes=[*notes, *_description_notes(plans, reports), *_title_notes(kind, plans, reports)],
         daily_limit=limit,
         remaining_today=max(0, remaining - sum(1 for r in reports if r.created)),
         applied=apply,

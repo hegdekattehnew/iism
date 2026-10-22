@@ -147,3 +147,71 @@ describe("SignUpForm — the same endpoint, told the same way on both screens", 
     ).toBeTruthy();
   });
 });
+
+describe("SignUpForm — what a training organisation does (ADR-102)", () => {
+  const caps = () => screen.queryByRole("group", { name: "What does your organisation do?" });
+
+  it("asks a stranger signing up as a provider, and nobody else", () => {
+    world.signedIn = false;
+    const a = renderUi(<SignUpForm type="provider" />);
+    expect(caps()).not.toBeNull();
+    a.unmount();
+    renderUi(<SignUpForm type="employer" />);
+    expect(caps()).toBeNull();
+  });
+
+  it("asks a signed-in person adding a provider too", () => {
+    world.memberships = [personal()];
+    renderUi(<SignUpForm type="provider" />);
+    expect(caps()).not.toBeNull();
+  });
+
+  it("registers with what was chosen (delivering only)", async () => {
+    world.signedIn = false;
+    POST.mockResolvedValue({
+      data: { sent: true, expires_in_seconds: 600, resend_after_seconds: 30 },
+      error: undefined,
+      response: { status: 200 },
+    });
+    renderUi(<SignUpForm type="provider" />);
+    fireEvent.change(screen.getByPlaceholderText("NSDC Healthcare Academy"), { target: { value: "Centre Co" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /email/i }), { target: { value: "a@centre.example" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Sells courses/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Delivers training/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /privacy notice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /code/i }));
+    await vi.waitFor(() => expect(POST).toHaveBeenCalled());
+    const [path, init] = POST.mock.calls[0] as [string, { body: Record<string, unknown> }];
+    expect(path).toBe("/auth/org/register");
+    expect(init.body).toMatchObject({
+      tenant_type: "course_provider",
+      sells_courses: false,
+      delivers_training: true,
+    });
+  });
+
+  it("sends the neutral pair for an employer, which delivers nothing", async () => {
+    world.signedIn = false;
+    POST.mockResolvedValue({
+      data: { sent: true, expires_in_seconds: 600, resend_after_seconds: 30 },
+      error: undefined,
+      response: { status: 200 },
+    });
+    renderUi(<SignUpForm type="employer" />);
+    fireEvent.change(screen.getByRole("textbox", { name: /email/i }), { target: { value: "h@hire.example" } });
+    fireEvent.change(screen.getByPlaceholderText("Sunrise Multispeciality Hospital"), { target: { value: "Hire Co" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /privacy notice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /code/i }));
+    await vi.waitFor(() => expect(POST).toHaveBeenCalled());
+    const init = POST.mock.calls[0][1] as { body: Record<string, unknown> };
+    expect(init.body).toMatchObject({ tenant_type: "employer", sells_courses: true, delivers_training: false });
+  });
+
+  it("holds the button while a provider has chosen neither", () => {
+    world.signedIn = false;
+    renderUi(<SignUpForm type="provider" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Sells courses/ }));
+    expect(screen.getByRole("alert").textContent).toBe("Choose at least one.");
+    expect(screen.getByRole("button", { name: /code/i })).toHaveProperty("disabled", true);
+  });
+});

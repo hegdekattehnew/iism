@@ -108,6 +108,10 @@ EVENT_NAMES = (
     # Sprint 61, BL-14.10. An operator enrolled a file of people for an agency programme. Subject
     # to nobody; the payload is the four counts and the programme, never a number or a name.
     "enrolment_applied",
+    # Sprint 94, ADR-102. An owner changed what a training organisation does (sells courses,
+    # delivers training). Subject to the organisation; the payload is the capability and whether it
+    # is now on, and nothing about a person beyond the `user_id` every event already carries.
+    "organisation_capability_changed",
 )
 
 

@@ -182,9 +182,19 @@ async function checkPublic(page: Page, locale: string, route: string, label: str
   });
 }
 
-/** The three detail pages made through the API: a vacancy, a course and a standard. */
+/**
+ * The detail pages made through the API: a vacancy, a course, a standard, and (Sprint 94, ADR-102) the
+ * organisation that sells the course. **Not yet run in a browser**: its three entries in
+ * `target-baseline.json` are 0, the count the page's own controls should have (every one is 44 px), and
+ * CI's first run says whether that is true.
+ */
 async function checkDetailPages(page: Page, locale: string, label: string): Promise<void> {
-  for (const route of [`/jobs/${world.jobSlug}`, `/courses/${world.courseSlug}`, `/skills/${COLLECT_BLOOD_SLUG}`]) {
+  for (const route of [
+    `/jobs/${world.jobSlug}`,
+    `/courses/${world.courseSlug}`,
+    `/skills/${COLLECT_BLOOD_SLUG}`,
+    `/providers/${world.provider.slug}`,
+  ]) {
     await visit(page, `/${locale}${route}`);
     await checkSwept(page, `${label}${route}`);
   }

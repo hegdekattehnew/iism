@@ -320,6 +320,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/providers/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Provider
+         * @description A training organisation's public page: who it is, what it says about itself, the sectors it
+         *     trains in (derived from its courses) and its published courses (Sprint 94, ADR-102).
+         *
+         *     404 for anything that is not a training organisation, with one body for all of them.
+         */
+        get: operations["get_provider_providers__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skills/{slug}/jobs": {
         parameters: {
             query?: never;
@@ -731,6 +754,29 @@ export interface paths {
          *     somebody else, and the people still waiting are told.
          */
         delete: operations["delete_organisation_org__org_slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Capabilities
+         * @description Owner only: whether this training organisation sells courses, delivers training, or both.
+         *
+         *     Refused (409) for an employer, for a change that would leave it doing neither, and while it has
+         *     published courses or anything that delivering means (ADR-102). The change is recorded.
+         */
+        put: operations["set_capabilities_org__org_slug__capabilities_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3653,6 +3699,16 @@ export interface components {
             /** Preferred Role Title */
             preferred_role_title?: string | null;
         };
+        /**
+         * CapabilitiesIn
+         * @description What a training organisation does now (Sprint 94, ADR-102). An absent field is left alone.
+         */
+        CapabilitiesIn: {
+            /** Sells Courses */
+            sells_courses?: boolean | null;
+            /** Delivers Training */
+            delivers_training?: boolean | null;
+        };
         /** CareerLadderOut */
         CareerLadderOut: {
             anchor?: components["schemas"]["RoleRefOut"] | null;
@@ -5612,6 +5668,16 @@ export interface components {
              * @enum {string}
              */
             tenant_type: "employer" | "course_provider";
+            /**
+             * Sells Courses
+             * @default true
+             */
+            sells_courses: boolean;
+            /**
+             * Delivers Training
+             * @default false
+             */
+            delivers_training: boolean;
         };
         /**
          * OrgJobOut
@@ -5706,6 +5772,16 @@ export interface components {
              * @enum {string}
              */
             tenant_type: "employer" | "course_provider";
+            /**
+             * Sells Courses
+             * @default true
+             */
+            sells_courses: boolean;
+            /**
+             * Delivers Training
+             * @default false
+             */
+            delivers_training: boolean;
             /** Consent Version */
             consent_version: string;
         };
@@ -5791,6 +5867,12 @@ export interface components {
             logo_url?: string | null;
             /** Contact Email */
             contact_email?: string | null;
+            /** Year Established */
+            year_established?: number | null;
+            /** Affiliations */
+            affiliations?: string | null;
+            /** Teaching Languages */
+            teaching_languages?: string | null;
         };
         /**
          * OrganisationOut
@@ -5824,8 +5906,24 @@ export interface components {
              * @default false
              */
             is_verified: boolean;
+            /**
+             * Publishes Courses
+             * @default false
+             */
+            publishes_courses: boolean;
+            /**
+             * Delivers Training
+             * @default false
+             */
+            delivers_training: boolean;
             /** Contact Email */
             contact_email?: string | null;
+            /** Year Established */
+            year_established?: number | null;
+            /** Affiliations */
+            affiliations?: string | null;
+            /** Teaching Languages */
+            teaching_languages?: string | null;
         };
         /**
          * OrganisationQueue
@@ -6041,6 +6139,69 @@ export interface components {
             conversion_rate: number;
             /** Courses */
             courses?: components["schemas"]["CourseInterestCount"][];
+        };
+        /**
+         * ProviderPublicOut
+         * @description A training organisation's public page (Sprint 94, ADR-102).
+         *
+         *     **Not `TenantOut`**, which is embedded in every vacancy and course: the claims an organisation
+         *     makes about itself (`affiliations`, `year_established`, `teaching_languages`) are shown on its
+         *     own page and nowhere else, and `contact_email` is on neither. `sectors` is derived from its
+         *     published courses at read time and never stored.
+         */
+        ProviderPublicOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** City */
+            city?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+            /**
+             * Publishes Courses
+             * @default false
+             */
+            publishes_courses: boolean;
+            /**
+             * Delivers Training
+             * @default false
+             */
+            delivers_training: boolean;
+            /** Year Established */
+            year_established?: number | null;
+            /** Affiliations */
+            affiliations?: string | null;
+            /** Teaching Languages */
+            teaching_languages?: string | null;
+            /** Sectors */
+            sectors?: components["schemas"]["ProviderSectorOut"][];
+            /** Courses */
+            courses?: components["schemas"]["CourseOut"][];
+            /**
+             * Courses Total
+             * @default 0
+             */
+            courses_total: number;
+        };
+        /**
+         * ProviderSectorOut
+         * @description A sector an organisation trains in, with how many of its published courses are in it.
+         */
+        ProviderSectorOut: {
+            /** Name */
+            name: string;
+            /** Courses */
+            courses: number;
         };
         /**
          * ProviderStatusIn
@@ -6729,6 +6890,16 @@ export interface components {
              * @default false
              */
             is_verified: boolean;
+            /**
+             * Publishes Courses
+             * @default false
+             */
+            publishes_courses: boolean;
+            /**
+             * Delivers Training
+             * @default false
+             */
+            delivers_training: boolean;
         };
         /** TokenPairOut */
         TokenPairOut: {
@@ -7496,6 +7667,41 @@ export interface operations {
             };
         };
     };
+    get_provider_providers__slug__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description Override the negotiated language */
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderPublicOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     jobs_for_skill_skills__slug__jobs_get: {
         parameters: {
             query?: {
@@ -8217,6 +8423,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_capabilities_org__org_slug__capabilities_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapabilitiesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisationOut"];
+                };
             };
             /** @description Validation Error */
             422: {

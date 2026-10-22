@@ -55,6 +55,8 @@ async def organisation(
         tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
         assert tenant is not None
         tenant.tenant_type = kind
+        # A provider sells courses (Sprint 94, ADR-102): the flag moves with the type.
+        tenant.publishes_courses = kind == "course_provider"
         await db.commit()
     return headers, slug
 

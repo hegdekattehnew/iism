@@ -126,6 +126,8 @@ async def register_organisation(
         name=payload.organisation_name,
         tenant_type=payload.tenant_type,
         consent_version=payload.consent_version,
+        sells_courses=payload.sells_courses,
+        delivers_training=payload.delivers_training,
     )
     return schemas.OrgRegisterResponse(**vars(result))
 
@@ -250,6 +252,11 @@ async def create_organisation(
     second membership, not a second account (ADR-038).
     """
     tenant = await service.add_organisation(
-        db, user, payload.organisation_name, payload.tenant_type
+        db,
+        user,
+        payload.organisation_name,
+        payload.tenant_type,
+        sells_courses=payload.sells_courses,
+        delivers_training=payload.delivers_training,
     )
     return schemas.TenantOut.model_validate(tenant)

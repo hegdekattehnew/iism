@@ -5,6 +5,12 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Field, Text } from "@/components/profile/fields";
+import {
+  DEFAULT_CAPABILITIES,
+  TrainingCapabilities,
+  doesSomething,
+  type Capabilities,
+} from "@/components/TrainingCapabilities";
 import { WELCOME_BACK } from "@/components/ReturningNotice";
 import { Button, ButtonLink } from "@/components/ui";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -68,11 +74,18 @@ function AlreadySignedIn({ type }: { type: SignUpType }) {
   const qc = useQueryClient();
   const { data, isPending, memberships } = useMemberships();
   const [organisation, setOrganisation] = useState("");
+  const [caps, setCaps] = useState<Capabilities>(DEFAULT_CAPABILITIES);
 
   const create = useMutation({
     mutationFn: async (tenant_type: "employer" | "course_provider") => {
       const { data: tenant, error, response } = await api.POST("/me/organisations", {
-        body: { organisation_name: organisation, tenant_type },
+        body: {
+          organisation_name: organisation,
+          tenant_type,
+          // What a training organisation does (ADR-102). An employer sends the neutral pair.
+          sells_courses: tenant_type === "course_provider" ? caps.sells : true,
+          delivers_training: tenant_type === "course_provider" ? caps.delivers : false,
+        },
       });
       // `new Error("create failed")` threw the status away, so this screen
       // showed one generic line while `CreateOrgForm` -- the *other* caller of
@@ -125,11 +138,14 @@ function AlreadySignedIn({ type }: { type: SignUpType }) {
           placeholder={t(`${type}Placeholder`)}
         />
       </Field>
+      {type === "provider" && (
+        <TrainingCapabilities value={caps} onChange={setCaps} className="mt-4" />
+      )}
       <Button
         type="submit"
         size="lg"
         className="mt-6 w-full"
-        disabled={create.isPending}
+        disabled={create.isPending || (type === "provider" && !doesSomething(caps))}
       >
         {create.isPending ? tc("creating") : tc("create")}
       </Button>
@@ -154,6 +170,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
   const isSeeker = type === "seeker";
   const [identifier, setIdentifier] = useState("");
   const [organisation, setOrganisation] = useState("");
+  const [caps, setCaps] = useState<Capabilities>(DEFAULT_CAPABILITIES);
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -217,6 +234,8 @@ function ColdSignUp({ type }: { type: SignUpType }) {
               email: identifier,
               organisation_name: organisation,
               tenant_type: TENANT_TYPE[type],
+              sells_courses: type === "provider" ? caps.sells : true,
+              delivers_training: type === "provider" ? caps.delivers : false,
               consent_version: PRIVACY_NOTICE_VERSION,
             },
           });
@@ -344,6 +363,9 @@ function ColdSignUp({ type }: { type: SignUpType }) {
                   onChange={(e) => setIdentifier(e.target.value)}
                 />
               </Field>
+              {type === "provider" && (
+                <TrainingCapabilities value={caps} onChange={setCaps} className="mt-4" />
+              )}
             </>
           )}
 
@@ -388,7 +410,7 @@ function ColdSignUp({ type }: { type: SignUpType }) {
             type="submit"
             size="lg"
             className="mt-6 w-full"
-            disabled={request.isPending}
+            disabled={request.isPending || (type === "provider" && !doesSomething(caps))}
           >
             {request.isPending ? t("sending") : t("sendCode")}
           </Button>

@@ -221,9 +221,39 @@ class TenantContext:
 # pool and publish a vacancy attributed to "Personal workspace".
 ORGANISATION_TYPES = ("employer", "course_provider")
 
-# What each kind of organisation may publish. Nothing enforced this before, so a
-# course provider could post vacancies and an employer could publish training.
-PUBLISHES: dict[str, str] = {"job": "employer", "course": "course_provider"}
+# What an organisation may do is answered in one place (Sprint 94, ADR-102). It used to be a map
+# from a verb to one organisation type, compared with `Tenant.tenant_type`; a training organisation
+# may now sell courses, deliver training, or both, so a type no longer says what it may do.
+#
+#   "job"    -- an employer
+#   "course" -- an organisation that sells courses (`publishes_courses`)
+#   "centre" -- an organisation that delivers training (`delivers_training`): its centres
+#   "batch"  -- the same: a course run at a centre
+#
+# Nothing else compares `tenant_type` to answer "may this organisation publish X": a guard a handler
+# must remember is one that eventually is not called (Sprint 15), so the answer is one function.
+CAPABILITIES = ("job", "course", "centre", "batch")
+
+# The sentence a refusal says, by capability (the 403's detail).
+CAPABILITY_WORDS: dict[str, str] = {
+    "job": "an employer",
+    "course": "an organisation that sells courses",
+    "centre": "an organisation that delivers training",
+    "batch": "an organisation that delivers training",
+}
+
+
+def capability_for(tenant: "Tenant", capability: str) -> bool:
+    """May this organisation do `capability`? The one function that answers it."""
+    if capability not in CAPABILITIES:
+        raise ValueError(f"unknown capability {capability!r}")
+    if capability == "job":
+        return tenant.tenant_type == "employer"
+    if tenant.tenant_type != "course_provider":
+        return False
+    if capability == "course":
+        return bool(tenant.publishes_courses)
+    return bool(tenant.delivers_training)
 
 
 async def _context_for(db: AsyncSession, user: "User", slug: str) -> TenantContext:
@@ -307,23 +337,21 @@ def require(
                 status.HTTP_403_FORBIDDEN,
                 f"Your role ({context.role}) does not permit {permission.value}",
             )
-        if publishes is not None:
-            expected = PUBLISHES[publishes]
-            if context.tenant.tenant_type != expected:
-                log.warning(
-                    "authz.wrong_tenant_type",
-                    publishes=publishes,
-                    expected=expected,
-                    actual=context.tenant.tenant_type,
-                )
-                raise HTTPException(
-                    status.HTTP_403_FORBIDDEN,
-                    # Names the tenant type rather than the verb: this same
-                    # gate gates reads too, and "can publish a course" is
-                    # the wrong sentence for a provider reading their own
-                    # interested learners.
-                    f"This is for a {expected.replace('_', ' ')} organisation",
-                )
+        if publishes is not None and not capability_for(context.tenant, publishes):
+            log.warning(
+                "authz.wrong_capability",
+                publishes=publishes,
+                tenant_type=context.tenant.tenant_type,
+                sells_courses=context.tenant.publishes_courses,
+                delivers_training=context.tenant.delivers_training,
+            )
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                # Names what the organisation must be able to do rather than the verb: this same
+                # gate gates reads too, and "can publish a course" is the wrong sentence for a
+                # provider reading their own interested learners.
+                f"This is for {CAPABILITY_WORDS[publishes]}",
+            )
         return context
 
     return dependency

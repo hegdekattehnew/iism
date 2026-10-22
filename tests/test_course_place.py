@@ -74,6 +74,7 @@ async def _provider(client: AsyncClient, db: AsyncSession) -> tuple[dict[str, st
     tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
     assert tenant is not None
     tenant.tenant_type = "course_provider"
+    tenant.publishes_courses = True  # a provider sells courses (Sprint 94, ADR-102)
     await db.commit()
     return headers, slug
 

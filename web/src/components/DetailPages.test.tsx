@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CourseDetailPage from "@/app/[locale]/courses/[slug]/page";
 import JobDetailPage from "@/app/[locale]/jobs/[slug]/page";
+import ProviderPage from "@/app/[locale]/providers/[slug]/page";
 import SkillDetailPage from "@/app/[locale]/skills/[slug]/page";
 import { resetWorld } from "@/test/harness";
 import messages from "@/messages/en.json";
@@ -80,7 +81,7 @@ const COURSE = {
   seats_left: 8,
   qualification_name: "General Duty Assistant",
   qualification_credits: 12,
-  tenant: { name: "NSDC Academy", is_verified: false },
+  tenant: { name: "NSDC Academy", slug: "nsdc-academy", is_verified: false },
   skills: [{ skill: { slug: "hand-hygiene", name: "Hand hygiene" }, level_taught: 4 }],
 };
 
@@ -275,6 +276,130 @@ describe("the course page", () => {
     expect(tileOf("Provider not yet verified").className).not.toContain("bg-success-surface");
     expect(screen.getByRole("link", { name: /Report/ }).className).toContain("min-h-11");
     expect(screen.getByTestId("interest-panel")).toBeTruthy();
+  });
+});
+
+describe("the course page links its organisation", () => {
+  it("makes the organisation's name a 44 px link to its own page", async () => {
+    serve(COURSE);
+    await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    const link = screen.getByRole("link", { name: "NSDC Academy" });
+    expect(link.getAttribute("href")).toBe("/providers/nsdc-academy");
+    expect(link.className).toContain("min-h-11");
+  });
+});
+
+const PROVIDER = {
+  slug: "nsdc-academy",
+  name: "NSDC Academy",
+  city: "Pune",
+  description: "We train ward staff.",
+  website: "https://nsdc-academy.example/about",
+  logo_url: null,
+  is_verified: true,
+  publishes_courses: true,
+  delivers_training: true,
+  year_established: 2005,
+  affiliations: "NSDC training partner",
+  teaching_languages: "Hindi, English",
+  sectors: [{ name: "Healthcare", courses: 2 }],
+  courses: [{ ...COURSE, tenant: { name: "NSDC Academy", city: "Pune" } }],
+  courses_total: 2,
+};
+
+/** Sprint 94, ADR-102: a training organisation's own page. */
+describe("the training organisation's page", () => {
+  const page = (slug = "nsdc-academy") => ProviderPage({ params: Promise.resolve({ slug }) });
+
+  it("says what it does as two badges, one for each capability it has", async () => {
+    serve(PROVIDER);
+    const a = await show(page());
+    expect(screen.getByText("Sells courses")).toBeTruthy();
+    expect(screen.getByText("Delivers training")).toBeTruthy();
+    a.unmount();
+    serve({ ...PROVIDER, publishes_courses: false });
+    await show(page());
+    expect(screen.queryByText("Sells courses")).toBeNull();
+    expect(screen.getByText("Delivers training")).toBeTruthy();
+  });
+
+  it("shows its claims as its own, labelled, and the sectors read from its courses", async () => {
+    serve(PROVIDER);
+    await show(page());
+    const labels = [...document.querySelectorAll("dt")].map((d) => d.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["City", "Established", "Teaches in", "Website", "Affiliations"]));
+    expect(screen.getByText("NSDC training partner")).toBeTruthy();
+    expect(screen.getByText(/Stated by the organisation\. We have not checked it\./)).toBeTruthy();
+    expect(screen.getByText("Healthcare")).toBeTruthy();
+    expect(screen.getByText("2 courses")).toBeTruthy();
+    expect(screen.getByText("Read from the courses it has published.")).toBeTruthy();
+  });
+
+  it("lists its published courses on the same card as the list", async () => {
+    serve(PROVIDER);
+    await show(page());
+    expect(screen.getByText("Courses it sells (2)")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /GDA certificate/ }).getAttribute("href")).toBe("/courses/gda-certificate");
+    expect(screen.getByText("Showing 1 of 2 courses.")).toBeTruthy();
+  });
+
+  it("says whether it is verified, and what that means only when it is", async () => {
+    serve(PROVIDER);
+    const a = await show(page());
+    expect(screen.getByText("Verified training organisation")).toBeTruthy();
+    expect(screen.getByText("Reviewed by our team.")).toBeTruthy();
+    a.unmount();
+    serve({ ...PROVIDER, is_verified: false });
+    await show(page());
+    expect(screen.getByText("Not yet verified")).toBeTruthy();
+    expect(screen.queryByText("Reviewed by our team.")).toBeNull();
+  });
+
+  it("links the website only if it is a web address, and safely", async () => {
+    serve(PROVIDER);
+    const a = await show(page());
+    const link = screen.getByRole("link", { name: "nsdc-academy.example/about" });
+    expect(link.getAttribute("href")).toBe("https://nsdc-academy.example/about");
+    expect(link.getAttribute("rel")).toContain("noopener");
+    expect(link.getAttribute("rel")).toContain("nofollow");
+    a.unmount();
+    serve({ ...PROVIDER, website: "javascript:alert(1)" });
+    await show(page());
+    expect(document.querySelector('a[href^="javascript"]')).toBeNull();
+    expect(screen.queryByText("Website")).toBeNull();
+  });
+
+  it("is still a page for an organisation that delivers and sells nothing yet", async () => {
+    serve({
+      ...PROVIDER,
+      publishes_courses: false,
+      year_established: null,
+      affiliations: null,
+      teaching_languages: null,
+      website: null,
+      city: null,
+      description: null,
+      sectors: [],
+      courses: [],
+      courses_total: 0,
+    });
+    await show(page());
+    expect(screen.getByText("It delivers training and sells no courses of its own.")).toBeTruthy();
+    expect(document.querySelector("dl")).toBeNull();
+    expect(screen.queryByText("Trains in")).toBeNull();
+  });
+
+  it("says a seller has no courses yet in the seller's words", async () => {
+    serve({ ...PROVIDER, courses: [], courses_total: 0, sectors: [] });
+    await show(page());
+    expect(screen.getByText("It has no published courses yet.")).toBeTruthy();
+  });
+
+  it("is a 404 for an unknown organisation, and an outage is not a 404", async () => {
+    GET.mockImplementation(async () => ({ error: {}, response: { status: 404 } }));
+    await expect(page("missing")).rejects.toThrow("NOT_FOUND");
+    GET.mockImplementation(async () => ({ error: {}, response: { status: 503 } }));
+    await expect(page("down")).rejects.toThrow("API responded 503");
   });
 });
 
