@@ -228,3 +228,19 @@ describe("ContextSwitcher — what the control says outside a workspace", () => 
     expect(trigger().textContent).not.toContain("Alpha Hospital");
   });
 });
+
+/**
+ * Sprint 93, BL-18.2. The create-organisation dialog is a `next/dynamic` chunk, fetched on the first
+ * click, so the Radix modal stack is not in every route's first load. What is asserted here is the
+ * behaviour a person sees: nothing is mounted until they ask, and asking brings the dialog.
+ */
+describe("ContextSwitcher — the create-organisation dialog is fetched when asked for", () => {
+  it("mounts no dialog until Create is chosen, then shows it", async () => {
+    world.memberships = [personal(), org("a", "employer", "Alpha Hospital")];
+    renderUi(<ContextSwitcher />);
+    openSwitcher();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create an organisation" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+});

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VerificationQueue } from "@/components/ops/VerificationQueue";
@@ -136,5 +136,79 @@ describe("the verification queue -- the kind of organisation", () => {
     expect(hiring.querySelector("svg")!.innerHTML).not.toBe(training.querySelector("svg")!.innerHTML);
     expect(hiring.className).toContain("bg-accent-soft");
     expect(training.className).toContain("bg-surface-muted");
+  });
+});
+
+type Query = { q?: string; kind?: string; offset?: number };
+const lastQuery = () => (GET.mock.calls.at(-1)![1] as { params: { query: Query } }).params.query;
+
+/** Sprint 93, BL-22.8: a queue of hundreds is found by name and by kind, not by scrolling. */
+describe("the verification queue -- search and kind", () => {
+  it("has the filter row before the rows arrive, so nothing moves when they do", async () => {
+    GET.mockImplementation(() => new Promise(() => {})); // never answers
+    renderUi(<VerificationQueue />);
+    expect(screen.getByRole("searchbox", { name: "Search the queue" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Kind of organisation" })).toBeTruthy();
+  });
+
+  it("asks the server for what was typed, and says how many match", async () => {
+    answer([ROW], 162);
+    renderUi(<VerificationQueue />);
+    await screen.findByText(/Showing 1 of 162 organisations waiting/);
+    answer([ROW], 3);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the queue" }), {
+      target: { value: "apollo" },
+    });
+    // The filtered count is the server's, and it is a count of matches, not of the whole queue.
+    expect(await screen.findByText(/Showing 1 of 3 that match/)).toBeTruthy();
+    expect(lastQuery().q).toBe("apollo");
+    expect(lastQuery().offset).toBe(0);
+  });
+
+  it("narrows to one kind, and sends nothing for 'all kinds'", async () => {
+    renderUi(<VerificationQueue />);
+    await screen.findByText("Apollo Care Hospitals");
+    expect(lastQuery().kind).toBeUndefined();
+    answer([{ ...ROW, tenant_type: "course_provider" }], 1);
+    fireEvent.change(screen.getByRole("combobox", { name: "Kind of organisation" }), {
+      target: { value: "course_provider" },
+    });
+    await waitFor(() => expect(lastQuery().kind).toBe("course_provider"));
+    expect(await screen.findByText(/1 organisation matches/)).toBeTruthy();
+  });
+
+  it("says that nothing matches, which is not the same as an answered queue", async () => {
+    renderUi(<VerificationQueue />);
+    await screen.findByText("Apollo Care Hospitals");
+    answer([], 0);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the queue" }), {
+      target: { value: "zzz" },
+    });
+    expect(await screen.findByText("No organisation waiting matches that.")).toBeTruthy();
+    expect(screen.queryByText(/Every organisation has been decided on/)).toBeNull();
+  });
+
+  it("clears both filters and asks for the whole queue again", async () => {
+    renderUi(<VerificationQueue />);
+    await screen.findByText("Apollo Care Hospitals");
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the queue" }), {
+      target: { value: "apollo" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(lastQuery().q).toBeUndefined());
+    expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("");
+  });
+
+  it("keeps the first page's rows on screen while the next search loads", async () => {
+    renderUi(<VerificationQueue />);
+    await screen.findByText("Apollo Care Hospitals");
+    GET.mockImplementation(() => new Promise(() => {}));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the queue" }), {
+      target: { value: "apo" },
+    });
+    // Still the old rows, not a skeleton: one flash per keystroke would be worse than a stale line.
+    await waitFor(() => expect(lastQuery().q).toBe("apo"));
+    expect(screen.getByText("Apollo Care Hospitals")).toBeTruthy();
   });
 });

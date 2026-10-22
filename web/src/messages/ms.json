@@ -1725,6 +1725,15 @@
       "note": "A count of fewer than {min} residents is not shown, so a small district describes nobody. Shortfall is per standard: one resident holds several."
     },
     "queueShowing": "Showing {shown} of {total} organisations waiting.",
+    "queueSearchLabel": "Search the queue",
+    "queueSearchPlaceholder": "Name, address or city",
+    "queueFiltersLabel": "Filter the queue",
+    "queueKindLabel": "Kind of organisation",
+    "queueKindAll": "All kinds",
+    "queueClear": "Clear",
+    "queueNoMatch": "No organisation waiting matches that.",
+    "queueFilteredCount": "{count, plural, one {# organisation matches} other {# organisations match}}.",
+    "queueFilteredShowing": "Showing {shown} of {total} that match.",
     "queueMore": "Show more ({left} left)",
     "queueMoreFailed": "The next page of the queue could not be loaded. Try again.",
     "nav": {

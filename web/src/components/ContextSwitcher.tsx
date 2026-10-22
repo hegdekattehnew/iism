@@ -1,14 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { CreateOrgForm } from "@/components/CreateOrgForm";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useIsSignedIn } from "@/lib/auth";
 import { useMemberships } from "@/lib/org";
 import { recentContexts } from "@/lib/context";
 import { useDismiss } from "@/lib/use-dismiss";
+
+/**
+ * The create-organisation dialog is fetched when somebody asks for it (Sprint 93, BL-18.2). It is
+ * the only importer of `ui/dialog`, and with it the whole Radix modal stack (dialog, focus scope,
+ * dismissable layer, remove-scroll, presence) was in **every route's first load**, because the
+ * header mounts this switcher everywhere: leaving it took 35,573 bytes off each one (`/profile`
+ * 699,148 to 663,575). It was already rendered only while `creating` is true, so loading it then
+ * changes nothing a person sees except a network round trip on the first click; the dialog is a
+ * modal over the page, so nothing moves when it arrives. `ssr: false`: it only ever exists after
+ * a click.
+ */
+const CreateOrgForm = dynamic(() => import("@/components/CreateOrgForm").then((m) => m.CreateOrgForm), {
+  ssr: false,
+});
 
 /**
  * Which hat the person is wearing, and how to change it.

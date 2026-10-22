@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.authorization import OperatorContext, Permission, require_operator
 from api.core.database import get_db_session
 from api.modules import skills
+from api.modules.identity.schemas import OrgTenantType
 from api.modules.marketplace.bulk import BulkFileError, decode
 from api.modules.operations import enrolment, schemas, service, skill_gap
 
@@ -28,11 +29,19 @@ CanEnrol = Depends(require_operator(Permission.OPS_ENROL))
 async def verification_queue(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: str | None = Query(None, max_length=100),
+    kind: OrgTenantType | None = Query(None),
     db: AsyncSession = Depends(get_db_session),
     context: OperatorContext = CanReadOrgs,
 ) -> schemas.OrganisationQueue:
-    """Organisations awaiting a verification decision, oldest first, and how many wait in all."""
-    rows, total = await service.unverified_organisations(db, limit=limit, offset=offset)
+    """Organisations awaiting a verification decision, oldest first, and how many match.
+
+    `q` searches name, slug and city; `kind` narrows to one organisation type (Sprint 93, BL-22.8).
+    Neither given, `total` is every organisation waiting, which is the overview tile's figure.
+    """
+    rows, total = await service.unverified_organisations(
+        db, limit=limit, offset=offset, q=q, kind=kind
+    )
     items = [
         schemas.UnverifiedOrganisation(
             slug=tenant.slug,
