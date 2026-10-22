@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { OrgCapabilities } from "@/components/employer/OrgCapabilities";
 import { Area, Field, FormErrors, Text } from "@/components/profile/fields";
 import { SessionExpired } from "@/components/SessionExpired";
-import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
 import { apiErrorFrom, detailOf, fieldsOf, isSignedOut } from "@/lib/http";
 import { api } from "@/lib/api";
 
@@ -48,6 +49,10 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
       website: string | null;
       logo_url: string | null;
       contact_email: string | null;
+      // What a training organisation says about itself (Sprint 94): sent only by the form that has them.
+      year_established?: number | null;
+      affiliations?: string | null;
+      teaching_languages?: string | null;
     }) => {
       const { data, error, response } = await api.PUT("/org/{org_slug}", {
         params: { path: { org_slug: orgSlug } },
@@ -71,8 +76,10 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
   if (org.isError) return <p className="text-sm text-muted">{t("noAccess")}</p>;
 
   const d = org.data;
+  const isProvider = d?.tenant_type === "course_provider";
 
   return (
+    <>
     <Card>
       <CardBody>
         <FormErrors fields={fieldsOf(save.error)}>
@@ -91,6 +98,13 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
                 website: s("website"),
                 logo_url: s("logo_url"),
                 contact_email: s("contact_email"),
+                ...(isProvider
+                  ? {
+                      year_established: s("year_established") ? Number(s("year_established")) : null,
+                      affiliations: s("affiliations"),
+                      teaching_languages: s("teaching_languages"),
+                    }
+                  : {}),
               });
             }}
           >
@@ -148,6 +162,37 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
                   defaultValue={d?.contact_email ?? ""}
                 />
               </Field>
+              {isProvider && (
+                <>
+                  {/* Claims the organisation makes about itself, shown on its public page as its own
+                      and never sorted or filtered on (ADR-085). */}
+                  <Field label={t("yearEstablished")}>
+                    <Text
+                      name="year_established"
+                      type="number"
+                      inputMode="numeric"
+                      min={1800}
+                      max={new Date().getFullYear()}
+                      defaultValue={d?.year_established ?? ""}
+                    />
+                  </Field>
+                  <Field label={t("teachingLanguages")} hint={t("teachingLanguagesHint")}>
+                    <Text name="teaching_languages" maxLength={200} defaultValue={d?.teaching_languages ?? ""} />
+                  </Field>
+                  <Field
+                    label={t("affiliations")}
+                    className="sm:col-span-2"
+                    hint={t("affiliationsHint")}
+                  >
+                    <Area
+                      name="affiliations"
+                      rows={2}
+                      maxLength={500}
+                      defaultValue={d?.affiliations ?? ""}
+                    />
+                  </Field>
+                </>
+              )}
             </div>
 
             <p className="mt-6 rounded-lg border border-border-token bg-surface-muted px-3 py-2 text-xs text-muted">
@@ -159,6 +204,11 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
                 {save.isPending ? t("saving") : t("save")}
               </Button>
               {saved && <span className="text-sm text-brand">{t("saved")}</span>}
+              {isProvider && (
+                <ButtonLink href={`/providers/${d?.slug}`} variant="secondary">
+                  {t("viewPublicPage")}
+                </ButtonLink>
+              )}
               {save.isError && (
                 <span className="text-sm text-danger-text">
                   {/* What the server said -- "Website: URL should have a scheme"
@@ -172,5 +222,13 @@ export function OrgSettings({ orgSlug }: { orgSlug: string }) {
         </FormErrors>
       </CardBody>
     </Card>
+    {isProvider && d && (
+      <OrgCapabilities
+        orgSlug={orgSlug}
+        sells={d.publishes_courses ?? false}
+        delivers={d.delivers_training ?? false}
+      />
+    )}
+    </>
   );
 }

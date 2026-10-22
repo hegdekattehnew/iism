@@ -9,7 +9,7 @@
     "skills": "Skills",
     "howItWorks": "How it works",
     "forEmployers": "For employers",
-    "forProviders": "For providers",
+    "forProviders": "For training organisations",
     "signIn": "Sign in",
     "getStarted": "Get started",
     "openMenu": "Open menu",
@@ -43,7 +43,7 @@
       "retailSales": "Retail sales"
     },
     "hiringLink": "Hiring? For employers",
-    "trainingLink": "Run training? For providers"
+    "trainingLink": "Run training? For training organisations"
   },
   "how": {
     "title": "How it works",
@@ -619,7 +619,7 @@
     "signedUp": "{count} signed up",
     "employers": "Employers",
     "hiringNow": "{count} hiring now",
-    "providers": "Training providers",
+    "providers": "Training organisations",
     "withCourse": "{count} with a published course",
     "applications": "Applications made",
     "hires": "Hires",
@@ -688,7 +688,7 @@
     "status": "Employers now sign in and publish their own vacancies. Still to come: inviting colleagues, and verification so a candidate can tell a vetted employer from an unvetted one."
   },
   "providersPage": {
-    "title": "For training providers",
+    "title": "For training organisations",
     "lede": "Publish a course against the standards it teaches, and be recommended to the people whose specific gap it closes.",
     "primaryCta": "Sign up to publish courses",
     "secondaryCta": "Browse courses",
@@ -836,7 +836,7 @@
     "orgNamePlaceholder": "Sunrise Multispeciality Hospital",
     "orgType": "What does it do?",
     "typeEmployer": "Hires people",
-    "typeProvider": "Provides training",
+    "typeProvider": "Training organisation",
     "create": "Create",
     "creating": "Creating…",
     "cancel": "Cancel",
@@ -853,7 +853,7 @@
     "createErrorCap": "You have created a lot of organisations today. Try again tomorrow.",
     "switchToExisting": "Switch to it",
     "typeEmployerShort": "Employer",
-    "typeProviderShort": "Training provider",
+    "typeProviderShort": "Training organisation",
     "filterPlaceholder": "Filter organisations",
     "filterLabel": "Filter your organisations",
     "filterEmpty": "Nothing matched that."
@@ -888,7 +888,13 @@
     "deleteConfirmLabel": "Type {name} to confirm",
     "deleteCta": "Delete organisation",
     "deleting": "Deleting…",
-    "deleteError": "Could not delete the organisation. Try again."
+    "deleteError": "Could not delete the organisation. Try again.",
+    "yearEstablished": "Year established",
+    "teachingLanguages": "Languages it teaches in",
+    "teachingLanguagesHint": "For example: Hindi, English.",
+    "affiliations": "Affiliations",
+    "affiliationsHint": "For example a training-partner scheme or a sector skill council. Shown on your public page as your own statement; we do not check it.",
+    "viewPublicPage": "View your public page"
   },
   "credentials": {
     "title": "How you sign in",
@@ -931,7 +937,7 @@
     "employerTitle": "Hire against real standards",
     "employerSubtitle": "Sign up with your work email. We send a six-digit code — there is no password to set or reset.",
     "providerTitle": "Publish your courses",
-    "providerSubtitle": "Sign up with your work email and start listing training anchored to the national framework.",
+    "providerSubtitle": "Sign up with your work email and list the courses you sell, the training you deliver, or both.",
     "phoneLabel": "Mobile number",
     "phoneHint": "We send a six-digit code by SMS. It expires in five minutes.",
     "emailLabel": "Work email",
@@ -971,7 +977,7 @@
     "newCourse": "New course",
     "editCourse": "Edit course",
     "actionFailed": "Could not do that. Try again, and reload the page if it keeps failing.",
-    "saveFailed": "Could not save. Check the details, or confirm this organisation is a training provider.",
+    "saveFailed": "Could not save. Check the details, or confirm this organisation sells courses.",
     "signInPrompt": "Sign in with your work email to manage your courses.",
     "signIn": "Sign in",
     "teachesCount": "{count, plural, =0 {No standards yet} one {Teaches # standard} other {Teaches # standards}}",
@@ -2155,5 +2161,40 @@
     "fieldCheck": "Open to relocation",
     "optionOne": "Full time",
     "optionTwo": "Gig"
+  },
+  "capabilities": {
+    "legend": "What does your organisation do?",
+    "sells": "Sells courses",
+    "sellsHint": "You publish courses, and learners register interest with you.",
+    "delivers": "Delivers training",
+    "deliversHint": "You run classes at centres, for your own courses or for courses other providers authorise you to deliver.",
+    "none": "Choose at least one.",
+    "settingsTitle": "What this organisation does",
+    "settingsSubtitle": "An organisation can sell courses, deliver training, or both. Only an owner can change this.",
+    "save": "Save what it does",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "saveError": "This could not be saved. Try again."
+  },
+  "providerPage": {
+    "back": "Back to courses",
+    "sells": "Sells courses",
+    "delivers": "Delivers training",
+    "verified": "Verified training organisation",
+    "verifiedBy": "Reviewed by our team.",
+    "notVerifiedYet": "Not yet verified",
+    "cityLabel": "City",
+    "establishedLabel": "Established",
+    "languagesLabel": "Teaches in",
+    "websiteLabel": "Website",
+    "affiliationsLabel": "Affiliations",
+    "statedByNote": "Stated by the organisation. We have not checked it.",
+    "trainsIn": "Trains in",
+    "sectorCourses": "{count, plural, one {# course} other {# courses}}",
+    "sectorsNote": "Read from the courses it has published.",
+    "coursesTitle": "{count, plural, =0 {Courses it sells} one {Course it sells (#)} other {Courses it sells (#)}}",
+    "noCourses": "It has no published courses yet.",
+    "noCoursesDeliverer": "It delivers training and sells no courses of its own.",
+    "moreCourses": "Showing {shown} of {total} courses."
   }
 }

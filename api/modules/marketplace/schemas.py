@@ -225,6 +225,41 @@ class CourseDetail(CourseOut):
     seats_left: int | None = None
 
 
+class ProviderSectorOut(BaseModel):
+    """A sector an organisation trains in, with how many of its published courses are in it."""
+
+    name: str
+    courses: int
+
+
+class ProviderPublicOut(BaseModel):
+    """A training organisation's public page (Sprint 94, ADR-102).
+
+    **Not `TenantOut`**, which is embedded in every vacancy and course: the claims an organisation
+    makes about itself (`affiliations`, `year_established`, `teaching_languages`) are shown on its
+    own page and nowhere else, and `contact_email` is on neither. `sectors` is derived from its
+    published courses at read time and never stored.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    slug: str
+    name: str
+    city: str | None = None
+    description: str | None = None
+    website: str | None = None
+    logo_url: str | None = None
+    is_verified: bool = False
+    publishes_courses: bool = False
+    delivers_training: bool = False
+    year_established: int | None = None
+    affiliations: str | None = None
+    teaching_languages: str | None = None
+    sectors: list[ProviderSectorOut] = Field(default_factory=list)
+    courses: list["CourseOut"] = Field(default_factory=list)
+    courses_total: int = 0
+
+
 class CourseSkillIn(BaseModel):
     """One standard a course teaches, and how far it takes the learner.
 

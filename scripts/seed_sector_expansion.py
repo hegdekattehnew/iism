@@ -1121,6 +1121,20 @@ def is_template_description(text: str | None) -> bool:
     return bool(text) and any(p.match(text or "") for p in TEMPLATE_DESCRIPTIONS)
 
 
+# The suffix the generator put on a vacancy's title when its qualification was a trainee-level one
+# ("Mushroom Grower (Small Unit) — Trainee Programme"; Hindi "... — प्रशिक्षु कार्यक्रम"). It is the
+# name of the qualification, not of the job, and it made a list of vacancies read like a list of
+# courses (Sprint 94, BL-22.9). A vacancy is seeded without it. The rows whose whole title is a
+# qualification's name ("Certificate in Airport Management") are not rewritten here: that needs a
+# person who knows what the job is called, so `tests/test_seed_descriptions.py` counts them and
+# will only let the number go down.
+_PROGRAMME_SUFFIX = re.compile(r"\s*[—–-]\s*(?:Trainee Programme|प्रशिक्षु कार्यक्रम)\s*$")
+
+
+def as_a_job_title(title: str) -> str:
+    return _PROGRAMME_SUFFIX.sub("", title).strip() or title
+
+
 async def _forget_description_translation(db, entity_type: str, row) -> None:  # type: ignore[no-untyped-def]
     """Drop a Hindi description a previous run wrote for what is now an empty English one.
 
@@ -7769,9 +7783,12 @@ async def seed() -> dict[str, int]:
                 stats["jobs"] += 1
             job.tenant_id = tenants[tslug].id
             generic = is_template_description(d_en)
-            job.title, job.description = t_en, None if generic else d_en
+            job.title, job.description = as_a_job_title(t_en), None if generic else d_en
             await _translate(
-                db, "job", job, {"title": t_hi, "description": None if generic else d_hi}
+                db,
+                "job",
+                job,
+                {"title": as_a_job_title(t_hi), "description": None if generic else d_hi},
             )
             if generic:
                 await _forget_description_translation(db, "job", job)

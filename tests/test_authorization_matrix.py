@@ -51,6 +51,11 @@ PUBLIC_ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs"): "public catalogue",
     ("GET", "/jobs/{slug}"): "public catalogue",
     ("GET", "/jobs/states"): "the states that have an open vacancy, with counts; names nobody",
+    (
+        "GET",
+        "/providers/{slug}",
+    ): "a training organisation's own page: what it chose to say, its published courses; "
+    "never its contact address, and the same 404 for anything that is not one",
     ("GET", "/jobs/{job_slug}/poster-rating"): "an average over ratings; names nobody",
     ("GET", "/geography/districts"): "reference data",
     ("GET", "/geography/states"): "reference data",

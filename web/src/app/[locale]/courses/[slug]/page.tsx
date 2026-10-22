@@ -95,10 +95,16 @@ export default async function CourseDetailPage({
       </div>
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
-      {/* The provider's mark beside its name, as on the card in the list (Sprint 85). */}
+      {/* The provider's mark beside its name, as on the card in the list (Sprint 85). The name is a
+          link to the organisation's own page (Sprint 94, ADR-102). */}
       <div className="mt-3 flex items-center gap-3">
         <Avatar name={data.tenant.name} />
-        <p className="min-w-0 flex-1 text-lg text-muted">{data.tenant.name}</p>
+        <Link
+          href={`/providers/${data.tenant.slug}`}
+          className="inline-flex min-h-11 min-w-0 flex-1 items-center text-lg text-muted underline-offset-4 hover:text-foreground hover:underline"
+        >
+          {data.tenant.name}
+        </Link>
       </div>
 
       {/* The one thing a learner can do here. Until Sprint 24 this page

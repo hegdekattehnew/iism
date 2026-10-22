@@ -154,6 +154,44 @@ async def get_course(
     )
 
 
+# ---------------------------------------------------------- training organisations
+
+
+@marketplace_router.get(
+    "/providers/{slug}", response_model=schemas.ProviderPublicOut, tags=["providers"]
+)
+async def get_provider(
+    slug: str,
+    limit: int = Query(24, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
+    locale: str = Depends(request_locale),
+) -> schemas.ProviderPublicOut:
+    """A training organisation's public page: who it is, what it says about itself, the sectors it
+    trains in (derived from its courses) and its published courses (Sprint 94, ADR-102).
+
+    404 for anything that is not a training organisation, with one body for all of them.
+    """
+    tenant = await service.get_provider_by_slug(db, slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organisation not found")
+    items, total = await service.list_courses(db, tenant_id=tenant.id, limit=limit)
+    overrides = await overrides_for(db, "course", items, ("title", "description"), locale)
+    qualifications = await service.qualification_for(db, items)
+    sectors = await service.provider_sectors(db, tenant.id)
+    return schemas.ProviderPublicOut.model_validate(tenant).model_copy(
+        update={
+            "sectors": [schemas.ProviderSectorOut(name=n, courses=c) for n, c in sectors],
+            "courses": [
+                schemas.CourseOut.model_validate(c).model_copy(
+                    update={**overrides.get(c.id, {}), **qualifications[c.id]}
+                )
+                for c in items
+            ],
+            "courses_total": total,
+        }
+    )
+
+
 # ------------------------------------------------------- skill ↔ marketplace
 # These edges live here, not in the skills module: marketplace already depends
 # on skills, and the reverse import would be a cycle.

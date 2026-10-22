@@ -5,6 +5,12 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Field, Select, Text } from "@/components/profile/fields";
+import {
+  DEFAULT_CAPABILITIES,
+  TrainingCapabilities,
+  doesSomething,
+  type Capabilities,
+} from "@/components/TrainingCapabilities";
 import { Alert, Button } from "@/components/ui";
 // Imported directly, not through the barrel: `ui/index.ts` is pulled in by
 // nearly every component, and re-exporting the modal there put it on every
@@ -43,6 +49,7 @@ export function CreateOrgForm({
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [type, setType] = useState<"employer" | "course_provider">("employer");
+  const [caps, setCaps] = useState<Capabilities>(DEFAULT_CAPABILITIES);
   const [error, setError] = useState<string | null>(null);
   // The slug of the organisation a 409 pointed at, so the refusal can offer
   // to take them there instead of leaving them to go and find it.
@@ -53,7 +60,13 @@ export function CreateOrgForm({
       setError(null);
       setExisting(null);
       const { data, error: err, response } = await api.POST("/me/organisations", {
-        body: { organisation_name: name, tenant_type: type },
+        body: {
+          organisation_name: name,
+          tenant_type: type,
+          // What a training organisation does (ADR-102); an employer sends the neutral pair.
+          sells_courses: type === "course_provider" ? caps.sells : true,
+          delivers_training: type === "course_provider" ? caps.delivers : false,
+        },
       });
       if (err || !data) {
         // The server names the organisation it already found, so the client
@@ -114,6 +127,9 @@ export function CreateOrgForm({
             <option value="course_provider">{t("typeProvider")}</option>
           </Select>
         </Field>
+        {type === "course_provider" && (
+          <TrainingCapabilities value={caps} onChange={setCaps} className="mt-4" />
+        )}
 
         {error && (
           <Alert className="mt-3">
@@ -134,7 +150,10 @@ export function CreateOrgForm({
         )}
 
         <div className="mt-6 flex gap-3">
-          <Button type="submit" disabled={create.isPending}>
+          <Button
+            type="submit"
+            disabled={create.isPending || (type === "course_provider" && !doesSomething(caps))}
+          >
             {create.isPending ? t("creating") : t("create")}
           </Button>
           <Button type="button" variant="secondary" onClick={onClose}>

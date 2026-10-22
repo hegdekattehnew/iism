@@ -100,7 +100,13 @@ describe("CreateOrgForm — what it sends", () => {
     await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
     const [path, init] = POST.mock.calls[0] as [string, { body: Record<string, unknown> }];
     expect(path).toBe("/me/organisations");
-    expect(init.body).toEqual({ organisation_name: "Apollo Care", tenant_type: "employer" });
+    expect(init.body).toEqual({
+      organisation_name: "Apollo Care",
+      tenant_type: "employer",
+      // An employer sends the neutral pair: it neither sells courses nor delivers training.
+      sells_courses: true,
+      delivers_training: false,
+    });
   });
 
   it("says what went wrong rather than sitting there", async () => {
@@ -110,5 +116,45 @@ describe("CreateOrgForm — what it sends", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     expect(await screen.findByRole("alert")).toBeTruthy();
+  });
+});
+
+describe("CreateOrgForm — what a training organisation does (ADR-102)", () => {
+  const chooseProvider = () =>
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "course_provider" } });
+
+  it("asks what it does only for a training organisation", () => {
+    renderUi(form());
+    expect(screen.queryByRole("group", { name: "What does your organisation do?" })).toBeNull();
+    chooseProvider();
+    expect(screen.getByRole("group", { name: "What does your organisation do?" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /Sells courses/ })).toHaveProperty("checked", true);
+    expect(screen.getByRole("checkbox", { name: /Delivers training/ })).toHaveProperty("checked", false);
+  });
+
+  it("sends what was chosen, including delivering only", async () => {
+    renderUi(form());
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Centre Co" } });
+    chooseProvider();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Sells courses/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Delivers training/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+    const init = POST.mock.calls[0][1] as { body: Record<string, unknown> };
+    expect(init.body).toEqual({
+      organisation_name: "Centre Co",
+      tenant_type: "course_provider",
+      sells_courses: false,
+      delivers_training: true,
+    });
+  });
+
+  it("will not create an organisation that does neither", () => {
+    renderUi(form());
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Idle Co" } });
+    chooseProvider();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Sells courses/ }));
+    expect(screen.getByRole("alert").textContent).toBe("Choose at least one.");
+    expect(screen.getByRole("button", { name: "Create" })).toHaveProperty("disabled", true);
   });
 });

@@ -1,8 +1,16 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 from api.core.config import get_settings
 
@@ -109,12 +117,31 @@ class EmailOtpVerify(BaseModel):
         return normalise_email(v)
 
 
+def _check_capabilities(tenant_type: str, sells: bool, delivers: bool) -> None:
+    """A training organisation sells, delivers, or both; an employer has neither (ADR-102).
+
+    A value error is a 422 with the field named by the framework. The default
+    (`sells_courses` true, `delivers_training` false) is an employer's too, so an employer's
+    request that says nothing is valid, and one that asks for delivery is not.
+    """
+    if tenant_type == "employer":
+        if delivers:
+            raise ValueError("An employer does not deliver training")
+        return
+    if not (sells or delivers):
+        raise ValueError("A training organisation sells courses, delivers training, or both")
+
+
 class OrgRegisterRequest(BaseModel):
     """Cold registration: an address and the organisation it belongs to."""
 
     email: EmailStr
     organisation_name: Annotated[str, Field(min_length=2, max_length=120)]
     tenant_type: OrgTenantType = "employer"
+    # What a training organisation does (Sprint 94, ADR-102). Optional and additive: absent means
+    # what every provider did before they existed (sells courses, delivers nothing).
+    sells_courses: bool = True
+    delivers_training: bool = False
     # Required, and checked before any lookup: the answer for a missing or stale
     # version must not depend on whether the address already has an account.
     consent_version: Annotated[str, Field(min_length=1, max_length=32)]
@@ -123,6 +150,11 @@ class OrgRegisterRequest(BaseModel):
     @classmethod
     def _normalise(cls, v: str) -> str:
         return normalise_email(v)
+
+    @model_validator(mode="after")
+    def _capabilities(self) -> "OrgRegisterRequest":
+        _check_capabilities(self.tenant_type, self.sells_courses, self.delivers_training)
+        return self
 
 
 class OrgCreateRequest(BaseModel):
@@ -135,6 +167,13 @@ class OrgCreateRequest(BaseModel):
 
     organisation_name: Annotated[str, Field(min_length=2, max_length=120)]
     tenant_type: OrgTenantType = "employer"
+    sells_courses: bool = True
+    delivers_training: bool = False
+
+    @model_validator(mode="after")
+    def _capabilities(self) -> "OrgCreateRequest":
+        _check_capabilities(self.tenant_type, self.sells_courses, self.delivers_training)
+        return self
 
 
 class LinkEmailRequest(BaseModel):
@@ -244,12 +283,21 @@ class TenantOut(BaseModel):
     logo_url: str | None = None
     # Set by an operator, never by the organisation itself.
     is_verified: bool = False
+    # What a training organisation does (Sprint 94, ADR-102). Public: a learner reads "sells
+    # courses" and "delivers training" off the page, and the header's navigation follows them.
+    publishes_courses: bool = False
+    delivers_training: bool = False
 
 
 class OrganisationOut(TenantOut):
     """What the organisation's own members see. Adds what the public may not."""
 
     contact_email: str | None = None
+    # What it says about itself (Sprint 94). Public on the organisation's own page, but not on
+    # `TenantOut`, which is embedded in every vacancy and course.
+    year_established: int | None = None
+    affiliations: str | None = None
+    teaching_languages: str | None = None
 
 
 class OrganisationIn(BaseModel):
@@ -266,6 +314,19 @@ class OrganisationIn(BaseModel):
     website: Annotated[str | None, Field(max_length=500)] = None
     logo_url: Annotated[str | None, Field(max_length=500)] = None
     contact_email: EmailStr | None = None
+    # Claims an organisation makes about itself (Sprint 94, ADR-102): shown as its own and never
+    # sorted or filtered on (ADR-085). An absent field leaves the stored value alone (the
+    # partial-update rule); a blank one clears it.
+    year_established: Annotated[int | None, Field(ge=1800, le=2100)] = None
+    affiliations: Annotated[str | None, Field(max_length=500)] = None
+    teaching_languages: Annotated[str | None, Field(max_length=200)] = None
+
+    @field_validator("year_established", mode="after")
+    @classmethod
+    def _not_in_the_future(cls, v: int | None) -> int | None:
+        if v is not None and v > datetime.now(UTC).year:
+            raise ValueError("An organisation cannot have been established in the future")
+        return v
 
     @field_validator("contact_email", mode="after")
     @classmethod
@@ -276,6 +337,13 @@ class OrganisationIn(BaseModel):
         # `model_dump()` stored whatever was typed. This is also the address
         # `notifications/service.py` sends an organisation's mail to.
         return normalise_email(v) if v is not None else None
+
+
+class CapabilitiesIn(BaseModel):
+    """What a training organisation does now (Sprint 94, ADR-102). An absent field is left alone."""
+
+    sells_courses: bool | None = None
+    delivers_training: bool | None = None
 
 
 class MembershipOut(BaseModel):

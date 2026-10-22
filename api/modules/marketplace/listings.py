@@ -19,6 +19,7 @@ The retired-standard rule had **no test in either copy**, which is exactly how a
 duplicated rule rots: nothing fails when one side drifts.
 """
 
+import re
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -153,3 +154,23 @@ async def load_with_skills(
     if listing is None:  # pragma: no cover - just written
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{label} not found")
     return listing
+
+
+# A vacancy's title is the job: "Ward Attendant". A qualification or a programme is something a
+# person studies, and a list of vacancies that leads with "Advanced Certificate in Quality and
+# Industrial Engineering" reads as a list of courses (the designer's review, Sprint 91; BL-22.9).
+# The words are the ones the national qualification names use; a match is a **note**, never a
+# refusal, because a job can honestly be called "Certified Welder" or "Diploma Holder Supervisor"
+# (neither is a "certificate in" anything).
+_COURSE_LIKE_TITLE = re.compile(
+    r"""^\s*(?:(?:advanced|basic|senior|junior|professional|post[- ]graduate|pg)\s+)*
+        (?:certificate|diploma)\s+(?:in|of|for|course|programme|program)\b
+      | \b(?:trainee|training|skilling|apprenticeship)\s+programme\b
+      | \bcertificate\s+course\b""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def title_reads_like_a_course(title: str) -> bool:
+    """Does a vacancy's title read like a course or qualification rather than a job?"""
+    return bool(_COURSE_LIKE_TITLE.search(title))

@@ -14,6 +14,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from api.core.localisation import ContentTranslation
 from api.core.text import expand_query_terms
+from api.modules.identity.models import Tenant
 from api.modules.marketplace.models import (
     Course,
     CourseSkill,
@@ -23,6 +24,7 @@ from api.modules.marketplace.models import (
     posted_job,
 )
 from api.modules.skills import packs_by_code
+from api.modules.skills.hierarchy import Sector
 from api.modules.skills.models import Skill
 
 PUBLISHED = "published"
@@ -247,10 +249,14 @@ async def list_courses(
     mode: str | None = None,
     language: str | None = None,
     max_fee_inr: int | None = None,
+    tenant_id: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Course], int]:
     stmt = select(Course).where(Course.status == PUBLISHED)
+    if tenant_id is not None:
+        # One organisation's published courses (its public page, Sprint 94).
+        stmt = stmt.where(Course.tenant_id == tenant_id)
 
     if q:
         stmt = _text_filter(stmt, Course, q)
@@ -306,3 +312,37 @@ async def courses_teaching_skill(
         .limit(limit)
     )
     return list((await db.scalars(stmt)).unique())
+
+
+async def get_provider_by_slug(db: AsyncSession, slug: str) -> Tenant | None:
+    """The **public** view of a training organisation (Sprint 94, ADR-102).
+
+    Only a `course_provider` has a page: an employer's slug, a personal workspace's and a missing
+    one are all the same 404, so this cannot be used to tell which slugs exist or what they are.
+    Everything on the page is public by construction: it is built from `TenantOut`'s fields, the
+    claims an organisation chose to make, and its published courses, never `contact_email`.
+    """
+    return await db.scalar(
+        select(Tenant).where(Tenant.slug == slug, Tenant.tenant_type == "course_provider")
+    )
+
+
+async def provider_sectors(db: AsyncSession, tenant_id: uuid.UUID) -> list[tuple[str, int]]:
+    """The sectors an organisation trains in, **read from its published courses, never stored**.
+
+    A course teaches standards and a standard belongs to a sector, so the answer is derived each
+    time: it cannot go stale when a course is unpublished or a standard moves, and an organisation
+    cannot claim a sector it has no course in. Most courses first, then by name.
+    """
+    count = func.count(func.distinct(Course.id))
+    rows = await db.execute(
+        select(Sector.name, count)
+        .select_from(Course)
+        .join(CourseSkill, CourseSkill.course_id == Course.id)
+        .join(Skill, Skill.id == CourseSkill.skill_id)
+        .join(Sector, Sector.id == Skill.sector_id)
+        .where(Course.tenant_id == tenant_id, Course.status == PUBLISHED)
+        .group_by(Sector.name)
+        .order_by(count.desc(), Sector.name)
+    )
+    return [(name, n) for name, n in rows.all()]
