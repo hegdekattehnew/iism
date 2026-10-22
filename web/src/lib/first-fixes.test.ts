@@ -40,6 +40,15 @@ describe("first fixes", () => {
     expect(keys(ms).sort()).toEqual(keys(en).sort());
   });
 
+  it("the words added in Sprint 92 exist in all three catalogues", () => {
+    for (const [name, m] of [["en", en], ["hi", hi], ["ms", ms]] as const) {
+      expect(m.applications.signInToApplyHint.length, name).toBeGreaterThan(10);
+      expect(m.reviews.notEnough.length, name).toBeGreaterThan(10);
+      expect(m.jobsPage.verifiedBy.length, name).toBeGreaterThan(5);
+      expect(m.coursesPage.verifiedBy.length, name).toBeGreaterThan(5);
+    }
+  });
+
   it("the stylesheet hides the visitor's chooser, at the welcome card's height, for a browser that holds a sign-in", () => {
     const rule = css.match(/html\[data-auth\] \[data-home-chooser\]:not\(\[data-shown\]\) \{[^}]*\}/)?.[0] ?? "";
     expect(rule).toContain("height: 11rem");

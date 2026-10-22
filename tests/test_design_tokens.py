@@ -173,8 +173,9 @@ class TestTheCopiesOfAColour:
     def test_the_address_bar_follows_the_page(self) -> None:
         """The layout names the colours through `THEME_COLOURS` (Sprint 78), their one home."""
         layout = (ROOT / "web" / "src" / "app" / "[locale]" / "layout.tsx").read_text("utf-8")
-        assert re.search(r'prefers-color-scheme: light\)", color: THEME_COLOURS\.light', layout)
-        assert re.search(r'prefers-color-scheme: dark\)", color: THEME_COLOURS\.dark', layout)
+        # One tag, light: the default must not depend on the device (Sprint 92).
+        assert re.search(r"themeColor: THEME_COLOURS\.light", layout)
+        assert "prefers-color-scheme" not in layout.split("export const viewport")[1].split("};")[0]
         theme = (ROOT / "web" / "src" / "lib" / "theme.ts").read_text("utf-8")
         light = re.search(r'light: "(#[0-9a-f]{6})"', theme)
         dark = re.search(r'dark: "(#[0-9a-f]{6})"', theme)
@@ -309,15 +310,18 @@ class TestTheThemeControl:
     THEME_TS = (ROOT / "web" / "src" / "lib" / "theme.ts").read_text(encoding="utf-8")
     LAYOUT = (ROOT / "web" / "src" / "app" / "[locale]" / "layout.tsx").read_text(encoding="utf-8")
 
-    def test_the_media_query_yields_to_a_person_who_chose_light(self) -> None:
+    def test_the_device_only_decides_for_a_person_who_chose_to_match_it(self) -> None:
+        """Light is the default (Sprint 92): a dark device alone must not turn the page dark."""
         media = _block(CSS, "@media (prefers-color-scheme: dark)")
-        assert ':root:not([data-theme="light"])' in media, (
-            "a chosen light theme would still turn dark with the device"
-        )
+        assert ':root[data-theme="system"]' in media
+        assert ":root:not(" not in media, "a dark device would turn every visitor's page dark"
+
+    def test_the_page_says_it_is_light_without_being_asked(self) -> None:
+        assert "color-scheme: light" in ROOT_BLOCK
 
     def test_the_two_copies_of_the_dark_tokens_are_the_same(self) -> None:
         by_media = _block(
-            _block(CSS, "@media (prefers-color-scheme: dark)"), ':root:not([data-theme="light"])'
+            _block(CSS, "@media (prefers-color-scheme: dark)"), ':root[data-theme="system"]'
         )
         by_choice = _block(CSS, ':root[data-theme="dark"]')
         read = lambda text: {k: v.strip() for k, v in re.findall(r"([a-z-]+)\s*:\s*([^;]+);", text)}  # noqa: E731

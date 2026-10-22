@@ -24,7 +24,9 @@ export function ChipRow({ label, children }: { label: string; children: ReactNod
       aria-label={label}
       // Scrolls sideways inside the page's gutter instead of wrapping into more rows; the negative
       // margin lets a chip slide to the screen edge, the padding puts the first one back on the gutter.
-      className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+      // The right edge fades (1 rem, less than the 1.25 rem gutter, so the last chip is whole at the end of
+      // the scroll): a half-cut chip alone did not say that the row moves (Sprint 92).
+      className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1rem),transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
     >
       {children}
     </div>

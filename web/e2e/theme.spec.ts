@@ -1,9 +1,10 @@
 import { checkPage, expect, test } from "./support/test";
 
 /**
- * Journey 15 (Sprint 78, ADR-087, BL-19.8). A person overrides the device's colour scheme from the
- * footer; the choice is on the page before the first paint on the next load, the address bar follows,
- * and returning to "Match device" hands the page back to the device.
+ * Journey 15 (Sprint 78, ADR-087, BL-19.8; light by default since Sprint 92). The page is light
+ * whatever the device says; a person can choose dark or "match device" from the footer; the choice is
+ * on the page before the first paint on the next load, the address bar follows, and choosing light
+ * forgets the choice.
  */
 const BACKGROUND = { light: "rgb(248, 249, 250)", dark: "rgb(17, 20, 23)" } as const;
 
@@ -24,7 +25,7 @@ async function appearance(page: Page) {
   return group;
 }
 
-test("a person chooses a theme against the device, it survives a reload with no flash, and the device can have it back", async ({
+test("the page is light on a dark device, a person chooses dark with no flash, and can match the device or go back", async ({
   page,
 }) => {
   // Record what <html> says the moment <body> exists: the head script has run by then or never will.
@@ -41,36 +42,34 @@ test("a person chooses a theme against the device, it survives a reload with no 
 
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/en");
-  expect(await backgroundOf(page), "the device is dark and nothing was chosen").toBe(BACKGROUND.dark);
-  const group = await appearance(page);
-  await expect(group.getByRole("button", { name: "Match device" })).toHaveAttribute("aria-pressed", "true");
-
-  // Light against a dark device.
-  await group.getByRole("button", { name: "Light" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  expect(await backgroundOf(page)).toBe(BACKGROUND.light);
-  await expect(group.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
+  expect(await backgroundOf(page), "the device is dark and nothing was chosen: the page is light").toBe(BACKGROUND.light);
   await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute("content", "#f8f9fa");
+  const group = await appearance(page);
+  await expect(group.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
 
-  // Reloaded: it is the first thing on the page, not a correction after a dark flash.
-  await page.reload();
-  expect(await page.evaluate(() => (window as unknown as { __themeAtBody?: string | null }).__themeAtBody)).toBe("light");
-  expect(await backgroundOf(page)).toBe(BACKGROUND.light);
-  await checkPage(page, "a chosen light theme on a dark device", { light: true });
-
-  // Dark against a light device, on another page of the site.
-  await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/en/jobs");
-  expect(await backgroundOf(page), "the choice follows the person from page to page").toBe(BACKGROUND.light);
-  await (await appearance(page)).getByRole("button", { name: "Dark" }).click();
+  // Dark, chosen, on a dark device and then after a reload.
+  await group.getByRole("button", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(await backgroundOf(page)).toBe(BACKGROUND.dark);
+  await expect(group.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute("content", "#111417");
-  await checkPage(page, "a chosen dark theme on a light device", { light: true });
-
-  // Back to the device: the override is gone and the media query decides again.
-  await (await appearance(page)).getByRole("button", { name: "Match device" }).click();
-  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
-  expect(await backgroundOf(page)).toBe(BACKGROUND.light);
-  await page.emulateMedia({ colorScheme: "dark" });
+  await page.reload();
+  expect(await page.evaluate(() => (window as unknown as { __themeAtBody?: string | null }).__themeAtBody)).toBe("dark");
   expect(await backgroundOf(page)).toBe(BACKGROUND.dark);
+  await checkPage(page, "a chosen dark theme", { light: true });
+
+  // Match the device: dark while the device is dark, light when it changes.
+  await (await appearance(page)).getByRole("button", { name: "Match device" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  expect(await backgroundOf(page)).toBe(BACKGROUND.dark);
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await backgroundOf(page)).toBe(BACKGROUND.light);
+
+  // Light again: the choice is forgotten and the page stays light on a dark device.
+  await (await appearance(page)).getByRole("button", { name: "Light" }).click();
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await backgroundOf(page)).toBe(BACKGROUND.light);
+  await page.goto("/en/jobs");
+  expect(await backgroundOf(page), "and on another page").toBe(BACKGROUND.light);
 });

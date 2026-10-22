@@ -31,7 +31,7 @@ describe("ThemeDisclosure", () => {
     details.open = true;
     fireEvent(details, new Event("toggle"));
     await waitFor(() => expect(screen.getByRole("group", { name: "Appearance" })).toBeTruthy());
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Match device", "Light", "Dark"]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Light", "Dark", "Match device"]);
   });
 
   it("the footer's own summary is a 44 px target", () => {

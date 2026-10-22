@@ -25,6 +25,7 @@ import {
   type Translate,
 } from "@/lib/job-text";
 import { payLine, yearlyLine } from "@/lib/pay";
+import { ratingDisplay } from "@/lib/reputation";
 import { presentRequirements } from "@/lib/requirements";
 
 export const dynamic = "force-dynamic";
@@ -124,15 +125,18 @@ export default async function JobDetailPage({
         </p>
       </div>
       {posted !== null && <p className="mt-2 text-sm text-muted">{posted}</p>}
-      {rated && (
+      {/* A score only from three ratings (Sprint 92): "4 out of 5 from 1 rating" read as a verdict. */}
+      {ratingDisplay(rated) !== "none" && rated && (
         <p className="mt-1 text-sm text-muted">
           {tr("ofPoster")}:{" "}
-          {tr("summary", {
-            average: new Intl.NumberFormat(locale === "hi" ? "hi-IN" : "en-IN", {
-              maximumFractionDigits: 1,
-            }).format(rated.average),
-            count: rated.count,
-          })}
+          {ratingDisplay(rated) === "shown"
+            ? tr("summary", {
+                average: new Intl.NumberFormat(locale === "hi" ? "hi-IN" : "en-IN", {
+                  maximumFractionDigits: 1,
+                }).format(rated.average),
+                count: rated.count,
+              })
+            : tr("notEnough")}
         </p>
       )}
 
@@ -153,6 +157,8 @@ export default async function JobDetailPage({
           verified={data.tenant.is_verified}
           statement={data.tenant.is_verified ? t("verifiedEmployer") : t("notVerifiedYet")}
         >
+          {/* What the mark means, in one line (Sprint 92): an operator reviewed this organisation. */}
+          {data.tenant.is_verified && <p className="mt-1 text-muted">{t("verifiedBy")}</p>}
           <p className="mt-1 text-muted">{t("neverPay")}</p>
           {/* Its own line at the product's 44 px: an inline link in the sentence was a small target. */}
           <a

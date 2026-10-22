@@ -142,6 +142,8 @@ async function shoot(id, who_, route, variant) {
     timezoneId: "Asia/Kolkata",
     isMobile: variant !== "desktop",
   });
+  // Light is the default whatever the device says (Sprint 92), so a dark capture chooses dark.
+  if (variant === "dark") await context.addInitScript(() => localStorage.setItem("iism-theme", "dark"));
   const tokens = who[who_] ?? null;
   if (tokens) {
     await context.addInitScript(([a, r]) => {

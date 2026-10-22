@@ -20,7 +20,7 @@ jest.mock("react-native/Libraries/Utilities/useColorScheme", () => ({ __esModule
 
 beforeEach(() => {
   mockScheme = "light";
-  themePreference.set("system");
+  themePreference.set("light");
 });
 
 function Probe() {
@@ -29,10 +29,10 @@ function Probe() {
 }
 
 describe("the appearance chooser", () => {
-  it("offers the phone's own setting, light and dark, with the phone's own selected", async () => {
+  it("offers light, dark and the phone's own setting, with light selected", async () => {
     await renderScreen(<AppearanceChooser />);
-    expect(screen.getByRole("button", { name: "Match phone" }).props.accessibilityState).toMatchObject({ selected: true });
-    expect(screen.getByRole("button", { name: "Light" }).props.accessibilityState).toMatchObject({ selected: false });
+    expect(screen.getByRole("button", { name: "Light" }).props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByRole("button", { name: "Match phone" }).props.accessibilityState).toMatchObject({ selected: false });
     expect(screen.getByRole("button", { name: "Dark" }).props.accessibilityState).toMatchObject({ selected: false });
   });
 
@@ -46,7 +46,14 @@ describe("the appearance chooser", () => {
 });
 
 describe("the colours follow the choice, then the phone", () => {
-  it("with no choice, the phone's own setting decides", async () => {
+  it("with no choice it is light, even on a phone that is in dark mode", async () => {
+    mockScheme = "dark";
+    await render(<Probe />);
+    expect(screen.getByTestId("probe").props.children).toBe(light.background);
+  });
+
+  it("matching the phone follows it", async () => {
+    await act(async () => themePreference.set("system"));
     await render(<Probe />);
     expect(screen.getByTestId("probe").props.children).toBe(light.background);
     mockScheme = "dark";

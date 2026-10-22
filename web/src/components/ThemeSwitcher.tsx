@@ -7,20 +7,20 @@ import { MonitorIcon, MoonIcon, SunIcon } from "@/components/ui/icons";
 import { getTheme, setTheme, subscribeTheme, type Theme } from "@/lib/theme";
 
 const OPTIONS = [
-  { value: "system", key: "themeSystem", Icon: MonitorIcon },
   { value: "light", key: "themeLight", Icon: SunIcon },
   { value: "dark", key: "themeDark", Icon: MoonIcon },
+  { value: "system", key: "themeSystem", Icon: MonitorIcon },
 ] as const satisfies ReadonlyArray<{ value: Theme; key: string; Icon: typeof SunIcon }>;
 
 /**
  * Light, dark, or the same as the device (Sprint 78, BL-19.8, ADR-087). Three buttons in a group,
  * the chosen one marked with `aria-pressed` (a name and a state, which a colour alone is not), each
  * 44 px. It reads the choice with `useSyncExternalStore`, so another tab's change shows here and the
- * server render (always "system", since it cannot read this browser) is corrected on hydration.
+ * server render (always light, since it cannot read this browser) is corrected on hydration.
  */
 export function ThemeSwitcher() {
   const t = useTranslations("footer");
-  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "system" as Theme);
+  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "light" as Theme);
 
   return (
     <div role="group" aria-label={t("appearance")} className="flex flex-wrap gap-2">

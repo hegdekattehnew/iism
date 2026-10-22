@@ -52,10 +52,7 @@ const devanagari = Noto_Sans_Devanagari({
  *  A mismatch here is what makes an installed app look like a web page. A person who chose a theme
  *  overrides both tags from the script in `<head>` (`lib/theme.ts`). */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: THEME_COLOURS.light },
-    { media: "(prefers-color-scheme: dark)", color: THEME_COLOURS.dark },
-  ],
+  themeColor: THEME_COLOURS.light,
 };
 
 export function generateStaticParams() {
