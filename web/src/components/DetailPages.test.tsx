@@ -363,6 +363,43 @@ describe("the training organisation's page", () => {
     expect(screen.queryByText(/^Centres/)).toBeNull();
   });
 
+  it("lists what it is authorised to deliver for others, whose each course is, as one link each", async () => {
+    GET.mockImplementation(async (path: string) =>
+      path === "/providers/{slug}/delivery"
+        ? {
+            data: {
+              items: [
+                { provider: { slug: "acme", name: "Acme Training", is_verified: false }, course: { slug: "welding", title: "Welding basics" } },
+                { provider: { slug: "beta", name: "Beta Institute", is_verified: true }, course: null },
+              ],
+            },
+            error: undefined,
+            response: { status: 200 },
+          }
+        : { data: PROVIDER, error: undefined, response: { status: 200 } },
+    );
+    await show(page());
+    expect(screen.getByText("Authorised to deliver for other organisations")).toBeTruthy();
+    const one = screen.getByRole("link", { name: "Welding basics, by Acme Training" });
+    expect(one.getAttribute("href")).toBe("/providers/acme");
+    const every = screen.getByRole("link", { name: "Every course of Beta Institute" });
+    expect(every.getAttribute("href")).toBe("/providers/beta");
+  });
+
+  it("shows no such section when nothing is authorised, and keeps the page when that read fails", async () => {
+    serve(PROVIDER);
+    const a = await show(page());
+    expect(screen.queryByText("Authorised to deliver for other organisations")).toBeNull();
+    a.unmount();
+    GET.mockImplementation(async (path: string) => {
+      if (path === "/providers/{slug}/delivery") throw new Error("down");
+      return { data: PROVIDER, error: undefined, response: { status: 200 } };
+    });
+    await show(page());
+    expect(screen.getByRole("heading", { level: 1, name: "NSDC Academy" })).toBeTruthy();
+    expect(screen.queryByText("Authorised to deliver for other organisations")).toBeNull();
+  });
+
   it("lists its published courses on the same card as the list", async () => {
     serve(PROVIDER);
     await show(page());

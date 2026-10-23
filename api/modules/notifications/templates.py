@@ -102,6 +102,37 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "If you were not expecting this, you can ignore it -- nothing happens until you "
             "open the link.\n",
         ),
+        "delivery_requested": (
+            "{organisation} has asked to deliver your courses on IISM",
+            "{organisation} has asked to deliver some or all of the courses you sell on IISM.\n\n"
+            "Open the link to see what it asked for and to answer. Nothing changes until you "
+            "approve it:\n{link}\n",
+        ),
+        "delivery_invited": (
+            "{organisation} has authorised you to deliver its courses on IISM",
+            "{organisation} has authorised your organisation to deliver some or all of the "
+            "courses it sells on IISM. Nothing is expected of you: you can now run its courses at "
+            "your centres, and you can end the arrangement at any time.\n\n"
+            "See what it covers:\n{link}\n",
+        ),
+        "delivery_approved": (
+            "{organisation} has approved your request to deliver its courses",
+            "{organisation} has approved your request to deliver some or all of its courses on "
+            "IISM. You can now run those courses at your centres.\n\n"
+            "See what it covers:\n{link}\n",
+        ),
+        "delivery_declined": (
+            "{organisation} has closed a delivery request on IISM",
+            "{organisation} has closed a request about delivering courses. Nothing changes for "
+            "your courses or your centres.\n\n"
+            "See your arrangements:\n{link}\n",
+        ),
+        "delivery_revoked": (
+            "{organisation} has ended an arrangement to deliver courses on IISM",
+            "{organisation} has ended an arrangement about delivering courses on IISM. No new "
+            "batches can be made under it. Classes already running are not stopped.\n\n"
+            "See your arrangements:\n{link}\n",
+        ),
         "ownership_received": (
             "You are now an owner of {organisation} on IISM",
             "You have been made an owner of {organisation} on IISM. Owners can "
@@ -211,6 +242,39 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "बार काम करता है:\n{link}\n\n"
             "यदि आपको इसकी अपेक्षा नहीं थी, तो इसे अनदेखा कर सकते हैं — लिंक खोलने तक कुछ "
             "नहीं होता।\n",
+        ),
+        "delivery_requested": (
+            "{organisation} ने IISM पर आपके पाठ्यक्रम चलाने का अनुरोध किया है",
+            "{organisation} ने IISM पर आप जो पाठ्यक्रम बेचते हैं, उनमें से कुछ या सभी को चलाने का "
+            "अनुरोध किया है।\n\n"
+            "उसने क्या माँगा है यह देखने और जवाब देने के लिए लिंक खोलें। आपके मंज़ूर करने तक "
+            "कुछ नहीं बदलता:\n{link}\n",
+        ),
+        "delivery_invited": (
+            "{organisation} ने IISM पर आपको अपने पाठ्यक्रम चलाने के लिए अधिकृत किया है",
+            "{organisation} ने IISM पर अपने बेचे जाने वाले पाठ्यक्रमों में से कुछ या सभी को चलाने "
+            "के लिए आपके संगठन को अधिकृत किया है। आपसे कुछ अपेक्षित नहीं है: अब आप उसके "
+            "पाठ्यक्रम अपने केंद्रों पर चला सकते हैं, और इस व्यवस्था को कभी भी समाप्त कर सकते "
+            "हैं।\n\n"
+            "देखें कि इसमें क्या शामिल है:\n{link}\n",
+        ),
+        "delivery_approved": (
+            "{organisation} ने अपने पाठ्यक्रम चलाने का आपका अनुरोध मंज़ूर कर लिया है",
+            "{organisation} ने IISM पर अपने कुछ या सभी पाठ्यक्रम चलाने का आपका अनुरोध मंज़ूर कर "
+            "लिया है। अब आप वे पाठ्यक्रम अपने केंद्रों पर चला सकते हैं।\n\n"
+            "देखें कि इसमें क्या शामिल है:\n{link}\n",
+        ),
+        "delivery_declined": (
+            "{organisation} ने IISM पर एक अनुरोध बंद कर दिया है",
+            "{organisation} ने पाठ्यक्रम चलाने से जुड़ा एक अनुरोध बंद कर दिया है। आपके पाठ्यक्रमों "
+            "या केंद्रों के लिए कुछ नहीं बदलता।\n\n"
+            "अपनी व्यवस्थाएँ देखें:\n{link}\n",
+        ),
+        "delivery_revoked": (
+            "{organisation} ने IISM पर पाठ्यक्रम चलाने की एक व्यवस्था समाप्त कर दी है",
+            "{organisation} ने IISM पर पाठ्यक्रम चलाने से जुड़ी एक व्यवस्था समाप्त कर दी है। इसके "
+            "अंतर्गत नए बैच नहीं बन सकते। चल रही कक्षाएँ रोकी नहीं जातीं।\n\n"
+            "अपनी व्यवस्थाएँ देखें:\n{link}\n",
         ),
         "ownership_received": (
             "अब आप IISM पर {organisation} के स्वामी हैं",

@@ -114,35 +114,35 @@ class TestTheOneFunctionThatAnswers:
                 "course_provider",
                 True,
                 False,
-                {"job": False, "course": True, "centre": False, "batch": False},
+                {"job": False, "course": True, "centre": False, "batch": False, "delivery": True},
             ),
             # seller and deliverer: own delivery
             (
                 "course_provider",
                 True,
                 True,
-                {"job": False, "course": True, "centre": True, "batch": True},
+                {"job": False, "course": True, "centre": True, "batch": True, "delivery": True},
             ),
             # deliverer only: sells nothing
             (
                 "course_provider",
                 False,
                 True,
-                {"job": False, "course": False, "centre": True, "batch": True},
+                {"job": False, "course": False, "centre": True, "batch": True, "delivery": True},
             ),
             # an employer is neither, whatever the flags say
             (
                 "employer",
                 True,
                 True,
-                {"job": True, "course": False, "centre": False, "batch": False},
+                {"job": True, "course": False, "centre": False, "batch": False, "delivery": False},
             ),
             # a personal workspace may do nothing
             (
                 "personal",
                 True,
                 True,
-                {"job": False, "course": False, "centre": False, "batch": False},
+                {"job": False, "course": False, "centre": False, "batch": False, "delivery": False},
             ),
         ],
     )

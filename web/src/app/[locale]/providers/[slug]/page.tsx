@@ -17,6 +17,7 @@ import {
   TargetIcon,
 } from "@/components/ui/icons";
 import { TrustStrip } from "@/components/ui/trust-strip";
+import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,13 @@ export default async function ProviderPage({
   // Only a 404 is "not found"; an outage must not tell a visitor an organisation does not exist.
   if (response.status === 404) notFound();
   if (error || !data) throw new Error(`API responded ${response.status}`);
+
+  // What it is authorised to deliver for others (Sprint 97). A second request, and a failure of it
+  // costs the page one section, never the page: it is extra, not the organisation.
+  const delivered = await api
+    .GET("/providers/{slug}/delivery", { params: { path: { slug } } })
+    .then((r) => (r.data?.items ?? []))
+    .catch(() => []);
 
   // Lists that default to empty are optional in the generated types.
   const sectors = data.sectors ?? [];
@@ -191,6 +199,32 @@ export default async function ProviderPage({
               })}
             </ul>
           )}
+        </section>
+      )}
+
+      {delivered.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("authorisedTitle")}
+          </h2>
+          <p className="mt-2 text-xs text-muted">{t("authorisedNote")}</p>
+          <ul className="mt-3 space-y-2">
+            {delivered.map((d) => (
+              <li key={`${d.provider.slug}:${d.course?.slug ?? "all"}`}>
+                <Link
+                  href={`/providers/${d.provider.slug}`}
+                  className="flex min-h-11 items-center gap-2 rounded-xl border border-border-token bg-surface px-4 py-3 text-sm hover:bg-surface-muted"
+                >
+                  <BuildingIcon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    {d.course
+                      ? t("courseBy", { course: d.course.title, organisation: d.provider.name })
+                      : t("everyCourseOf", { organisation: d.provider.name })}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

@@ -24,6 +24,7 @@ from api.modules import applications, grievances, interests, moderation, operati
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, ApplicationReview, SavedJob
+from api.modules.delivery.models import CourseDeliveryAuthorisation
 from api.modules.identity import (
     Invitation,
     Membership,
@@ -261,6 +262,16 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     # tombstone that survives erasure, which is a fresh DPDP decision.
     await db.execute(
         delete(TenantVerificationEvent).where(TenantVerificationEvent.tenant_id == tenant_id)
+    )
+    # Arrangements to deliver courses (Sprint 97), on either side. Explicitly, like everything
+    # above: the foreign keys cascade, and "everything went" is the one claim erasure must never
+    # make on assumption. The other organisation is not told here (an organisation that has stopped
+    # existing has no one to notify its partners); its own list simply no longer shows the row.
+    await db.execute(
+        delete(CourseDeliveryAuthorisation).where(
+            (CourseDeliveryAuthorisation.provider_id == tenant_id)
+            | (CourseDeliveryAuthorisation.partner_id == tenant_id)
+        )
     )
     await db.execute(delete(Membership).where(Membership.tenant_id == tenant_id))
     await db.execute(delete(Tenant).where(Tenant.id == tenant_id))

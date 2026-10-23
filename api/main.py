@@ -33,6 +33,8 @@ from api.modules.assessment import router as assessment_router
 from api.modules.careers import router as careers_router
 from api.modules.centres import manager_router as centre_manager_router
 from api.modules.centres import router as centres_router
+from api.modules.delivery import public_router as delivery_public_router
+from api.modules.delivery import router as delivery_router
 from api.modules.geography import router as geography_router
 from api.modules.grievances import me_router as grievances_me_router
 from api.modules.grievances import ops_router as grievances_ops_router
@@ -171,6 +173,8 @@ app.include_router(bulk_router)
 app.include_router(centres_router)
 app.include_router(centre_manager_router)
 app.include_router(centre_staff_router)
+app.include_router(delivery_router)
+app.include_router(delivery_public_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)
 app.include_router(matching_router)

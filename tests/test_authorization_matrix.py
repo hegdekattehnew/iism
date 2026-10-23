@@ -56,6 +56,16 @@ PUBLIC_ROUTES: dict[tuple[str, str], str] = {
         "/providers/{slug}",
     ): "a training organisation's own page: what it chose to say, its published courses; "
     "never its contact address, and the same 404 for anything that is not one",
+    (
+        "GET",
+        "/providers/{slug}/delivery",
+    ): "what a training organisation is authorised to deliver for others, and whose each course "
+    "is (Sprint 97): approved arrangements only, and what its public page already says",
+    (
+        "GET",
+        "/training-organisations",
+    ): "training organisations by name, slug or city, optionally only those that sell or deliver: "
+    "the public page's own facts, so an organisation can find the one to ask or invite",
     ("GET", "/jobs/{job_slug}/poster-rating"): "an average over ratings; names nobody",
     ("GET", "/geography/districts"): "reference data",
     ("GET", "/geography/states"): "reference data",

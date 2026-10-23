@@ -100,6 +100,13 @@ TEMPLATES = (
     # Sprint 96. Somebody was asked to run a training centre. Email, to the address the
     # invitation was written to (resolved at send time, so revoking it stops the mail).
     "centre_manager_invitation",
+    # Sprint 97. An arrangement to deliver somebody's courses changed. Email, to the organisation on
+    # the other side; fixed words, the other organisation's name and a link, nothing else.
+    "delivery_requested",
+    "delivery_invited",
+    "delivery_approved",
+    "delivery_declined",
+    "delivery_revoked",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

@@ -41,6 +41,24 @@ async def _published_courses(db: AsyncSession, tenant: Tenant) -> int:
     ) or 0
 
 
+async def _live_arrangements(db: AsyncSession, tenant: Tenant, side: str) -> int:
+    """Delivery arrangements with other organisations that are still open (asked or approved).
+
+    Imported inside the function: `delivery` depends on this package for `Tenant`, so a module-level
+    import is the cycle `marketplace` is read through the same way for `_published_courses`.
+    """
+    from api.modules.delivery.models import CourseDeliveryAuthorisation as Arrangement
+
+    column = Arrangement.provider_id if side == "provider" else Arrangement.partner_id
+    return (
+        await db.scalar(
+            select(func.count())
+            .select_from(Arrangement)
+            .where(column == tenant.id, Arrangement.ended_at.is_(None))
+        )
+    ) or 0
+
+
 async def delivery_in_progress(db: AsyncSession, tenant: Tenant) -> str | None:
     """Why this organisation cannot stop delivering training, or `None` if it can.
 
@@ -61,6 +79,13 @@ async def delivery_in_progress(db: AsyncSession, tenant: Tenant) -> str | None:
     ) or 0
     if active:
         return "This organisation has centres that are open. Close them first"
+    # An arrangement to deliver somebody else's course (Sprint 97) is a standing promise, asked or
+    # approved: ending it is the organisation's own act, not a side effect of a switch.
+    if await _live_arrangements(db, tenant, "partner"):
+        return (
+            "This organisation has arrangements to deliver other organisations' courses. "
+            "Decline or end them first"
+        )
     return None
 
 
@@ -94,6 +119,16 @@ async def set_capabilities(
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "This organisation has published courses. Unpublish them first",
+        )
+    if (
+        tenant.publishes_courses
+        and not sells
+        and await _live_arrangements(db, tenant, "provider") > 0
+    ):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Other organisations hold arrangements to deliver this organisation's courses. "
+            "Decline or end them first",
         )
     if tenant.delivers_training and not delivers:
         reason = await delivery_in_progress(db, tenant)
