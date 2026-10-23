@@ -2388,7 +2388,7 @@
     "declineNamed": "Decline: {name}",
     "withdraw": "Withdraw",
     "withdrawNamed": "Withdraw: {name}",
-    "end": "End it",
+    "end": "End",
     "endNamed": "End: {name}"
   }
 }

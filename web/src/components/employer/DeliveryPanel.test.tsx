@@ -133,6 +133,25 @@ describe("DeliveryPanel", () => {
     }
   });
 
+  it("names every row button so that its visible word is inside its accessible name (WCAG 2.5.3)", async () => {
+    // The browser sweep's axe rule `label-content-name-mismatch`: "End it" with the name "End: Acme"
+    // failed it in CI, because the visible text was not part of the name.
+    as(true, true);
+    serve(
+      [row({ id: "a", state: "requested" }), row({ id: "b", state: "approved", other: other({ name: "Two" }) })],
+      [row({ id: "c", state: "requested", side: "provider", other: other({ name: "Three" }) }), row({ id: "d", state: "approved", side: "provider", other: other({ name: "Four" }) })],
+    );
+    panel();
+    await screen.findByText("Four");
+    const named = [...document.querySelectorAll("button[aria-label]")];
+    expect(named.length).toBeGreaterThanOrEqual(5);
+    for (const button of named) {
+      const visible = (button.textContent ?? "").trim().toLowerCase();
+      expect(visible, button.outerHTML).not.toBe("");
+      expect((button.getAttribute("aria-label") ?? "").toLowerCase(), button.outerHTML).toContain(visible);
+    }
+  });
+
   it("says in words what each state means for the reader", async () => {
     as(true, false);
     serve([
