@@ -25,7 +25,8 @@
     "tabMatches": "Matches",
     "tabProfile": "Profile",
     "centres": "Centres",
-    "centre": "Your centre"
+    "centre": "Your centre",
+    "delivery": "Delivery"
   },
   "hero": {
     "eyebrow": "For people looking for work",
@@ -2216,7 +2217,11 @@
     "moreCourses": "Showing {shown} of {total} courses.",
     "centresTitle": "{count, plural, =0 {Centres} one {Centre (#)} other {Centres (#)}}",
     "noCentres": "It has not listed any centres yet.",
-    "addressChecked": "Address checked"
+    "addressChecked": "Address checked",
+    "authorisedTitle": "Authorised to deliver for other organisations",
+    "authorisedNote": "Courses another organisation sells that this one may run at its centres.",
+    "everyCourseOf": "Every course of {organisation}",
+    "courseBy": "{course}, by {organisation}"
   },
   "centres": {
     "heading": "Centres",
@@ -2324,5 +2329,66 @@
     "whoRunsItNote": "The organisation decides who runs a centre. Ask them if someone should be added or removed.",
     "colleaguesFailed": "Could not load who runs this centre.",
     "you": "you"
+  },
+  "delivery": {
+    "heading": "Delivery",
+    "subheading": "Who delivers whose courses. An organisation that sells a course decides who may run it.",
+    "noAccess": "You do not have access to this organisation's delivery arrangements.",
+    "failed": "That did not work. Try again.",
+    "asPartnerTitle": "Courses you deliver for others",
+    "asPartnerIntro": "Ask an organisation that sells courses to let you run some or all of them at your centres. Nothing changes until they approve.",
+    "asProviderTitle": "Organisations that deliver your courses",
+    "asProviderIntro": "Authorise an organisation to run some or all of the courses you sell. They can end it at any time, and so can you.",
+    "nonePartner": "You have not asked anyone to let you deliver their courses yet.",
+    "noneProvider": "Nobody delivers your courses yet.",
+    "askTitle": "Ask to deliver",
+    "inviteTitle": "Authorise an organisation",
+    "findSeller": "Find the organisation that sells the courses",
+    "findPartner": "Find the organisation that will deliver them",
+    "findHint": "Type at least two letters of its name or city.",
+    "noMatch": "No organisation found. It has to be a training organisation that does this.",
+    "change": "Change",
+    "scope": "What it covers",
+    "scopeAskHint": "One course, or every course they sell.",
+    "scopeInviteHint": "One of your courses, or every course you sell.",
+    "allCourses": "Every course",
+    "sendRequest": "Send the request",
+    "sendInvite": "Authorise them",
+    "requestSent": "Sent. They have been told, and nothing changes until they approve.",
+    "inviteSent": "Done. They have been told and can start running those courses.",
+    "everyCourse": "Every course they sell",
+    "oneCourse": "The course: {title}",
+    "state": {
+      "requested": "Waiting",
+      "approved": "In force",
+      "declined": "Closed",
+      "revoked": "Ended"
+    },
+    "story": {
+      "requested": {
+        "partner": "You asked {organisation} to let you deliver this.",
+        "provider": "{organisation} asked to deliver this."
+      },
+      "approved": {
+        "partner": "{organisation} lets you deliver this.",
+        "provider": "{organisation} may deliver this."
+      },
+      "declined": {
+        "partner": "The request to {organisation} is closed.",
+        "provider": "The request from {organisation} is closed."
+      },
+      "revoked": {
+        "partner": "The arrangement with {organisation} has ended.",
+        "provider": "The arrangement with {organisation} has ended."
+      }
+    },
+    "approve": "Approve",
+    "approveNamed": "Approve: {name}",
+    "decline": "Decline",
+    "declineNamed": "Decline: {name}",
+    "withdraw": "Withdraw",
+    "withdrawNamed": "Withdraw: {name}",
+    "end": "End",
+    "endNamed": "End: {name}"
   }
 }

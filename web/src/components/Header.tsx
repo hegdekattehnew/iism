@@ -41,6 +41,7 @@ const ORG_NAV = {
   course_provider: [
     { key: "courses_org", href: "" },
     { key: "learners", href: "/interests" },
+    { key: "delivery", href: "/delivery" },
     { key: "team", href: "/team" },
   ],
   // A centre's manager has one page: their centre (Sprint 96). No team, no vacancies, no courses.

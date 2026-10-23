@@ -88,6 +88,12 @@ class Permission(StrEnum):
     # and everything about the organisation stay with the organisation.
     MANAGED_CENTRE_READ = "centre:managed:read"
     MANAGED_CENTRE_EDIT = "centre:managed:edit"
+    # Sprint 97, ADR-102. Delivering somebody else's course, and letting somebody deliver yours.
+    # Seeing the arrangements is every member's; asking, inviting, approving, declining and
+    # revoking are an admin's and an owner's. All of it reverses (an arrangement ends, and a new
+    # one can be asked for) and none of it discloses a person, so it sits with the centres.
+    DELIVERY_READ = "delivery:read"
+    DELIVERY_MANAGE = "delivery:manage"
 
     # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
     # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
@@ -126,7 +132,12 @@ class Permission(StrEnum):
 # colleagues, not candidates: no contact detail, no listing, nothing about
 # anybody outside the organisation.
 _MEMBER: frozenset[Permission] = frozenset(
-    {Permission.ORG_READ, Permission.MEMBER_READ, Permission.CENTRE_READ}
+    {
+        Permission.ORG_READ,
+        Permission.MEMBER_READ,
+        Permission.CENTRE_READ,
+        Permission.DELIVERY_READ,
+    }
 )
 # Roles stay type-agnostic: an admin of any organisation holds both publishing
 # sets, and the `publishes` half of `require()` decides which one their tenant
@@ -143,6 +154,7 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.CANDIDATE_SHORTLIST,
     Permission.LEARNER_CONTACT,
     Permission.CENTRE_MANAGE,
+    Permission.DELIVERY_MANAGE,
     # An admin may bring someone in, and `invite()` decides at what role: a
     # `member` only. That ceiling is enforced in the service, once, rather
     # than by a fourth permission -- it is a rule about the *argument*, and a
@@ -268,10 +280,12 @@ WORKSPACE_TYPES = (*ORGANISATION_TYPES, "training_centre")
 #   "course" -- an organisation that sells courses (`publishes_courses`)
 #   "centre" -- an organisation that delivers training (`delivers_training`): its centres
 #   "batch"  -- the same: a course run at a centre
+#   "delivery" -- a training organisation of either kind: the arrangements by which one delivers
+#                 another's courses (Sprint 97). A centre has none: it is its organisation's.
 #
 # Nothing else compares `tenant_type` to answer "may this organisation publish X": a guard a handler
 # must remember is one that eventually is not called (Sprint 15), so the answer is one function.
-CAPABILITIES = ("job", "course", "centre", "batch")
+CAPABILITIES = ("job", "course", "centre", "batch", "delivery")
 
 # The sentence a refusal says, by capability (the 403's detail).
 CAPABILITY_WORDS: dict[str, str] = {
@@ -279,6 +293,7 @@ CAPABILITY_WORDS: dict[str, str] = {
     "course": "an organisation that sells courses",
     "centre": "an organisation that delivers training",
     "batch": "an organisation that delivers training",
+    "delivery": "an organisation that sells courses or delivers training",
 }
 
 
@@ -293,6 +308,8 @@ def capability_for(tenant: "Tenant", capability: str) -> bool:
         return tenant.tenant_type == "employer"
     if tenant.tenant_type != "course_provider":
         return False
+    if capability == "delivery":
+        return bool(tenant.publishes_courses or tenant.delivers_training)
     if capability == "course":
         return bool(tenant.publishes_courses)
     return bool(tenant.delivers_training)

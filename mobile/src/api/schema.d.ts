@@ -1536,6 +1536,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Arrangements
+         * @description Every arrangement this organisation is in, as the seller and as the one delivering.
+         */
+        get: operations["my_arrangements_org__org_slug__delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/delivery/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask To Deliver
+         * @description Ask a seller to let this organisation deliver one of its courses, or all of them.
+         */
+        post: operations["ask_to_deliver_org__org_slug__delivery_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/delivery/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite To Deliver
+         * @description Authorise a delivering organisation to deliver one of this organisation's courses, or all.
+         */
+        post: operations["invite_to_deliver_org__org_slug__delivery_invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/delivery/{authorisation_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Request
+         * @description The seller says yes. 403 for the partner, 409 if it is no longer a request.
+         */
+        post: operations["approve_request_org__org_slug__delivery__authorisation_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/delivery/{authorisation_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Request
+         * @description Close a request nobody has approved: refuse it (the seller) or withdraw it (the partner).
+         */
+        post: operations["decline_request_org__org_slug__delivery__authorisation_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/delivery/{authorisation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Arrangement
+         * @description End an approved arrangement. Either side may.
+         */
+        post: operations["revoke_arrangement_org__org_slug__delivery__authorisation_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training-organisations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Training Organisations
+         * @description Training organisations by name, slug or city, optionally only those that sell courses or
+         *     deliver training: how an organisation finds the one to ask, or to invite.
+         */
+        get: operations["training_organisations_training_organisations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/providers/{slug}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Authorised To Deliver
+         * @description What this organisation is authorised to deliver for others, and whose each course is.
+         */
+        get: operations["authorised_to_deliver_providers__slug__delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/{org_slug}/jobs": {
         parameters: {
             query?: never;
@@ -3588,6 +3749,50 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /**
+         * AuthorisationOut
+         * @description One arrangement, **as the organisation asking sees it**.
+         *
+         *     `side` is what the asking organisation is in it (the course's seller, or the one delivering),
+         *     `other` is the organisation on the other side, and `course` is `None` for "every course the
+         *     seller has". What the viewer may do about it is the client's to read off `state`, `side` and
+         *     `initiated_by` (the server refuses anything else), never a flag the server could get wrong.
+         */
+        AuthorisationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "requested" | "approved" | "declined" | "revoked";
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "provider" | "partner";
+            /**
+             * Initiated By
+             * @enum {string}
+             */
+            initiated_by: "provider" | "partner";
+            other: components["schemas"]["OrgRefOut"];
+            course?: components["schemas"]["CourseRefOut"] | null;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Approved At */
+            approved_at?: string | null;
+            /** Ended At */
+            ended_at?: string | null;
+            /** Ended By Side */
+            ended_by_side?: ("provider" | "partner") | null;
+        };
         /** BulkPublishIn */
         BulkPublishIn: {
             /** Slugs */
@@ -4457,6 +4662,13 @@ export interface components {
             fee_inr?: number | null;
             tenant: components["schemas"]["TenantOut"];
         };
+        /** CourseRefOut */
+        CourseRefOut: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+        };
         /**
          * CourseRoleAlignmentOut
          * @description A course measured against one role, with no candidate in the request
@@ -4636,6 +4848,41 @@ export interface components {
             organisations_deleted: components["schemas"]["OrganisationFate"][];
             /** Blocked By */
             blocked_by: components["schemas"]["OrganisationFate"][];
+        };
+        /**
+         * DeliveredCourseOut
+         * @description A course an organisation is **authorised** to deliver, and whose it is.
+         */
+        DeliveredCourseOut: {
+            provider: components["schemas"]["OrgRefOut"];
+            course?: components["schemas"]["CourseRefOut"] | null;
+        };
+        /** DeliveredOut */
+        DeliveredOut: {
+            /** Items */
+            items?: components["schemas"]["DeliveredCourseOut"][];
+        };
+        /**
+         * DeliveryAskIn
+         * @description Ask to deliver, or invite to deliver: the other organisation's slug, and the scope.
+         *
+         *     `course_slug` absent or null means every course the seller has.
+         */
+        DeliveryAskIn: {
+            /** Organisation Slug */
+            organisation_slug: string;
+            /** Course Slug */
+            course_slug?: string | null;
+        };
+        /**
+         * DeliveryOut
+         * @description Every arrangement an organisation is in, on both sides (an organisation may be both).
+         */
+        DeliveryOut: {
+            /** As Partner */
+            as_partner?: components["schemas"]["AuthorisationOut"][];
+            /** As Provider */
+            as_provider?: components["schemas"]["AuthorisationOut"][];
         };
         /**
          * DeviceIn
@@ -6151,6 +6398,23 @@ export interface components {
             takedown_reason?: string | null;
         };
         /**
+         * OrgRefOut
+         * @description An organisation as a counterparty sees it: its public face and nothing else.
+         */
+        OrgRefOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** City */
+            city?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+        };
+        /**
          * OrgRegisterRequest
          * @description Cold registration: an address and the organisation it belongs to.
          */
@@ -7382,6 +7646,13 @@ export interface components {
             nsqf_level_min?: number | null;
             /** Level Shortfall */
             level_shortfall?: number | null;
+        };
+        /** TrainingOrganisationList */
+        TrainingOrganisationList: {
+            /** Items */
+            items: components["schemas"]["OrgRefOut"][];
+            /** Total */
+            total: number;
         };
         /**
          * TrainingOut
@@ -10354,6 +10625,268 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_arrangements_org__org_slug__delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_to_deliver_org__org_slug__delivery_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_to_deliver_org__org_slug__delivery_invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_request_org__org_slug__delivery__authorisation_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorisation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_request_org__org_slug__delivery__authorisation_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorisation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_arrangement_org__org_slug__delivery__authorisation_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorisation_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    training_organisations_training_organisations_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                sells?: boolean;
+                delivers?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingOrganisationList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorised_to_deliver_providers__slug__delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveredOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -72,6 +72,10 @@ EXEMPT: dict[str, str] = {
     "counts and who attested the notice was read out. `actor_user_id` is `SET NULL` on erasure so "
     "the record outlives its author; a person's own link to it is `enrolment_batch_members`, "
     "which is exported.",
+    "course_delivery_authorisations": "An arrangement between two organisations (Sprint 97): who "
+    "may deliver whose courses. `requested_by`, `approved_by` and `ended_by` are the people who "
+    "acted for an organisation, `SET NULL` on erasure so the record outlives them; it states "
+    "nothing about them as data subjects.",
     "role_alias_events": "The operator's audit trail of decisions about role aliases (Sprint 47); "
     "`actor_user_id` is `SET NULL` on erasure for the same reason.",
 }

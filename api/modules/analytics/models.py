@@ -117,6 +117,13 @@ EVENT_NAMES = (
     "centre_created",
     "centre_closed",
     "centres_bulk_uploaded",
+    # Sprint 97, ADR-102. Delivering somebody else's course: asked, offered, approved, ended.
+    # Subject to the organisation that acted; the payload says whether it covers every course
+    # (never which course, never who).
+    "delivery_requested",
+    "delivery_invited",
+    "delivery_approved",
+    "delivery_ended",
 )
 
 

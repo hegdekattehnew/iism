@@ -96,6 +96,14 @@ export function useOrgDelivers(orgSlug: string | null): boolean {
   return found?.tenant.delivers_training === true;
 }
 
+/** Whether this organisation sells courses, the same way `useOrgDelivers` answers the other. */
+export function useOrgSells(orgSlug: string | null): boolean {
+  const { organisations } = useMemberships();
+  if (!orgSlug) return false;
+  const found = organisations.find((m) => m.tenant.slug === orgSlug);
+  return found?.tenant.publishes_courses === true;
+}
+
 export function useOrgJobs(orgSlug: string | null) {
   return useQuery({
     queryKey: ["org-jobs", orgSlug],

@@ -53,6 +53,17 @@ describe("Header — the whole header switches, not half of it", () => {
     }
   });
 
+  it("offers Delivery to every training organisation, whichever it does, and to no other kind (Sprint 97)", () => {
+    world.memberships = [personal(), org("tnt", "course_provider"), org("acme")];
+    world.pathname = "/employer/tnt";
+    const a = renderUi(<Header />);
+    expect(link("Delivery")?.getAttribute("href")).toBe("/employer/tnt/delivery");
+    a.unmount();
+    world.pathname = "/employer/acme";
+    renderUi(<Header />);
+    expect(link("Delivery")).toBeNull();
+  });
+
   it("gives a centre's manager their one page and none of an organisation's (Sprint 96)", () => {
     world.memberships = [org("hadapsar", "training_centre", "Hadapsar")];
     world.pathname = "/employer/hadapsar";

@@ -1,0 +1,59 @@
+{
+  "sprint": 97,
+  "captured": "2026-10-23",
+  "method": "Read from the production build's route-bundle-stats.json (npm run build:e2e); the pages checked against the dev API in the in-app browser. NOT the sweep (no Chromium on the machine).",
+  "firstLoadBytes": {
+    "ceiling": 700000,
+    "/profile": {
+      "before": 663951,
+      "after": 664119,
+      "headroom": 35881
+    },
+    "/admin": {
+      "before": 665243,
+      "after": 665411,
+      "headroom": 34589
+    },
+    "/employer/[org]/delivery": {
+      "after": 642213
+    },
+    "/employer/[org]": {
+      "before": 629499,
+      "after": 629667
+    },
+    "/providers/[slug]": {
+      "before": 634948,
+      "after": 635116
+    }
+  },
+  "phoneBundle": {
+    "android_bytes": 3756009,
+    "before": 3750109,
+    "ceiling": 3800000
+  },
+  "migration0061": {
+    "upDownUpRun": true,
+    "alembicCheckClean": true,
+    "appliedToDevDatabase": true
+  },
+  "inAppBrowser": {
+    "sellerSeesRequestApprovesAndSearchesForPartner": true,
+    "deliveryPageHindiAt360pxAnd200PercentText": {
+      "documentWidth": 360,
+      "textOutsideTheScreen": 0,
+      "controlsUnder44px": 0
+    },
+    "publicPartnerPageListsWhatItIsAuthorisedToDeliver": true
+  },
+  "tests": {
+    "backend": 2259,
+    "web": 1369,
+    "mobile": 816
+  },
+  "mutationChecks": {
+    "run": 38,
+    "backend": 24,
+    "web": 14,
+    "survivorsClosed": 3
+  }
+}

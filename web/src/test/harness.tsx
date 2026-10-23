@@ -32,6 +32,7 @@ export type TestMembership = {
     tenant_type: TenantType;
     // What a training organisation does (Sprint 94/95); absent on every other kind.
     delivers_training?: boolean;
+    publishes_courses?: boolean;
   };
 };
 
@@ -134,6 +135,11 @@ function derived() {
 
 export const orgMock = {
   useMemberships: derived,
+  useOrgSells: (slug: string | null) => {
+    if (!slug) return false;
+    const found = derived().organisations.find((m) => m.tenant.slug === slug);
+    return found?.tenant.publishes_courses === true;
+  },
   useOrgDelivers: (slug: string | null) => {
     if (!slug) return false;
     const found = derived().organisations.find((m) => m.tenant.slug === slug);
