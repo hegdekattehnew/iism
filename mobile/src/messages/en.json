@@ -26,7 +26,8 @@
     "tabProfile": "Profile",
     "centres": "Centres",
     "centre": "Your centre",
-    "delivery": "Delivery"
+    "delivery": "Delivery",
+    "batches": "Batches"
   },
   "hero": {
     "eyebrow": "For people looking for work",
@@ -1464,7 +1465,14 @@
       "resolved": "resolved",
       "dismissed": "closed"
     },
-    "statusMessage": "{organisation} moved your application for {vacancy} to: {status}, and left you a message. Read it below."
+    "statusMessage": "{organisation} moved your application for {vacancy} to: {status}, and left you a message. Read it below.",
+    "batchCancelled": "The batch of {course} you registered for was cancelled: {reason}.",
+    "batchReason": {
+      "by_organisation": "the centre cancelled it",
+      "arrangement_ended": "the centre can no longer offer this course",
+      "course_unavailable": "the course is no longer available",
+      "centre_closed": "the centre closed"
+    }
   },
   "searchPage": {
     "title": "Results for “{q}”",
@@ -2390,5 +2398,98 @@
     "withdrawNamed": "Withdraw: {name}",
     "end": "End",
     "endNamed": "End: {name}"
+  },
+  "batches": {
+    "heading": "Batches",
+    "subheading": "A batch is one run of a course at one of your centres, with its own dates and seats.",
+    "count": "{total, plural, one {# batch} other {# batches}}",
+    "plan": "Plan a batch",
+    "filterLabel": "Show batches",
+    "phaseAll": "Every batch",
+    "phase": {
+      "draft": "Draft",
+      "open": "Open",
+      "full": "Full",
+      "running": "Running",
+      "finished": "Finished",
+      "cancelled": "Cancelled"
+    },
+    "story": {
+      "draft": "Not published yet. Publish it when the dates and seats are right.",
+      "open": "Published, and it has not started.",
+      "full": "Published, and every seat is taken.",
+      "running": "Running now. A class in progress cannot be changed or cancelled.",
+      "finished": "This batch is over.",
+      "cancelled": {
+        "by_organisation": "Cancelled by your organisation.",
+        "arrangement_ended": "Cancelled because the arrangement to deliver this course ended.",
+        "course_unavailable": "Cancelled because the course is no longer available.",
+        "centre_closed": "Cancelled because the centre closed."
+      }
+    },
+    "ownCourse": "Your own course",
+    "courseBy": "Course by {organisation}",
+    "deliveredBy": "Delivered by {organisation} at {centre}",
+    "reviewed": "Reviewed by our team",
+    "addressChecked": "Address checked",
+    "dates": "{start} to {end}",
+    "seatsTotal": "{seats, plural, one {# seat} other {# seats}}",
+    "seatsLeft": "{left} of {seats} seats left",
+    "fee": "₹{amount}",
+    "feeFree": "Free",
+    "feeSetByCentre": "Fee set by the centre",
+    "mode": {
+      "in_person": "In person",
+      "hybrid": "Partly online",
+      "online": "Online"
+    },
+    "courseUnavailable": "This course is not published, so this batch cannot be shown to learners until it is.",
+    "publish": "Publish",
+    "publishNamed": "Publish: {name}",
+    "edit": "Edit",
+    "editNamed": "Edit: {name}",
+    "cancelBatch": "Cancel batch",
+    "cancelNamed": "Cancel batch: {name}",
+    "more": "More",
+    "confirmCancel": "Cancel this batch? Nobody has registered for it.",
+    "confirmCancelTold": "Cancel this batch? {count, plural, one {# learner who registered will be told.} other {# learners who registered will be told.}}",
+    "confirmYes": "Yes, cancel it",
+    "confirmNo": "Keep it",
+    "course": "Course",
+    "courseHint": "Your own courses, and courses another organisation has authorised you to deliver.",
+    "chooseCourse": "Choose a course",
+    "courseOption": "{title} (by {organisation})",
+    "centre": "Centre",
+    "centreHint": "Where it is taught.",
+    "chooseCentre": "Choose a centre",
+    "label": "Name for this batch",
+    "labelHint": "Optional. For example: Morning batch.",
+    "startsOn": "First day",
+    "endsOn": "Last day",
+    "datesLocked": "Learners have registered for these dates. To move them, cancel this batch and plan a new one, so they are told.",
+    "seats": "Seats",
+    "seatsHint": "How many learners it can take.",
+    "modeLabel": "How it is taught",
+    "schedule": "Days and times",
+    "scheduleHint": "Optional. For example: Monday to Friday, 9 to 1.",
+    "feeLabel": "Fee for this batch (₹)",
+    "feeHint": "Optional. Leave empty to use the course's fee. Enter 0 if it is free.",
+    "fixedFor": "{course} at {centre}. The course and the centre cannot be changed: plan a new batch instead.",
+    "create": "Plan batch",
+    "saveChanges": "Save changes",
+    "back": "Back",
+    "showMore": "Show more ({left} left)",
+    "empty": "No batches yet",
+    "emptyHint": "Plan a run of one of your courses at one of your centres. You can publish it when the dates are right.",
+    "emptyFiltered": "No batches like this",
+    "emptyFilteredHint": "Choose another phase to see the rest.",
+    "noCentres": "You need an open centre before you can plan a batch.",
+    "noCourses": "You have no course to teach yet. Publish one of your own, or ask another organisation to authorise you to deliver theirs.",
+    "toCentres": "Open centres",
+    "toDelivery": "Open delivery",
+    "notDelivering": "This organisation does not deliver training, so it has no batches. You can change what it does in settings.",
+    "toSettings": "Open settings",
+    "noAccess": "You do not have access to this organisation's batches.",
+    "failed": "Could not save the batch. Try again."
   }
 }

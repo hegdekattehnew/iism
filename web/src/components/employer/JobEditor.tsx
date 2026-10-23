@@ -143,7 +143,7 @@ export function JobEditor({
       <CardBody>
         <FormErrors fields={fieldsOf(error)}>
           <form onSubmit={submit} key={job?.slug ?? "new"} ref={formRef}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label={t("titleEn")} className="sm:col-span-2">
                 {/* `minLength` mirrors `JobIn.title`'s `min_length=3`. Without
                     it the browser accepted a two-character title, the server

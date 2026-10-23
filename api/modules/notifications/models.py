@@ -107,6 +107,10 @@ TEMPLATES = (
     "delivery_approved",
     "delivery_declined",
     "delivery_revoked",
+    # Sprint 98, ADR-103. A batch a learner had registered for was cancelled. In-app only, to the
+    # learner; fixed words, the course's name, a reason code and a link to the course page --
+    # nothing about the centre's address or any free text.
+    "batch_cancelled",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

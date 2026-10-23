@@ -76,6 +76,13 @@ EXEMPT: dict[str, str] = {
     "may deliver whose courses. `requested_by`, `approved_by` and `ended_by` are the people who "
     "acted for an organisation, `SET NULL` on erasure so the record outlives them; it states "
     "nothing about them as data subjects.",
+    "batches": "A run of a course at a centre (Sprint 98): an organisation's plan. `created_by` is "
+    "the person who made it for the organisation, `SET NULL` on erasure so the record outlives "
+    "them; it states nothing about them as a data subject.",
+    "batch_interests": "A learner's interest in a batch -- **personal data, excused only because "
+    "nothing writes a row yet** (Sprint 98 built the table so seats and the cancellation notice "
+    "have something to count; registration is Sprint 100). The change that adds the first writer "
+    "must export this table and remove this entry in the same commit.",
     "role_alias_events": "The operator's audit trail of decisions about role aliases (Sprint 47); "
     "`actor_user_id` is `SET NULL` on erasure for the same reason.",
 }

@@ -72,7 +72,11 @@ export function Header() {
           // courses has no such page, so it is not offered. Only a training organisation can
           // deliver (the server refuses an employer that does), so `delivers` is the whole test.
           ...(delivers
-            ? [{ key: "centres", href: "/centres" }]
+            ? [
+                { key: "centres", href: "/centres" },
+                // ...and runs batches of courses at them (Sprint 98).
+                { key: "batches", href: "/batches" },
+              ]
             : []),
         ].map(({ key, href }) => ({
           key,

@@ -246,10 +246,35 @@ async def update_centre(
 
 
 async def close_centre(db: AsyncSession, parent: Tenant, centre: Tenant, actor: User) -> Tenant:
-    """Close a centre. Batches (Sprint 98) will add their reason here: an open or running batch
-    keeps it open, so a class in progress is never stopped from under its learners."""
+    """Close a centre. A batch not yet over (draft, planned or running) keeps it open, so a class in
+    progress is never stopped from under its learners (Sprint 98)."""
     if centre.closed_at is not None:
         return centre
+    # Lazy: batches import this module's tenant rows, not the other way round at import time.
+    from api.modules import batches
+
+    # Lock the centre against a batch being planned at the same instant: `create_batch` share-locks
+    # this row and re-reads `closed_at`, this takes the stronger lock and counts, so a batch either
+    # lands before the count (the close is refused) or finds the centre closed (and is refused).
+    locked = await db.scalar(
+        select(Tenant)
+        .where(Tenant.id == centre.id)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+    assert locked is not None
+    centre = locked
+    if centre.closed_at is not None:
+        return centre
+    live = await batches.live_at_centre(db, centre.id)
+    if live:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"This centre has {live} batch{'es' if live != 1 else ''} that "
+            f"{'are' if live != 1 else 'is'} not over yet. Cancel "
+            f"{'them' if live != 1 else 'it'}, or wait until "
+            f"{'they finish' if live != 1 else 'it finishes'}, then close the centre",
+        )
     centre.closed_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(centre)

@@ -112,7 +112,7 @@ export function CourseEditor({
       <CardBody>
         <FormErrors fields={fieldsOf(error)}>
           <form onSubmit={submit} key={course?.slug ?? "new"}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label={t("titleEn")} className="sm:col-span-2">
                 <Text
                   name="title"

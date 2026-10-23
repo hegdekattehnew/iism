@@ -1,0 +1,31 @@
+{
+  "sprint": 98,
+  "date": "2026-10-23",
+  "what": "Batches and the batch card (ADR-103, BL-18.5, BL-20.1 in part)",
+  "method": "Built-in browser on the dev API and dev web server, a demonstration delivering organisation with three batches (a draft, a published one, a cancelled one); width 375-380 px (the pane's own size) and, for text fit, 360 px with the root font at 200% in Hindi. First-load bytes from `npm run build:e2e` + `route-bundle-stats.json`. Phone bundle from `make check-mobile-budget`.",
+  "batches_page": {
+    "screens_at_812": 3.31,
+    "batches_listed": 3,
+    "controls_under_44px": 0,
+    "text_under_12px": 0
+  },
+  "text_fit_360px_hindi": {
+    "at_100_percent": {"document_width": 360, "text_outside_screen": 0},
+    "at_200_percent_form_open_before_fix": {"document_width": 389, "text_outside_screen": 3, "cause": "a grid form with no one-column base (`grid gap-4 sm:grid-cols-2`) has an implicit auto column as wide as its widest hint"},
+    "at_200_percent_form_open_after_fix": {"document_width": 360, "text_outside_screen": 0}
+  },
+  "first_load_bytes": {
+    "ceiling": 700000,
+    "/profile": 664151,
+    "/admin": 665443,
+    "/matches": 659208,
+    "/applications": 655433,
+    "/employer/[org]/batches": 653883,
+    "/employer/[org]/centres": 644399,
+    "/employer/[org]/delivery": 642245,
+    "closest_headroom": 34557,
+    "note": "every route grew by 32 B (the shared chunk) against Sprint 97; the batches page is its own route and costs no other route anything"
+  },
+  "phone_bundle_bytes": {"android_hermes": 3765000, "ceiling": 3800000, "note": "grew about 9,000 B from the three message catalogues (the phone carries the web's messages); no batch screen on the phone yet"},
+  "tests": {"backend": 2313, "web": 1429, "mobile": 816, "mutation_checks_backend": 43, "survivors": "1 equivalent (a lock-narrowing optimisation), six closed with tests"}
+}

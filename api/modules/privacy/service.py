@@ -14,16 +14,17 @@ from typing import Any, cast
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
-from api.modules import applications, grievances, interests, moderation, operations
+from api.modules import applications, batches, grievances, interests, moderation, operations
 from api.modules.alerts.models import JobAlert, SponsorIntent
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.applications.models import Application, ApplicationReview, SavedJob
+from api.modules.batches.models import Batch, BatchInterest
 from api.modules.delivery.models import CourseDeliveryAuthorisation
 from api.modules.identity import (
     Invitation,
@@ -214,6 +215,10 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     # cannot be deleted from under them, and a centre has rows of its own (its verification
     # history). Through this same function, so a centre's rows are removed by the one list that
     # knows what a tenant owns, and a table added to it later covers centres too.
+    # Learners with a live interest in a batch that goes with this organisation are told first
+    # (Sprint 98), in this transaction; the rows themselves are removed below. Before the centres
+    # are walked, so the notice is queued once, by the organisation that owns them.
+    await batches.tell_before_deleting(db, tenant_id)
     centre_ids = (await db.scalars(select(Tenant.id).where(Tenant.parent_id == tenant_id))).all()
     for centre_id in centre_ids:
         await _delete_tenant(db, centre_id)
@@ -234,6 +239,15 @@ async def _delete_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     await db.execute(delete(SponsorIntent).where(SponsorIntent.job_id.in_(job_ids)))
     await db.execute(delete(JobSkill).where(JobSkill.job_id.in_(job_ids)))
     await db.execute(delete(Job).where(Job.tenant_id == tenant_id))
+    # Batches (Sprint 98), explicitly: those at this tenant (a centre) and those of its courses
+    # (which another organisation may be running). The interests first, then the rows they point at.
+    batch_ids = select(Batch.id).where(
+        or_(Batch.centre_id == tenant_id, Batch.course_id.in_(course_ids))
+    )
+    await db.execute(delete(BatchInterest).where(BatchInterest.batch_id.in_(batch_ids)))
+    await db.execute(
+        delete(Batch).where(or_(Batch.centre_id == tenant_id, Batch.course_id.in_(course_ids)))
+    )
     await db.execute(delete(CourseInterest).where(CourseInterest.course_id.in_(course_ids)))
     await db.execute(delete(CourseSkill).where(CourseSkill.course_id.in_(course_ids)))
     await db.execute(delete(Course).where(Course.tenant_id == tenant_id))

@@ -80,6 +80,16 @@ const CASES: { file: string; label: string; expect: Expected }[] = [
     },
   },
   {
+    file: "components/employer/BatchForm.tsx",
+    label: "BatchIn (Sprint 98)",
+    expect: {
+      label: ["maxLength={120}"],
+      seats: ["min={1}", "max={5000}"],
+      schedule: ["maxLength={200}"],
+      fee_inr: ["min={0}", "max={10000000}"],
+    },
+  },
+  {
     file: "components/employer/OrgSettings.tsx",
     label: "OrganisationIn",
     expect: {

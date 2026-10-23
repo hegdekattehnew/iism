@@ -74,10 +74,30 @@ describe("text fits at 360 px and 200% text", () => {
     expect(source).toContain('stacked ? "min-w-0 text-left" : "max-w-[12rem] truncate"');
   });
 
+  it("a form that is two columns from tablet up is one *shrinkable* column on a phone (Sprint 98)", () => {
+    // `grid gap-4 sm:grid-cols-2` has an implicit `auto` column on a phone, which is as wide as its
+    // widest child's longest line: at 200% text in Hindi the batch form's hints ran 29 px past a
+    // 360 px screen (document 389 px wide) and the centre form had the same shape. `grid-cols-1` is
+    // `minmax(0, 1fr)`, which lets the column shrink to the screen.
+    for (const file of [
+      "components/employer/BatchForm.tsx",
+      "components/employer/CentreForm.tsx",
+      "components/employer/CourseEditor.tsx",
+      "components/employer/JobEditor.tsx",
+      "components/employer/OrgSettings.tsx",
+    ]) {
+      const grids = classNames(read(file)).filter((c) => /\bsm:grid-cols-2\b/.test(c) && /\bgrid\b/.test(c));
+      expect(grids.length, file).toBeGreaterThan(0);
+      for (const c of grids) expect(c, file).toMatch(/\bgrid-cols-1\b/);
+    }
+  });
+
   it("the matcher can fail", () => {
     expect(classNames('<p className="a truncate b" />').some((c) => /\btruncate\b/.test(c))).toBe(true);
     expect(classNames('<p className={`a ${x} min-w-0`} />').some((c) => /\bmin-w-0\b/.test(c))).toBe(true);
     expect(classNames("<p />")).toEqual([]);
+    // ...and the grid check can fail: a two-column grid with no one-column base is what it looks for.
+    expect(/\bgrid-cols-1\b/.test("grid gap-4 sm:grid-cols-2")).toBe(false);
     expect(() => read("components/does-not-exist.tsx")).toThrow();
   });
 });
