@@ -80,6 +80,14 @@ class Permission(StrEnum):
     # a person.
     CENTRE_READ = "centre:read"
     CENTRE_MANAGE = "centre:manage"
+    # Sprint 96, ADR-102. What a centre's own manager may do **in the centre they run**, reached
+    # through the centre's slug and held by the `manager` role alone. Separate from the two above,
+    # which are an organisation's powers over its centres: no organisation role carries these, so an
+    # owner cannot reach a centre by its own slug, and a manager cannot reach a sibling centre or
+    # the organisation. Seeing the centre and keeping its details true; closing it, who else runs it
+    # and everything about the organisation stay with the organisation.
+    MANAGED_CENTRE_READ = "centre:managed:read"
+    MANAGED_CENTRE_EDIT = "centre:managed:edit"
 
     # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
     # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
@@ -153,10 +161,26 @@ _OWNER: frozenset[Permission] = _ADMIN | {
     Permission.MEMBER_MANAGE,
 }
 
+# The one role that exists only on a training centre (Sprint 96). **Not a rung of the ladder
+# above**: it is smaller than `member` in what it can reach and carries two permissions no
+# organisation role does. A manager sees who else runs the centre and nothing about the
+# organisation's team, listings or learners.
+_MANAGER: frozenset[Permission] = frozenset(
+    {
+        # **No `ORG_READ`**: it opens every route that reads "this organisation's" record, listings
+        # and market, and a centre has none of them. A manager reads their centre through
+        # `MANAGED_CENTRE_READ`, and who else runs it through `MEMBER_READ`.
+        Permission.MEMBER_READ,
+        Permission.MANAGED_CENTRE_READ,
+        Permission.MANAGED_CENTRE_EDIT,
+    }
+)
+
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "member": _MEMBER,
     "admin": _ADMIN,
     "owner": _OWNER,
+    "manager": _MANAGER,
 }
 
 # What `users.is_staff` grants, and the only route to an `OPS_` permission
@@ -230,6 +254,12 @@ class TenantContext:
 # pool and publish a vacancy attributed to "Personal workspace".
 ORGANISATION_TYPES = ("employer", "course_provider")
 
+# Where a person can hold a role and act (Sprint 96): an organisation, or the training centre they
+# were asked to run. **Not `ORGANISATION_TYPES`**, which is what is counted, verified and listed as
+# an organisation: a centre is a place that has a manager, not a fourth kind of business.
+# `_context_for` is the one reader of this list.
+WORKSPACE_TYPES = (*ORGANISATION_TYPES, "training_centre")
+
 # What an organisation may do is answered in one place (Sprint 94, ADR-102). It used to be a map
 # from a verb to one organisation type, compared with `Tenant.tenant_type`; a training organisation
 # may now sell courses, deliver training, or both, so a type no longer says what it may do.
@@ -280,7 +310,7 @@ async def _context_for(db: AsyncSession, user: "User", slug: str) -> TenantConte
             .where(
                 Membership.user_id == user.id,
                 Tenant.slug == slug,
-                Tenant.tenant_type.in_(ORGANISATION_TYPES),
+                Tenant.tenant_type.in_(WORKSPACE_TYPES),
             )
         )
     ).first()

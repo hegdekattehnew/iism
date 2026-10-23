@@ -24,7 +24,8 @@
     "candidateLabel": "Halaman anda",
     "tabMatches": "Padanan",
     "tabProfile": "Profil",
-    "centres": "Centres"
+    "centres": "Centres",
+    "centre": "Your centre"
   },
   "hero": {
     "eyebrow": "For people looking for work",
@@ -846,7 +847,8 @@
     "role": {
       "owner": "Owner",
       "admin": "Administrator",
-      "member": "Member"
+      "member": "Member",
+      "manager": "Manager"
     },
     "chooseContext": "Choose workspace",
     "menuHeading": "Workspace",
@@ -857,7 +859,8 @@
     "typeProviderShort": "Training organisation",
     "filterPlaceholder": "Filter organisations",
     "filterLabel": "Filter your organisations",
-    "filterEmpty": "Nothing matched that."
+    "filterEmpty": "Nothing matched that.",
+    "typeCentreShort": "Training centre"
   },
   "orgSettings": {
     "title": "Organisation profile",
@@ -1063,7 +1066,8 @@
     "welcomeSeekerMeta": "Jobs ranked for what you can do",
     "welcomeOrgMeta": {
       "employer": "Hiring · open your workspace",
-      "course_provider": "Training · open your workspace"
+      "course_provider": "Training · open your workspace",
+      "training_centre": "Centre · open it"
     },
     "welcomeMore": "{count, plural, one {# more workspace is} other {# more workspaces are}} in the menu at the top.",
     "welcomeNote": "You are signed in. What you manage is one tap away."
@@ -1617,7 +1621,8 @@
     "notFoundTitle": "We could not find that invitation",
     "notFoundBody": "Check the link in your email, or ask for a new invitation.",
     "errorGeneric": "Something went wrong. Try again.",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "bodyCentre": "{organisation} has asked you to run its training centre, {centre}."
   },
   "ops": {
     "queueTitle": "Verification queue",
@@ -2250,7 +2255,8 @@
     "notDelivering": "This organisation does not deliver training, so it has no centres. You can change what it does in settings.",
     "toSettings": "Open settings",
     "noAccess": "You do not have access to this organisation's centres.",
-    "failed": "Could not save the centre. Try again."
+    "failed": "Could not save the centre. Try again.",
+    "staffSummary": "Who runs it"
   },
   "centresUpload": {
     "back": "Back to centres",
@@ -2287,5 +2293,36 @@
     "created": "{count, plural, one {# centre added.} other {# centres added.}}",
     "another": "Use another file",
     "viewList": "See my centres"
+  },
+  "centreStaff": {
+    "loadFailed": "Could not load who runs this centre. Try again.",
+    "failed": "That did not work. Try again.",
+    "none": "Nobody has been asked to run this centre yet. You and your colleagues in the organisation can still manage it from here.",
+    "closed": "This centre is closed. Reopen it before asking anyone to run it.",
+    "emailLabel": "Ask somebody to run it",
+    "emailHint": "Their email address. They get a link that works once and lasts seven days.",
+    "invite": "Send the invitation",
+    "remove": "Remove",
+    "removeNamed": "Remove: {name}",
+    "withdraw": "Withdraw",
+    "withdrawNamed": "Withdraw: {email}",
+    "state": {
+      "pending": "Waiting",
+      "accepted": "Accepted",
+      "revoked": "Withdrawn",
+      "expired": "Expired"
+    }
+  },
+  "centreWorkspace": {
+    "title": "Your centre",
+    "subtitle": "Keep its address true and see who else runs it.",
+    "noAccess": "You do not have access to this centre.",
+    "centreOf": "A training centre of {organisation}",
+    "closedNote": "This centre is closed, so it cannot be changed. The organisation can reopen it.",
+    "edit": "Change the centre's details",
+    "whoRunsIt": "Who runs it",
+    "whoRunsItNote": "The organisation decides who runs a centre. Ask them if someone should be added or removed.",
+    "colleaguesFailed": "Could not load who runs this centre.",
+    "you": "you"
   }
 }

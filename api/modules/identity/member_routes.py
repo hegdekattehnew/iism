@@ -245,6 +245,7 @@ async def preview_invitation(
         organisation_slug=tenant.slug,
         tenant_type=tenant.tenant_type,
         role=invitation.role,
+        centre_of=await service.parent_name_of(db, tenant),
     )
 
 

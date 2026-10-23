@@ -208,6 +208,19 @@ describe("ContextSwitcher — what the control says outside a workspace", () => 
     expect(trigger().textContent).not.toContain("Choose workspace");
   });
 
+  it("tells a training centre from the organisations, with the manager's role in words", () => {
+    world.pathname = "/employer/hadapsar";
+    world.memberships = [
+      org("hadapsar", "training_centre", "Hadapsar"),
+      org("acme", "employer", "Acme"),
+    ];
+    world.memberships[0].role = "manager";
+    renderUi(<ContextSwitcher />);
+    fireEvent.click(trigger());
+    expect(screen.getByRole("menuitem", { name: /Hadapsar/ }).textContent).toContain("Training centre · Manager");
+    expect(screen.getByRole("menuitem", { name: /Acme/ }).textContent).toContain("Employer");
+  });
+
   it("names the one used last when there are several", () => {
     world.memberships = [org("a", "employer", "Alpha Hospital"), org("b", "employer", "Beta Clinic")];
     localStorage.setItem("iism.recent_contexts", JSON.stringify(["b"]));

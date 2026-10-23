@@ -1,0 +1,72 @@
+{
+  "sprint": 96,
+  "captured": "2026-10-23",
+  "method": "Read from the production build's route-bundle-stats.json (npm run build:e2e); the pages checked against the dev API in the in-app browser. NOT the sweep (no Chromium on the machine).",
+  "firstLoadBytes": {
+    "ceiling": 700000,
+    "/profile": {
+      "before": 663792,
+      "after": 663951,
+      "headroom": 36049
+    },
+    "/admin": {
+      "before": 665084,
+      "after": 665243,
+      "headroom": 34757
+    },
+    "/employer/[org]/centres": {
+      "before": 642361,
+      "after": 644199
+    },
+    "/employer/[org]/centres/upload": {
+      "before": 648355,
+      "after": 649269
+    },
+    "/employer/[org]": {
+      "before": 629026,
+      "after": 629499
+    },
+    "/invite/[token]": {
+      "after": 634083
+    },
+    "/providers/[slug]": {
+      "before": 634789,
+      "after": 634948
+    }
+  },
+  "phoneBundle": {
+    "android_bytes": 3750109,
+    "before": 3747008,
+    "ceiling": 3800000
+  },
+  "migration0060": {
+    "upDownUpRun": true,
+    "appliedToDevDatabase": true
+  },
+  "inAppBrowser": {
+    "managerPageHindiAt360pxAnd200PercentText": {
+      "documentWidth": 360,
+      "textOutsideTheScreen": 0,
+      "controlsUnder44px": 0
+    },
+    "organisationCentresPageWithStaffFoldOpenHindi": {
+      "documentWidth": 360,
+      "textOutsideTheScreen": 0,
+      "controlsUnder44px": 0
+    },
+    "managerSeesCentreOrganisationAndColleagues": true,
+    "organisationSeesManagerAndAcceptedInvitation": true
+  },
+  "tests": {
+    "backend": 2223,
+    "web": 1352,
+    "mobile": 816
+  },
+  "mutationChecks": {
+    "run": 34,
+    "backend": 18,
+    "web": 16,
+    "survivors": 2,
+    "survivorsNote": "one equivalent (two permissions always held together), one a condition that could not matter (removed)"
+  }
+}

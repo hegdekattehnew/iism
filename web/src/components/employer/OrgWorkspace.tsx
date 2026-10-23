@@ -23,6 +23,10 @@ const ProviderWorkspace = dynamic(
   () => import("@/components/employer/ProviderWorkspace").then((m) => m.ProviderWorkspace),
   { loading },
 );
+const CentreWorkspace = dynamic(
+  () => import("@/components/employer/CentreWorkspace").then((m) => m.CentreWorkspace),
+  { loading },
+);
 
 /**
  * The right workspace for the kind of organisation this is.
@@ -34,6 +38,7 @@ const ProviderWorkspace = dynamic(
 export function OrgWorkspace({ orgSlug }: { orgSlug: string }) {
   const t = useTranslations("employerWorkspace");
   const tp = useTranslations("providerWorkspace");
+  const tc = useTranslations("centreWorkspace");
   const me = useMemberships();
   const type = useOrgType(orgSlug);
 
@@ -65,17 +70,20 @@ export function OrgWorkspace({ orgSlug }: { orgSlug: string }) {
   }
 
   const provider = type === "course_provider";
+  const centre = type === "training_centre";
   return (
     <>
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          {provider ? tp("title") : t("title")}
+          {centre ? tc("title") : provider ? tp("title") : t("title")}
         </h1>
         <p className="mt-2 max-w-2xl text-base text-muted">
-          {provider ? tp("subtitle") : t("subtitle")}
+          {centre ? tc("subtitle") : provider ? tp("subtitle") : t("subtitle")}
         </p>
       </header>
-      {provider ? (
+      {centre ? (
+        <CentreWorkspace slug={orgSlug} />
+      ) : provider ? (
         <ProviderWorkspace orgSlug={orgSlug} />
       ) : (
         <EmployerWorkspace orgSlug={orgSlug} />

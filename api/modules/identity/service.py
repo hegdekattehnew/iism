@@ -26,6 +26,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.adapters.notifications import get_email_provider, get_notification_provider
+from api.core.authorization import ORGANISATION_TYPES
 from api.core.cache import get_redis
 from api.core.config import get_settings
 from api.core.redaction import mask_email, mask_phone
@@ -416,7 +417,7 @@ async def _refuse_duplicate_organisation(db: AsyncSession, user: User, name: str
     existing = await db.scalars(
         select(Tenant)
         .join(Membership, Membership.tenant_id == Tenant.id)
-        .where(Membership.user_id == user.id, Tenant.tenant_type != "personal")
+        .where(Membership.user_id == user.id, Tenant.tenant_type.in_(ORGANISATION_TYPES))
     )
     for tenant in existing:
         if slugify(tenant.name)[:60].strip("-") == wanted:
@@ -451,7 +452,7 @@ async def _within_organisation_cap(db: AsyncSession, user: User) -> None:
         .join(Membership, Membership.tenant_id == Tenant.id)
         .where(
             Membership.user_id == user.id,
-            Tenant.tenant_type != "personal",
+            Tenant.tenant_type.in_(ORGANISATION_TYPES),
             Tenant.created_at >= since,
         )
     )

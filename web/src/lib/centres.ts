@@ -82,3 +82,52 @@ export function useCentreMutations(org: string) {
 
   return { create, update, close, reopen };
 }
+
+export type ManagedCentre = components["schemas"]["ManagedCentreOut"];
+
+/** The centre a manager runs: one key, so saving refreshes the page and nothing else. */
+export const myCentreKey = (slug: string) => ["my-centre", slug] as const;
+
+export function useMyCentre(slug: string) {
+  return useQuery({
+    queryKey: myCentreKey(slug),
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/centre", {
+        params: { path: { org_slug: slug } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useUpdateMyCentre(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: CentreInput) => {
+      const { data, error, response } = await api.PUT("/org/{org_slug}/centre", {
+        params: { path: { org_slug: slug } },
+        body,
+      });
+      if (error || !data) throw apiErrorFrom(response.status, error);
+      return data;
+    },
+    onSuccess: (data) => qc.setQueryData(myCentreKey(slug), data),
+  });
+}
+
+/** Who else runs the centre, as any member of it may read (a colleague's name and address). */
+export function useCentreColleagues(slug: string) {
+  return useQuery({
+    queryKey: ["my-centre", slug, "members"] as const,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/members", {
+        params: { path: { org_slug: slug } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    retry: false,
+  });
+}

@@ -338,6 +338,7 @@ class TestAccepting:
             "organisation_slug": slug,
             "tenant_type": "employer",
             "role": "admin",
+            "centre_of": None,
         }
         inviter = (await client.get("/auth/me", headers=headers)).json()["email"]
         assert inviter not in str(preview)

@@ -272,7 +272,9 @@ export function ContextSwitcher({ stacked = false }: { stacked?: boolean }) {
                 <span className="block text-xs text-muted">
                   {m.tenant.tenant_type === "course_provider"
                     ? t("typeProviderShort")
-                    : t("typeEmployerShort")}
+                    : m.tenant.tenant_type === "training_centre"
+                      ? t("typeCentreShort")
+                      : t("typeEmployerShort")}
                   {" · "}
                   {t(`role.${m.role}`)}
                 </span>

@@ -84,7 +84,13 @@ export function HomeAccess({ children }: { children: ReactNode }) {
               <span className="min-w-0">
                 <span className="block text-base font-semibold">{m.tenant.name}</span>
                 <span className="mt-0.5 block text-xs text-muted">
-                  {t(`welcomeOrgMeta.${m.tenant.tenant_type === "course_provider" ? "course_provider" : "employer"}`)}
+                  {t(
+                    `welcomeOrgMeta.${
+                      m.tenant.tenant_type === "course_provider" || m.tenant.tenant_type === "training_centre"
+                        ? m.tenant.tenant_type
+                        : "employer"
+                    }`,
+                  )}
                 </span>
               </span>
               <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />

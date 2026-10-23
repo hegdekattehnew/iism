@@ -43,6 +43,8 @@ const ORG_NAV = {
     { key: "learners", href: "/interests" },
     { key: "team", href: "/team" },
   ],
+  // A centre's manager has one page: their centre (Sprint 96). No team, no vacancies, no courses.
+  training_centre: [{ key: "centre", href: "" }],
 } as const;
 
 export function Header() {

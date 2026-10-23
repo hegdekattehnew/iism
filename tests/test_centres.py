@@ -6,39 +6,15 @@ through the parent's slug, and anybody else gets the 404 a slug that does not ex
 
 import uuid
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import capability_for
 from api.modules.analytics.models import AnalyticsEvent
 from api.modules.centres import service
-from api.modules.geography.models import District, State
 from api.modules.identity import Tenant
 from api.modules.operations.models import TenantVerificationEvent
 from tests.test_training_organisations import _register, _tenant
-
-
-@pytest.fixture
-async def place(db: AsyncSession) -> tuple[str, str]:
-    state = State(
-        state_code=900_000 + uuid.uuid4().int % 90_000,
-        name=f"Centreland {uuid.uuid4().hex[:6]}",
-        slug=f"centreland-{uuid.uuid4().hex[:8]}",
-    )
-    db.add(state)
-    await db.flush()
-    district = District(
-        district_code=900_000 + uuid.uuid4().int % 90_000,
-        state_id=state.id,
-        name=f"Centreville {uuid.uuid4().hex[:6]}",
-        slug=f"centreville-{uuid.uuid4().hex[:8]}",
-    )
-    db.add(district)
-    await db.commit()
-    assert district.name is not None
-    return state.name, district.name
 
 
 def _body(name: str, place: tuple[str, str], address: str | None = "12 Main Road") -> dict:

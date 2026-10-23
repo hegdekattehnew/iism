@@ -56,6 +56,14 @@ from api.modules.skills import Skill
 log = structlog.get_logger("iism.privacy")
 
 
+# A person's membership of a **training centre** (Sprint 96: they run it) is not a stake in an
+# organisation that erasure would have to hand over or delete. Without this the sole manager of a
+# centre, erasing their account, would be told the centre goes with them -- and it would: the centre
+# is the organisation's, and it only loses its manager.
+def _is_stake(tenant: Tenant) -> bool:
+    return tenant.tenant_type not in ("personal", "training_centre")
+
+
 async def _memberships(db: AsyncSession, user_id: uuid.UUID) -> list[tuple[Membership, Tenant]]:
     rows = await db.execute(
         select(Membership, Tenant)
@@ -177,9 +185,7 @@ async def confirm_consent(db: AsyncSession, user: User, version: str) -> Consent
 
 
 async def deletion_preview(db: AsyncSession, user: User) -> DeletionPreview:
-    memberships = [
-        (m, t) for m, t in await _memberships(db, user.id) if t.tenant_type != "personal"
-    ]
+    memberships = [(m, t) for m, t in await _memberships(db, user.id) if _is_stake(t)]
     tenant_ids = [t.id for _, t in memberships]
     counts = await _membership_counts(db, tenant_ids, user.id)
     listings = await _listings_by_tenant(db, tenant_ids)
@@ -361,9 +367,7 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
     # Before the preview, which is where "is this the only other owner?" is
     # counted: the answer has to hold until our own commit, or an owner erasing
     # themselves while a colleague leaves empties the organisation (Sprint 44).
-    await lock_ownership_of(
-        db, [t.id for _, t in await _memberships(db, user.id) if t.tenant_type != "personal"]
-    )
+    await lock_ownership_of(db, [t.id for _, t in await _memberships(db, user.id) if _is_stake(t)])
     preview = await deletion_preview(db, user)
     if preview.blocked_by:
         names = ", ".join(o.name for o in preview.blocked_by)

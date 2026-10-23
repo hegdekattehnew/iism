@@ -100,3 +100,31 @@ async def client(db) -> AsyncIterator:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def place(db) -> tuple[str, str]:  # type: ignore[no-untyped-def]
+    """A state and a district that exist in the master, for tests that write a place (Sprint 95)."""
+    import uuid
+
+    # Imported here: a module-level import would load settings before `_environment` has pointed
+    # them at the containers.
+    from api.modules.geography.models import District, State
+
+    state = State(
+        state_code=900_000 + uuid.uuid4().int % 90_000,
+        name=f"Centreland {uuid.uuid4().hex[:6]}",
+        slug=f"centreland-{uuid.uuid4().hex[:8]}",
+    )
+    db.add(state)
+    await db.flush()
+    district = District(
+        district_code=900_000 + uuid.uuid4().int % 90_000,
+        state_id=state.id,
+        name=f"Centreville {uuid.uuid4().hex[:6]}",
+        slug=f"centreville-{uuid.uuid4().hex[:8]}",
+    )
+    db.add(district)
+    await db.commit()
+    assert district.name is not None
+    return state.name, district.name

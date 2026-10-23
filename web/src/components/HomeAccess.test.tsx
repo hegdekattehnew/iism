@@ -46,6 +46,13 @@ describe("HomeAccess", () => {
     expect(screen.getByText("Training · open your workspace")).toBeTruthy();
   });
 
+  it("says what a centre is when a manager has only a centre (Sprint 96)", () => {
+    world.memberships = [org("hadapsar", "training_centre", "Hadapsar")];
+    renderUi(<HomeAccess>{chooser}</HomeAccess>);
+    expect(screen.getByText("Centre · open it")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Hadapsar/ }).getAttribute("href")).toBe("/employer/hadapsar");
+  });
+
   it("offers a job seeker their matches", () => {
     world.memberships = [personal()];
     renderUi(<HomeAccess>{chooser}</HomeAccess>);
