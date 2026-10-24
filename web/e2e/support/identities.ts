@@ -184,6 +184,34 @@ export async function publishedCourse(
   return slug;
 }
 
+/** A centre of a delivering organisation, created through the API as set-up (Sprint 95). */
+export async function addCentre(
+  request: APIRequestContext,
+  org: { slug: string; tokens: Tokens },
+  name: string,
+  place: { state: string; district: string } = { state: "Maharashtra", district: "Pune" },
+): Promise<string> {
+  const made = await request.post(api(`/org/${org.slug}/centres`), {
+    headers: bearer(org.tokens),
+    data: { name, address: "12 Main Road", ...place },
+  });
+  if (!made.ok()) throw new Error(`add centre: ${made.status()} ${await made.text()}`);
+  return (await made.json()).slug;
+}
+
+/** A seller authorises a delivering organisation to deliver every course it sells (Sprint 97). */
+export async function authoriseDelivery(
+  request: APIRequestContext,
+  seller: { slug: string; tokens: Tokens },
+  partnerSlug: string,
+): Promise<void> {
+  const made = await request.post(api(`/org/${seller.slug}/delivery/invitations`), {
+    headers: bearer(seller.tokens),
+    data: { organisation_slug: partnerSlug, course_slug: null },
+  });
+  if (!made.ok()) throw new Error(`authorise delivery: ${made.status()} ${await made.text()}`);
+}
+
 /** Save a vacancy for later, as a seeker. */
 export async function saveJob(request: APIRequestContext, tokens: Tokens, jobSlug: string): Promise<void> {
   const res = await request.post(api("/me/saved-jobs"), { headers: bearer(tokens), data: { job_slug: jobSlug } });

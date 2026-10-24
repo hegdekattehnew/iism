@@ -266,6 +266,9 @@ async def test_a_managers_reach_is_their_centre_alone(client, db, setup, place):
         ("GET", "/org/{org_slug}/members"),
         ("GET", "/org/{org_slug}/centre"),
         ("PUT", "/org/{org_slug}/centre"),
+        # Sprint 98: the batches of their own centre, to read. Planning them is the organisation's
+        # (`BATCH_MANAGE`), and so is the list of courses it may plan from.
+        ("GET", "/org/{org_slug}/batches"),
         ("POST", "/org/{org_slug}/leave"),
     }
     seen = 0
@@ -320,7 +323,11 @@ def test_no_organisation_role_holds_a_managers_permissions_and_the_manager_holds
         Permission.MEMBER_READ,
         Permission.MANAGED_CENTRE_READ,
         Permission.MANAGED_CENTRE_EDIT,
+        # Sprint 98: they read their centre's batches. They plan none (`BATCH_MANAGE` is held by no
+        # manager until the centre workspace, Sprint 99).
+        Permission.BATCH_READ,
     }
+    assert Permission.BATCH_MANAGE not in manager
 
 
 # -------------------------------------------------------------------- taking one out

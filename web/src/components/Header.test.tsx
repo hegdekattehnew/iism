@@ -53,6 +53,22 @@ describe("Header — the whole header switches, not half of it", () => {
     }
   });
 
+  it("offers Batches beside Centres, to an organisation that delivers and to nobody else (Sprint 98)", () => {
+    const delivers = org("tnt", "course_provider");
+    delivers.tenant.delivers_training = true;
+    world.memberships = [personal(), delivers, org("sells", "course_provider"), org("acme")];
+    world.pathname = "/employer/tnt";
+    const a = renderUi(<Header />);
+    expect(link("Batches")?.getAttribute("href")).toBe("/employer/tnt/batches");
+    a.unmount();
+    for (const slug of ["sells", "acme"]) {
+      world.pathname = `/employer/${slug}`;
+      const b = renderUi(<Header />);
+      expect(link("Batches"), slug).toBeNull();
+      b.unmount();
+    }
+  });
+
   it("offers Delivery to every training organisation, whichever it does, and to no other kind (Sprint 97)", () => {
     world.memberships = [personal(), org("tnt", "course_provider"), org("acme")];
     world.pathname = "/employer/tnt";
@@ -69,7 +85,7 @@ describe("Header — the whole header switches, not half of it", () => {
     world.pathname = "/employer/hadapsar";
     renderUi(<Header />);
     expect(link("Your centre")?.getAttribute("href")).toBe("/employer/hadapsar");
-    for (const name of ["Vacancies", "Courses", "Team", "Interested learners", "Centres"]) {
+    for (const name of ["Vacancies", "Courses", "Team", "Interested learners", "Centres", "Batches"]) {
       expect(link(name), name).toBeNull();
     }
   });

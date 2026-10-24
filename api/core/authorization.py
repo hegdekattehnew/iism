@@ -94,6 +94,14 @@ class Permission(StrEnum):
     # one can be asked for) and none of it discloses a person, so it sits with the centres.
     DELIVERY_READ = "delivery:read"
     DELIVERY_MANAGE = "delivery:manage"
+    # Sprint 98, ADR-103. A batch is one run of one course at one centre. Seeing them is every
+    # member's and a centre manager's (a batch is a plan, not a person); making, changing,
+    # publishing and cancelling them is an admin's and an owner's, as the centres are. A manager
+    # gains `BATCH_MANAGE` with the centre workspace (Sprint 99), not before: planning a run commits
+    # the organisation to teaching it, and that is not yet theirs to do. The learners of a batch are
+    # a different permission and arrive with the registration that creates them.
+    BATCH_READ = "batch:read"
+    BATCH_MANAGE = "batch:manage"
 
     # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
     # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
@@ -137,6 +145,7 @@ _MEMBER: frozenset[Permission] = frozenset(
         Permission.MEMBER_READ,
         Permission.CENTRE_READ,
         Permission.DELIVERY_READ,
+        Permission.BATCH_READ,
     }
 )
 # Roles stay type-agnostic: an admin of any organisation holds both publishing
@@ -155,6 +164,7 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.LEARNER_CONTACT,
     Permission.CENTRE_MANAGE,
     Permission.DELIVERY_MANAGE,
+    Permission.BATCH_MANAGE,
     # An admin may bring someone in, and `invite()` decides at what role: a
     # `member` only. That ceiling is enforced in the service, once, rather
     # than by a fourth permission -- it is a rule about the *argument*, and a
@@ -185,6 +195,7 @@ _MANAGER: frozenset[Permission] = frozenset(
         Permission.MEMBER_READ,
         Permission.MANAGED_CENTRE_READ,
         Permission.MANAGED_CENTRE_EDIT,
+        Permission.BATCH_READ,
     }
 )
 

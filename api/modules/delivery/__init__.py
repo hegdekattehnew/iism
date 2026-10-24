@@ -8,6 +8,6 @@ capability guards), the way it reads courses.
 
 from api.modules.delivery.models import CourseDeliveryAuthorisation
 from api.modules.delivery.routes import public_router, router
-from api.modules.delivery.service import authorises
+from api.modules.delivery.service import authorises, on_ended
 
-__all__ = ["CourseDeliveryAuthorisation", "authorises", "public_router", "router"]
+__all__ = ["CourseDeliveryAuthorisation", "authorises", "on_ended", "public_router", "router"]

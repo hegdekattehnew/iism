@@ -124,6 +124,9 @@ EVENT_NAMES = (
     "delivery_invited",
     "delivery_approved",
     "delivery_ended",
+    "batch_created",
+    "batch_published",
+    "batch_cancelled",
 )
 
 

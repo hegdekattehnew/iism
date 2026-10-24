@@ -7,6 +7,7 @@ import {
   BellIcon,
   BookOpenIcon,
   BriefcaseIcon,
+  CalendarIcon,
   InboxIcon,
   InfoIcon,
   TargetIcon,
@@ -28,6 +29,7 @@ const ICONS: Record<string, ReactElement> = {
   vacancy_closed: <AlertTriangleIcon />,
   course_interest_status_changed: <BookOpenIcon />,
   sponsor_offer: <AwardIcon />,
+  batch_cancelled: <CalendarIcon />,
   grievance_update: <InfoIcon />,
 };
 

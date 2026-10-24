@@ -1656,6 +1656,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Batches */
+        get: operations["list_batches_org__org_slug__batches_get"];
+        put?: never;
+        /** Create Batch */
+        post: operations["create_batch_org__org_slug__batches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deliverable Courses
+         * @description The courses a batch can be made of: this organisation's own, and those it is authorised to
+         *     deliver.
+         */
+        get: operations["deliverable_courses_org__org_slug__batches_courses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Batch */
+        get: operations["get_batch_org__org_slug__batches__batch_id__get"];
+        /** Update Batch */
+        put: operations["update_batch_org__org_slug__batches__batch_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/{batch_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Batch */
+        post: operations["publish_batch_org__org_slug__batches__batch_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/{batch_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Batch */
+        post: operations["cancel_batch_org__org_slug__batches__batch_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/training-organisations": {
         parameters: {
             query?: never;
@@ -3793,6 +3884,195 @@ export interface components {
             /** Ended By Side */
             ended_by_side?: ("provider" | "partner") | null;
         };
+        /** BatchCentreOut */
+        BatchCentreOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+        };
+        /** BatchCourseOut */
+        BatchCourseOut: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /**
+             * Available
+             * @default true
+             */
+            available: boolean;
+            provider: components["schemas"]["BatchOrgOut"];
+            /**
+             * Own
+             * @default true
+             */
+            own: boolean;
+        };
+        /** BatchIn */
+        BatchIn: {
+            /** Label */
+            label?: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Mode
+             * @default in_person
+             * @enum {string}
+             */
+            mode: "in_person" | "hybrid" | "online";
+            /** Schedule */
+            schedule?: string | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /** Course Slug */
+            course_slug: string;
+            /** Centre Slug */
+            centre_slug?: string | null;
+        };
+        /** BatchList */
+        BatchList: {
+            /** Items */
+            items: components["schemas"]["BatchOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** BatchOrgOut */
+        BatchOrgOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Is Verified
+             * @default false
+             */
+            is_verified: boolean;
+        };
+        /** BatchOut */
+        BatchOut: {
+            /** Id */
+            id: string;
+            course: components["schemas"]["BatchCourseOut"];
+            centre: components["schemas"]["BatchCentreOut"];
+            organisation: components["schemas"]["BatchOrgOut"];
+            /** Label */
+            label?: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Enrolled
+             * @default 0
+             */
+            enrolled: number;
+            /** Seats Left */
+            seats_left: number;
+            /**
+             * Interested
+             * @default 0
+             */
+            interested: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "in_person" | "hybrid" | "online";
+            /** Schedule */
+            schedule?: string | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            /** Fee Effective */
+            fee_effective?: number | null;
+            /**
+             * Fee Is Override
+             * @default false
+             */
+            fee_is_override: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published" | "cancelled";
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "open" | "full" | "running" | "finished" | "cancelled";
+            /** Cancel Reason */
+            cancel_reason?: ("by_organisation" | "arrangement_ended" | "course_unavailable" | "centre_closed") | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * BatchUpdateIn
+         * @description The course and the centre are fixed once a batch exists: a different course or a different
+         *     place is a different batch, and the learners who registered for this one did not choose that.
+         */
+        BatchUpdateIn: {
+            /** Label */
+            label?: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Mode
+             * @default in_person
+             * @enum {string}
+             */
+            mode: "in_person" | "hybrid" | "online";
+            /** Schedule */
+            schedule?: string | null;
+            /** Fee Inr */
+            fee_inr?: number | null;
+        };
         /** BulkPublishIn */
         BulkPublishIn: {
             /** Slugs */
@@ -4848,6 +5128,28 @@ export interface components {
             organisations_deleted: components["schemas"]["OrganisationFate"][];
             /** Blocked By */
             blocked_by: components["schemas"]["OrganisationFate"][];
+        };
+        /**
+         * DeliverableCourseOut
+         * @description A course this organisation may make a batch of: its own, or one it may deliver.
+         */
+        DeliverableCourseOut: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Fee Inr */
+            fee_inr?: number | null;
+            provider: components["schemas"]["BatchOrgOut"];
+            /** Own */
+            own: boolean;
+        };
+        /** DeliverableCourses */
+        DeliverableCourses: {
+            /** Items */
+            items: components["schemas"]["DeliverableCourseOut"][];
+            /** Total */
+            total: number;
         };
         /**
          * DeliveredCourseOut
@@ -10821,6 +11123,241 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthorisationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_batches_org__org_slug__batches_get: {
+        parameters: {
+            query?: {
+                phase?: ("draft" | "open" | "full" | "running" | "finished" | "cancelled") | null;
+                centre?: string | null;
+                course?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_batch_org__org_slug__batches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deliverable_courses_org__org_slug__batches_courses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliverableCourses"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_batch_org__org_slug__batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_batch_org__org_slug__batches__batch_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_batch_org__org_slug__batches__batch_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_batch_org__org_slug__batches__batch_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
                 };
             };
             /** @description Validation Error */

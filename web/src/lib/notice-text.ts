@@ -59,6 +59,12 @@ export function useNoticeText(): (notice: NoticeData) => string {
             `interestStatus.${String(notice.payload.status ?? "contacted")}`,
           ),
         });
+      case "batch_cancelled":
+        // Fixed words and a reason *code*: nothing about the centre's address or any free text.
+        return t("batchCancelled", {
+          course: String(notice.payload.course ?? ""),
+          reason: t(`batchReason.${String(notice.payload.reason ?? "by_organisation")}`),
+        });
       case "sponsor_offer":
         // Names the organisation, the standard and the course, and nothing about the person: the
         // employer does not know who they are.

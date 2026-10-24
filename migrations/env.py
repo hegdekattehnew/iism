@@ -15,6 +15,7 @@ from api.core.localisation import ContentTranslation as _ContentTranslation  # n
 from api.modules.alerts import models as _alerts_models  # noqa: F401
 from api.modules.analytics import models as _analytics_models  # noqa: F401
 from api.modules.applications import models as _applications_models  # noqa: F401
+from api.modules.batches import models as _batches_models  # noqa: F401
 from api.modules.delivery import models as _delivery_models  # noqa: F401
 from api.modules.geography import models as _geography_models  # noqa: F401
 from api.modules.grievances import models as _grievances_models  # noqa: F401

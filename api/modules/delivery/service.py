@@ -19,6 +19,7 @@ One module owns the rules, each in one place:
 """
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -43,6 +44,20 @@ from api.modules.marketplace.models import Course
 from api.modules.notifications import enqueue
 
 log = structlog.get_logger("iism.delivery")
+
+# What happens when an approved arrangement ends (Sprint 98, ADR-103). `delivery` must not depend on
+# `batches` (batches asks `authorises`; the other direction is a cycle), so the batch module
+# registers a callback here, and `revoke` calls each one **inside its own transaction, before the
+# commit**: the arrangement ends and the open batches under it are cancelled together or not at all.
+EndedCallback = Callable[[AsyncSession, Authorisation], Awaitable[None]]
+_on_ended: list[EndedCallback] = []
+
+
+def on_ended(callback: EndedCallback) -> None:
+    """Register what must also happen when an approved arrangement is revoked. Idempotent."""
+    if callback not in _on_ended:
+        _on_ended.append(callback)
+
 
 # Arrangements an organisation has started and nobody has answered. A cap that deters a script
 # writing to a hundred organisations; advisory, like the other abuse caps (ADR-052).
@@ -94,23 +109,31 @@ async def _course_of(db: AsyncSession, provider: Tenant, course_slug: str | None
     return course
 
 
-async def authorises(db: AsyncSession, partner_id: uuid.UUID, course: Course) -> bool:
-    """May this organisation deliver this course? **The one answer batches will ask.**
+async def authorises(
+    db: AsyncSession, partner_id: uuid.UUID, course: Course, *, lock: bool = False
+) -> bool:
+    """May this organisation deliver this course? **The one answer batches ask.**
 
     Its own course: always, and no row exists. Somebody else's: only through an approved,
     unended authorisation that names the course or all of the seller's courses.
+
+    `lock=True` share-locks the covering rows, for a writer that acts on the answer (a batch being
+    made or published): `FOR SHARE` conflicts with `revoke`'s `FOR UPDATE`, so the batch either
+    exists before the revocation's sweep looks for open batches (and is cancelled by it) or finds
+    the arrangement ended (and is refused). The answer is only true while nobody can end it.
     """
     if course.tenant_id == partner_id:
         return True
-    held = await db.scalar(
-        select(Authorisation.id).where(
-            Authorisation.partner_id == partner_id,
-            Authorisation.provider_id == course.tenant_id,
-            or_(Authorisation.course_id.is_(None), Authorisation.course_id == course.id),
-            Authorisation.approved_at.is_not(None),
-            Authorisation.ended_at.is_(None),
-        )
+    query = select(Authorisation.id).where(
+        Authorisation.partner_id == partner_id,
+        Authorisation.provider_id == course.tenant_id,
+        or_(Authorisation.course_id.is_(None), Authorisation.course_id == course.id),
+        Authorisation.approved_at.is_not(None),
+        Authorisation.ended_at.is_(None),
     )
+    if lock:
+        query = query.with_for_update(read=True)
+    held = (await db.scalars(query)).first()
     return held is not None
 
 
@@ -396,6 +419,12 @@ async def _end(
     row.ended_by_side = side
     row.ended_by = actor.id
     await _notify_other(db, org, row, template)
+    if from_state == "approved":
+        # An approved arrangement that ends takes its open batches with it (ADR-103). Flushed first
+        # so the callbacks see this row as ended; a declined request never had any.
+        await db.flush()
+        for callback in _on_ended:
+            await callback(db, row)
     org_id = org.id
     await db.commit()
     await db.refresh(row)

@@ -173,6 +173,30 @@ describe("Notices", () => {
       );
     });
 
+    it.each([
+      ["by_organisation", "the centre cancelled it"],
+      ["arrangement_ended", "the centre can no longer offer this course"],
+      ["course_unavailable", "the course is no longer available"],
+      ["centre_closed", "the centre closed"],
+    ])("words a cancelled batch, with the reason %s", async (reason, words) => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "batch_cancelled",
+            payload: { course: "Welding basics", reason, path: "/courses/welding" },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(
+        await screen.findByText(`The batch of Welding basics you registered for was cancelled: ${words}.`),
+      ).toBeTruthy();
+      expect(screen.queryByText("You have an update.")).toBeNull();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/courses/welding");
+    });
+
     it("says something neutral for a template it does not know", async () => {
       GET.mockResolvedValue({
         data: [notice({ template: "something_new", payload: {} })],

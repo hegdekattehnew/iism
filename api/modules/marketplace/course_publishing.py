@@ -241,6 +241,18 @@ async def delete_course(db: AsyncSession, tenant_id: uuid.UUID, slug: str) -> No
     )
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+    # A class somebody is planning or attending is not deleted from under them (Sprint 98). Lazy:
+    # batches import this module's models, so a module-level import is a cycle.
+    from api.modules import batches
+
+    live = await batches.live_for_course(db, course.id)
+    if live:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{live} batch{'es' if live != 1 else ''} of this course "
+            f"{'are' if live != 1 else 'is'} not over yet. Unpublish the course instead, or wait "
+            "until the batches finish or are cancelled",
+        )
     # WARNING, not INFO: irreversible, owner-only, and it is what you go
     # looking for after "our listing disappeared".
     log.warning("marketplace.course_deleted", slug=slug)
