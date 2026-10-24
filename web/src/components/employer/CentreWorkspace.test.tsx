@@ -38,10 +38,31 @@ const colleague = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const overview = (over: Record<string, unknown> = {}) => ({
+  drafts: 2,
+  starting_soon: 3,
+  running: 1,
+  unfilled_seats: 14,
+  unfilled_batches: 2,
+  unavailable: 0,
+  upcoming: [
+    {
+      id: "b1",
+      course: { title: "Welding basics" },
+      centre: { name: "Hadapsar" },
+      starts_on: "2026-11-09",
+      seats_left: 12,
+    },
+  ],
+  ...over,
+});
+
 function serve(c: unknown, members: unknown[] = [colleague()], status = 200) {
   GET.mockImplementation(async (path: string) => {
     if (status !== 200) return { data: undefined, error: {}, response: { status } };
     if (path === "/org/{org_slug}/centre") return { data: c, error: undefined, response: { status } };
+    if (path === "/org/{org_slug}/batches/overview")
+      return { data: overview(), error: undefined, response: { status } };
     return { data: members, error: undefined, response: { status } };
   });
 }
@@ -64,6 +85,19 @@ describe("CentreWorkspace", () => {
     expect(screen.getByText(/12 Main Road · Pune, Maharashtra/)).toBeTruthy();
     expect(screen.getByText("Open")).toBeTruthy();
     expect(screen.getByText("Address not checked yet")).toBeTruthy();
+  });
+
+  it("leads with the centre's work: the figures, then the next batch to start (Sprint 99)", async () => {
+    serve(centre());
+    page();
+    expect(await screen.findByText("Starting this week")).toBeTruthy();
+    expect(await screen.findByText("14")).toBeTruthy();
+    expect(screen.getByText("in 2 batches")).toBeTruthy();
+    expect(screen.getByText(/Welding basics/)).toBeTruthy();
+    expect(screen.getByText(/12 seats left/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "All batches" }).getAttribute("href")).toBe(
+      "/employer/acme-hadapsar/batches",
+    );
   });
 
   it("says who runs it, naming the reader as 'you', and says who decides", async () => {

@@ -1684,11 +1684,128 @@ export interface paths {
         /**
          * Deliverable Courses
          * @description The courses a batch can be made of: this organisation's own, and those it is authorised to
-         *     deliver.
+         *     deliver. **Planning's, not reading's**: it names other organisations' arrangements, which a
+         *     centre's manager (who reads their centre's batches) has no part in.
          */
         get: operations["deliverable_courses_org__org_slug__batches_courses_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Batches Overview
+         * @description What to look at today: drafts, what starts this week, what is running, seats still free in
+         *     classes about to begin, and the next few to start.
+         */
+        get: operations["batches_overview_org__org_slug__batches_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/of-my-courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Batches Of My Courses
+         * @description How other organisations run this seller's courses: per course and organisation, counts of
+         *     published batches by phase and seats. No learner, no contact, no centre.
+         */
+        get: operations["batches_of_my_courses_org__org_slug__batches_of_my_courses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/bulk/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Batches Template */
+        get: operations["batches_template_org__org_slug__batches_bulk_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/bulk/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Batches
+         * @description Validate every row and say what an apply would do. Writes nothing.
+         */
+        post: operations["check_batches_org__org_slug__batches_bulk_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/bulk/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Batches
+         * @description Check the file again, then create each valid row as a **draft**. Never publishes.
+         */
+        post: operations["apply_batches_org__org_slug__batches_bulk_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/bulk/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Batches */
+        post: operations["publish_batches_org__org_slug__batches_bulk_publish_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3884,6 +4001,73 @@ export interface components {
             /** Ended By Side */
             ended_by_side?: ("provider" | "partner") | null;
         };
+        /** BatchBulkPublishIn */
+        BatchBulkPublishIn: {
+            /** Ids */
+            ids: string[];
+        };
+        /** BatchBulkPublishOut */
+        BatchBulkPublishOut: {
+            /** Results */
+            results: components["schemas"]["BatchBulkPublishRowOut"][];
+            /** Published */
+            published: number;
+            /** Refused */
+            refused: number;
+        };
+        /** BatchBulkPublishRowOut */
+        BatchBulkPublishRowOut: {
+            /** Id */
+            id: string;
+            /** Published */
+            published: boolean;
+            /** Message */
+            message?: string | null;
+        };
+        /** BatchBulkReportOut */
+        BatchBulkReportOut: {
+            /** Applied */
+            applied: boolean;
+            /** Rows */
+            rows: components["schemas"]["BatchBulkRowOut"][];
+            /** Notes */
+            notes: string[];
+            /** Ok */
+            ok: number;
+            /** Warnings */
+            warnings: number;
+            /** Errors */
+            errors: number;
+            /** Skipped */
+            skipped: number;
+            /** Created */
+            created: number;
+            /** Errors Csv */
+            errors_csv?: string | null;
+        };
+        /** BatchBulkRowOut */
+        BatchBulkRowOut: {
+            /** Row */
+            row: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "skip";
+            /** Course */
+            course?: string | null;
+            /** Centre */
+            centre?: string | null;
+            /** Messages */
+            messages?: string[];
+            /** Id */
+            id?: string | null;
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+        };
         /** BatchCentreOut */
         BatchCentreOut: {
             /** Slug */
@@ -4041,6 +4225,27 @@ export interface components {
             cancelled_at?: string | null;
             /** Created At */
             created_at?: string | null;
+        };
+        /**
+         * BatchOverview
+         * @description What a delivering organisation (or a centre) has to look at today: counts first, then the
+         *     next few that start. Every figure is counted where the rows are, never read off a page.
+         */
+        BatchOverview: {
+            /** Drafts */
+            drafts: number;
+            /** Starting Soon */
+            starting_soon: number;
+            /** Running */
+            running: number;
+            /** Unfilled Seats */
+            unfilled_seats: number;
+            /** Unfilled Batches */
+            unfilled_batches: number;
+            /** Unavailable */
+            unavailable: number;
+            /** Upcoming */
+            upcoming: components["schemas"]["BatchOut"][];
         };
         /**
          * BatchUpdateIn
@@ -4733,6 +4938,35 @@ export interface components {
             districts_with_vacancy: number;
             /** Demo */
             demo: boolean;
+        };
+        /** CourseBatchesOut */
+        CourseBatchesOut: {
+            /** Items */
+            items: components["schemas"]["CourseBatchesRowOut"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * CourseBatchesRowOut
+         * @description One course of the seller's, as one delivering organisation runs it: counts, no learner.
+         */
+        CourseBatchesRowOut: {
+            course: components["schemas"]["OrgCourseRef"];
+            organisation: components["schemas"]["BatchOrgOut"];
+            /** Batches */
+            batches: number;
+            /** Open */
+            open: number;
+            /** Full */
+            full: number;
+            /** Running */
+            running: number;
+            /** Finished */
+            finished: number;
+            /** Seats */
+            seats: number;
+            /** Enrolled */
+            enrolled: number;
         };
         /** CourseDetail */
         CourseDetail: {
@@ -6595,6 +6829,13 @@ export interface components {
              * @description Derived from the date, never stored: a stored flag is wrong the morning after.
              */
             readonly started: boolean;
+        };
+        /** OrgCourseRef */
+        OrgCourseRef: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
         };
         /**
          * OrgCreateRequest
@@ -11226,6 +11467,204 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeliverableCourses"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batches_overview_org__org_slug__batches_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batches_of_my_courses_org__org_slug__batches_of_my_courses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseBatchesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batches_template_org__org_slug__batches_bulk_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_batches_org__org_slug__batches_bulk_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchBulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_batches_org__org_slug__batches_bulk_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchBulkReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_batches_org__org_slug__batches_bulk_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchBulkPublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchBulkPublishOut"];
                 };
             };
             /** @description Validation Error */

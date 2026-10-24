@@ -140,3 +140,82 @@ class DeliverableCourseOut(BaseModel):
 class DeliverableCourses(BaseModel):
     items: list[DeliverableCourseOut]
     total: int
+
+
+class BatchOverview(BaseModel):
+    """What a delivering organisation (or a centre) has to look at today: counts first, then the
+    next few that start. Every figure is counted where the rows are, never read off a page."""
+
+    drafts: int
+    starting_soon: int
+    running: int
+    # Seats not yet taken in published batches that start within a fortnight, and how many batches
+    # they are in: the work of filling a class is the work of the weeks before it starts.
+    unfilled_seats: int
+    unfilled_batches: int
+    # Batches not yet over whose course is not published (the page warns; learners cannot see them).
+    unavailable: int
+    upcoming: list[BatchOut]
+
+
+class OrgCourseRef(BaseModel):
+    slug: str
+    title: str
+
+
+class CourseBatchesRowOut(BaseModel):
+    """One course of the seller's, as one delivering organisation runs it: counts, no learner."""
+
+    course: OrgCourseRef
+    organisation: BatchOrgOut
+    batches: int
+    open: int
+    full: int
+    running: int
+    finished: int
+    seats: int
+    enrolled: int
+
+
+class CourseBatchesOut(BaseModel):
+    items: list[CourseBatchesRowOut]
+    total: int
+
+
+class BatchBulkRowOut(BaseModel):
+    row: int
+    status: Literal["ok", "warning", "error", "skip"]
+    course: str | None = None
+    centre: str | None = None
+    messages: list[str] = Field(default_factory=list)
+    # The batch a skipped row matched, or the one an applied row made.
+    id: str | None = None
+    created: bool = False
+
+
+class BatchBulkReportOut(BaseModel):
+    applied: bool
+    rows: list[BatchBulkRowOut]
+    notes: list[str]
+    ok: int
+    warnings: int
+    errors: int
+    skipped: int
+    created: int
+    errors_csv: str | None = None
+
+
+class BatchBulkPublishIn(BaseModel):
+    ids: Annotated[list[str], Field(min_length=1, max_length=200)]
+
+
+class BatchBulkPublishRowOut(BaseModel):
+    id: str
+    published: bool
+    message: str | None = None
+
+
+class BatchBulkPublishOut(BaseModel):
+    results: list[BatchBulkPublishRowOut]
+    published: int
+    refused: int

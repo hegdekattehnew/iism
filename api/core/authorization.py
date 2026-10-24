@@ -96,10 +96,11 @@ class Permission(StrEnum):
     DELIVERY_MANAGE = "delivery:manage"
     # Sprint 98, ADR-103. A batch is one run of one course at one centre. Seeing them is every
     # member's and a centre manager's (a batch is a plan, not a person); making, changing,
-    # publishing and cancelling them is an admin's and an owner's, as the centres are. A manager
-    # gains `BATCH_MANAGE` with the centre workspace (Sprint 99), not before: planning a run commits
-    # the organisation to teaching it, and that is not yet theirs to do. The learners of a batch are
-    # a different permission and arrive with the registration that creates them.
+    # publishing and cancelling them is an admin's and an owner's, **and, since Sprint 99, a centre
+    # manager's for their own centre** (the route's tenant is the centre, so a sibling's batch is
+    # the 404 of none; an authorisation the organisation does not hold still refuses the plan).
+    # The learners of a batch are a different permission and arrive with the registration that
+    # creates them (Sprint 100).
     BATCH_READ = "batch:read"
     BATCH_MANAGE = "batch:manage"
 
@@ -195,7 +196,11 @@ _MANAGER: frozenset[Permission] = frozenset(
         Permission.MEMBER_READ,
         Permission.MANAGED_CENTRE_READ,
         Permission.MANAGED_CENTRE_EDIT,
+        # Sprint 99: they plan, publish, change and cancel the batches of their own centre (the
+        # route's tenant is the centre, so a sibling's batch is the 404 of none). The courses they
+        # may plan from are their organisation's authorisations, read for them.
         Permission.BATCH_READ,
+        Permission.BATCH_MANAGE,
     }
 )
 

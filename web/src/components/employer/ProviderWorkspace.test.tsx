@@ -57,6 +57,19 @@ function serving(status: number | null, courses = [course()]) {
   GET.mockImplementation(async (path: string) => {
     if (status !== null)
       return { data: undefined, error: { detail: "no" }, response: { status } };
+    if (path.includes("/batches/overview"))
+      return {
+        data: {
+          drafts: 1,
+          starting_soon: 4,
+          running: 0,
+          unfilled_seats: 6,
+          unfilled_batches: 1,
+          unavailable: 0,
+          upcoming: [],
+        },
+        error: undefined,
+      };
     if (path.includes("/interests")) return { data: [], error: undefined };
     if (path.includes("/courses")) return { data: courses, error: undefined };
     return { data: { memberships: [] }, error: undefined };
@@ -187,5 +200,25 @@ describe("ProviderWorkspace -- the look of a course's state", () => {
       unmount();
     }
     expect(new Set(shapes).size).toBe(3);
+  });
+});
+
+describe("ProviderWorkspace — a delivering organisation leads with its batches (Sprint 99)", () => {
+  it("shows the figures above the courses for an organisation that delivers", async () => {
+    const m = org("inst", "course_provider", "Inst");
+    m.tenant.delivers_training = true;
+    world.memberships = [m];
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    expect(await screen.findByText("Starting this week")).toBeTruthy();
+    const courses = await screen.findByRole("heading", { name: "Your courses" });
+    const figures = screen.getByText("Starting this week").compareDocumentPosition(courses);
+    expect(figures & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks for nothing and shows nothing of the kind to an organisation that only sells", async () => {
+    renderUi(<ProviderWorkspace orgSlug="inst" />);
+    await screen.findByRole("heading", { name: "Your courses" });
+    expect(screen.queryByText("Starting this week")).toBeNull();
+    expect(GET.mock.calls.some((c) => String(c[0]).includes("/batches/overview"))).toBe(false);
   });
 });

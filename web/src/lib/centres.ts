@@ -10,9 +10,10 @@ export type CentreInput = components["schemas"]["CentreIn"];
 /** The one key every centre read and write shares, so a change refreshes the list and nothing else. */
 export const centresKey = (org: string) => ["org-centres", org] as const;
 
-export function useCentres(org: string) {
+export function useCentres(org: string, enabled = true) {
   return useQuery({
     queryKey: centresKey(org),
+    enabled,
     queryFn: async () => {
       const { data, error, response } = await api.GET("/org/{org_slug}/centres", {
         params: { path: { org_slug: org } },

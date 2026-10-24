@@ -19,6 +19,7 @@ export function BatchForm({
   batch,
   courses,
   centres,
+  inCentre = false,
   pending,
   error,
   onSubmit,
@@ -27,6 +28,8 @@ export function BatchForm({
   batch?: Batch;
   courses?: DeliverableCourse[];
   centres?: Centre[];
+  /** A centre's own manager plans in their centre: there is no centre to choose. */
+  inCentre?: boolean;
   pending: boolean;
   error: unknown;
   onSubmit: (body: BatchInput | BatchChanges) => void;
@@ -54,7 +57,11 @@ export function BatchForm({
           onSubmit(
             batch
               ? common
-              : { ...common, course_slug: s("course_slug"), centre_slug: s("centre_slug") },
+              : {
+                  ...common,
+                  course_slug: s("course_slug"),
+                  centre_slug: inCentre ? null : s("centre_slug"),
+                },
           );
         }}
       >
@@ -76,18 +83,20 @@ export function BatchForm({
                 ))}
               </Select>
             </Field>
-            <Field label={t("centre")} hint={t("centreHint")}>
-              <Select name="centre_slug" required defaultValue="">
-                <option value="" disabled>
-                  {t("chooseCentre")}
-                </option>
-                {(centres ?? []).map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.name}
+            {!inCentre && (
+              <Field label={t("centre")} hint={t("centreHint")}>
+                <Select name="centre_slug" required defaultValue="">
+                  <option value="" disabled>
+                    {t("chooseCentre")}
                   </option>
-                ))}
-              </Select>
-            </Field>
+                  {(centres ?? []).map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </>
         )}
         <Field label={t("label")} hint={t("labelHint")} className="sm:col-span-2">

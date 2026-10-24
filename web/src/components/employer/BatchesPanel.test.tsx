@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchesPanel } from "@/components/employer/BatchesPanel";
-import { renderUi, resetWorld } from "@/test/harness";
+import { org as orgMembership, renderUi, resetWorld, world } from "@/test/harness";
 
 vi.mock("@/lib/auth", async () => (await import("@/test/harness")).authMock);
 vi.mock("@/lib/org", async () => (await import("@/test/harness")).orgMock);
@@ -84,6 +84,16 @@ function serve(
   GET.mockImplementation(async (path: string) => {
     if (path === "/org/{org_slug}/batches")
       return ok({ items, total, limit: 25, offset: 0 });
+    if (path === "/org/{org_slug}/batches/overview")
+      return ok({
+        drafts: 1,
+        starting_soon: 2,
+        running: 0,
+        unfilled_seats: 9,
+        unfilled_batches: 1,
+        unavailable: 0,
+        upcoming: [],
+      });
     if (path === "/org/{org_slug}/batches/courses") return ok({ items: courses, total: courses.length });
     if (path === "/org/{org_slug}/centres")
       return ok({ items: centres, total: centres.length, active: centres.length, limit: 200 });
@@ -332,5 +342,61 @@ describe("BatchesPanel", () => {
     expect(within(first).getByRole("button", { name: "Publish: Welding basics" })).toBeTruthy();
     const second = screen.getByRole("heading", { name: "Plumbing basics" }).closest("li") as HTMLElement;
     expect(within(second).queryByRole("button", { name: /^Publish/ })).toBeNull();
+  });
+
+  it("leads with the figures that need a look, above the list (Sprint 99)", async () => {
+    serve([batch()]);
+    panel();
+    expect(await screen.findByText("Starting this week")).toBeTruthy();
+    expect(await screen.findByText("in 1 batch")).toBeTruthy();
+    const figures = screen.getByText("Starting this week").compareDocumentPosition(
+      screen.getByRole("heading", { name: "Welding basics" }),
+    );
+    expect(figures & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("offers an organisation a file of batches, and a way to plan one", async () => {
+    serve([batch()]);
+    panel();
+    expect(await screen.findByRole("link", { name: "Add many from a file" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Add many from a file" }).getAttribute("href")).toBe(
+      "/employer/me/batches/upload",
+    );
+  });
+
+  describe("for a centre's own manager", () => {
+    const asCentre = () => {
+      world.memberships = [orgMembership("hadapsar", "training_centre", "Hadapsar")];
+    };
+
+    it("asks for no centres and offers no centre to choose, and no file of batches", async () => {
+      asCentre();
+      serve([]);
+      renderUi(<BatchesPanel org="hadapsar" />);
+      fireEvent.click(await screen.findByRole("button", { name: "Plan a batch" }));
+      await screen.findByLabelText("Course");
+      expect(screen.queryByLabelText("Centre")).toBeNull();
+      expect(GET.mock.calls.some((c) => c[0] === "/org/{org_slug}/centres")).toBe(false);
+      expect(screen.queryByRole("link", { name: "Add many from a file" })).toBeNull();
+      expect(screen.queryByText(/You need an open centre/)).toBeNull();
+    });
+
+    it("plans into their own centre: the request names no centre", async () => {
+      asCentre();
+      serve([]);
+      POST.mockResolvedValue(ok(batch()));
+      renderUi(<BatchesPanel org="hadapsar" />);
+      fireEvent.click(await screen.findByRole("button", { name: "Plan a batch" }));
+      fireEvent.change(await screen.findByLabelText("Course"), { target: { value: "welding" } });
+      fireEvent.change(screen.getByLabelText("First day"), { target: { value: "2026-11-09" } });
+      fireEvent.change(screen.getByLabelText("Last day"), { target: { value: "2026-12-09" } });
+      fireEvent.change(screen.getByLabelText("Seats"), { target: { value: "25" } });
+      fireEvent.click(screen.getByRole("button", { name: "Plan batch" }));
+      await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+      const body = POST.mock.calls[0][1].body;
+      expect(body.course_slug).toBe("welding");
+      expect(body.centre_slug).toBeNull();
+      expect(POST.mock.calls[0][1].params.path.org_slug).toBe("hadapsar");
+    });
   });
 });

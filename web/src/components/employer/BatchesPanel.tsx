@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { BatchCard } from "@/components/cards/BatchCard";
 import { BatchForm } from "@/components/employer/BatchForm";
+import { BatchOverviewPanel } from "@/components/employer/BatchOverviewPanel";
 import { RowActions } from "@/components/RowActions";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, ButtonLink, Card, CardBody, Skeleton } from "@/components/ui";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/batches";
 import { useCentres } from "@/lib/centres";
 import { detailOf, isSignedOut } from "@/lib/http";
+import { useOrgType } from "@/lib/org";
 
 /**
  * One batch with what its phase allows next. **What may be done is read off the phase, never a flag**:
@@ -141,14 +143,18 @@ function Row({ org, batch }: { org: string; batch: Batch }) {
 
 /**
  * An organisation's batches (Sprint 98, ADR-103): plan one, publish it, change it, cancel it. A
- * centre's own manager reads the same list for their centre only; planning is the organisation's.
+ * centre's own manager does the same for their centre only (Sprint 99): the page is the same, there
+ * is no centre to choose and no centres to read, and a file of batches is the organisation's.
  */
 export function BatchesPanel({ org }: { org: string }) {
   const t = useTranslations("batches");
   const [phase, setPhase] = useState<BatchPhase | "">("");
   const [adding, setAdding] = useState(false);
   const list = useBatches(org, phase);
-  const centres = useCentres(org);
+  const inCentre = useOrgType(org) === "training_centre";
+  // A centre has no centres of its own to read (the request would be refused): only an
+  // organisation lists them, to choose where a batch goes.
+  const centres = useCentres(org, !inCentre);
   const courses = useDeliverableCourses(org);
   const { create } = useBatchMutations(org);
 
@@ -178,7 +184,7 @@ export function BatchesPanel({ org }: { org: string }) {
   // Planning needs somewhere to teach and something to teach: say which is missing instead of
   // opening a form with an empty choice.
   const blocker =
-    centres.isSuccess && openCentres.length === 0
+    !inCentre && centres.isSuccess && openCentres.length === 0
       ? "noCentres"
       : courses.isSuccess && courseChoices.length === 0
         ? "noCourses"
@@ -190,10 +196,19 @@ export function BatchesPanel({ org }: { org: string }) {
         <p className="text-sm text-muted" role="status">
           {t("count", { total })}
         </p>
-        {!adding && blocker === null && (
-          <Button onClick={() => setAdding(true)}>{t("plan")}</Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {!inCentre && (
+            <ButtonLink href={`/employer/${org}/batches/upload`} variant="secondary">
+              {t("uploadLink")}
+            </ButtonLink>
+          )}
+          {!adding && blocker === null && (
+            <Button onClick={() => setAdding(true)}>{t("plan")}</Button>
+          )}
+        </div>
       </div>
+
+      <BatchOverviewPanel org={org} />
 
       <ChipRow label={t("filterLabel")}>
         <ChipSelect
@@ -231,6 +246,7 @@ export function BatchesPanel({ org }: { org: string }) {
             <BatchForm
               courses={courseChoices}
               centres={openCentres}
+              inCentre={inCentre}
               pending={create.isPending}
               error={create.error}
               onCancel={() => {
