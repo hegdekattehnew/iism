@@ -5,6 +5,7 @@ import { useDeferredValue, useState } from "react";
 
 import { DELIVERY_LOOK } from "@/components/cards/delivery-look";
 import { Field, Select, Text } from "@/components/profile/fields";
+import { BatchesOfMyCourses } from "@/components/employer/BatchesOfMyCourses";
 import { SessionExpired } from "@/components/SessionExpired";
 import { Alert, Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { BuildingIcon } from "@/components/ui/icons";
@@ -277,6 +278,7 @@ export function DeliveryPanel({ org }: { org: string }) {
     <div className="mt-8 space-y-10">
       {delivers && <Section org={org} mode="ask" rows={list.data.as_partner ?? []} />}
       {sells && <Section org={org} mode="invite" rows={list.data.as_provider ?? []} />}
+      {sells && <BatchesOfMyCourses org={org} />}
     </div>
   );
 }

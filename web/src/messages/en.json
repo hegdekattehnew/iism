@@ -2397,7 +2397,20 @@
     "withdraw": "Withdraw",
     "withdrawNamed": "Withdraw: {name}",
     "end": "End",
-    "endNamed": "End: {name}"
+    "endNamed": "End: {name}",
+    "batchesOfMine": {
+      "heading": "How your courses are being run",
+      "intro": "Other organisations that deliver your courses, and how many batches each has. Counts only: you never see the learners or their contact, and a draft is the other organisation's own plan.",
+      "none": "None of your courses has a published batch yet.",
+      "batches": "{count, plural, one {# batch} other {# batches}}",
+      "open": "{count} open",
+      "full": "{count} full",
+      "running": "{count} running",
+      "finished": "{count} finished",
+      "seats": "{enrolled} of {seats} seats marked as taken by them",
+      "noteWho": "Delivered by",
+      "reviewed": "Reviewed by our team"
+    }
   },
   "batches": {
     "heading": "Batches",
@@ -2490,6 +2503,62 @@
     "notDelivering": "This organisation does not deliver training, so it has no batches. You can change what it does in settings.",
     "toSettings": "Open settings",
     "noAccess": "You do not have access to this organisation's batches.",
-    "failed": "Could not save the batch. Try again."
+    "failed": "Could not save the batch. Try again.",
+    "overview": {
+      "heading": "Today",
+      "startingSoon": "Starting this week",
+      "drafts": "Waiting to be published",
+      "running": "Running now",
+      "unfilled": "Seats still free in batches starting within two weeks",
+      "unfilledIn": "{count, plural, one {in # batch} other {in # batches}}",
+      "unavailable": "Need a look: their course is not published",
+      "next": "Next to start",
+      "seatsLeft": "{count, plural, one {# seat left} other {# seats left}}",
+      "all": "All batches",
+      "nothingNext": "Nothing is about to start."
+    },
+    "uploadLink": "Add many from a file"
+  },
+  "batchesUpload": {
+    "back": "Back to batches",
+    "title": "Plan batches from a file",
+    "intro": "Check the file first. Nothing is made until you press the button at the end, and a batch you already planned is skipped, never changed. Batches are made as drafts: you publish them as a separate step.",
+    "step1": "1. Download the template",
+    "templateHelp": "Each row is one batch: the course (its slug or exact title), the centre (its slug or exact name), the first and last day (year-month-day), the seats, and optionally the mode, a name, the days and times, and a fee. A course you are not authorised to deliver is a row with a problem.",
+    "downloadTemplate": "Download the template",
+    "step2": "2. Choose your file",
+    "chooseFile": "A CSV file, up to 2 MB",
+    "tooBig": "That file is larger than 2 MB. Split it and upload the parts one at a time.",
+    "checking": "Checking the file…",
+    "failed": "Could not read that file. Check that it is a CSV and try again.",
+    "step3": "3. What would happen",
+    "step3Done": "Done",
+    "summary": "{ok} ready, {warnings} to look at, {errors} with a problem, {skipped} already planned.",
+    "tableCaption": "What each row of the file would do",
+    "colRow": "Row",
+    "colBatch": "Course and centre",
+    "colResult": "Result",
+    "colDetails": "Details",
+    "status": {
+      "ok": "Ready",
+      "warning": "Warning",
+      "error": "Problem",
+      "skip": "Skipped",
+      "update": "Update"
+    },
+    "acknowledge": "{count, plural, one {# row has a problem and will not be made.} other {# rows have a problem and will not be made.}} Make the others.",
+    "downloadErrors": "Download the rows to fix",
+    "apply": "{count, plural, one {Make # draft batch} other {Make # draft batches}}",
+    "applying": "Making…",
+    "created": "{count, plural, one {# draft batch made.} other {# draft batches made.}}",
+    "step4": "4. Publish",
+    "publishNote": "Publishing makes a batch final: it can no longer be changed freely once learners register. A batch whose first day has passed, or whose course or arrangement is no longer in force, is refused and says why.",
+    "publish": "Publish these {count}",
+    "publishConfirm": "Publish {count, plural, one {# batch} other {# batches}}?",
+    "confirmPublish": "Yes, publish",
+    "cancel": "Cancel",
+    "publishedSummary": "{published} published, {refused} not published.",
+    "another": "Use another file",
+    "viewList": "See my batches"
   }
 }

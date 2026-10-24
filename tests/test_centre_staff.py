@@ -266,9 +266,16 @@ async def test_a_managers_reach_is_their_centre_alone(client, db, setup, place):
         ("GET", "/org/{org_slug}/members"),
         ("GET", "/org/{org_slug}/centre"),
         ("PUT", "/org/{org_slug}/centre"),
-        # Sprint 98: the batches of their own centre, to read. Planning them is the organisation's
-        # (`BATCH_MANAGE`), and so is the list of courses it may plan from.
+        # Sprints 98 and 99: the batches of their own centre, to read and to plan (a body-less POST
+        # and PUT are a 422: they were let in, and then refused for the empty body), the figures
+        # for their home, and the courses their organisation lets them plan from. A file of
+        # batches names a centre on every row and the seller's counts are the seller's, so
+        # neither is in this list.
         ("GET", "/org/{org_slug}/batches"),
+        ("POST", "/org/{org_slug}/batches"),
+        ("GET", "/org/{org_slug}/batches/courses"),
+        ("GET", "/org/{org_slug}/batches/overview"),
+        ("PUT", "/org/{org_slug}/batches/{batch_id}"),
         ("POST", "/org/{org_slug}/leave"),
     }
     seen = 0
@@ -291,7 +298,7 @@ async def test_a_managers_reach_is_their_centre_alone(client, db, setup, place):
                 )
             elif response.status_code not in (403, 404):
                 leaks.append((method, route.path, response.status_code))
-    assert leaks == []
+    assert leaks == [], leaks
     assert seen > 30, "the sweep found the route table"
 
 
@@ -323,11 +330,12 @@ def test_no_organisation_role_holds_a_managers_permissions_and_the_manager_holds
         Permission.MEMBER_READ,
         Permission.MANAGED_CENTRE_READ,
         Permission.MANAGED_CENTRE_EDIT,
-        # Sprint 98: they read their centre's batches. They plan none (`BATCH_MANAGE` is held by no
-        # manager until the centre workspace, Sprint 99).
+        # Sprints 98 and 99: they read and plan their own centre's batches.
         Permission.BATCH_READ,
+        Permission.BATCH_MANAGE,
     }
-    assert Permission.BATCH_MANAGE not in manager
+    # ...and nothing about files of batches (a centre per row), arrangements or the team.
+    assert Permission.CENTRE_MANAGE not in manager and Permission.DELIVERY_READ not in manager
 
 
 # -------------------------------------------------------------------- taking one out

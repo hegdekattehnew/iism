@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.clock import today_ist
 from api.modules import batches
 from api.modules.analytics.models import AnalyticsEvent
+from api.modules.batches import bulk as bulk_module
 from api.modules.batches import phases, service
 from api.modules.batches.models import Batch, BatchInterest
 from api.modules.identity.models import User
@@ -399,7 +400,7 @@ async def test_a_member_may_read_but_not_change(client, db, world):
     ).status_code == 403
 
 
-async def test_a_centres_manager_reads_only_their_own_centre(client, db, world):
+async def test_a_centres_manager_works_in_their_own_centre_only(client, db, world):
     w = world
     await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
     second = await _centre(client, w["partner_h"], w["partner"], w["place"], "Kothrud")
@@ -415,15 +416,25 @@ async def test_a_centres_manager_reads_only_their_own_centre(client, db, world):
     ).status_code == 200
     sibling = await client.get(f"/org/{w['centre']}/batches/{there}", headers=manager)
     assert sibling.status_code == 404, "a manager cannot reach a sibling centre's batch"
-    # Reading is theirs; planning a run commits the organisation, and is not yet. Nor is the list of
-    # courses to plan from: it names the organisation's arrangements with other organisations.
-    assert (
-        await client.get(f"/org/{w['centre']}/batches/courses", headers=manager)
-    ).status_code == 403
-    planned = await _make(client, manager, w["centre"], w["course"], None)
-    assert planned.status_code == 403
+    # Planning is theirs too (Sprint 99), in their own centre and nowhere else.
+    mine = await _make(client, manager, w["centre"], w["course"], None)
+    assert mine.status_code == 201, mine.text
+    assert mine.json()["centre"]["slug"] == w["centre"]
+    elsewhere = await _make(client, manager, w["centre"], w["course"], second)
+    assert elsewhere.status_code == 404, "a manager cannot plan into a sibling centre"
+    published = await client.post(
+        f"/org/{w['centre']}/batches/{mine.json()['id']}/publish", headers=manager
+    )
+    assert published.status_code == 200
     cancelled = await client.post(f"/org/{w['centre']}/batches/{here}/cancel", headers=manager)
-    assert cancelled.status_code == 403
+    assert cancelled.status_code == 200
+    sibling_cancel = await client.post(
+        f"/org/{w['centre']}/batches/{there}/cancel", headers=manager
+    )
+    assert sibling_cancel.status_code == 404
+    # A file of batches names a centre on every row: the organisation's, never a manager's.
+    template = await client.get(f"/org/{w['centre']}/batches/bulk/template", headers=manager)
+    assert template.status_code in (403, 404)
     # ...and the organisation's own route is closed to them.
     assert (await client.get(f"/org/{w['partner']}/batches", headers=manager)).status_code == 404
 
@@ -882,3 +893,446 @@ def test_the_module_registers_itself_with_delivery() -> None:
     from api.modules.delivery import service as delivery_service
 
     assert service.cancel_on_arrangement_ended in delivery_service._on_ended
+
+
+# ---------------------------------------------------------------- Sprint 99: the home's figures
+
+
+def _day(n: int) -> str:
+    return (today_ist() + timedelta(days=n)).isoformat()
+
+
+async def _plan_at(client, w, *, start, length=20, seats=10, course=None, centre=None, **over):
+    made = await client.post(
+        f"/org/{w['partner']}/batches",
+        headers=w["partner_h"],
+        json={
+            "course_slug": course or w["course"],
+            "centre_slug": centre or w["centre"],
+            "starts_on": _day(start),
+            "ends_on": _day(start + length),
+            "seats": seats,
+            **over,
+        },
+    )
+    assert made.status_code == 201, made.text
+    return made.json()["id"]
+
+
+async def _publish(client, w, batch_id):
+    done = await client.post(
+        f"/org/{w['partner']}/batches/{batch_id}/publish", headers=w["partner_h"]
+    )
+    assert done.status_code == 200, done.text
+
+
+async def test_the_overview_counts_what_needs_a_look(client, db, world, a_skill):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    await _plan_at(client, w, start=40)  # a draft
+    soon = await _plan_at(client, w, start=3, seats=10)
+    await _publish(client, w, soon)
+    await _interest(db, soon, "enrolled")
+    await _interest(db, soon, "enrolled")
+    fortnight = await _plan_at(client, w, start=10, seats=5)
+    await _publish(client, w, fortnight)
+    far = await _plan_at(client, w, start=60, seats=7)
+    await _publish(client, w, far)
+    running = await _plan_at(client, w, start=1)
+    await _publish(client, w, running)
+    await _set(db, running, starts_on=today_ist())
+    # Full and about to begin: no seat to fill, so it is in neither figure.
+    full = await _plan_at(client, w, start=8, seats=1)
+    await _publish(client, w, full)
+    await _interest(db, full, "enrolled")
+    cancelled = await _plan_at(client, w, start=5)
+    await _publish(client, w, cancelled)
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+
+    got = (await client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])).json()
+    assert got["drafts"] == 1
+    assert got["starting_soon"] == 1, "only the one beginning within the week"
+    assert got["running"] == 1
+    # 8 free in the first, 5 in the second; the batch 60 days away is not about to begin.
+    assert (got["unfilled_seats"], got["unfilled_batches"]) == (13, 2)
+    assert got["unavailable"] == 0
+    assert [b["id"] for b in got["upcoming"]] == [soon, full, fortnight, far], (
+        "soonest first, published only"
+    )
+
+    # A course that stops being live puts its batches in front of the organisation.
+    await db.execute(update(Course).where(Course.slug == w["course"]).values(status="draft"))
+    await db.commit()
+    again = (
+        await client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])
+    ).json()
+    assert again["unavailable"] == 6, "every batch not yet over, drafts included, of that course"
+
+
+async def test_the_overview_is_each_organisations_and_each_centres_own(client, db, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    second = await _centre(client, w["partner_h"], w["partner"], w["place"], "Kothrud")
+    here = await _plan_at(client, w, start=2)
+    await _publish(client, w, here)
+    there = await _plan_at(client, w, start=3, centre=second)
+    await _publish(client, w, there)
+    manager = await _manager(client, db, w["partner_h"], w["partner"], w["centre"])
+
+    mine = (await client.get(f"/org/{w['centre']}/batches/overview", headers=manager)).json()
+    assert mine["starting_soon"] == 1 and [b["id"] for b in mine["upcoming"]] == [here]
+    whole = (
+        await client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])
+    ).json()
+    assert whole["starting_soon"] == 2
+
+    other_h, other = await _deliverer(client)
+    nobody = (await client.get(f"/org/{other}/batches/overview", headers=other_h)).json()
+    assert (nobody["drafts"], nobody["starting_soon"], nobody["upcoming"]) == (0, 0, [])
+    assert (
+        await client.get(f"/org/{w['seller']}/batches/overview", headers=w["seller_h"])
+    ).status_code == 403, "a seller that does not deliver has no figures of its own"
+
+
+# ---------------------------------------------------------------- Sprint 99: the seller's counts
+
+
+async def test_a_seller_sees_counts_of_how_its_courses_are_run_and_nothing_else(client, db, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    await _plan_at(client, w, start=30)  # a draft: the partner's private plan
+    open_batch = await _plan_at(client, w, start=20, seats=10)
+    await _publish(client, w, open_batch)
+    await _interest(db, open_batch, "enrolled")
+    full = await _plan_at(client, w, start=25, seats=1)
+    await _publish(client, w, full)
+    await _interest(db, full, "enrolled")
+    running = await _plan_at(client, w, start=2)
+    await _publish(client, w, running)
+    await _set(db, running, starts_on=today_ist())
+    finished = await _plan_at(client, w, start=2)
+    await _publish(client, w, finished)
+    await _set(
+        db,
+        finished,
+        starts_on=today_ist() - timedelta(days=9),
+        ends_on=today_ist() - timedelta(days=1),
+    )
+    cancelled = await _plan_at(client, w, start=9)
+    await _publish(client, w, cancelled)
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+
+    got = await client.get(f"/org/{w['seller']}/batches/of-my-courses", headers=w["seller_h"])
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert body["total"] == 1
+    row = body["items"][0]
+    assert row["course"]["slug"] == w["course"] and row["organisation"]["slug"] == w["partner"]
+    assert (row["batches"], row["open"], row["full"], row["running"], row["finished"]) == (
+        4,
+        1,
+        1,
+        1,
+        1,
+    )
+    assert (row["seats"], row["enrolled"]) == (10 + 1 + 10 + 10, 2)
+    # Counts and the delivering organisation: no learner, centre, contact or batch id.
+    assert set(row) == {
+        *("course", "organisation", "batches", "open", "full", "running", "finished"),
+        *("seats", "enrolled"),
+    }
+    assert set(row["organisation"]) == {"slug", "name", "is_verified"}
+    text = got.text
+    for secret in ("contact", "phone", "email", "centre", "profile"):
+        assert secret not in text
+
+
+async def test_only_a_seller_reads_it_and_only_its_own_courses(client, db, world, a_skill):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    live = await _plan_at(client, w, start=20)
+    await _publish(client, w, live)
+    assert (
+        await client.get(f"/org/{w['partner']}/batches/of-my-courses", headers=w["partner_h"])
+    ).status_code == 403
+    other_h, other = await _register(client, f"Other {uuid.uuid4().hex[:6]}", sells=True)
+    assert (await client.get(f"/org/{other}/batches/of-my-courses", headers=other_h)).json() == {
+        "items": [],
+        "total": 0,
+    }
+    stranger = await client.get(f"/org/{w['seller']}/batches/of-my-courses", headers=other_h)
+    assert stranger.status_code == 404
+
+
+async def test_an_organisation_that_sells_and_delivers_sees_its_own_courses_run_too(
+    client, a_skill, place
+):
+    both_h, both = await _register(
+        client, f"Both {uuid.uuid4().hex[:6]}", sells=True, delivers=True
+    )
+    mine = await _course(client, both_h, both, a_skill, "Mine")
+    centre = await _centre(client, both_h, both, place)
+    batch = await _live(client, both_h, both, mine, centre)
+    got = (await client.get(f"/org/{both}/batches/of-my-courses", headers=both_h)).json()
+    assert got["total"] == 1 and got["items"][0]["open"] == 1
+    assert batch
+
+
+# ---------------------------------------------------------------- Sprint 99: a file of batches
+
+
+def _csv(*rows: str, header: str | None = None) -> bytes:
+    head = header or "course,centre,starts_on,ends_on,seats,mode,label,schedule,fee_inr"
+    return ("\r\n".join([head, *rows]) + "\r\n").encode()
+
+
+async def _bulk(client, w, verb, body, headers=None, org=None):
+    return await client.post(
+        f"/org/{org or w['partner']}/batches/bulk/{verb}",
+        headers={**(headers or w["partner_h"]), "content-type": "text/csv"},
+        content=body,
+    )
+
+
+async def test_a_file_is_checked_then_made_into_drafts_and_writes_nothing_until_then(
+    client, db, world
+):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    body = _csv(
+        f"{w['course']},{w['centre']},{_day(30)},{_day(60)},25,hybrid,Morning,Mon to Fri,3500",
+        f"{w['course']},Hadapsar Skill Centre,{_day(40)},{_day(70)},15,,,,",
+    )
+    checked = await _bulk(client, w, "check", body)
+    assert checked.status_code == 200, checked.text
+    c = checked.json()
+    assert (c["applied"], c["ok"] + c["warnings"], c["errors"], c["created"]) == (False, 1, 1, 0)
+    assert (await db.scalar(select(Batch.id))) is None, "a check writes nothing"
+
+    applied = (await _bulk(client, w, "apply", body)).json()
+    assert applied["applied"] is True and applied["created"] == 1
+    made = [r for r in applied["rows"] if r["created"]]
+    row = await _row(db, made[0]["id"])
+    assert (row.status, row.seats, row.mode, row.fee_inr, row.label) == (
+        "draft", 25, "hybrid", 3500, "Morning",
+    )  # fmt: skip
+    # Draft: nobody sees it as published, and a second apply makes nothing more.
+    again = (await _bulk(client, w, "apply", body)).json()
+    assert again["created"] == 0 and again["skipped"] == 1
+    assert [r["id"] for r in again["rows"] if r["status"] == "skip"] == [made[0]["id"]]
+
+
+async def test_the_check_and_the_apply_decide_alike(client, db, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    body = _csv(
+        f"{w['course']},{w['centre']},{_day(30)},{_day(60)},25",
+        f"nope,{w['centre']},{_day(30)},{_day(60)},25",
+        f"{w['course']},{w['centre']},{_day(30)},{_day(60)},25",
+        f"{w['course']},{w['centre']},{_day(-3)},{_day(60)},25",
+    )
+    before = [
+        (r["row"], r["status"]) for r in (await _bulk(client, w, "check", body)).json()["rows"]
+    ]
+    after = [
+        (r["row"], r["status"]) for r in (await _bulk(client, w, "apply", body)).json()["rows"]
+    ]
+    assert before == after == [(2, "ok"), (3, "error"), (4, "error"), (5, "error")]
+
+
+@pytest.mark.parametrize(
+    ("cells", "words"),
+    [
+        ("nope,{c},{a},{b},25", "No course you may deliver"),
+        ("{k},nowhere,{a},{b},25", "no centre called that"),
+        ("{k},{c},{p},{b},25", "cannot be in the past"),
+        ("{k},{c},{b},{a},25", "before the first day"),
+        ("{k},{c},{a},{b},0", "seats"),
+        ("{k},{c},{a},{b},lots", "seats"),
+        ("{k},{c},{a},{b},25,teleport", "mode"),
+        ("{k},{c},not-a-date,{b},25", "starts_on"),
+        ("{k},{c},{a},{b},25,,,,-5", "fee_inr"),
+    ],
+)
+async def test_a_bad_row_says_what_is_wrong_and_blocks_nothing(client, world, cells, words):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    bad = cells.format(k=w["course"], c=w["centre"], a=_day(30), b=_day(60), p=_day(-3))
+    body = _csv(bad, f"{w['course']},{w['centre']},{_day(31)},{_day(61)},10")
+    got = (await _bulk(client, w, "apply", body)).json()
+    assert got["errors"] == 1 and got["created"] == 1, "the good row still lands"
+    assert words in " ".join(got["rows"][0]["messages"]), got["rows"][0]
+    assert got["errors_csv"] and "error" in got["errors_csv"].splitlines()[0]
+
+
+async def test_a_course_is_named_by_slug_or_exact_title_and_never_guessed(client, world, a_skill):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    twin_a = await _course(client, w["seller_h"], w["seller"], a_skill, "Twin Title")
+    twin_b = await _course(client, w["seller_h"], w["seller"], a_skill, "Twin Title")
+    body = _csv(
+        f"Welding basics,{w['centre']},{_day(30)},{_day(60)},10",
+        f"welding bas,{w['centre']},{_day(31)},{_day(61)},10",
+        f"Twin Title,{w['centre']},{_day(32)},{_day(62)},10",
+        f"{twin_a},{w['centre']},{_day(33)},{_day(63)},10",
+        f"{twin_b},{w['centre']},{_day(34)},{_day(64)},10",
+    )
+    rows = (await _bulk(client, w, "check", body)).json()["rows"]
+    assert [r["status"] for r in rows] == ["ok", "error", "error", "ok", "ok"]
+    assert "Two of your courses have that title" in rows[2]["messages"][0]
+
+
+async def test_a_course_the_organisation_may_not_deliver_is_not_in_the_file(client, world):
+    w = world
+    body = _csv(f"{w['course']},{w['centre']},{_day(30)},{_day(60)},10")
+    refused = (await _bulk(client, w, "apply", body)).json()
+    assert refused["errors"] == 1 and refused["created"] == 0
+    assert "authorised" in refused["rows"][0]["messages"][0]
+
+
+async def test_a_closed_centre_and_a_repeated_row_are_errors_and_a_duplicate_is_skipped(
+    client, world
+):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    closed = await _centre(client, w["partner_h"], w["partner"], w["place"], "Closed One")
+    await client.post(f"/org/{w['partner']}/centres/{closed}/close", headers=w["partner_h"])
+    line = f"{w['course']},{w['centre']},{_day(30)},{_day(60)},10,,Evening"
+    body = _csv(
+        f"{w['course']},{closed},{_day(30)},{_day(60)},10", line, line.replace("Evening", "evening")
+    )
+    rows = (await _bulk(client, w, "check", body)).json()["rows"]
+    assert "closed" in rows[0]["messages"][0]
+    assert rows[1]["status"] == "ok"
+    assert rows[2]["status"] == "error"
+    assert "appears on row 3" in rows[2]["messages"][0], "the spreadsheet's own numbering"
+
+
+async def test_the_per_centre_cap_holds_in_a_file_as_it_does_by_hand(client, world, monkeypatch):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    monkeypatch.setattr(service, "MAX_LIVE_PER_CENTRE", 2)
+    body = _csv(
+        *[f"{w['course']},{w['centre']},{_day(30 + i)},{_day(60 + i)},10" for i in range(3)]
+    )
+    # The preview says it before anything is made, and the apply says the same.
+    previewed = (await _bulk(client, w, "check", body)).json()["rows"]
+    assert [r["status"] for r in previewed] == ["ok", "ok", "error"]
+    rows = (await _bulk(client, w, "apply", body)).json()["rows"]
+    assert [r["status"] for r in rows] == ["ok", "ok", "error"]
+    assert "up to 2 batches" in rows[2]["messages"][0]
+
+
+async def test_a_cell_that_would_be_a_formula_comes_back_inert(client, world):
+    w = world
+    body = _csv(f"=HYPERLINK(1),{w['centre']},{_day(30)},{_day(60)},10")
+    got = (await _bulk(client, w, "check", body)).json()
+    assert got["errors_csv"] is not None
+    assert "'=HYPERLINK" in got["errors_csv"] and ",=HYPERLINK" not in got["errors_csv"]
+
+
+async def test_an_unreadable_or_oversized_file_is_refused_before_any_row(client, world):
+    w = world
+    assert (await _bulk(client, w, "check", b"")).status_code in (400, 413, 422)
+    nothing = await _bulk(client, w, "check", b"just,one,column\r\n")
+    assert nothing.status_code in (400, 422)
+    many = _csv(
+        *[f"x,{w['centre']},{_day(30)},{_day(60)},1" for _ in range(bulk_module.MAX_ROWS + 1)]
+    )
+    assert (await _bulk(client, w, "check", many)).status_code in (400, 413, 422)
+
+
+async def test_published_in_bulk_through_the_single_writer_with_each_refusal_reported(
+    client, db, world
+):
+    w = world
+    row = await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    made = (
+        await _bulk(
+            client,
+            w,
+            "apply",
+            _csv(
+                f"{w['course']},{w['centre']},{_day(30)},{_day(60)},10",
+                f"{w['course']},{w['centre']},{_day(31)},{_day(61)},10",
+            ),
+        )
+    ).json()
+    ids = [r["id"] for r in made["rows"] if r["created"]]
+    # One of them is already started by the time the publication runs: the writer refuses it.
+    await _set(db, ids[1], starts_on=today_ist() - timedelta(days=1))
+    result = await client.post(
+        f"/org/{w['partner']}/batches/bulk/publish",
+        headers=w["partner_h"],
+        json={"ids": [*ids, ids[0], "not-an-id", str(uuid.uuid4())]},
+    )
+    assert result.status_code == 200, result.text
+    got = result.json()
+    assert (got["published"], got["refused"]) == (1, 3), "a repeated id is one act"
+    by_id = {r["id"]: r for r in got["results"]}
+    assert by_id[ids[0]]["published"] is True
+    assert "already passed" in by_id[ids[1]]["message"]
+    assert by_id["not-an-id"]["message"] == "Batch not found"
+    assert (await _row(db, ids[0])).status == "published"
+    del row
+
+
+async def test_publishing_in_bulk_cannot_reach_another_organisations_batch(client, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    draft = await _plan_at(client, w, start=30)
+    other_h, other = await _deliverer(client)
+    got = (
+        await client.post(
+            f"/org/{other}/batches/bulk/publish", headers=other_h, json={"ids": [draft]}
+        )
+    ).json()
+    assert got["published"] == 0 and got["results"][0]["message"] == "Batch not found"
+
+
+async def test_a_file_of_batches_is_for_admins_and_owners_only(client, db, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    body = _csv(f"{w['course']},{w['centre']},{_day(30)},{_day(60)},10")
+    for verb in ("check", "apply"):
+        assert (
+            await _bulk(client, w, verb, body, org=w["seller"], headers=w["seller_h"])
+        ).status_code == 403
+    manager = await _manager(client, db, w["partner_h"], w["partner"], w["centre"])
+    for verb in ("check", "apply"):
+        refused = await _bulk(client, w, verb, body, org=w["centre"], headers=manager)
+        assert refused.status_code in (403, 404)
+    assert (await _bulk(client, w, "check", body, org="no-such-org")).status_code == 404
+    assert (
+        await client.get(f"/org/{w['partner']}/batches/bulk/template", headers=w["partner_h"])
+    ).status_code == 200
+
+
+async def test_a_taken_down_course_needs_a_look_too(client, db, world):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    await _plan_at(client, w, start=30)
+    await db.execute(
+        update(Course)
+        .where(Course.slug == w["course"])
+        .values(taken_down_at=datetime.now(UTC), takedown_reason="reported")
+    )
+    await db.commit()
+    got = (await client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])).json()
+    assert got["unavailable"] == 1
+
+
+async def test_two_rows_of_one_course_and_centre_are_two_batches_when_the_day_or_name_differs(
+    client, world
+):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    base = f"{w['course']},{w['centre']}"
+    body = _csv(
+        f"{base},{_day(30)},{_day(60)},10,,Morning",
+        f"{base},{_day(30)},{_day(60)},10,,Evening",
+        f"{base},{_day(31)},{_day(61)},10,,Morning",
+    )
+    rows = (await _bulk(client, w, "apply", body)).json()["rows"]
+    assert [r["status"] for r in rows] == ["ok", "ok", "ok"]
+    assert all(r["created"] for r in rows)

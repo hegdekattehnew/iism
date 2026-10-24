@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { BatchOverviewPanel } from "@/components/employer/BatchOverviewPanel";
 import { CourseEditor } from "@/components/employer/CourseEditor";
 import { ProviderDashboard } from "@/components/employer/ProviderDashboard";
 import { courseState, LISTING_LOOK } from "@/components/cards/listing-look";
@@ -17,6 +18,7 @@ import {
   type OrgCourse,
   useMemberships,
   useOrgCourseMutations,
+  useOrgDelivers,
   useOrgCourses,
   useOrgInterests,
 } from "@/lib/org";
@@ -48,6 +50,9 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
   const te = useTranslations("employerWorkspace");
   const format = useFormatter();
   const me = useMemberships();
+  // Known by the time this renders (`OrgWorkspace` waits for the memberships), so the block below is
+  // either there from the first paint or not at all and nothing under it moves.
+  const delivers = useOrgDelivers(orgSlug);
   const courses = useOrgCourses(orgSlug);
   // One request for the whole list, joined by slug -- not one per card.
   const interest = useOrgInterests(orgSlug);
@@ -158,6 +163,8 @@ export function ProviderWorkspace({ orgSlug }: { orgSlug: string }) {
 
   return (
     <div className="space-y-6">
+      {/* An organisation that delivers leads with what its batches need today (Sprint 99). */}
+      {delivers && <BatchOverviewPanel org={orgSlug} showNext />}
       <ProviderDashboard orgSlug={orgSlug} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

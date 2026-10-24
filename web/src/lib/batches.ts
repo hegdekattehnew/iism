@@ -9,6 +9,8 @@ export type BatchPhase = Batch["phase"];
 export type BatchInput = components["schemas"]["BatchIn"];
 export type BatchChanges = components["schemas"]["BatchUpdateIn"];
 export type DeliverableCourse = components["schemas"]["DeliverableCourseOut"];
+export type BatchOverview = components["schemas"]["BatchOverview"];
+export type CourseBatchesRow = components["schemas"]["CourseBatchesRowOut"];
 
 /** Every phase the server can say, in the order a list is filtered by them. Typed over the union. */
 export const BATCH_PHASES = [
@@ -122,4 +124,35 @@ export function useBatchMutations(org: string) {
   });
 
   return { create, update, publish, cancel };
+}
+
+/** What to look at today: counts first, then the next few that start. */
+export function useBatchOverview(org: string) {
+  return useQuery({
+    queryKey: [...batchesKey(org), "overview"] as const,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/batches/overview", {
+        params: { path: { org_slug: org } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    retry: false,
+  });
+}
+
+/** How other organisations run this seller's courses: counts only, never a learner. */
+export function useBatchesOfMyCourses(org: string, enabled = true) {
+  return useQuery({
+    queryKey: ["org-batches-of-my-courses", org] as const,
+    enabled,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/batches/of-my-courses", {
+        params: { path: { org_slug: org } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    retry: false,
+  });
 }

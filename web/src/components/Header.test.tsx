@@ -85,7 +85,9 @@ describe("Header — the whole header switches, not half of it", () => {
     world.pathname = "/employer/hadapsar";
     renderUi(<Header />);
     expect(link("Your centre")?.getAttribute("href")).toBe("/employer/hadapsar");
-    for (const name of ["Vacancies", "Courses", "Team", "Interested learners", "Centres", "Batches"]) {
+    // ...and, since Sprint 99, its batches: the one thing they plan.
+    expect(link("Batches")?.getAttribute("href")).toBe("/employer/hadapsar/batches");
+    for (const name of ["Vacancies", "Courses", "Team", "Interested learners", "Centres"]) {
       expect(link(name), name).toBeNull();
     }
   });

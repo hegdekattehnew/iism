@@ -1,4 +1,4 @@
-import { checkPage, expect, test } from "./support/test";
+import { checkPage, expect, test, watch } from "./support/test";
 import {
   addCentre,
   authoriseDelivery,
@@ -91,4 +91,80 @@ test("an organisation that only sells courses has no batches page to use", async
   await page.goto(`/en/employer/${org.slug}/batches`);
   await expect(page.getByText(/does not deliver training/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Batches" })).toHaveCount(0);
+});
+
+/**
+ * Journey 10 (Sprint 99, BL-18.8). A delivering organisation plans two batches from a spreadsheet:
+ * the file is checked (one row names a course it may not deliver), drafts are made, and publishing is
+ * its own confirmed step. Its batches page leads with the figures, and the seller sees counts of how
+ * its course is being run and no learner.
+ */
+test("a delivering organisation plans batches from a file, publishes them, and the seller sees counts", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const id = suffix();
+  const seller = await organisation(request, "course_provider", `E2E File Seller ${id}`, {
+    sells_courses: true,
+    delivers_training: false,
+  });
+  const partner = await organisation(request, "course_provider", `E2E File Partner ${id}`, {
+    sells_courses: false,
+    delivers_training: true,
+  });
+  const title = `Fitting ${id}`;
+  const course = await publishedCourse(request, seller, title, [COLLECT_BLOOD]);
+  await addCentre(request, partner, `Kothrud ${id}`);
+  await authoriseDelivery(request, seller, partner.slug);
+  await signInAs(page, partner.tokens);
+
+  const csv = [
+    "course,centre,starts_on,ends_on,seats,mode,label,schedule,fee_inr",
+    `${course},Kothrud ${id},${inDays(30)},${inDays(60)},25,hybrid,Morning,Mon to Fri,3500`,
+    `${title},Kothrud ${id},${inDays(31)},${inDays(61)},15,,Evening,,`,
+    `no-such-course,Kothrud ${id},${inDays(32)},${inDays(62)},10`,
+  ].join("\r\n");
+
+  await page.goto(`/en/employer/${partner.slug}/batches`);
+  await page.getByRole("link", { name: "Add many from a file" }).click();
+  await expect(page.getByRole("heading", { name: "Plan batches from a file", level: 1 })).toBeVisible();
+  await page.getByLabel("A CSV file, up to 2 MB").setInputFiles({
+    name: "batches.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+  await expect(page.getByText("2 ready, 0 to look at, 1 with a problem, 0 already planned.")).toBeVisible();
+  await expect(page.getByText(/No course you may deliver is called that/)).toBeVisible();
+  await checkPage(page, "batches upload, checked");
+
+  // The problem row has to be acknowledged before anything is made.
+  await expect(page.getByRole("button", { name: "Make 2 draft batches" })).toBeDisabled();
+  await page.getByLabel(/1 row has a problem and will not be made/).check();
+  await page.getByRole("button", { name: "Make 2 draft batches" }).click();
+  await expect(page.getByText("2 draft batches made.")).toBeVisible();
+
+  // Publishing is a separate, confirmed act.
+  await page.getByRole("button", { name: "Publish these 2" }).click();
+  await expect(page.getByText("Publish 2 batches?")).toBeVisible();
+  await page.getByRole("button", { name: "Yes, publish" }).click();
+  await expect(page.getByText("2 published, 0 not published.")).toBeVisible();
+
+  // The list leads with the figures, and both batches are open.
+  await page.goto(`/en/employer/${partner.slug}/batches`);
+  await expect(page.getByText("Seats still free in batches starting within two weeks")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: title }).getByText("Open", { exact: true })).toHaveCount(2);
+  await checkPage(page, "batches, from a file");
+
+  // The seller sees counts for its course, and the delivering organisation, and nothing else.
+  const sellerContext = await browser.newContext({ baseURL: "http://localhost:3100", locale: "en-IN" });
+  const sellerPage = await sellerContext.newPage();
+  await watch(sellerPage, "http://localhost:8100");
+  await signInAs(sellerPage, seller.tokens);
+  await sellerPage.goto(`/en/employer/${seller.slug}/delivery`);
+  await expect(sellerPage.getByRole("heading", { name: "How your courses are being run" })).toBeVisible();
+  const row = sellerPage.getByRole("listitem").filter({ hasText: `Delivered by E2E File Partner ${id}` });
+  await expect(row.getByText("2 batches")).toBeVisible();
+  await expect(row.getByText("2 open")).toBeVisible();
+  await sellerContext.close();
 });

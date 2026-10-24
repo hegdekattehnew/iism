@@ -44,8 +44,11 @@ const ORG_NAV = {
     { key: "delivery", href: "/delivery" },
     { key: "team", href: "/team" },
   ],
-  // A centre's manager has one page: their centre (Sprint 96). No team, no vacancies, no courses.
-  training_centre: [{ key: "centre", href: "" }],
+  // A centre's manager has their centre and its batches (Sprints 96 and 99). No team, vacancies or courses.
+  training_centre: [
+    { key: "centre", href: "" },
+    { key: "batches", href: "/batches" },
+  ],
 } as const;
 
 export function Header() {

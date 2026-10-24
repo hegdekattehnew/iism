@@ -40,6 +40,8 @@ function serve(asPartner: unknown[] = [], asProvider: unknown[] = []) {
   GET.mockImplementation(async (path: string) => {
     if (path === "/org/{org_slug}/delivery")
       return { data: { as_partner: asPartner, as_provider: asProvider }, error: undefined, response: { status: 200 } };
+    if (path === "/org/{org_slug}/batches/of-my-courses")
+      return ok({ items: [], total: 0 });
     if (path === "/training-organisations")
       return {
         data: { items: [other(), other({ slug: "me", name: "Me Myself" })], total: 2 },
@@ -85,6 +87,19 @@ describe("DeliveryPanel", () => {
     panel();
     expect(await screen.findByText("Organisations that deliver your courses")).toBeTruthy();
     expect(screen.queryByText("Courses you deliver for others")).toBeNull();
+  });
+
+  it("shows how a seller's courses are run only to a seller (Sprint 99)", async () => {
+    as(true, false);
+    serve();
+    const a = panel();
+    await screen.findByText("Courses you deliver for others");
+    expect(screen.queryByText("How your courses are being run")).toBeNull();
+    expect(GET.mock.calls.some((c) => c[0] === "/org/{org_slug}/batches/of-my-courses")).toBe(false);
+    a.unmount();
+    as(false, true);
+    panel();
+    expect(await screen.findByText("How your courses are being run")).toBeTruthy();
   });
 
   it("shows both for an organisation that does both", async () => {

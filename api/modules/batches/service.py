@@ -21,7 +21,7 @@ The rules held here, each in one place:
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import structlog
 from fastapi import HTTPException, status
@@ -40,13 +40,18 @@ from api.modules.batches.models import (
 from api.modules.batches.schemas import (
     BatchCentreOut,
     BatchCourseOut,
+    BatchFields,
     BatchIn,
     BatchList,
     BatchOrgOut,
     BatchOut,
+    BatchOverview,
     BatchUpdateIn,
+    CourseBatchesOut,
+    CourseBatchesRowOut,
     DeliverableCourseOut,
     DeliverableCourses,
+    OrgCourseRef,
 )
 from api.modules.delivery import CourseDeliveryAuthorisation, authorises
 from api.modules.identity.models import Tenant, User
@@ -177,6 +182,7 @@ async def _select(
     *conditions: ColumnElement[bool],
     limit: int | None = None,
     offset: int = 0,
+    soonest_first: bool = False,
 ) -> list[BatchOut]:
     centre = aliased(Tenant)
     organisation = aliased(Tenant)
@@ -192,7 +198,7 @@ async def _select(
         .where(_scope(tenant), *conditions)
         # The furthest start first (what was planned most recently ahead is on top); ends in the id,
         # so a page boundary never swaps rows.
-        .order_by(Batch.starts_on.desc(), Batch.id)
+        .order_by(Batch.starts_on if soonest_first else Batch.starts_on.desc(), Batch.id)
     )
     if limit is not None:
         query = query.limit(limit).offset(offset)
@@ -280,6 +286,131 @@ async def deliverable_courses(db: AsyncSession, tenant: Tenant) -> DeliverableCo
         for c, p in rows
     ]
     return DeliverableCourses(items=items, total=len(items))
+
+
+SOON_DAYS = 7
+FILLING_DAYS = 14
+
+
+async def overview(db: AsyncSession, tenant: Tenant) -> BatchOverview:
+    """The home's figures: what is waiting to be published, what starts this week, what is running,
+    how many seats are still free in classes that begin within a fortnight, and what needs a look.
+
+    Counted in one pass over the batches that are not over (a draft, a published one not yet ended),
+    in the database, with the same predicates the list filters by; the next few that start are the
+    list's own rows, soonest first.
+    """
+    today = today_ist()
+    soon = today + timedelta(days=SOON_DAYS)
+    filling = today + timedelta(days=FILLING_DAYS)
+    enrolled = _enrolled()
+    published = Batch.status == "published"
+    row = (
+        await db.execute(
+            select(
+                func.count().filter(Batch.status == "draft"),
+                func.count().filter(published, Batch.starts_on > today, Batch.starts_on <= soon),
+                func.count().filter(published, Batch.starts_on <= today),
+                func.coalesce(
+                    func.sum(Batch.seats - enrolled).filter(
+                        published, Batch.starts_on > today, Batch.starts_on <= filling
+                    ),
+                    0,
+                ),
+                func.count().filter(
+                    published,
+                    Batch.starts_on > today,
+                    Batch.starts_on <= filling,
+                    enrolled < Batch.seats,
+                ),
+                func.count().filter(
+                    Batch.course_id.in_(
+                        select(Course.id).where(
+                            or_(Course.status != "published", Course.taken_down_at.is_not(None))
+                        )
+                    )
+                ),
+            )
+            .select_from(Batch)
+            .where(
+                _scope(tenant),
+                Batch.status.in_(("draft", "published")),
+                Batch.ends_on >= today,
+            )
+        )
+    ).one()
+    upcoming = await _select(
+        db,
+        tenant,
+        published,
+        Batch.starts_on > today,
+        limit=5,
+        soonest_first=True,
+    )
+    drafts, starting, running, seats, batches_with_seats, unavailable = row
+    return BatchOverview(
+        drafts=drafts,
+        starting_soon=starting,
+        running=running,
+        unfilled_seats=max(0, int(seats or 0)),
+        unfilled_batches=batches_with_seats,
+        unavailable=unavailable,
+        upcoming=upcoming,
+    )
+
+
+async def of_my_courses(db: AsyncSession, seller: Tenant) -> CourseBatchesOut:
+    """The seller's read-only view: how its courses are being run by others, **counts and nothing
+    else** (ADR-103's recommendation). A draft is the other organisation's private plan, so only
+    published batches are counted; no learner, contact or centre is named. Its own organisation's
+    batches of its own courses are included, because they are batches of its courses too."""
+    centre = aliased(Tenant)
+    organisation = aliased(Tenant)
+    enrolled = _enrolled().label("enrolled")
+    rows = (
+        await db.execute(
+            select(Batch, Course, organisation, enrolled)
+            .join(Course, Course.id == Batch.course_id)
+            .join(centre, centre.id == Batch.centre_id)
+            .join(organisation, organisation.id == centre.parent_id)
+            .where(Course.tenant_id == seller.id, Batch.status == "published")
+            .order_by(Course.title, organisation.name, Batch.id)
+            .limit(5000)
+        )
+    ).all()
+    today = today_ist()
+    grouped: dict[tuple[uuid.UUID, uuid.UUID], CourseBatchesRowOut] = {}
+    for batch, course, org, enrolled_count in rows:
+        key = (course.id, org.id)
+        item = grouped.get(key)
+        if item is None:
+            item = grouped[key] = CourseBatchesRowOut(
+                course=OrgCourseRef(slug=course.slug, title=course.title),
+                organisation=_org_ref(org),
+                batches=0,
+                open=0,
+                full=0,
+                running=0,
+                finished=0,
+                seats=0,
+                enrolled=0,
+            )
+        enrolled_count = int(enrolled_count or 0)
+        item.batches += 1
+        item.seats += batch.seats
+        item.enrolled += enrolled_count
+        now = phases.phase(
+            status=batch.status,
+            starts_on=batch.starts_on,
+            ends_on=batch.ends_on,
+            seats=batch.seats,
+            enrolled=enrolled_count,
+            today=today,
+        )
+        if now in ("open", "full", "running", "finished"):
+            setattr(item, now, getattr(item, now) + 1)
+    items = list(grouped.values())
+    return CourseBatchesOut(items=items, total=len(items))
 
 
 async def live_at_centre(db: AsyncSession, centre_id: uuid.UUID) -> int:
@@ -385,14 +516,18 @@ async def _require_may_deliver(
         )
 
 
-async def create_batch(db: AsyncSession, tenant: Tenant, actor: User, data: BatchIn) -> BatchOut:
-    centre = await _resolve_centre(db, tenant, data.centre_slug)
-    course = await _course_to_deliver(db, data.course_slug)
+async def add_batch(
+    db: AsyncSession, centre_id: uuid.UUID, course: Course, actor_id: uuid.UUID, data: BatchFields
+) -> Batch:
+    """Insert one draft batch and flush. **Does not commit**: one creation commits, a file of them
+    commits once. Every refusal is here so both paths make them: the centre is share-locked and
+    open, the organisation may deliver the course (under lock), the course is live and the centre
+    has room."""
+    centre = await _lock_centre_open(db, centre_id)
     organisation_id = centre.parent_id
     assert (
         organisation_id is not None
     )  # a centre always has a parent (ck_tenants_centre_has_parent)
-    centre = await _lock_centre_open(db, centre.id)
     await _require_may_deliver(db, organisation_id, course)
     _refuse_unavailable(course)
     if await live_at_centre(db, centre.id) >= MAX_LIVE_PER_CENTRE:
@@ -412,10 +547,18 @@ async def create_batch(db: AsyncSession, tenant: Tenant, actor: User, data: Batc
         schedule=data.schedule,
         fee_inr=data.fee_inr,
         status="draft",
-        created_by=actor.id,
+        created_by=actor_id,
     )
     db.add(batch)
     await db.flush()
+    return batch
+
+
+async def create_batch(db: AsyncSession, tenant: Tenant, actor: User, data: BatchIn) -> BatchOut:
+    centre = await _resolve_centre(db, tenant, data.centre_slug)
+    course = await _course_to_deliver(db, data.course_slug)
+    organisation_id = centre.parent_id
+    batch = await add_batch(db, centre.id, course, actor.id, data)
     batch_id = batch.id
     await db.commit()
     # After the commit, never inside it: `record()` commits.
