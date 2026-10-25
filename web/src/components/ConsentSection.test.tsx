@@ -15,9 +15,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 const STATE = {
-  consent_version: "2026-10-17",
+  consent_version: "2026-10-24",
   consented_at: "2026-10-01T10:00:00Z",
-  notice_version: "2026-10-17",
+  notice_version: "2026-10-24",
   current: true,
   withdrawn: false,
   consent_withdrawn_at: null as string | null,
@@ -40,7 +40,7 @@ describe("the consent section", () => {
   it("says what was agreed and when, and offers to withdraw", async () => {
     serve();
     renderUi(<ConsentSection />);
-    expect(await screen.findByText(/You agreed to the privacy notice of 2026-10-17/)).toBeTruthy();
+    expect(await screen.findByText(/You agreed to the privacy notice of 2026-10-24/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Withdraw my consent…" })).toBeTruthy();
   });
 

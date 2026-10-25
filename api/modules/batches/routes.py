@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.authorization import Permission, TenantContext, require
 from api.core.database import get_db_session
-from api.modules.batches import bulk, service
+from api.modules.batches import bulk, learners, service
 from api.modules.batches.schemas import (
     BatchBulkPublishIn,
     BatchBulkPublishOut,
@@ -25,10 +25,12 @@ from api.modules.batches.schemas import (
     BatchBulkReportOut,
     BatchBulkRowOut,
     BatchIn,
+    BatchLearnersOut,
     BatchList,
     BatchOut,
     BatchOverview,
     BatchUpdateIn,
+    CentreStatusIn,
     CourseBatchesOut,
     DeliverableCourses,
 )
@@ -37,6 +39,9 @@ router = APIRouter(prefix="/org/{org_slug}/batches", tags=["batches"])
 
 CanReadBatches = Depends(require(Permission.BATCH_READ, "batch"))
 CanManageBatches = Depends(require(Permission.BATCH_MANAGE, "batch"))
+# The learners of a batch, their contact included: the centre and its organisation's owners and
+# admins (ADR-103, decision 1). A plain member reads the batches and never a person.
+CanSeeLearners = Depends(require(Permission.BATCH_LEARNERS, "batch"))
 # A file of batches names a centre on every row, so it is the organisation's: `CENTRE_MANAGE` is an
 # admin's and an owner's and is held by no centre manager, and a centre has no "centre" capability.
 CanUploadBatches = Depends(require(Permission.CENTRE_MANAGE, "centre"))
@@ -229,3 +234,28 @@ async def cancel_batch(
     db: AsyncSession = Depends(get_db_session),
 ) -> BatchOut:
     return await service.cancel_batch(db, context.tenant, context.user, batch_id)
+
+
+@router.get("/{batch_id}/learners", response_model=BatchLearnersOut)
+async def batch_learners(
+    batch_id: uuid.UUID,
+    context: TenantContext = CanSeeLearners,
+    db: AsyncSession = Depends(get_db_session),
+) -> BatchLearnersOut:
+    """Who registered interest in this batch, the longest-waiting unanswered first, with the contact
+    they chose to share (gone once they withdraw)."""
+    return await learners.learners_of(db, context.tenant, batch_id)
+
+
+@router.patch("/{batch_id}/learners/{interest_id}", response_model=BatchLearnersOut)
+async def set_learner_status(
+    batch_id: uuid.UUID,
+    interest_id: uuid.UUID,
+    payload: CentreStatusIn,
+    context: TenantContext = CanSeeLearners,
+    db: AsyncSession = Depends(get_db_session),
+) -> BatchLearnersOut:
+    """Mark a learner contacted, enrolled (takes a seat) or attended (after it started)."""
+    return await learners.set_status(
+        db, context.tenant, context.user, batch_id, interest_id, payload.status
+    )

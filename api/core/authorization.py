@@ -103,6 +103,11 @@ class Permission(StrEnum):
     # creates them (Sprint 100).
     BATCH_READ = "batch:read"
     BATCH_MANAGE = "batch:manage"
+    # Sprint 100, ADR-103's owner decision 1, built as recommended: **the learners of a batch**,
+    # their name and contact, reach the centre that runs it and its organisation's owners and
+    # admins, and nobody else. A plain member (who reads the batches) does not see a person; the
+    # seller never does (counts only, `of_my_courses`).
+    BATCH_LEARNERS = "batch:learners"
 
     # ---- operator (ADR-042). Granted by `users.is_staff`, by nothing else.
     # **Never reachable from a membership role**: `ROLE_PERMISSIONS` is the only
@@ -166,6 +171,7 @@ _ADMIN: frozenset[Permission] = _MEMBER | {
     Permission.CENTRE_MANAGE,
     Permission.DELIVERY_MANAGE,
     Permission.BATCH_MANAGE,
+    Permission.BATCH_LEARNERS,
     # An admin may bring someone in, and `invite()` decides at what role: a
     # `member` only. That ceiling is enforced in the service, once, rather
     # than by a fourth permission -- it is a rule about the *argument*, and a
@@ -201,6 +207,7 @@ _MANAGER: frozenset[Permission] = frozenset(
         # may plan from are their organisation's authorisations, read for them.
         Permission.BATCH_READ,
         Permission.BATCH_MANAGE,
+        Permission.BATCH_LEARNERS,
     }
 )
 

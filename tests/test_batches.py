@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.clock import today_ist
@@ -24,7 +24,7 @@ from api.modules.analytics.models import AnalyticsEvent
 from api.modules.batches import bulk as bulk_module
 from api.modules.batches import phases, service
 from api.modules.batches.models import Batch, BatchInterest
-from api.modules.identity.models import User
+from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Course
 from api.modules.notifications.models import Notification
 from api.modules.skills.hierarchy import Sector
@@ -1336,3 +1336,779 @@ async def test_two_rows_of_one_course_and_centre_are_two_batches_when_the_day_or
     rows = (await _bulk(client, w, "apply", body)).json()["rows"]
     assert [r["status"] for r in rows] == ["ok", "ok", "ok"]
     assert all(r["created"] for r in rows)
+
+
+# ================================================================ Sprint 100: the learner's side
+
+from api.core.config import PRIVACY_NOTICE_VERSION as _CONSENT  # noqa: E402
+from api.modules.geography.models import District, State  # noqa: E402
+from api.modules.matching.attendance import REACH_RANK  # noqa: E402
+
+
+async def _learner(client, db, name="Asha Rao") -> tuple[dict[str, str], uuid.UUID, uuid.UUID]:
+    """A candidate with a profile, a name and a phone: `(headers, user id, profile id)`."""
+    phone = "9" + str(uuid.uuid4().int)[:9]
+    code = (await client.post("/auth/otp/request", json={"phone": phone})).json()["debug_code"]
+    tokens = (
+        await client.post(
+            "/auth/otp/verify", json={"phone": phone, "code": code, "consent_version": _CONSENT}
+        )
+    ).json()
+    headers = {"authorization": f"Bearer {tokens['access_token']}"}
+    user_id = uuid.UUID((await client.get("/auth/me", headers=headers)).json()["id"])
+    assert (await client.get("/me/profile", headers=headers)).status_code == 200
+    await db.execute(update(User).where(User.id == user_id).values(full_name=name))
+    await db.commit()
+    profile_id = await db.scalar(
+        select(CandidateProfile.id).where(CandidateProfile.user_id == user_id)
+    )
+    assert profile_id is not None
+    return headers, user_id, profile_id
+
+
+async def _ids(db: AsyncSession, place: tuple[str, str]) -> tuple[uuid.UUID, uuid.UUID]:
+    state = await db.scalar(select(State).where(State.name == place[0]))
+    district = await db.scalar(select(District).where(District.name == place[1]))
+    assert state is not None and district is not None
+    return state.id, district.id
+
+
+async def _lives_in(db: AsyncSession, profile_id: uuid.UUID, place: tuple[str, str]) -> None:
+    state_id, district_id = await _ids(db, place)
+    await db.execute(
+        update(CandidateProfile)
+        .where(CandidateProfile.id == profile_id)
+        .values(state_id=state_id, district_id=district_id)
+    )
+    await db.commit()
+
+
+async def _another_place(db: AsyncSession) -> tuple[str, str]:
+    state = State(
+        state_code=800_000 + uuid.uuid4().int % 90_000,
+        name=f"Otherland {uuid.uuid4().hex[:6]}",
+        slug=f"otherland-{uuid.uuid4().hex[:8]}",
+    )
+    db.add(state)
+    await db.flush()
+    district = District(
+        district_code=800_000 + uuid.uuid4().int % 90_000,
+        state_id=state.id,
+        name=f"Otherville {uuid.uuid4().hex[:6]}",
+        slug=f"otherville-{uuid.uuid4().hex[:8]}",
+    )
+    db.add(district)
+    await db.commit()
+    return state.name, district.name
+
+
+async def _interest_in(client, headers, batch_id, message=None):
+    return await client.post(
+        "/me/batch-interests", headers=headers, json={"batch_id": batch_id, "message": message}
+    )
+
+
+async def _listed(client, headers=None, **params) -> dict:
+    got = await client.get("/batches", headers=headers or {}, params=params)
+    assert got.status_code == 200, got.text
+    return got.json()
+
+
+async def _open_world(client, w, *, start=20, seats=10, **over) -> str:
+    """One published, joinable batch of the world's course at its centre."""
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"]) if not w.get(
+        "approved"
+    ) else None
+    w["approved"] = True
+    batch = await _plan_at(client, w, start=start, seats=seats, **over)
+    await _publish(client, w, batch)
+    return batch
+
+
+# ---------------------------------------------------------------- finding a batch
+
+
+async def test_the_public_list_shows_what_can_still_be_joined_and_nothing_else(client, db, world):
+    w = world
+    open_id = await _open_world(client, w, start=20, seats=10)
+    full_id = await _open_world(client, w, start=21, seats=1)
+    await _interest(db, full_id, "enrolled")
+    await _plan_at(client, w, start=22)  # a draft
+    cancelled = await _open_world(client, w, start=23)
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+    running = await _open_world(client, w, start=1)
+    await _set(db, running, starts_on=today_ist())
+    finished = await _open_world(client, w, start=2)
+    await _set(
+        db,
+        finished,
+        starts_on=today_ist() - timedelta(days=9),
+        ends_on=today_ist() - timedelta(days=1),
+    )
+    # A batch of a course that stopped being live, and one at a closed centre.
+    other_course = await _course(client, w["seller_h"], w["seller"], w["skill"], "Gone course")
+    gone = await _open_world(client, w, start=24, course=other_course)
+    await db.execute(update(Course).where(Course.slug == other_course).values(status="draft"))
+    await db.commit()
+
+    got = await _listed(client)  # signed out
+    ids = [b["id"] for b in got["items"]]
+    assert set(ids) == {open_id, full_id}, "joinable, and just filled: nothing else"
+    assert got["total"] == 2
+    by_id = {b["id"]: b for b in got["items"]}
+    assert by_id[open_id]["phase"] == "open" and by_id[open_id]["seats_left"] == 10
+    assert by_id[full_id]["phase"] == "full" and by_id[full_id]["seats_left"] == 0
+    assert gone not in ids
+
+
+async def test_what_a_learner_is_shown_carries_no_person_and_no_count_of_the_interested(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    await _interest(db, batch, "registered")
+    await _interest(db, batch, "enrolled")
+    row = (await _listed(client))["items"][0]
+    assert set(row) == {
+        *("id", "course", "centre", "organisation", "label", "starts_on", "ends_on"),
+        *("seats", "seats_left", "mode", "schedule", "fee_effective", "fee_is_override"),
+        *("phase", "cancel_reason", "reach", "my_interest"),
+    }
+    assert set(row["centre"]) == {
+        "slug",
+        "name",
+        "location_state",
+        "location_district",
+        "is_verified",
+    }
+    text = str(row)
+    for secret in ("interested", "enrolled", "phone", "email", "address"):
+        assert secret not in text
+    assert row["seats_left"] == 9, "the one derived figure: seats minus those the centre enrolled"
+
+
+async def test_one_batch_by_link_cancelled_is_shown_as_such_and_a_draft_is_not_there(
+    client, world, db
+):
+    w = world
+    batch = await _open_world(client, w)
+    draft = await _plan_at(client, w, start=40)
+    assert (await client.get(f"/batches/{batch}")).json()["phase"] == "open"
+    assert (await client.get(f"/batches/{draft}")).status_code == 404
+    await client.post(f"/org/{w['partner']}/batches/{batch}/cancel", headers=w["partner_h"])
+    gone = (await client.get(f"/batches/{batch}")).json()
+    assert gone["phase"] == "cancelled" and gone["cancel_reason"] == "by_organisation"
+    assert (await client.get(f"/batches/{uuid.uuid4()}")).status_code == 404
+    await db.execute(update(Course).where(Course.slug == w["course"]).values(status="draft"))
+    await db.commit()
+    assert (await client.get(f"/batches/{batch}")).status_code == 404
+
+
+async def test_the_order_is_reach_then_soonest_then_cheapest_and_nothing_is_hidden(
+    client, db, world, place
+):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    w["approved"] = True
+    elsewhere = await _another_place(db)
+    state_only = (place[0], "Nowhereville")
+    centres = {
+        "district": w["centre"],
+        "state": await _centre(client, w["partner_h"], w["partner"], state_only, "State only"),
+        "unknown": await _centre(
+            client, w["partner_h"], w["partner"], ("Atlantis", "Lemuria"), "Unknown"
+        ),
+        "elsewhere": await _centre(client, w["partner_h"], w["partner"], elsewhere, "Far away"),
+    }
+    made = {}
+    for i, (reach, slug) in enumerate(centres.items()):
+        # The nearest starts LAST: reach must outrank the date.
+        made[reach] = await _plan_at(client, w, start=40 - i * 5, centre=slug)
+        await _publish(client, w, made[reach])
+    headers, _user, profile_id = await _learner(client, db)
+    await _lives_in(db, profile_id, place)
+
+    got = (await _listed(client, headers))["items"]
+    assert [b["id"] for b in got] == [
+        made["district"],
+        made["state"],
+        made["unknown"],
+        made["elsewhere"],
+    ]
+    assert [b["reach"] for b in got] == ["district", "state", "unknown", "elsewhere"]
+    ranks = [REACH_RANK[b["reach"]] for b in got]
+    assert ranks == sorted(ranks), "the label and the order are one rule"
+    assert len(got) == 4, "a far batch is last, never gone"
+
+
+async def test_an_online_batch_is_as_near_as_one_in_your_district(client, db, world, place):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    w["approved"] = True
+    far = await _another_place(db)
+    far_centre = await _centre(client, w["partner_h"], w["partner"], far, "Far centre")
+    online = await _plan_at(client, w, start=30, centre=far_centre, mode="online")
+    await _publish(client, w, online)
+    here = await _plan_at(client, w, start=40)
+    await _publish(client, w, here)
+    headers, _user, profile_id = await _learner(client, db)
+    await _lives_in(db, profile_id, place)
+    got = (await _listed(client, headers))["items"]
+    assert [b["reach"] for b in got] == ["online", "district"]
+    assert [b["id"] for b in got] == [online, here], "equal reach: the sooner first"
+
+
+async def test_the_same_reach_orders_by_start_then_by_the_fee_the_learner_would_pay(
+    client, db, world
+):
+    w = world
+    sooner = await _open_world(client, w, start=20)
+    dear = await _open_world(client, w, start=30, fee_inr=9000)
+    cheap = await _open_world(client, w, start=30, fee_inr=1000)
+    free = await _open_world(client, w, start=30, fee_inr=0)
+    got = [b["id"] for b in (await _listed(client))["items"]]
+    assert got == [sooner, free, cheap, dear]
+    assert {b["id"]: b["fee_is_override"] for b in (await _listed(client))["items"]}[dear] is True
+
+
+async def test_an_anonymous_visitor_can_say_where_they_are_and_it_filters_and_orders(
+    client, db, world, place
+):
+    w = world
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    w["approved"] = True
+    far = await _another_place(db)
+    far_centre = await _centre(client, w["partner_h"], w["partner"], far, "Far centre")
+    near = await _plan_at(client, w, start=30)
+    await _publish(client, w, near)
+    away = await _plan_at(client, w, start=25, centre=far_centre)
+    await _publish(client, w, away)
+    state_id, district_id = await _ids(db, place)
+    everyone = await _listed(client)
+    assert {b["reach"] for b in everyone["items"]} <= {"unknown"}, "no evidence about the person"
+    here = await _listed(client, district_id=str(district_id))
+    assert [b["id"] for b in here["items"]] == [near] and here["items"][0]["reach"] == "district"
+    in_state = await _listed(client, state_id=str(state_id))
+    assert [b["id"] for b in in_state["items"]] == [near]
+
+
+async def test_filters_total_and_paging(client, db, world):
+    w = world
+    soon = await _open_world(client, w, start=5)
+    later = await _open_world(client, w, start=60, fee_inr=8000)
+    other_course = await _course(client, w["seller_h"], w["seller"], w["skill"], "Other course")
+    other = await _open_world(client, w, start=10, course=other_course, mode="online")
+
+    assert [b["id"] for b in (await _listed(client, starts_within=14))["items"]] == [other, soon]
+    assert [b["id"] for b in (await _listed(client, max_fee=5000))["items"]] == [other, soon]
+    assert [b["id"] for b in (await _listed(client, course=other_course))["items"]] == [other]
+    assert [b["id"] for b in (await _listed(client, mode="online"))["items"]] == [other]
+    first = await _listed(client, limit=2)
+    second = await _listed(client, limit=2, offset=2)
+    assert first["total"] == second["total"] == 3, "the count of what matches, not the page"
+    assert [b["id"] for b in first["items"] + second["items"]] == [other, soon, later], (
+        "an online batch is as near as one in your district: it comes first, then by start"
+    )
+    assert (await client.get("/batches", params={"starts_within": 0})).status_code == 422
+    assert (await client.get("/batches", params={"mode": "teleport"})).status_code == 422
+
+
+# ---------------------------------------------------------------- registering and withdrawing
+
+
+async def test_a_learner_registers_the_centre_is_told_and_they_can_take_it_back(client, db, world):
+    w = world
+    batch = await _open_world(client, w)
+    headers, user_id, profile_id = await _learner(client, db)
+
+    made = await _interest_in(client, headers, batch, "Evenings only, please")
+    assert made.status_code == 201, made.text
+    body = made.json()
+    assert body["status"] == "registered" and body["message"] == "Evenings only, please"
+    assert body["batch"]["id"] == batch
+    row = await db.scalar(select(BatchInterest).where(BatchInterest.profile_id == profile_id))
+    assert row is not None and row.contact_shared_at is not None and row.contact_revoked_at is None
+    # The organisation is told once, by email, with a name and a link and nobody's details.
+    org = await _tenant(db, w["partner"])
+    mail = (
+        await db.scalars(
+            select(Notification).where(
+                Notification.recipient_id == org.id,
+                Notification.template == "batch_interest_registered",
+            )
+        )
+    ).all()
+    assert len(mail) == 1 and mail[0].channel == "email"
+    assert set(mail[0].payload) == {"course", "centre", "path"}
+    assert mail[0].payload["path"] == f"/employer/{w['partner']}/batches"
+    event = await db.scalar(
+        select(AnalyticsEvent).where(AnalyticsEvent.name == "batch_interest_registered")
+    )
+    assert event is not None and set(event.payload) == {"organisation", "provider"}
+
+    listed = (await _listed(client, headers))["items"][0]
+    assert listed["my_interest"] == {"id": body["id"], "status": "registered"}
+    assert (await client.get(f"/batches/{batch}", headers=headers)).json()["my_interest"][
+        "id"
+    ] == body["id"]
+    assert (await _listed(client))["items"][0]["my_interest"] is None, "signed out: nobody's"
+
+    again = await _interest_in(client, headers, batch)
+    assert again.status_code == 409
+
+    back = await client.post(f"/me/batch-interests/{body['id']}/withdraw", headers=headers)
+    assert back.status_code == 200 and back.json()["status"] == "withdrawn"
+    await db.refresh(row)
+    assert row.contact_revoked_at is not None
+    assert (await _listed(client, headers))["items"][0]["my_interest"] is None
+    # Changing their mind is not an error: the same row is reused.
+    once_more = await _interest_in(client, headers, batch)
+    assert once_more.status_code == 201 and once_more.json()["id"] == body["id"]
+    count = await db.scalar(
+        select(func.count())
+        .select_from(BatchInterest)
+        .where(BatchInterest.profile_id == profile_id)
+    )
+    assert count == 1
+
+
+async def test_a_batch_that_cannot_be_joined_is_refused_for_the_right_reason(client, db, world):
+    w = world
+    full = await _open_world(client, w, start=20, seats=1)
+    await _interest(db, full, "enrolled")
+    running = await _open_world(client, w, start=3)
+    await _set(db, running, starts_on=today_ist())
+    draft = await _plan_at(client, w, start=40)
+    cancelled = await _open_world(client, w, start=30)
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+    headers, _user, _profile = await _learner(client, db)
+    assert (await _interest_in(client, headers, full)).status_code == 409
+    assert "full" in (await _interest_in(client, headers, full)).json()["detail"]
+    assert "started" in (await _interest_in(client, headers, running)).json()["detail"]
+    for gone in (draft, cancelled, str(uuid.uuid4()), "not-an-id"):
+        assert (await _interest_in(client, headers, gone)).status_code == 404, gone
+
+
+async def test_a_learner_whose_course_stopped_being_live_cannot_register(client, db, world):
+    w = world
+    batch = await _open_world(client, w)
+    await db.execute(update(Course).where(Course.slug == w["course"]).values(status="draft"))
+    await db.commit()
+    headers, _u, _p = await _learner(client, db)
+    assert (await _interest_in(client, headers, batch)).status_code == 404
+
+
+async def test_a_paused_learner_cannot_register_and_pausing_takes_back_what_was_shared(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    headers, _user, profile_id = await _learner(client, db)
+    made = (await _interest_in(client, headers, batch)).json()
+    paused = await client.post("/me/account/consent/withdraw", headers=headers)
+    assert paused.status_code == 200, paused.text
+    row = await db.scalar(
+        select(BatchInterest)
+        .where(BatchInterest.id == uuid.UUID(made["id"]))
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None and row.status == "withdrawn" and row.contact_revoked_at is not None
+    other = await _open_world(client, w, start=45)
+    refused = await _interest_in(client, headers, other)
+    assert refused.status_code == 409, "a disclosure is stopped outright while consent is withdrawn"
+    assert (
+        "paused" in refused.json()["detail"].lower()
+        or "consent" in refused.json()["detail"].lower()
+    )
+    assert profile_id
+
+
+async def test_an_organisation_only_account_cannot_register_and_is_given_no_profile(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    before = await db.scalar(select(func.count()).select_from(CandidateProfile))
+    org_h, _org = await _register(client, f"Only Org {uuid.uuid4().hex[:6]}", sells=True)
+    refused = await _interest_in(client, org_h, batch)
+    assert refused.status_code in (403, 404)
+    # ...and merely reading the public list does not create one either.
+    assert (await client.get("/batches", headers=org_h)).status_code == 200
+    assert await db.scalar(select(func.count()).select_from(CandidateProfile)) == before
+
+
+async def test_the_daily_limit_applies_to_batches_too(client, db, world, monkeypatch):
+    from api.core.config import get_settings
+
+    w = world
+    first = await _open_world(client, w, start=20)
+    second = await _open_world(client, w, start=21)
+    headers, _u, _p = await _learner(client, db)
+    monkeypatch.setattr(get_settings(), "max_course_interests_per_day", 1)
+    assert (await _interest_in(client, headers, first)).status_code == 201
+    limited = await _interest_in(client, headers, second)
+    assert limited.status_code == 429 and limited.headers["retry-after"] == "3600"
+
+
+async def test_my_interests_show_a_cancelled_batch_and_are_nobody_elses(client, db, world):
+    w = world
+    batch = await _open_world(client, w)
+    headers, _u, _p = await _learner(client, db)
+    other_headers, _ou, _op = await _learner(client, db, "Ravi Iyer")
+    made = (await _interest_in(client, headers, batch)).json()
+    await client.post(f"/org/{w['partner']}/batches/{batch}/cancel", headers=w["partner_h"])
+    mine = (await client.get("/me/batch-interests", headers=headers)).json()
+    assert [(i["id"], i["batch"]["phase"], i["batch"]["cancel_reason"]) for i in mine] == [
+        (made["id"], "cancelled", "by_organisation")
+    ]
+    assert (await client.get("/me/batch-interests", headers=other_headers)).json() == []
+    stranger = await client.post(
+        f"/me/batch-interests/{made['id']}/withdraw", headers=other_headers
+    )
+    assert stranger.status_code == 404
+    gone = (await client.get("/me/batch-interests", headers=headers)).json()[0]
+    assert gone["status"] == "registered", "a stranger's attempt changed nothing"
+
+
+# ---------------------------------------------------------------- the centre sees them
+
+
+async def _registered(client, db, batch, n=1, message=None):
+    people = []
+    for i in range(n):
+        h, uid, pid = await _learner(client, db, f"Learner {i}")
+        made = await _interest_in(client, h, batch, message)
+        assert made.status_code == 201, made.text
+        people.append((h, uid, pid, made.json()["id"]))
+    return people
+
+
+async def test_the_organisation_sees_who_registered_unanswered_first_and_oldest_first(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    first, second, third = await _registered(client, db, batch, 3, "Hello")
+    for person in (second, third):
+        await db.execute(
+            update(CandidateProfile)
+            .where(CandidateProfile.id == person[2])
+            .values(location_state="Maharashtra", location_district="Pune")
+        )
+    await db.commit()
+    # The suite is one transaction, so `now()` is the same instant for all three: say who was first.
+    for age, person in zip((3, 2, 1), (first, second, third), strict=True):
+        await db.execute(
+            update(BatchInterest)
+            .where(BatchInterest.id == uuid.UUID(person[3]))
+            .values(created_at=datetime.now(UTC) - timedelta(days=age))
+        )
+    await db.flush()
+    # The oldest has been answered; the order puts the still-waiting ones first, longest first.
+    await client.patch(
+        f"/org/{w['partner']}/batches/{batch}/learners/{first[3]}",
+        headers=w["partner_h"],
+        json={"status": "contacted"},
+    )
+    await client.post(f"/me/batch-interests/{third[3]}/withdraw", headers=third[0])
+    got = (
+        await client.get(f"/org/{w['partner']}/batches/{batch}/learners", headers=w["partner_h"])
+    ).json()
+    assert [i["interest_id"] for i in got["items"]] == [second[3], first[3], third[3]]
+    waiting, answered, withdrawn = got["items"]
+    assert waiting["contact"]["full_name"] == "Learner 1" and waiting["contact"]["phone"]
+    assert waiting["message"] == "Hello"
+    assert (waiting["location_state"], waiting["location_district"]) == ("Maharashtra", "Pune")
+    assert answered["status"] == "contacted"
+    # Withdrawn keeps the fact and loses the person.
+    assert withdrawn["status"] == "withdrawn"
+    assert withdrawn["contact"] is None and withdrawn["message"] is None
+    assert withdrawn["location_district"] is None
+    assert got["batch"]["interested"] == 2, "the withdrawn one is not counted as interested"
+
+
+async def test_who_may_see_a_learner_is_the_centre_and_its_organisations_owners_and_admins(
+    client, db, world
+):
+    w = world
+    sibling = await _centre(client, w["partner_h"], w["partner"], w["place"], "Kothrud")
+    await _approve_all(client, w["seller_h"], w["seller"], w["partner"])
+    w["approved"] = True
+    here = await _open_world(client, w)
+    there = await _plan_at(client, w, start=30, centre=sibling)
+    await _publish(client, w, there)
+    await _registered(client, db, here)
+    await _registered(client, db, there)
+    path = lambda org, b: f"/org/{org}/batches/{b}/learners"  # noqa: E731
+
+    assert (await client.get(path(w["partner"], here), headers=w["partner_h"])).status_code == 200
+    manager = await _manager(client, db, w["partner_h"], w["partner"], w["centre"])
+    assert (await client.get(path(w["centre"], here), headers=manager)).status_code == 200
+    # Their own centre only: a sibling's learners are the 404 of none.
+    assert (await client.get(path(w["centre"], there), headers=manager)).status_code == 404
+    # The seller of the course never reaches a learner, by any door.
+    for org, headers in ((w["seller"], w["seller_h"]), (w["partner"], w["seller_h"])):
+        refused = await client.get(path(org, here), headers=headers)
+        assert refused.status_code in (403, 404)
+    # A plain member reads the batch and never a person.
+    from api.modules.identity.models import Membership
+
+    tenant = await _tenant(db, w["partner"])
+    owner = await db.scalar(select(Membership).where(Membership.tenant_id == tenant.id))
+    assert owner is not None
+    owner.role = "member"
+    await db.commit()
+    assert (
+        await client.get(f"/org/{w['partner']}/batches/{here}", headers=w["partner_h"])
+    ).status_code == 200
+    assert (await client.get(path(w["partner"], here), headers=w["partner_h"])).status_code == 403
+    # ...and another organisation gets the 404 of a batch that does not exist.
+    other_h, other = await _deliverer(client)
+    assert (await client.get(path(other, here), headers=other_h)).status_code == 404
+
+
+async def test_marking_a_learner_tells_them_and_enrolling_takes_a_seat(client, db, world):
+    w = world
+    batch = await _open_world(client, w, seats=2)
+    (h1, u1, _p1, i1), (h2, u2, _p2, i2), (h3, _u3, _p3, i3) = await _registered(
+        client, db, batch, 3
+    )
+    mark = lambda interest, status: client.patch(  # noqa: E731
+        f"/org/{w['partner']}/batches/{batch}/learners/{interest}",
+        headers=w["partner_h"],
+        json={"status": status},
+    )
+    contacted = await mark(i1, "contacted")
+    assert contacted.status_code == 200
+    notices = (
+        await db.scalars(
+            select(Notification).where(
+                Notification.recipient_id == u1,
+                Notification.template == "batch_interest_status_changed",
+            )
+        )
+    ).all()
+    assert len(notices) == 1 and notices[0].channel == "in_app"
+    assert set(notices[0].payload) == {"course", "organisation", "status", "path"}
+    assert notices[0].payload["status"] == "contacted"
+    await mark(i1, "contacted")  # unchanged: nobody is told twice
+    assert (
+        len(
+            (
+                await db.scalars(
+                    select(Notification).where(
+                        Notification.recipient_id == u1,
+                        Notification.template == "batch_interest_status_changed",
+                    )
+                )
+            ).all()
+        )
+        == 1
+    )
+
+    assert (await mark(i1, "enrolled")).status_code == 200
+    assert (await mark(i2, "enrolled")).status_code == 200
+    assert (await _listed(client))["items"][0]["seats_left"] == 0
+    full = await mark(i3, "enrolled")
+    assert full.status_code == 409 and "Every seat is taken" in full.json()["detail"]
+    # Someone enrolled can be moved to contacted again (a correction), which frees the seat.
+    assert (await mark(i2, "contacted")).status_code == 200
+    assert (await mark(i3, "enrolled")).status_code == 200
+    assert (await _listed(client))["items"][0]["seats_left"] == 0
+    assert u2 and h1 and h2 and h3
+
+
+async def test_attended_needs_a_started_batch_and_an_enrolled_learner_and_still_holds_the_seat(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w, seats=1)
+    ((_h, _u, _p, interest),) = await _registered(client, db, batch)
+    url = f"/org/{w['partner']}/batches/{batch}/learners/{interest}"
+    attend = lambda: client.patch(url, headers=w["partner_h"], json={"status": "attended"})  # noqa: E731
+    not_yet = await attend()
+    assert not_yet.status_code == 409 and "enrolled before" in not_yet.json()["detail"], (
+        "not enrolled yet, and that is the reason it says"
+    )
+    await client.patch(url, headers=w["partner_h"], json={"status": "enrolled"})
+    early = await attend()
+    assert early.status_code == 409 and "has not started" in early.json()["detail"]
+    await _set(db, batch, starts_on=today_ist())
+    done = await attend()
+    assert done.status_code == 200
+    assert done.json()["items"][0]["status"] == "attended"
+    assert done.json()["batch"]["seats_left"] == 0, "a learner who came still holds the seat"
+    assert (
+        await db.scalar(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.template == "batch_interest_status_changed",
+                Notification.payload["status"].astext == "attended",
+            )
+        )
+    ) == 0, "no notice for attending"
+
+
+async def test_a_withdrawn_or_foreign_interest_cannot_be_moved_and_a_cancelled_batch_is_closed(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    other = await _open_world(client, w, start=40)
+    ((h, _u, _p, interest),) = await _registered(client, db, batch)
+    ((_h2, _u2, _p2, elsewhere),) = await _registered(client, db, other)
+    url = lambda b, i: f"/org/{w['partner']}/batches/{b}/learners/{i}"  # noqa: E731
+    body = {"status": "contacted"}
+    assert (
+        await client.patch(url(batch, elsewhere), headers=w["partner_h"], json=body)
+    ).status_code == 404
+    assert (
+        await client.patch(url(batch, uuid.uuid4()), headers=w["partner_h"], json=body)
+    ).status_code == 404
+    assert (
+        await client.patch(
+            url(batch, interest), headers=w["partner_h"], json={"status": "registered"}
+        )
+    ).status_code == 422
+    assert (
+        await client.patch(
+            url(batch, interest), headers=w["partner_h"], json={"status": "withdrawn"}
+        )
+    ).status_code == 422
+    await client.post(f"/me/batch-interests/{interest}/withdraw", headers=h)
+    refused = await client.patch(url(batch, interest), headers=w["partner_h"], json=body)
+    assert refused.status_code == 409 and "withdrawn" in refused.json()["detail"]
+    await client.post(f"/org/{w['partner']}/batches/{other}/cancel", headers=w["partner_h"])
+    assert (
+        await client.patch(url(other, elsewhere), headers=w["partner_h"], json=body)
+    ).status_code == 409
+
+
+async def test_replies_owed_is_counted_per_scope_and_leaves_when_answered(client, db, world):
+    w = world
+    batch = await _open_world(client, w)
+    (_h, _u, _p, first), (_h2, _u2, _p2, _second) = await _registered(client, db, batch, 2)
+    overview = lambda: client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])  # noqa: E731
+    got = (await overview()).json()
+    assert got["replies_owed"] == 2 and got["oldest_reply_owed_since"] is not None
+    await client.patch(
+        f"/org/{w['partner']}/batches/{batch}/learners/{first}",
+        headers=w["partner_h"],
+        json={"status": "contacted"},
+    )
+    assert (await overview()).json()["replies_owed"] == 1
+    other_h, other = await _deliverer(client)
+    assert (await client.get(f"/org/{other}/batches/overview", headers=other_h)).json()[
+        "replies_owed"
+    ] == 0
+
+
+# ---------------------------------------------------------------- the person's own record
+
+
+async def test_the_export_names_the_batch_the_centre_and_what_was_shared_and_erasure_removes_it(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    headers, user_id, profile_id = await _learner(client, db)
+    await _interest_in(client, headers, batch, "Mornings")
+    exported = (await client.get("/me/account/export", headers=headers)).json()
+    rows = exported["batch_interests"]
+    assert len(rows) == 1
+    assert rows[0]["course"] == "Welding basics"
+    assert rows[0]["centre"] and rows[0]["organisation"]
+    assert (
+        rows[0]["message"] == "Mornings"
+        and rows[0]["contact_shared_at"]
+        and rows[0]["contact_revoked_at"] is None
+    )
+    assert "profile_id" not in str(rows) and str(user_id) not in str(rows)
+
+    gone = await client.delete("/me/account", headers=headers)
+    assert gone.status_code in (200, 204), gone.text
+    assert (
+        await db.scalar(
+            select(func.count())
+            .select_from(BatchInterest)
+            .where(BatchInterest.profile_id == profile_id)
+        )
+    ) == 0
+
+
+# ------------------------------------------------- defensive states the writers refuse (forced)
+
+
+async def test_a_batch_whose_course_was_taken_down_is_not_listed_and_cannot_be_registered_for(
+    client, db, world
+):
+    """A takedown does not cancel batches (the card warns, publication refuses): the learner's
+    doors are what close. Forced into the state, because no writer of a batch will create it."""
+    w = world
+    batch = await _open_world(client, w)
+    headers, _, _ = await _learner(client, db)
+    assert [b["id"] for b in (await _listed(client))["items"]] == [batch]
+    await db.execute(
+        update(Course)
+        .where(Course.slug == w["course"])
+        .values(taken_down_at=datetime.now(UTC), takedown_reason="Reported")
+    )
+    await db.commit()
+    assert (await _listed(client))["items"] == []
+    assert (await client.get(f"/batches/{batch}")).status_code == 404
+    refused = await _interest_in(client, headers, batch)
+    assert refused.status_code == 404, refused.text
+
+
+async def test_a_batch_at_a_closed_centre_is_not_listed_and_cannot_be_registered_for(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    headers, _, _ = await _learner(client, db)
+    await db.execute(
+        update(Tenant).where(Tenant.slug == w["centre"]).values(closed_at=datetime.now(UTC))
+    )
+    await db.commit()
+    assert (await _listed(client))["items"] == []
+    assert (await client.get(f"/batches/{batch}")).status_code == 404
+    refused = await _interest_in(client, headers, batch)
+    assert refused.status_code == 409 and "closed" in refused.json()["detail"], refused.text
+
+
+async def test_batches_that_tie_on_everything_page_without_repeating_or_skipping(client, db, world):
+    w = world
+    made = {await _open_world(client, w, start=30, seats=5) for _ in range(5)}
+    assert len(made) == 5
+    seen: list[str] = []
+    for offset in range(5):
+        page = await _listed(client, limit=1, offset=offset)
+        assert page["total"] == 5
+        seen += [b["id"] for b in page["items"]]
+    assert sorted(seen) == sorted(made), "each exactly once across the pages"
+
+
+async def test_registering_again_after_withdrawing_brings_the_contact_back_on_the_same_row(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w)
+    headers, _, profile_id = await _learner(client, db)
+    first = (await _interest_in(client, headers, batch)).json()
+    await client.post(f"/me/batch-interests/{first['id']}/withdraw", headers=headers)
+    row = await db.scalar(
+        select(BatchInterest)
+        .where(BatchInterest.profile_id == profile_id)
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None and row.contact_revoked_at is not None, "withdrawing takes it back"
+    again = await _interest_in(client, headers, batch)
+    assert again.status_code == 201 and again.json()["id"] == first["id"], "the same row"
+    row = await db.scalar(
+        select(BatchInterest)
+        .where(BatchInterest.profile_id == profile_id)
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None and row.status == "registered"
+    assert row.contact_revoked_at is None and row.contact_shared_at is not None

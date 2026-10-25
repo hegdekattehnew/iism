@@ -9,6 +9,8 @@ under a batch) and `live_for_course` (a course cannot be deleted from under one)
 """
 
 from api.modules.batches import service
+from api.modules.batches.learner import live_interests, withdraw_all_live
+from api.modules.batches.learner_routes import me_router, public_router
 from api.modules.batches.routes import router
 from api.modules.delivery import on_ended
 
@@ -22,4 +24,13 @@ live_at_centre = service.live_at_centre
 live_for_course = service.live_for_course
 tell_before_deleting = service.tell_before_deleting
 
-__all__ = ["live_at_centre", "live_for_course", "router", "tell_before_deleting"]
+__all__ = [
+    "live_at_centre",
+    "live_for_course",
+    "live_interests",
+    "me_router",
+    "public_router",
+    "router",
+    "tell_before_deleting",
+    "withdraw_all_live",
+]

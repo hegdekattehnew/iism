@@ -8,6 +8,12 @@ Three races, each with a lock as arbiter and each shown to fail without it:
   an arrangement that no longer exists.
 * **Two publishes of one draft.** The batch row is locked and re-read: one wins, the other is told
   what the batch now is.
+* **A learner registering against the batch being cancelled.** Registering share-locks the batch and
+  re-reads it, and a cancel takes `FOR UPDATE` and tells the learners it can see: the learner either
+  registered first (and is told) or finds the batch cancelled (and is refused). Never a learner
+  registered on a cancelled batch, silently.
+* **Two enrolments of the last seat.** The batch row is locked for the whole decision, so one gets
+  the seat and the other is told every seat is taken.
 * **A batch against its centre closing.** `create_batch` share-locks the centre and `close_centre`
   takes the stronger lock before counting: the batch is counted (the close is refused) or finds the
   centre closed (and is refused).
@@ -24,19 +30,19 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from api.core.clock import today_ist
 from api.core.database import get_sessionmaker
 from api.modules.analytics.models import AnalyticsEvent
-from api.modules.batches import service
-from api.modules.batches.models import Batch
+from api.modules.batches import learner, learners, service
+from api.modules.batches.models import Batch, BatchInterest
 from api.modules.batches.schemas import BatchIn
 from api.modules.centres import service as centres
 from api.modules.delivery import CourseDeliveryAuthorisation as Arrangement
 from api.modules.delivery import service as delivery
 from api.modules.identity.models import Membership, Tenant, User
-from api.modules.marketplace.models import Course
+from api.modules.marketplace.models import CandidateProfile, Course
 from api.modules.notifications.models import Notification
 
 
@@ -274,3 +280,163 @@ async def test_a_centre_closing_stops_a_batch_being_made_there(
     assert await closing == 200
     assert created == 409, "the centre closed first, so no batch lands in a closed centre"
     assert await _batches(world) == []
+
+
+# ----------------------------------------------------------------- Sprint 100: the learner's side
+
+
+async def _published_batch(world: World, seats: int = 10) -> uuid.UUID:
+    start = today_ist() + timedelta(days=14)
+    async with get_sessionmaker()() as db:
+        batch = Batch(
+            course_id=world.course,
+            centre_id=world.centre,
+            starts_on=start,
+            ends_on=start + timedelta(days=30),
+            seats=seats,
+            status="published",
+            published_at=datetime.now(UTC),
+        )
+        db.add(batch)
+        await db.commit()
+        return batch.id
+
+
+@dataclass
+class Person:
+    user: uuid.UUID
+    profile: uuid.UUID
+
+
+async def _person() -> Person:
+    async with get_sessionmaker()() as db:
+        user = User(
+            phone=f"+91{9000000000 + uuid.uuid4().int % 999_999_999}", full_name="Race Learner"
+        )
+        db.add(user)
+        await db.flush()
+        profile = CandidateProfile(user_id=user.id)
+        db.add(profile)
+        await db.commit()
+        return Person(user.id, profile.id)
+
+
+@pytest.fixture
+async def people() -> AsyncIterator[list[Person]]:
+    made: list[Person] = []
+    yield made
+    async with get_sessionmaker()() as db:
+        ids = [p.user for p in made]
+        await db.execute(delete(Notification).where(Notification.recipient_id.in_(ids)))
+        await db.execute(delete(AnalyticsEvent).where(AnalyticsEvent.user_id.in_(ids)))
+        await db.execute(delete(CandidateProfile).where(CandidateProfile.user_id.in_(ids)))
+        await db.execute(delete(User).where(User.id.in_(ids)))
+        await db.commit()
+
+
+async def _register(person: Person, batch_id: uuid.UUID) -> int:
+    async with get_sessionmaker()() as db:
+        user = await db.get(User, person.user)
+        assert user is not None
+        try:
+            await learner.register(db, user, batch_id=batch_id)
+        except HTTPException as refusal:
+            return refusal.status_code
+        return 201
+
+
+async def _cancel(world: World, batch_id: uuid.UUID) -> int:
+    async with get_sessionmaker()() as db:
+        partner = await db.get(Tenant, world.partner)
+        actor = await db.get(User, world.partner_owner)
+        assert partner is not None and actor is not None
+        try:
+            await service.cancel_batch(db, partner, actor, batch_id)
+        except HTTPException as refusal:
+            return refusal.status_code
+        return 200
+
+
+async def _told(person: Person) -> int:
+    async with get_sessionmaker()() as db:
+        return len(
+            (
+                await db.scalars(
+                    select(Notification).where(
+                        Notification.recipient_id == person.user,
+                        Notification.template == "batch_cancelled",
+                    )
+                )
+            ).all()
+        )
+
+
+async def test_a_learner_registering_while_the_batch_is_cancelled_is_told(
+    world: World, people: list[Person], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    person = await _person()
+    people.append(person)
+    batch_id = await _published_batch(world)
+    _hold(monkeypatch, learner, "enqueue")  # inside the registration, share lock held
+    registering = asyncio.create_task(_register(person, batch_id))
+    await asyncio.sleep(0.25)
+    cancelled = await _cancel(world, batch_id)
+    assert await registering == 201 and cancelled == 200
+    assert await _told(person) == 1, (
+        "the registration landed first, so the cancel saw it and told them"
+    )
+
+
+async def test_a_learner_registering_after_a_cancellation_is_refused(
+    world: World, people: list[Person], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    person = await _person()
+    people.append(person)
+    batch_id = await _published_batch(world)
+    _hold(monkeypatch, service, "_tell_interested")  # inside the cancellation, row lock held
+    cancelling = asyncio.create_task(_cancel(world, batch_id))
+    await asyncio.sleep(0.25)
+    refused = await _register(person, batch_id)
+    assert await cancelling == 200
+    assert refused == 404, "the batch was cancelled first: no learner is registered on it"
+    async with get_sessionmaker()() as db:
+        assert (
+            await db.scalar(
+                select(BatchInterest.id).where(BatchInterest.profile_id == person.profile)
+            )
+        ) is None
+
+
+async def _enrol(world: World, batch_id: uuid.UUID, interest_id: uuid.UUID) -> int:
+    async with get_sessionmaker()() as db:
+        partner = await db.get(Tenant, world.partner)
+        actor = await db.get(User, world.partner_owner)
+        assert partner is not None and actor is not None
+        try:
+            await learners.set_status(db, partner, actor, batch_id, interest_id, "enrolled")
+        except HTTPException as refusal:
+            return refusal.status_code
+        return 200
+
+
+async def test_two_enrolments_of_the_last_seat_give_it_to_one(
+    world: World, people: list[Person], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, second = await _person(), await _person()
+    people.extend([first, second])
+    batch_id = await _published_batch(world, seats=1)
+    async with get_sessionmaker()() as db:
+        rows = [BatchInterest(batch_id=batch_id, profile_id=p.profile) for p in (first, second)]
+        db.add_all(rows)
+        await db.commit()
+        ids = [r.id for r in rows]
+    _hold(monkeypatch, learners, "_enrolled_of", 0.4)
+    results = await asyncio.gather(_enrol(world, batch_id, ids[0]), _enrol(world, batch_id, ids[1]))
+    assert sorted(results) == [200, 409], "one seat, one learner"
+    async with get_sessionmaker()() as db:
+        taken = await db.scalar(
+            select(func.count())
+            .select_from(BatchInterest)
+            .where(BatchInterest.batch_id == batch_id, BatchInterest.status == "enrolled")
+        )
+    assert taken == 1

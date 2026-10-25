@@ -127,6 +127,9 @@ EVENT_NAMES = (
     "batch_created",
     "batch_published",
     "batch_cancelled",
+    "batch_interest_registered",
+    "batch_interest_withdrawn",
+    "batch_interest_status_changed",
 )
 
 

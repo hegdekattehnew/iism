@@ -17,6 +17,7 @@ import { useOrgDelivers, useOrgType } from "@/lib/org";
 const SEEKER_NAV = [
   { key: "jobs", href: "/jobs" },
   { key: "courses", href: "/courses" },
+  { key: "batches", href: "/batches" },
   { key: "skills", href: "/skills" },
   { key: "howItWorks", href: "/#how-it-works" },
 ] as const;

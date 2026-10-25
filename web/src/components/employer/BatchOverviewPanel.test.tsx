@@ -25,6 +25,8 @@ const overview = (over: Record<string, unknown> = {}) => ({
   unfilled_seats: 14,
   unfilled_batches: 2,
   unavailable: 4,
+  replies_owed: 5,
+  oldest_reply_owed_since: "2026-10-12T09:00:00Z",
   upcoming: [upcoming(1), upcoming(2), upcoming(3), upcoming(4), upcoming(5)],
   ...over,
 });
@@ -53,6 +55,9 @@ describe("BatchOverviewPanel", () => {
     await tile("Seats still free in batches starting within two weeks", "14");
     expect(screen.getByText("in 2 batches")).toBeTruthy();
     await tile("Need a look: their course is not published", "4");
+    // Sprint 100: the learners who asked and have not been answered, and since when.
+    await tile("Learners waiting for a reply", "5");
+    expect(screen.getByText("the longest since Oct 12, 2026")).toBeTruthy();
   });
 
   it("is on the page before it arrives, with a dash and never a zero", () => {
@@ -64,10 +69,11 @@ describe("BatchOverviewPanel", () => {
   });
 
   it("shows a true zero as 0", async () => {
-    GET.mockResolvedValue(ok(overview({ starting_soon: 0, drafts: 0, running: 0, unfilled_seats: 0, unfilled_batches: 0, unavailable: 0, upcoming: [] })));
+    GET.mockResolvedValue(ok(overview({ starting_soon: 0, drafts: 0, running: 0, unfilled_seats: 0, unfilled_batches: 0, unavailable: 0, replies_owed: 0, oldest_reply_owed_since: null, upcoming: [] })));
     renderUi(<BatchOverviewPanel org="acme" />);
     await screen.findByText("in 0 batches");
-    expect(screen.getAllByText("0").length).toBe(5);
+    expect(screen.getAllByText("0").length).toBe(6);
+    expect(screen.queryByText(/the longest since/)).toBeNull();
   });
 
   it("without `showNext` leaves out the next-to-start list and the link (the list is on the page)", async () => {

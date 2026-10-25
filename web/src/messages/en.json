@@ -1187,6 +1187,7 @@
             "If you look for work: the profile you build — a headline, where you are (state and district), skills, experience, education, certifications, languages, the roles and places you prefer, and, if you choose to save it, the role you say you do now. You may also add your date of birth, your gender, the salary you expect, your notice period, the kind of work you want and whether you would relocate. Date of birth and gender are optional; gender is used only for equal-opportunity reporting. We also keep a numeric summary of your skills, which is how matching compares you with a vacancy.",
             "If an agency programme signed you up on your behalf, a record of which programme did, and of the notice it attested was read to you.",
             "Your applications and course interests, including any message you write, and what the employer or training provider replies. An employer may keep a private note about an application; it is included in the data you download.",
+            "Your batch interests: the batch, any message you write, and whether the training centre has contacted you, enrolled you or marked that you attended.",
             "Updates and alerts we send you, and the offers an employer makes you. If you use the phone app, the code your phone gives us so an update can reach it.",
             "Messages you send through the contact and grievance forms, and reports you make about a vacancy or course.",
             "Activity: which matches, gaps and courses you open. These records are linked to your account and carry no name, number or email, and no list of your skills.",
@@ -1200,7 +1201,7 @@
             "To sign you in with a one-time code — there are no passwords.",
             "To match job seekers with vacancies and courses against the National Occupational Standards, and to show each person the gap between them and a role.",
             "To let employers see who could fill a vacancy. In an employer's candidate list you appear as a reference, headline, district, years of experience and skill gap — never your name, number or email.",
-            "When you apply for a vacancy, your name, phone number, email and any message you write are shared with that employer, for that vacancy. When you register interest in a course, they are shared with that training provider. You are asked to confirm before either happens. Withdrawing the application or interest takes the details off their screen; they may already have used or noted them.",
+            "When you apply for a vacancy, your name, phone number, email and any message you write are shared with that employer, for that vacancy. When you register interest in a course, they are shared with that training provider. When you register interest in a batch, they are shared with that training centre and with the owners and administrators of the organisation it belongs to, and with nobody else: not the organisation that sells the course, unless it is the same one. You are asked to confirm before any of these happens. Withdrawing the application or interest takes the details off their screen; they may already have used or noted them.",
             "To tell you about vacancies that match your skills, by an in-app notice and email. You can turn these off in your profile.",
             "To measure, in aggregate, whether the marketplace is working."
           ]
@@ -1472,6 +1473,11 @@
       "arrangement_ended": "the centre can no longer offer this course",
       "course_unavailable": "the course is no longer available",
       "centre_closed": "the centre closed"
+    },
+    "batchInterestStatusChanged": "{organisation} marked your interest in the batch of {course} as: {status}.",
+    "batchInterestStatus": {
+      "contacted": "They got in touch",
+      "enrolled": "Enrolled"
     }
   },
   "searchPage": {
@@ -2515,7 +2521,9 @@
       "next": "Next to start",
       "seatsLeft": "{count, plural, one {# seat left} other {# seats left}}",
       "all": "All batches",
-      "nothingNext": "Nothing is about to start."
+      "nothingNext": "Nothing is about to start.",
+      "repliesOwed": "Learners waiting for a reply",
+      "oldestWaiting": "the longest since {date}"
     },
     "uploadLink": "Add many from a file"
   },
@@ -2560,5 +2568,126 @@
     "publishedSummary": "{published} published, {refused} not published.",
     "another": "Use another file",
     "viewList": "See my batches"
+  },
+  "publicBatches": {
+    "heading": "Batches near you",
+    "subheading": "Classes that start soon, nearest first. Each is one run of a course at a training centre, with its own dates and seats.",
+    "filtersLabel": "Narrow the batches",
+    "state": "State",
+    "anyState": "Any state",
+    "district": "District",
+    "anyDistrict": "Any district",
+    "startsWithin": "Starts within",
+    "anyStart": "Any start date",
+    "withinDays": "{days} days",
+    "maxFee": "Fee",
+    "anyFee": "Any fee",
+    "upTo": "Up to ₹{amount}",
+    "feeFree": "Free",
+    "modeLabel": "How it is taught",
+    "anyMode": "Any way",
+    "mode": {
+      "in_person": "In person",
+      "hybrid": "Partly online",
+      "online": "Online"
+    },
+    "loadFailed": "Could not load the batches. Try again.",
+    "empty": "No batches to show",
+    "emptyHint": "No batch is open for this yet. Try another state, a later start or a higher fee, or look at the courses themselves.",
+    "count": "{total, plural, one {# batch} other {# batches}}",
+    "showMore": "Show more ({left} left)",
+    "courseBy": "Course by {organisation}",
+    "deliveredBy": "Delivered by {organisation} at {centre}",
+    "reviewed": "Reviewed by our team",
+    "addressChecked": "Address checked",
+    "dates": "{start} to {end}",
+    "seatsLeft": "{left} of {seats} seats left",
+    "full": "Full",
+    "fee": "₹{amount}",
+    "feeSetByCentre": "Fee set by the centre",
+    "reach": {
+      "online": "Online",
+      "district": "In your district",
+      "state": "In your state",
+      "elsewhere": "Outside your state",
+      "unknown": "Place not known"
+    },
+    "register": "Register interest",
+    "registerNamed": "Register interest: {name}",
+    "signInToRegister": "Sign in to register interest",
+    "fullNote": "This batch is full. Ask the centre about the next one.",
+    "confirmHeading": "Before you register",
+    "confirmShare": "{centre} will see your name, phone number, email and district, so it can tell you about this batch. So will the owners and administrators of {organisation}, which runs it.",
+    "confirmWho": "Nobody else sees them: not the organisation that sells the course, unless it is the same one, and not another centre.",
+    "confirmWithdrawNote": "You can withdraw at any time, and they stop seeing your details.",
+    "messageLabel": "Anything they should know (optional)",
+    "messagePlaceholder": "e.g. evenings only, or when you could start",
+    "confirmCta": "Register my interest",
+    "registering": "Registering…",
+    "cancel": "Cancel",
+    "withdraw": "Withdraw",
+    "withdrawNamed": "Withdraw: {name}",
+    "withdrawing": "Withdrawing…",
+    "replyBy": "Reply expected by {date}",
+    "replyHelp": "Centres are asked to reply within {days} days.",
+    "errorSeeker": "Only a job seeker account can register interest.",
+    "failed": "That did not work. Try again.",
+    "interestStatus": {
+      "registered": "Registered",
+      "contacted": "They got in touch",
+      "enrolled": "Enrolled",
+      "attended": "Attended",
+      "withdrawn": "Withdrawn"
+    },
+    "nextHeading": "Next batches of this course",
+    "seeAll": "See all {count} batches of this course"
+  },
+  "batchInterest": {
+    "heading": "Batches you asked about",
+    "subheading": "Each is a centre you shared your details with. You can take them back at any time.",
+    "deliveredBy": "Delivered by {organisation} at {centre}",
+    "status": {
+      "registered": "Registered",
+      "contacted": "They got in touch",
+      "enrolled": "Enrolled",
+      "attended": "Attended",
+      "withdrawn": "Withdrawn"
+    },
+    "starts": "Starts {date}",
+    "cancelled": {
+      "by_organisation": "The centre cancelled this batch.",
+      "arrangement_ended": "The centre can no longer offer this course, so this batch was cancelled.",
+      "course_unavailable": "The course is no longer available, so this batch was cancelled.",
+      "centre_closed": "The centre closed, so this batch was cancelled."
+    },
+    "replyBy": "Reply expected by {date}",
+    "replyHelp": "Centres are asked to reply within {days} days.",
+    "notHeard": "Not heard back? Tell us",
+    "withdraw": "Withdraw",
+    "withdrawNamed": "Withdraw: {name}",
+    "failed": "That did not work. Try again."
+  },
+  "batchLearners": {
+    "summary": "{count, plural, =0 {Learners} one {Learners (# interested)} other {Learners (# interested)}}",
+    "none": "Nobody has registered interest yet.",
+    "noAccess": "You do not have access to this batch's learners.",
+    "failed": "That did not work. Try again.",
+    "someone": "A learner",
+    "status": {
+      "registered": "Waiting for a reply",
+      "contacted": "Contacted",
+      "enrolled": "Enrolled",
+      "attended": "Attended",
+      "withdrawn": "Withdrawn"
+    },
+    "withdrawnNote": "This learner withdrew, so their details are gone. The row stays so your list does not change behind your back.",
+    "registeredOn": "Registered {date}",
+    "waiting": "waiting {days, plural, one {# day} other {# days}}",
+    "contacted": "Contacted",
+    "contactedNamed": "Contacted: {name}",
+    "enrolled": "Enrolled",
+    "enrolledNamed": "Enrolled: {name}",
+    "attended": "Attended",
+    "attendedNamed": "Attended: {name}"
   }
 }

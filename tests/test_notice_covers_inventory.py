@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from api.modules.applications.models import Application
+from api.modules.batches.models import BatchInterest
 from api.modules.identity.models import User
 from api.modules.interests.models import CourseInterest
 from api.modules.marketplace.models import CandidateProfile
@@ -62,6 +63,10 @@ COVERED: dict[type, dict[str, str]] = {
         "message": "any message you write",
         "contact_shared_at": "shared with that training provider",
     },
+    BatchInterest: {
+        "message": "any message you write",
+        "contact_shared_at": "shared with that training centre",
+    },
     DeviceToken: {
         "token": "the code your phone gives us",
         "platform": "the code your phone gives us",
@@ -107,6 +112,15 @@ EXCUSED: dict[type, dict[str, str]] = {
     CourseInterest: {
         "id": "a random identifier",
         "course_id": "the course",
+        "profile_id": "the link to the person",
+        "status": "the state of an interest the notice names",
+        "contact_revoked_at": "the withdrawal the notice names",
+        "created_at": "a row stamp",
+        "updated_at": "a row stamp",
+    },
+    BatchInterest: {
+        "id": "a random identifier",
+        "batch_id": "the batch",
         "profile_id": "the link to the person",
         "status": "the state of an interest the notice names",
         "contact_revoked_at": "the withdrawal the notice names",

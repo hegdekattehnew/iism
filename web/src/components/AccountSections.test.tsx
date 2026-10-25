@@ -25,9 +25,9 @@ beforeEach(() => {
   GET.mockReset();
   GET.mockResolvedValue({
     data: {
-      consent_version: "2026-10-17",
+      consent_version: "2026-10-24",
       consented_at: "2026-10-01T10:00:00Z",
-      notice_version: "2026-10-17",
+      notice_version: "2026-10-24",
       current: true,
       withdrawn: false,
       consent_withdrawn_at: null,

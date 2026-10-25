@@ -156,3 +156,142 @@ export function useBatchesOfMyCourses(org: string, enabled = true) {
     retry: false,
   });
 }
+
+// ---------------------------------------------------------------------- Sprint 100: the learner
+
+export type PublicBatch = components["schemas"]["PublicBatchOut"];
+export type BatchInterest = components["schemas"]["BatchInterestOut"];
+export type BatchLearner = components["schemas"]["BatchLearnerOut"];
+export type BatchInterestStatus = BatchInterest["status"];
+export type CentreStatus = components["schemas"]["CentreStatusIn"]["status"];
+export type Reach = PublicBatch["reach"];
+
+export type PublicFilters = {
+  stateId: string;
+  districtId: string;
+  startsWithin: string;
+  maxFee: string;
+  mode: string;
+  course?: string;
+};
+
+export const PUBLIC_PAGE = 12;
+
+/** One prefix for every public batch read, so registering or withdrawing refreshes the lists. */
+export const PUBLIC_BATCHES = ["public-batches"] as const;
+export const MY_BATCH_INTERESTS = ["me", "batch-interests"] as const;
+
+/**
+ * The public list of batches, nearest first (the server orders by reach, then start, then fee).
+ * **`total` is the server's count of what matches**, so "Show more (n left)" is exact.
+ */
+export function usePublicBatches(filters: PublicFilters, signedIn: boolean, limit = PUBLIC_PAGE) {
+  return useInfiniteQuery({
+    // Signed in or not is part of the key: the same list carries the caller's own interests.
+    queryKey: [...PUBLIC_BATCHES, filters, signedIn, limit] as const,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const { data, error, response } = await api.GET("/batches", {
+        params: {
+          query: {
+            state_id: filters.stateId || undefined,
+            district_id: filters.districtId || undefined,
+            starts_within: filters.startsWithin ? Number(filters.startsWithin) : undefined,
+            max_fee: filters.maxFee ? Number(filters.maxFee) : undefined,
+            mode: (filters.mode || undefined) as PublicBatch["mode"] | undefined,
+            course: filters.course || undefined,
+            limit,
+            offset: pageParam,
+          },
+        },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    getNextPageParam: (last, all) => {
+      const loaded = all.reduce((n, page) => n + page.items.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
+    retry: false,
+  });
+}
+
+export function useMyBatchInterests(enabled: boolean) {
+  return useQuery({
+    queryKey: MY_BATCH_INTERESTS,
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/me/batch-interests");
+      if (error || !data) throw new Error("batch interests failed");
+      return data;
+    },
+    retry: false,
+  });
+}
+
+/** Register and withdraw. Each throws `ApiError` with what the server said. */
+export function useBatchInterestMutations() {
+  const qc = useQueryClient();
+  const refresh = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: PUBLIC_BATCHES }),
+      qc.invalidateQueries({ queryKey: MY_BATCH_INTERESTS }),
+    ]);
+  };
+  const register = useMutation({
+    mutationFn: async (v: { batchId: string; message: string | null }) => {
+      const { data, error, response } = await api.POST("/me/batch-interests", {
+        body: { batch_id: v.batchId, message: v.message },
+      });
+      if (error || !data) throw apiErrorFrom(response.status, error);
+      return data;
+    },
+    onSuccess: refresh,
+  });
+  const withdraw = useMutation({
+    mutationFn: async (interestId: string) => {
+      const { data, error, response } = await api.POST("/me/batch-interests/{interest_id}/withdraw", {
+        params: { path: { interest_id: interestId } },
+      });
+      if (error || !data) throw apiErrorFrom(response.status, error);
+      return data;
+    },
+    onSuccess: refresh,
+  });
+  return { register, withdraw };
+}
+
+/** The learners of one batch, as the centre and its organisation's owners and admins see them. */
+export function useBatchLearners(org: string, batchId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...batchesKey(org), "learners", batchId] as const,
+    enabled,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/org/{org_slug}/batches/{batch_id}/learners", {
+        params: { path: { org_slug: org, batch_id: batchId } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useSetLearnerStatus(org: string, batchId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { interestId: string; status: CentreStatus }) => {
+      const { data, error, response } = await api.PATCH(
+        "/org/{org_slug}/batches/{batch_id}/learners/{interest_id}",
+        {
+          params: { path: { org_slug: org, batch_id: batchId, interest_id: v.interestId } },
+          body: { status: v.status },
+        },
+      );
+      if (error || !data) throw apiErrorFrom(response.status, error);
+      return data;
+    },
+    // The seats and the counts on the card, the figures on the home and the learners themselves.
+    onSuccess: () => qc.invalidateQueries({ queryKey: batchesKey(org) }),
+  });
+}

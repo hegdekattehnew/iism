@@ -30,6 +30,8 @@ from api.modules.applications import employer_router as applications_employer_ro
 from api.modules.applications import public_router as applications_public_router
 from api.modules.applications import router as applications_router
 from api.modules.assessment import router as assessment_router
+from api.modules.batches import me_router as batch_interests_router
+from api.modules.batches import public_router as batches_public_router
 from api.modules.batches import router as batches_router
 from api.modules.careers import router as careers_router
 from api.modules.centres import manager_router as centre_manager_router
@@ -176,6 +178,8 @@ app.include_router(centre_manager_router)
 app.include_router(centre_staff_router)
 app.include_router(delivery_router)
 app.include_router(batches_router)
+app.include_router(batches_public_router)
+app.include_router(batch_interests_router)
 app.include_router(delivery_public_router)
 app.include_router(publishing_router)
 app.include_router(course_publishing_router)

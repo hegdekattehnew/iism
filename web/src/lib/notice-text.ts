@@ -65,6 +65,12 @@ export function useNoticeText(): (notice: NoticeData) => string {
           course: String(notice.payload.course ?? ""),
           reason: t(`batchReason.${String(notice.payload.reason ?? "by_organisation")}`),
         });
+      case "batch_interest_status_changed":
+        return t("batchInterestStatusChanged", {
+          course: String(notice.payload.course ?? ""),
+          organisation,
+          status: t(`batchInterestStatus.${String(notice.payload.status ?? "contacted")}`),
+        });
       case "sponsor_offer":
         // Names the organisation, the standard and the course, and nothing about the person: the
         // employer does not know who they are.

@@ -32,6 +32,7 @@ account, which erases it (`DELETE /me/account`, in the app).
 | `applications` | Vacancies applied to, status, the person's message, the employer's reply | Applying and the inbox | Yes | Account life |
 | `saved_jobs` | Vacancies saved | Convenience | Yes | Account life |
 | `course_interests` | Courses the person registered interest in | Telling the provider | Yes | Account life |
+| `batch_interests` | Batches the person registered interest in | Telling the centre that runs it | Yes | Account life |
 | `invitations_sent` | Invitations the person sent from an organisation they run (website only) | Team management | Yes | Account life |
 | `activity` | Which product actions happened (matches viewed, course opened), without content | Improving matching and measuring it | Yes, until erasure | 365 days |
 | `job_alerts` | Vacancies the person was alerted about | Alerts, a daily cap, never twice | Yes | Account life |
@@ -103,7 +104,7 @@ declare name, phone and email as shared with "employers and training providers" 
    token and the fixed notice text; add its handling here and in the privacy notice before launch.
 2. **An analytics or crash SDK is added** to the app. Today there is none.
 3. **A new section appears in the export** (the test above).
-4. **The privacy notice's version changes** (`PRIVACY_NOTICE_VERSION`; last bumped 2026-10-17 for the 18-and-over sentence). `tests/test_notice_covers_inventory.py` fails when a stored personal column is neither in the notice nor excused.
+4. **The privacy notice's version changes** (`PRIVACY_NOTICE_VERSION`; last bumped 2026-10-24 for batch interests; before that 2026-10-17 for the 18-and-over sentence). `tests/test_notice_covers_inventory.py` fails when a stored personal column is neither in the notice nor excused.
 5. **Real SMS** (DLT) is switched on: the SMS provider processes the phone number.
 
 ## What is not here
