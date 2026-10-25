@@ -3,7 +3,9 @@ import {
   addCentre,
   authoriseDelivery,
   COLLECT_BLOOD,
+  namedSeeker,
   organisation,
+  publishedBatch,
   publishedCourse,
   signInAs,
   suffix,
@@ -167,4 +169,80 @@ test("a delivering organisation plans batches from a file, publishes them, and t
   await expect(row.getByText("2 batches")).toBeVisible();
   await expect(row.getByText("2 open")).toBeVisible();
   await sellerContext.close();
+});
+
+/**
+ * Journey 11 (Sprint 100, BL-20.2, BL-20.3, BL-18.7). A learner finds the batch nearest them, is told
+ * who will see their details before anything is shared, registers, and sees where it stands; the
+ * centre's organisation sees them in its list, marks them enrolled, and a seat is taken.
+ * **Written and not run locally (no Chromium); CI's browser job is its first run.**
+ */
+test("a learner finds a batch, registers interest, and the centre enrols them", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const id = suffix();
+  const seller = await organisation(request, "course_provider", `E2E Learn Seller ${id}`, {
+    sells_courses: true,
+    delivers_training: false,
+  });
+  const partner = await organisation(request, "course_provider", `E2E Learn Partner ${id}`, {
+    sells_courses: false,
+    delivers_training: true,
+  });
+  const title = `Plumbing ${id}`;
+  const course = await publishedCourse(request, seller, title, [COLLECT_BLOOD]);
+  const centre = await addCentre(request, partner, `Baner ${id}`);
+  await authoriseDelivery(request, seller, partner.slug);
+  await publishedBatch(request, partner, { course, centre, startsInDays: 20, seats: 25 });
+  const learner = await namedSeeker(request, `Asha ${id}`);
+  await signInAs(page, learner);
+
+  // ---- the list names both organisations and says how near it is, and nothing is hidden
+  await page.goto(`/en/batches?course=${course}`);
+  await expect(page.getByRole("heading", { name: "Batches near you", level: 1 })).toBeVisible();
+  const card = page.getByRole("listitem").filter({ hasText: title });
+  await expect(card.getByText(`Course by E2E Learn Seller ${id}`)).toBeVisible();
+  await expect(card.getByText(`Delivered by E2E Learn Partner ${id} at Baner ${id}`)).toBeVisible();
+  await expect(card.getByText("In your district")).toBeVisible();
+  await expect(card.getByText("25 of 25 seats left")).toBeVisible();
+  await checkPage(page, "batches near you");
+
+  // ---- the consent step names the centre and its organisation before anything is shared
+  await card.getByRole("button", { name: `Register interest: ${title}` }).click();
+  await expect(card.getByText(new RegExp(`Baner ${id} will see your name`))).toBeVisible();
+  await expect(card.getByText(new RegExp(`E2E Learn Partner ${id}, which runs it`))).toBeVisible();
+  await card.getByLabel("Anything they should know (optional)").fill("Evenings only");
+  await card.getByRole("button", { name: "Register my interest" }).click();
+  await expect(card.getByText("Registered", { exact: true })).toBeVisible();
+  await expect(card.getByText(/Reply expected by/)).toBeVisible();
+
+  // ---- the learner's own list has it, and says when a reply is expected
+  await page.goto("/en/interests");
+  await expect(page.getByRole("heading", { name: "Batches you asked about" })).toBeVisible();
+  await expect(page.getByText(`Delivered by E2E Learn Partner ${id} at Baner ${id}`)).toBeVisible();
+  await checkPage(page, "interests, with a batch");
+
+  // ---- the organisation sees them, marks them enrolled, and a seat is taken
+  const orgContext = await browser.newContext({ baseURL: "http://localhost:3100", locale: "en-IN" });
+  const orgPage = await orgContext.newPage();
+  await watch(orgPage, "http://localhost:8100");
+  await signInAs(orgPage, partner.tokens);
+  await orgPage.goto(`/en/employer/${partner.slug}/batches`);
+  await expect(orgPage.getByText("Learners waiting for a reply")).toBeVisible();
+  const row = orgPage.getByRole("listitem").filter({ hasText: title });
+  await row.locator("summary", { hasText: "Learners" }).click();
+  await expect(row.getByText(`Asha ${id}`)).toBeVisible();
+  await expect(row.getByText("Evenings only")).toBeVisible();
+  await row.getByRole("button", { name: `Enrolled: Asha ${id}` }).click();
+  await expect(row.getByText("Enrolled", { exact: true })).toBeVisible();
+  await expect(row.getByText("24 of 25 seats left")).toBeVisible();
+  await orgContext.close();
+
+  // ---- and the learner sees where it stands, and withdrawing takes the details back
+  await page.goto("/en/interests");
+  await expect(page.getByText("Enrolled", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: `Withdraw: ${title}` }).click();
+  await expect(page.getByText("Withdrawn", { exact: true })).toBeVisible();
 });

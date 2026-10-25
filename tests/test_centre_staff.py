@@ -276,6 +276,9 @@ async def test_a_managers_reach_is_their_centre_alone(client, db, setup, place):
         ("GET", "/org/{org_slug}/batches/courses"),
         ("GET", "/org/{org_slug}/batches/overview"),
         ("PUT", "/org/{org_slug}/batches/{batch_id}"),
+        # Sprint 100: the learners of their own centre's batches. (The read is a 404 for a batch
+        # that does not exist and so is not listed; the status change is a 422 for the empty body.)
+        ("PATCH", "/org/{org_slug}/batches/{batch_id}/learners/{interest_id}"),
         ("POST", "/org/{org_slug}/leave"),
     }
     seen = 0
@@ -333,6 +336,8 @@ def test_no_organisation_role_holds_a_managers_permissions_and_the_manager_holds
         # Sprints 98 and 99: they read and plan their own centre's batches.
         Permission.BATCH_READ,
         Permission.BATCH_MANAGE,
+        # Sprint 100: they answer the learners who asked about those batches.
+        Permission.BATCH_LEARNERS,
     }
     # ...and nothing about files of batches (a centre per row), arrangements or the team.
     assert Permission.CENTRE_MANAGE not in manager and Permission.DELIVERY_READ not in manager

@@ -55,7 +55,7 @@ describe("my page", () => {
   it("says the account is paused after a withdrawal of consent", async () => {
     world.signedIn = true;
     serve(api.GET, {
-      "/auth/me": ok({ ...account(), consent_version: "2026-10-17", consent_current: true, consent_withdrawn: true }),
+      "/auth/me": ok({ ...account(), consent_version: "2026-10-24", consent_current: true, consent_withdrawn: true }),
       "/me/profile": ok(profile()),
     });
     await renderScreen(<Me />);
@@ -65,7 +65,7 @@ describe("my page", () => {
   it("says nothing about consent when the notice is the one in force", async () => {
     world.signedIn = true;
     serve(api.GET, {
-      "/auth/me": ok({ ...account(), consent_version: "2026-10-17", consent_current: true, consent_withdrawn: false }),
+      "/auth/me": ok({ ...account(), consent_version: "2026-10-24", consent_current: true, consent_withdrawn: false }),
       "/me/profile": ok(profile()),
     });
     await renderScreen(<Me />);

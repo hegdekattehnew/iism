@@ -77,9 +77,9 @@ describe("consent (Sprint 72)", () => {
 
   it("confirms with the version it is given and keeps the server's refusal", async () => {
     const ok = fake(state);
-    await confirmConsent(ok, "2026-10-17");
+    await confirmConsent(ok, "2026-10-24");
     expect((ok as { POST: jest.Mock }).POST).toHaveBeenCalledWith("/me/account/consent", {
-      body: { consent_version: "2026-10-17" },
+      body: { consent_version: "2026-10-24" },
     });
     await expect(confirmConsent(fake({ detail: "consent_required" }, 422), "1999")).rejects.toMatchObject({
       status: 422,
@@ -89,10 +89,10 @@ describe("consent (Sprint 72)", () => {
   });
 
   it("prompts for a stale notice and a withdrawal, never for a current one or for none on record", () => {
-    expect(consentPrompt({ consent_version: "2026-10-17", consent_current: true, consent_withdrawn: false })).toBeNull();
+    expect(consentPrompt({ consent_version: "2026-10-24", consent_current: true, consent_withdrawn: false })).toBeNull();
     expect(consentPrompt({ consent_version: "2026-09-11", consent_current: false, consent_withdrawn: false })).toBe("stale");
     expect(consentPrompt({ consent_version: null, consent_current: false, consent_withdrawn: false })).toBeNull();
-    expect(consentPrompt({ consent_version: "2026-10-17", consent_current: true, consent_withdrawn: true })).toBe("paused");
+    expect(consentPrompt({ consent_version: "2026-10-24", consent_current: true, consent_withdrawn: true })).toBe("paused");
     expect(consentPrompt({})).toBeNull(); // an older server that does not say
   });
 });

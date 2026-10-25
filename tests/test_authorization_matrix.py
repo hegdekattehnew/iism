@@ -53,6 +53,15 @@ PUBLIC_ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/states"): "the states that have an open vacancy, with counts; names nobody",
     (
         "GET",
+        "/batches",
+    ): "public: batches a person can still join, seats left and the centre's place; "
+    "no learner, no count of the interested (Sprint 100)",
+    (
+        "GET",
+        "/batches/{batch_id}",
+    ): "public: one batch; a draft, or a course no longer live, is a 404",
+    (
+        "GET",
         "/providers/{slug}",
     ): "a training organisation's own page: what it chose to say, its published courses; "
     "never its contact address, and the same 404 for anything that is not one",

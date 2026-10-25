@@ -33,6 +33,7 @@ vi.mock("next-intl/server", async () => {
 // Interactive panels are not what these tests are about.
 vi.mock("@/components/ApplyPanel", () => ({ ApplyPanel: () => <div data-testid="apply-panel" /> }));
 vi.mock("@/components/InterestPanel", () => ({ InterestPanel: () => <div data-testid="interest-panel" /> }));
+vi.mock("@/components/NextBatches", () => ({ NextBatches: ({ course }: { course: string }) => <div data-testid="next-batches" data-course={course} /> }));
 vi.mock("@/components/ReportListing", () => ({ ReportListing: () => <div data-testid="report-form" /> }));
 vi.mock("@/components/SkillRequirements", () => ({ SkillRequirements: () => null }));
 vi.mock("@/components/SkillQualifications", () => ({ SkillQualifications: () => null }));
@@ -276,6 +277,15 @@ describe("the course page", () => {
     expect(tileOf("Provider not yet verified").className).not.toContain("bg-success-surface");
     expect(screen.getByRole("link", { name: /Report/ }).className).toContain("min-h-11");
     expect(screen.getByTestId("interest-panel")).toBeTruthy();
+  });
+
+  it("lists the course's next batches, for its own slug, between the facts and the provider's strip (Sprint 100)", async () => {
+    serve(COURSE);
+    await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    const batches = screen.getByTestId("next-batches");
+    expect(batches.getAttribute("data-course")).toBe("gda-certificate");
+    const strip = tileOf("Provider not yet verified");
+    expect(batches.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

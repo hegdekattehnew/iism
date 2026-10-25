@@ -8,6 +8,7 @@ import {
   AlertTriangleIcon,
   CalendarIcon,
   ClockIcon,
+  InboxIcon,
   InfoIcon,
   UsersIcon,
 } from "@/components/ui/icons";
@@ -61,6 +62,17 @@ export function BatchOverviewPanel({ org, showNext = false }: { org: string; sho
           value={d?.unfilled_seats ?? null}
           label={t("unfilled")}
           secondary={d ? t("unfilledIn", { count: d.unfilled_batches }) : undefined}
+          className="min-w-0"
+        />
+        <MetricTile
+          icon={<InboxIcon />}
+          value={d?.replies_owed ?? null}
+          label={t("repliesOwed")}
+          secondary={
+            d?.oldest_reply_owed_since
+              ? t("oldestWaiting", { date: date(d.oldest_reply_owed_since.slice(0, 10)) })
+              : undefined
+          }
           className="min-w-0"
         />
         <MetricTile

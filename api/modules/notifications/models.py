@@ -111,6 +111,11 @@ TEMPLATES = (
     # learner; fixed words, the course's name, a reason code and a link to the course page --
     # nothing about the centre's address or any free text.
     "batch_cancelled",
+    # Sprint 100, ADR-103. A learner registered interest in a batch: an email to the organisation
+    # that runs it (a name, a link, nothing about the learner), and, when a centre marks them
+    # contacted or enrolled, an in-app notice to the learner.
+    "batch_interest_registered",
+    "batch_interest_status_changed",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

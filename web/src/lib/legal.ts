@@ -8,7 +8,7 @@
  * two files so it fails in CI first. Change both, together, only when the
  * privacy notice or terms change in a way people must agree to again.
  */
-export const PRIVACY_NOTICE_VERSION = "2026-10-17";
+export const PRIVACY_NOTICE_VERSION = "2026-10-24";
 
 /**
  * DPDP Act 2023 expects a named grievance officer. Not yet appointed: every

@@ -155,6 +155,10 @@ class BatchOverview(BaseModel):
     unfilled_batches: int
     # Batches not yet over whose course is not published (the page warns; learners cannot see them).
     unavailable: int
+    # Learners who registered and have not been answered (contacted or enrolled), across the
+    # batches not yet over, and since when the longest has waited (Sprint 100).
+    replies_owed: int = 0
+    oldest_reply_owed_since: datetime | None = None
     upcoming: list[BatchOut]
 
 
@@ -219,3 +223,108 @@ class BatchBulkPublishOut(BaseModel):
     results: list[BatchBulkPublishRowOut]
     published: int
     refused: int
+
+
+# ---------------------------------------------------------------------- Sprint 100: the learner
+
+Reach = Literal["online", "district", "state", "unknown", "elsewhere"]
+InterestStatus = Literal["registered", "withdrawn", "contacted", "enrolled", "attended"]
+CentreStatus = Literal["contacted", "enrolled", "attended"]
+
+
+class MyInterestRef(BaseModel):
+    """The signed-in learner's own interest in a batch, when they have one."""
+
+    id: str
+    status: InterestStatus
+
+
+class PublicBatchOut(BaseModel):
+    """A batch as a learner sees it: what decides whether to go, and nothing about anybody else.
+
+    **No count of interested learners, no enrolled count, no draft**: seats left is the one figure,
+    derived. The centre's street address is not here (the place is district and state); the fee is
+    the centre's own statement when it set one, and says so.
+    """
+
+    id: str
+    course: BatchCourseOut
+    centre: BatchCentreOut
+    organisation: BatchOrgOut
+    label: str | None = None
+    starts_on: date
+    ends_on: date
+    seats: int
+    seats_left: int
+    mode: BatchMode
+    schedule: str | None = None
+    fee_effective: int | None = None
+    fee_is_override: bool = False
+    phase: BatchPhase
+    cancel_reason: CancelReason | None = None
+    # How far it is from where this person is, by the same rule courses use (district, state);
+    # `unknown` when we know nothing about the person or the centre's place: no evidence either way.
+    reach: Reach = "unknown"
+    my_interest: MyInterestRef | None = None
+
+
+class PublicBatchList(BaseModel):
+    items: list[PublicBatchOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class BatchInterestIn(BaseModel):
+    batch_id: Annotated[str, Field(min_length=1, max_length=64)]
+    # What the learner wants the centre to know, not a CV.
+    message: Annotated[str | None, Field(max_length=1_000)] = None
+
+    @field_validator("message", mode="after")
+    @classmethod
+    def _blank(cls, v: str | None) -> str | None:
+        return _blank_is_none(v)
+
+
+class BatchInterestOut(BaseModel):
+    """The learner's own view of an interest: the batch (even a cancelled one) and their status."""
+
+    id: str
+    batch: PublicBatchOut
+    status: InterestStatus
+    message: str | None = None
+    registered_at: datetime
+    updated_at: datetime
+
+
+class BatchLearnerContactOut(BaseModel):
+    """The disclosure itself: present only while an interest is live."""
+
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class BatchLearnerOut(BaseModel):
+    """One interest, as the centre and its organisation's owners and admins see it."""
+
+    interest_id: str
+    status: InterestStatus
+    registered_at: datetime
+    message: str | None = None
+    location_state: str | None = None
+    location_district: str | None = None
+    # None once withdrawn: the fact is kept and the person is not.
+    contact: BatchLearnerContactOut | None = None
+
+
+class BatchLearnersOut(BaseModel):
+    batch: BatchOut
+    items: list[BatchLearnerOut]
+    total: int
+
+
+class CentreStatusIn(BaseModel):
+    """What a centre may set. `registered` and `withdrawn` are the learner's."""
+
+    status: CentreStatus

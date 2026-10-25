@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -23,6 +24,38 @@ import {
 import { useCentres } from "@/lib/centres";
 import { detailOf, isSignedOut } from "@/lib/http";
 import { useOrgType } from "@/lib/org";
+
+/**
+ * Who registered is **not in the route's first load**: it is fetched the first time the fold is
+ * opened (`next/dynamic` at module level; a source test fails on a static import), with a
+ * placeholder of its own so nothing moves when it arrives.
+ */
+const BatchLearners = dynamic(
+  () => import("@/components/employer/BatchLearners").then((m) => m.BatchLearners),
+  { loading: () => <Skeleton className="h-24 w-full rounded-lg" /> },
+);
+
+/** "Learners": a closed fold that mounts its content the first time it is opened. */
+function LearnersFold({ org, batch }: { org: string; batch: Batch }) {
+  const t = useTranslations("batchLearners");
+  const [opened, setOpened] = useState(false);
+  return (
+    <details
+      className="mt-4 border-t border-border-token pt-2"
+      // The first toggle can only be an opening, and once opened it stays mounted.
+      onToggle={() => setOpened(true)}
+    >
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">
+        {t("summary", { count: batch.interested })}
+      </summary>
+      {opened && (
+        <div className="pb-2 pt-2">
+          <BatchLearners org={org} batch={batch} />
+        </div>
+      )}
+    </details>
+  );
+}
 
 /**
  * One batch with what its phase allows next. **What may be done is read off the phase, never a flag**:
@@ -107,6 +140,7 @@ function Row({ org, batch }: { org: string; batch: Batch }) {
           ) : (
             actions
           )}
+          {batch.status !== "draft" && !editing && <LearnersFold org={org} batch={batch} />}
           {confirming && (
             <div className="mt-3 rounded-lg border border-border-token p-3">
               <p className="text-sm">
