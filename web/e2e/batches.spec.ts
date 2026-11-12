@@ -193,10 +193,13 @@ test("a learner finds a batch, registers interest, and the centre enrols them", 
   });
   const title = `Plumbing ${id}`;
   const course = await publishedCourse(request, seller, title, [COLLECT_BLOOD]);
-  const centre = await addCentre(request, partner, `Baner ${id}`);
+  // The browser job's database holds only a little real geography (Karnataka and Assam), so the
+  // place has to be one it knows or the reach chip has nothing to say.
+  const place = { state: "Karnataka", district: "Bengaluru" };
+  const centre = await addCentre(request, partner, `Baner ${id}`, place);
   await authoriseDelivery(request, seller, partner.slug);
   await publishedBatch(request, partner, { course, centre, startsInDays: 20, seats: 25 });
-  const learner = await namedSeeker(request, `Asha ${id}`);
+  const learner = await namedSeeker(request, `Asha ${id}`, place);
   await signInAs(page, learner);
 
   // ---- the list names both organisations and says how near it is, and nothing is hidden

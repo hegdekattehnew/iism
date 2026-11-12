@@ -46,6 +46,13 @@ describe("Header — the whole header switches, not half of it", () => {
     expect(link("Batches")?.getAttribute("href")).toBe("/batches");
   });
 
+  it("keeps every header link a 44 px target even for a one-word label (Hindi 'बैच' was 43 wide)", () => {
+    world.memberships = [personal()];
+    renderUi(<Header />);
+    expect(link("Batches")?.className).toContain("min-w-11");
+    expect(link("Batches")?.className).toContain("min-h-11");
+  });
+
   it("offers Centres to an organisation that delivers training, and to nobody else (Sprint 95)", () => {
     const delivers = org("tnt", "course_provider");
     delivers.tenant.delivers_training = true;
