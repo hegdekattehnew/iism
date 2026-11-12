@@ -16,7 +16,7 @@ import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from api.core.config import get_settings
 from api.core.security import revoke_all_for_user
@@ -146,7 +146,11 @@ async def consent_state(db: AsyncSession, user: User) -> ConsentState:
         )
     ) or 0
     live_applications = len(await applications.live_applications(db, user)) if has_profile else 0
-    live_interests = len(await interests.live_interests(db, user)) if has_profile else 0
+    live_interests = (
+        len(await interests.live_interests(db, user)) + len(await batches.live_interests(db, user))
+        if has_profile
+        else 0
+    )
     return ConsentState(
         consent_version=user.consent_version,
         consented_at=user.consented_at,
@@ -177,6 +181,7 @@ async def withdraw_my_consent(db: AsyncSession, user: User) -> ConsentState:
     if has_profile:
         await applications.withdraw_all_live(db, user)
         await interests.withdraw_all_live(db, user)
+        await batches.withdraw_all_live(db, user)
     return await consent_state(db, user)
 
 
@@ -425,6 +430,7 @@ async def delete_account(db: AsyncSession, user: User) -> DeletionPreview:
         await db.execute(delete(Application).where(Application.profile_id == profile.id))
         await db.execute(delete(SavedJob).where(SavedJob.profile_id == profile.id))
         await db.execute(delete(CourseInterest).where(CourseInterest.profile_id == profile.id))
+        await db.execute(delete(BatchInterest).where(BatchInterest.profile_id == profile.id))
         await db.execute(delete(JobAlert).where(JobAlert.profile_id == profile.id))
         await db.execute(delete(SponsorIntent).where(SponsorIntent.profile_id == profile.id))
         await db.delete(profile)
@@ -660,6 +666,32 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
         else None
     )
 
+    batch_centre = aliased(Tenant)
+    batch_interests = (
+        (
+            await db.execute(
+                select(BatchInterest, Batch, Course, batch_centre)
+                .join(Batch, Batch.id == BatchInterest.batch_id)
+                .join(Course, Course.id == Batch.course_id)
+                .join(batch_centre, batch_centre.id == Batch.centre_id)
+                .where(BatchInterest.profile_id == profile.id)
+                .order_by(BatchInterest.created_at)
+            )
+        ).all()
+        if profile is not None
+        else []
+    )
+    batch_organisations = {
+        t.id: t.name
+        for t in (
+            await db.scalars(
+                select(Tenant).where(
+                    Tenant.id.in_([c.parent_id for _i, _b, _c, c in batch_interests if c.parent_id])
+                )
+            )
+        ).all()
+    }
+
     events = (
         await db.scalars(
             select(AnalyticsEvent)
@@ -763,6 +795,24 @@ async def export_account(db: AsyncSession, user: User) -> dict[str, Any]:
                 "contact_revoked_at": _iso(interest.contact_revoked_at),
             }
             for interest in (interests.all() if interests is not None else [])
+        ],
+        # A batch the person registered for: the disclosure is part of their own record, naming the
+        # organisation and the centre that received it (Sprint 100, ADR-103).
+        "batch_interests": [
+            {
+                "course": course.title,
+                "centre": centre.name,
+                "organisation": batch_organisations.get(centre.parent_id)
+                if centre.parent_id
+                else None,
+                "starts_on": batch.starts_on.isoformat(),
+                "status": interest.status,
+                "message": interest.message,
+                "registered_at": _iso(interest.created_at),
+                "contact_shared_at": _iso(interest.contact_shared_at),
+                "contact_revoked_at": _iso(interest.contact_revoked_at),
+            }
+            for interest, batch, course, centre in batch_interests
         ],
         # Invitations this person sent, with what became of each. The state is
         # derived from the timestamps by the model, so this export cannot

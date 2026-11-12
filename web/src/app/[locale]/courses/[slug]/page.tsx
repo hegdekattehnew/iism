@@ -1,3 +1,4 @@
+import { NextBatches } from "@/components/NextBatches";
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
@@ -156,6 +157,9 @@ export default async function CourseDetailPage({
           </Fact>
         )}
       </Facts>
+
+      {/* The batches planned for it, nearest first (Sprint 100): shows nothing for a course with none. */}
+      <NextBatches course={data.slug} />
 
       {/* Who is behind it and what registering costs (UI-10; the vacancy page has the same strip). The
           page says "not yet verified"; a card in a list never does, because it would read as an

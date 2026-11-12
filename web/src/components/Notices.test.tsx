@@ -143,6 +143,32 @@ describe("Notices", () => {
       expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/interests");
     });
 
+    it("words a centre's update on a batch interest, naming the organisation and the course (Sprint 100)", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "batch_interest_status_changed",
+            payload: {
+              course: "Welding basics",
+              organisation: "Partner Skills",
+              status: "enrolled",
+              path: "/interests",
+            },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+
+      expect(
+        await screen.findByText(
+          "Partner Skills marked your interest in the batch of Welding basics as: Enrolled.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText("You have an update.")).toBeNull();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/interests");
+    });
+
     it("words a sponsorship offer, naming the organisation, the standard and the course", async () => {
       GET.mockResolvedValue({
         data: [

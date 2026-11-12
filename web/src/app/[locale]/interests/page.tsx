@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { BatchInterestList } from "@/components/BatchInterestList";
 import { InterestList } from "@/components/InterestList";
 import { SeekerOnly } from "@/components/SeekerOnly";
 import { CandidateNav } from "@/components/CandidateNav";
@@ -19,6 +20,7 @@ export default async function Page({
         <h1 className="text-3xl font-bold tracking-tight">{t("pageTitle")}</h1>
         <p className="mt-2 text-muted">{t("pageSubtitle")}</p>
         <InterestList />
+        <BatchInterestList />
       </SeekerOnly>
     </div>
   );

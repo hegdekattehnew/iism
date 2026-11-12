@@ -15,8 +15,9 @@ words, and the learner reads the reason code as a sentence.
 
 `BatchInterest` is a learner's interest in a batch, kept apart from `CourseInterest` for ADR-071's
 reason (a model never holds a foreign key into a module it may not import, and a course interest
-discloses to the seller while a batch interest discloses to the one who runs it). Nothing registers
-one yet (Sprint 100); the table exists so seats and the cancellation notice have something to count.
+discloses to the seller while a batch interest discloses to the one who runs it: the centre and its
+organisation's owners and admins, never the seller). Registered by the learner (Sprint 100), who
+chooses the disclosure and takes it back by withdrawing.
 """
 
 import uuid
@@ -54,9 +55,16 @@ CANCEL_REASONS = (
     "centre_closed",  # its centre closed
 )
 
-INTEREST_STATUSES = ("registered", "withdrawn", "contacted", "enrolled")
+# `attended` (Sprint 100) is the centre's own report that a learner came: only after the batch has
+# started, and only from `enrolled`.
+INTEREST_STATUSES = ("registered", "withdrawn", "contacted", "enrolled", "attended")
 # Who may still be seen / counted; `withdrawn` takes the contact back, as for a course.
-LIVE_INTEREST_STATUSES = ("registered", "contacted", "enrolled")
+LIVE_INTEREST_STATUSES = ("registered", "contacted", "enrolled", "attended")
+# What takes a seat: a learner the centre has enrolled, and one who then came. **Seats left is
+# `seats` minus these**, derived and never a counter (ADR-068).
+TAKEN_STATUSES = ("enrolled", "attended")
+# What a centre may set. `registered` and `withdrawn` are the learner's.
+CENTRE_STATUSES = ("contacted", "enrolled", "attended")
 
 
 class Batch(Base):
@@ -114,7 +122,7 @@ class Batch(Base):
 
 
 class BatchInterest(Base):
-    """One learner, one batch, once. Nothing writes it until Sprint 100."""
+    """One learner, one batch, once."""
 
     __tablename__ = "batch_interests"
     __table_args__ = (

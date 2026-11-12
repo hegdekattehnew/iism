@@ -212,6 +212,49 @@ export async function authoriseDelivery(
   if (!made.ok()) throw new Error(`authorise delivery: ${made.status()} ${await made.text()}`);
 }
 
+/** A job seeker with a name and a place, so a centre's list reads as a person (Sprint 100). */
+export async function namedSeeker(
+  request: APIRequestContext,
+  name: string,
+  place: { state: string; district: string } = { state: "Maharashtra", district: "Pune" },
+): Promise<Tokens> {
+  const tokens = await seekerTokens(request);
+  const res = await request.put(api("/me/profile"), {
+    headers: bearer(tokens),
+    data: { full_name: name, location_state: place.state, location_district: place.district },
+  });
+  if (!res.ok()) throw new Error(`name seeker: ${res.status()} ${await res.text()}`);
+  return tokens;
+}
+
+/** Plan and publish a batch of a course at a centre, through the API as set-up (Sprint 100). */
+export async function publishedBatch(
+  request: APIRequestContext,
+  org: { slug: string; tokens: Tokens },
+  v: { course: string; centre: string; startsInDays: number; seats: number; label?: string },
+): Promise<string> {
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const made = await request.post(api(`/org/${org.slug}/batches`), {
+    headers: bearer(org.tokens),
+    data: {
+      course_slug: v.course,
+      centre_slug: v.centre,
+      label: v.label ?? "Morning batch",
+      starts_on: day(v.startsInDays),
+      ends_on: day(v.startsInDays + 30),
+      seats: v.seats,
+      mode: "in_person",
+    },
+  });
+  if (!made.ok()) throw new Error(`plan batch: ${made.status()} ${await made.text()}`);
+  const { id } = await made.json();
+  const published = await request.post(api(`/org/${org.slug}/batches/${id}/publish`), {
+    headers: bearer(org.tokens),
+  });
+  if (!published.ok()) throw new Error(`publish batch: ${published.status()} ${await published.text()}`);
+  return id;
+}
+
 /** Save a vacancy for later, as a seeker. */
 export async function saveJob(request: APIRequestContext, tokens: Tokens, jobSlug: string): Promise<void> {
   const res = await request.post(api("/me/saved-jobs"), { headers: bearer(tokens), data: { job_slug: jobSlug } });

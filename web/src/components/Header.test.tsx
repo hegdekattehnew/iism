@@ -36,6 +36,23 @@ describe("Header — the whole header switches, not half of it", () => {
     expect(link("Team")?.getAttribute("href")).toBe("/employer/tnt/team");
   });
 
+  it("offers a job seeker, and a visitor, the batches near them beside courses (Sprint 100)", () => {
+    world.memberships = [personal()];
+    const a = renderUi(<Header />);
+    expect(link("Batches")?.getAttribute("href")).toBe("/batches");
+    a.unmount();
+    world.signedIn = false;
+    renderUi(<Header />);
+    expect(link("Batches")?.getAttribute("href")).toBe("/batches");
+  });
+
+  it("keeps every header link a 44 px target even for a one-word label (Hindi 'बैच' was 43 wide)", () => {
+    world.memberships = [personal()];
+    renderUi(<Header />);
+    expect(link("Batches")?.className).toContain("min-w-11");
+    expect(link("Batches")?.className).toContain("min-h-11");
+  });
+
   it("offers Centres to an organisation that delivers training, and to nobody else (Sprint 95)", () => {
     const delivers = org("tnt", "course_provider");
     delivers.tenant.delivers_training = true;

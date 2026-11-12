@@ -37,6 +37,11 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "Somebody has registered interest in {course}.\n\n"
             "Open your interested learners to see how to reach them:\n{link}\n",
         ),
+        "batch_interest_registered": (
+            "Somebody is interested in a batch of {course}",
+            "Somebody has registered interest in a batch of {course} at {centre}.\n\n"
+            "Open your batches to see who, and how long they have waited:\n{link}\n",
+        ),
         "job_alert": (
             "A new vacancy that matches you: {vacancy}",
             "{organisation} has published {vacancy}, and it matches the "
@@ -182,6 +187,11 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{course} में किसी की रुचि है",
             "{course} में किसी ने रुचि दर्ज की है।\n\n"
             "उनसे कैसे संपर्क करें यह देखने के लिए अपने इच्छुक शिक्षार्थी खोलें:\n{link}\n",
+        ),
+        "batch_interest_registered": (
+            "{course} के एक बैच में किसी की रुचि है",
+            "{centre} में {course} के एक बैच में किसी ने रुचि दर्ज की है।\n\n"
+            "कौन है और कितने समय से प्रतीक्षा में है, यह देखने के लिए अपने बैच खोलें:\n{link}\n",
         ),
         "job_alert": (
             "आपसे मेल खाती एक नई रिक्ति: {vacancy}",
@@ -335,6 +345,10 @@ PUSH_TEXT: dict[str, dict[str, tuple[str, str]]] = {
             "Update on a course you asked about",
             "Open IISM to see it.",
         ),
+        "batch_interest_status_changed": (
+            "Update on a batch you asked about",
+            "Open IISM to see it.",
+        ),
         "sponsor_offer": ("An employer has an offer for you", "Open IISM to see it."),
         "grievance_update": ("An update on your message to us", "Open IISM to see it."),
     },
@@ -344,6 +358,7 @@ PUSH_TEXT: dict[str, dict[str, tuple[str, str]]] = {
         "job_alert": ("एक नई रिक्ति आपसे मेल खाती है", "देखने के लिए IISM खोलें।"),
         "vacancy_closed": ("जिस रिक्ति में आपने आवेदन किया वह बंद हो गई", "विवरण के लिए IISM खोलें।"),
         "course_interest_status_changed": ("आपके पूछे पाठ्यक्रम पर नई जानकारी", "देखने के लिए IISM खोलें।"),
+        "batch_interest_status_changed": ("आपके पूछे बैच पर नई जानकारी", "देखने के लिए IISM खोलें।"),
         "sponsor_offer": ("एक नियोक्ता के पास आपके लिए प्रस्ताव है", "देखने के लिए IISM खोलें।"),
         "grievance_update": ("हमें भेजे आपके संदेश पर जानकारी", "देखने के लिए IISM खोलें।"),
     },

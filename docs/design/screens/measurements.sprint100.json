@@ -1,0 +1,30 @@
+{
+  "sprint": 100,
+  "date": "2026-10-24",
+  "what": "Nearby batches and registering interest (BL-20.2, BL-20.3 in part, BL-18.7's centre half, BL-18.6's replies owed)",
+  "method": "Built-in browser on the dev API and dev web server; a seller, two delivering organisations (one in Pune, one in Delhi), three published batches of one course, three learners in Pune, one of them registering through the page; 360 px, root font 100% and 200%, Hindi. First-load bytes from `npm run build:e2e` + `route-bundle-stats.json`. Phone bundle from `make check-mobile-budget`.",
+  "hindi_360px": {
+    "batches_page_as_a_learner": {"document_width_100": 360, "document_width_200": 360, "text_outside_screen": 0, "controls_under_44px_at_200": 0, "controls_under_44px_at_100_before_fix": "3 (the course title link, 20 px): now a 44 px target"},
+    "organisation_batches_page_with_the_learners_fold_open": {"document_width_100": 360, "document_width_200": 360, "text_outside_screen": 0, "controls_under_44px": 0},
+    "course_page_next_batches": {"cards": 3, "document_width_200": 360, "text_outside_screen": 0, "note": "one control under 44 px at 100%: the existing 'report this course' link (not new)"},
+    "interests_page_batches_list": {"document_width_200": 360, "text_outside_screen": 0, "controls_under_44px": 0}
+  },
+  "found_by_running_it": [
+    "the public list for a signed-in organisation-only account showed no button at all (correct: an organisation cannot register); the first measurement was taken while signed in as one",
+    "the course title link on both cards was a 20 px control inside a card whose other cards are whole-card links: made 44 px",
+    "'waiting 0 days' on a learner who registered a moment ago: shown only from the first whole day"
+  ],
+  "first_load_bytes": {
+    "ceiling": 700000,
+    "/admin": 665613,
+    "/profile": 664271,
+    "/employer/[org]/batches": 661044,
+    "/courses/[slug]": 654644,
+    "/batches": 651954,
+    "/interests": 645002,
+    "closest_headroom": 34387,
+    "note": "every route grew by 82 B against Sprint 99 (the shared chunk); the batches workspace by about 3 KB (the replies tile and the lazy learners fold's loader)"
+  },
+  "phone_bundle_bytes": {"android_hermes": 3778989, "ceiling": 3800000, "headroom": 21011, "note": "grew 7,849 B from the three message catalogues (the phone carries the web's messages); no batch screen on the phone yet. The next sprint's words come out of 21,011 B."},
+  "tests": {"backend": 2370, "web": 1536, "mobile": 816, "mutation_checks_backend": 50, "mutation_checks_web": 54, "survivors": "11 backend survivors first: one a redundant condition (removed), eight closed with tests, two equivalent (an `else_` that sorts last either way, an explicit erasure delete the cascade also performs). Six web survivors first (a seller's mark, an organisation's mark, a date's zone, an empty block, an attended button, a refresh): all closed with assertions; three more mutants were added for what running it found."}
+}
