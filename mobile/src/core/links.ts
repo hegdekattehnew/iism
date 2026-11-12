@@ -16,6 +16,8 @@
 
 /** A slug the API produces: lower-case letters, digits and hyphens. */
 const SLUG = /^[a-z0-9][a-z0-9-]{0,199}$/;
+/** A batch's id: a UUID, as the API writes it. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** An invitation token: URL-safe characters only. */
 const TOKEN = /^[A-Za-z0-9_-]{8,200}$/;
 
@@ -29,12 +31,14 @@ const RULES: Rule[] = [
   { match: /^\/courses?\/([^/]+)$/, to: bySlug("course") },
   { match: /^\/skills?\/([^/]+)$/, to: bySlug("skill") },
   { match: /^\/match\/([^/]+)$/, to: bySlug("match") },
+  { match: /^\/batches\/([^/]+)$/, to: (m) => (UUID.test(m[1]) ? `/batches/${m[1].toLowerCase()}` : null) },
   { match: /^\/invite\/([^/]+)$/, to: (m) => (TOKEN.test(m[1]) ? `/invite/${m[1]}` : null) },
   { match: /^\/(matches|applications|saved|interests|profile|account|contact|me)$/, to: (m) => `/${m[1]}` },
   { match: /^\/(notifications|notices)$/, to: () => "/notices" },
   { match: /^\/(grievance|contact)$/, to: () => "/contact" },
   { match: /^\/jobs$/, to: () => "/jobs" },
   { match: /^\/courses$/, to: () => "/courses" },
+  { match: /^\/batches$/, to: () => "/batches" },
   { match: /^\/(home)?$/, to: () => "/" },
 ];
 

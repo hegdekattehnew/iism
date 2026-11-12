@@ -1,0 +1,20 @@
+{
+  "sprint": 102,
+  "date": "2026-11-12",
+  "what": "Batches on the phone (BL-20.5): the list, one batch with the consent step, register and withdraw, next batches on a course, batches the learner asked about, the batch notices and links",
+  "method": "The app's web build (Expo, react-native-web) at 375 px against a second API on :8002 (WEB_BASE_URL=http://localhost:8081, rate limit off), signed in by phone and the development code as seeded candidates 9000000011 and 9000000012. Phone bundle from `make mobile-check` (Metro, Hermes, `check_mobile_budget.py`).",
+  "browser": {
+    "list_as_visitor_and_seeker": "3 batches, the server's count; mode chips; 'Outside your state' on a batch in Pune for a candidate in Kerala; nothing hidden",
+    "batch_page": "visitor sees 'Sign in to register interest'; a seeker sees 'Register interest', then the consent step naming Hadapsar Skill Centre and Pune Skill Partners; POST /me/batch-interests answered 201; the page then says 'Registered' and offers Withdraw; seats left stay 24 of 25 (a registration holds no seat)",
+    "interests_screen": "'Batches you asked about': Registered, 'Reply expected by 15 Nov 2026', 'Centres are asked to reply within 3 days.', 'Not heard back? Tell us', Batch details, Withdraw",
+    "hindi_375px": {"document_width": 375, "text_outside_screen": 0, "note": "list in Hindi: 3 batches, every line translated except names and the course's own text"},
+    "not_checked": "a device, TalkBack, VoiceOver, 200% font scale, Hermes; the nearest batch on a match screen (not built on the phone)"
+  },
+  "found_by_running_it": [
+    "not a product defect: the web build keeps the session in memory only, so a history step or a typed address reloads the page and signs the person out"
+  ],
+  "phone_bundle_bytes": {"android_hermes": 3629034, "ceiling": 3800000, "headroom": 170966, "after_catalogue_subset": 3598526, "before_sprint": 3780768, "assets": 512654, "assets_ceiling": 650000},
+  "catalogues": {"namespaces_copied": 22, "freed_bytes_approx": 182000},
+  "tests": {"backend": 2378, "web": 1563, "web_note": "not re-run: nothing on the web changed", "mobile": 882, "mutation_checks_mobile": 18, "survivors": "two survivors closed (a card given both a press and a footer; the interest badge's tone)"},
+  "contract": {"phone_operations": 59, "added": 5}
+}

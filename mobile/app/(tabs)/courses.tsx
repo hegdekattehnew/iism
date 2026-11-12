@@ -6,7 +6,7 @@ import { creditsText, feeLabel, intakeLabel, whereLabel } from "../../src/core/l
 import { useCourses } from "../../src/lib/queries";
 import { useSeededTerm } from "../../src/lib/term";
 import { useMonthName } from "../../src/lib/months";
-import { Badge, BadgeRow, Card, Chip, ChipRow, ResultList, SearchBox, Text } from "../../src/ui";
+import { Badge, BadgeRow, Button, Card, Chip, ChipRow, ResultList, SearchBox, Text } from "../../src/ui";
 
 const MODES = ["online", "offline", "hybrid"] as const;
 
@@ -14,6 +14,7 @@ type Course = NonNullable<ReturnType<typeof useCourses>["data"]>["pages"][number
 
 export default function Courses() {
   const t = useTranslations("coursesPage");
+  const tb = useTranslations("publicBatches");
   const router = useRouter();
   const monthName = useMonthName();
   const params = useLocalSearchParams<{ q?: string }>();
@@ -31,6 +32,7 @@ export default function Courses() {
       header={
         <>
           <SearchBox value={q} onChangeText={setQ} placeholder={t("searchPlaceholder")} />
+          <Button variant="secondary" label={tb("heading")} onPress={() => router.push("/batches")} />
           <ChipRow>
             <Chip label={t("allModes")} selected={mode === ""} onPress={() => setMode("")} />
             {MODES.map((m) => (

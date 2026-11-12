@@ -6,7 +6,7 @@ import { isSignedOut } from "../src/core/errors";
 import { noticePath, noticeText } from "../src/core/notices";
 import { shouldAsk } from "../src/core/push";
 import { useReadAll, useReadOne, useNoticePages } from "../src/lib/me-queries";
-import { useInstantDate } from "../src/lib/months";
+import { useCalendarDate, useInstantDate } from "../src/lib/months";
 import { usePushPermission, registerThisDevice } from "../src/push";
 import { api, useLocale } from "../src/runtime";
 import { space } from "../src/theme";
@@ -59,6 +59,7 @@ function Body() {
   const tn = useTranslations("notices");
   const router = useRouter();
   const day = useInstantDate();
+  const calendarDay = useCalendarDate();
   const pages = useNoticePages();
   const readOne = useReadOne();
   const readAll = useReadAll();
@@ -101,7 +102,7 @@ function Body() {
             return (
               <Card key={n.id}>
                 <BadgeRow>{n.read_at ? null : <Badge tone="brand" label={t("new")} />}</BadgeRow>
-                <Text>{noticeText(n, say)}</Text>
+                <Text>{noticeText(n, say, calendarDay)}</Text>
                 {when ? (
                   <Text tone="muted" variant="small">
                     {when}

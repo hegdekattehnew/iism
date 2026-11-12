@@ -49,6 +49,49 @@ describe("a notice in words", () => {
     expect(noticeText(notice(template, payload), t)).toBe(expected);
   });
 
+  describe("a batch the person asked about (Sprint 102)", () => {
+    const day = (iso: string) => (iso === "2026-11-09" ? "9 Nov 2026" : null);
+
+    it.each([
+      [
+        "batch_cancelled",
+        { course: "C", reason: "centre_closed" },
+        "batchCancelled(course=C,reason=batchReason.centre_closed)",
+      ],
+      [
+        "batch_interest_status_changed",
+        { course: "C", organisation: "O", status: "enrolled" },
+        "batchInterestStatusChanged(course=C,organisation=O,status=batchInterestStatus.enrolled)",
+      ],
+      ["batch_full", { course: "C", centre: "H" }, "batchFull(course=C,centre=H)"],
+    ])("words %s with its own sentence", (template, payload, expected) => {
+      expect(noticeText(notice(template, payload), t, day)).toBe(expected);
+    });
+
+    it("says whether the learner holds a seat when the batch starts, and the day in words", () => {
+      const starts = { course: "C", centre: "H", starts_on: "2026-11-09" };
+      expect(noticeText(notice("batch_starting", { ...starts, enrolled: true }), t, day)).toBe(
+        "batchStarting(course=C,centre=H,date=9 Nov 2026)",
+      );
+      expect(noticeText(notice("batch_starting", { ...starts, enrolled: false }), t, day)).toBe(
+        "batchStartingWaiting(course=C,centre=H,date=9 Nov 2026)",
+      );
+    });
+
+    it("leaves the date out rather than guessing it, and never reads a number as a seat", () => {
+      expect(noticeText(notice("batch_starting", { course: "C", centre: "H", starts_on: "soon", enrolled: true }), t, day)).toBe(
+        "batchStarting(course=C,centre=H,date=)",
+      );
+      expect(noticeText(notice("batch_starting", { course: "C", centre: "H", enrolled: "yes" }), t)).toContain("batchStartingWaiting");
+    });
+
+    it("opens the batch's own page from the notice's path, and nothing else", () => {
+      const id = "0b6f6f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b";
+      expect(noticePath(notice("batch_full", { path: `/batches/${id}` }))).toBe(`/batches/${id}`);
+      expect(noticePath(notice("batch_full", { path: "/batches/x" }))).toBeNull();
+    });
+  });
+
   it("says the generic line for a template it does not know, never nothing", () => {
     expect(noticeText(notice("something_new", { vacancy: "V" }), t)).toBe("generic");
   });

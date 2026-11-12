@@ -22,7 +22,15 @@ export const NOTICE_PAGE_SIZE = 30;
 
 const text = (value: unknown): string => String(value ?? "");
 
-export function noticeText(notice: NoticeData, t: Translate): string {
+/**
+ * `day` turns a calendar date (`"2026-11-09"`) into words in the language on screen: this file knows
+ * no language and no `Intl`. Without it a date is left out rather than guessed.
+ */
+export function noticeText(
+  notice: NoticeData,
+  t: Translate,
+  day: (iso: string) => string | null = () => null,
+): string {
   const p = notice.payload ?? {};
   const vacancy = text(p.vacancy);
   const organisation = text(p.organisation);
@@ -42,6 +50,26 @@ export function noticeText(notice: NoticeData, t: Translate): string {
         organisation,
         status: t(`interestStatus.${text(p.status ?? "contacted")}`),
       });
+    case "batch_cancelled":
+      // Fixed words and a reason *code*: nothing about the centre's address or any free text.
+      return t("batchCancelled", {
+        course: text(p.course),
+        reason: t(`batchReason.${text(p.reason ?? "by_organisation")}`),
+      });
+    case "batch_interest_status_changed":
+      return t("batchInterestStatusChanged", {
+        course: text(p.course),
+        organisation,
+        status: t(`batchInterestStatus.${text(p.status ?? "contacted")}`),
+      });
+    case "batch_starting":
+      return t(p.enrolled === true ? "batchStarting" : "batchStartingWaiting", {
+        course: text(p.course),
+        centre: text(p.centre),
+        date: day(text(p.starts_on)) ?? "",
+      });
+    case "batch_full":
+      return t("batchFull", { course: text(p.course), centre: text(p.centre) });
     case "sponsor_offer":
       // Names the organisation, the standard and the course, and nothing about the person.
       return t("sponsorOffer", { organisation, vacancy, standard: text(p.standard), course: text(p.course) });

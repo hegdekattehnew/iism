@@ -75,3 +75,11 @@ PUT /me/profile/{collection}/{entry_id}
 DELETE /me/profile/{collection}/{entry_id}
 GET /me/applications/{application_id}/gap
 GET /me/careers
+
+# Batches (Sprint 102, BL-20.5): the classes a person can still join, one batch, and registering
+# interest in one (the consent step names the centre and its organisation) or taking it back.
+GET /batches
+GET /batches/{batch_id}
+GET /me/batch-interests
+POST /me/batch-interests
+POST /me/batch-interests/{interest_id}/withdraw

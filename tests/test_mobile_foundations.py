@@ -33,19 +33,54 @@ def test_it_found_the_mobile_sources() -> None:
     assert len(names) >= 15
 
 
+def _sync_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "sync_mobile_messages", ROOT / "scripts" / "sync_mobile_messages.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_the_messages_are_the_webs_and_are_not_edited_here() -> None:
-    """Edit `web/src/messages`, then `make sync-mobile-messages`."""
+    """Edit `web/src/messages`, then `make sync-mobile-messages`. The copy is the web's words for
+    the namespaces a phone screen reads, and only those (Sprint 102)."""
+    sync = _sync_module()
+    used = sync.namespaces_used()
+    assert len(used) >= 15, "the scan found almost no namespaces"
     checked = 0
     for source in sorted(WEB_MESSAGES.glob("*.json")):
         if source.name == "fatal.json":
             continue
         copy = MOBILE / "src" / "messages" / source.name
         assert copy.exists(), f"{copy} is missing: run `make sync-mobile-messages`"
-        assert copy.read_text(encoding="utf-8") == source.read_text(encoding="utf-8"), (
+        expected = sync.rendered(sync.subset(json.loads(source.read_text(encoding="utf-8")), used))
+        assert copy.read_text(encoding="utf-8") == expected, (
             f"{copy.name} differs from the web's: run `make sync-mobile-messages`"
         )
         checked += 1
     assert checked >= 3
+
+
+def test_the_phone_carries_only_what_its_screens_read() -> None:
+    """The point of the subset: 70 percent of the catalogues were the website's own words. A
+    namespace that no screen reads is not in the copy, and one that a screen reads is."""
+    sync = _sync_module()
+    used = sync.namespaces_used()
+    web = json.loads((WEB_MESSAGES / "en.json").read_text(encoding="utf-8"))
+    phone = json.loads((MOBILE / "src/messages/en.json").read_text(encoding="utf-8"))
+    assert set(phone) == used & set(web)
+    assert used <= set(web), f"a screen reads a namespace the web does not have: {used - set(web)}"
+    # The back office, the workspaces and the footer are the website's and stay there.
+    for name in ("admin", "employerConsole", "footer"):
+        if name in web:
+            assert name not in phone, name
+    assert (MOBILE / "src/messages/en.json").stat().st_size < 0.6 * (
+        WEB_MESSAGES / "en.json"
+    ).stat().st_size
 
 
 def test_the_phone_only_strings_exist_in_both_languages_with_the_same_keys() -> None:
@@ -65,7 +100,8 @@ def test_every_message_the_screens_use_exists() -> None:
     same guard for the keys a screen names literally. Scoped per function, because `t` is a
     different namespace in each (a component may translate `errors` in one and `mobile.list` in
     another)."""
-    catalogue = json.loads((WEB_MESSAGES / "en.json").read_text(encoding="utf-8"))
+    # The phone's own copy: a namespace missing from it is a screen that renders its keys.
+    catalogue = json.loads((MOBILE / "src/messages/en.json").read_text(encoding="utf-8"))
     catalogue["mobile"] = json.loads(
         (MOBILE / "src/messages/app.en.json").read_text(encoding="utf-8")
     )

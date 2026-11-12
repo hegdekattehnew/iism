@@ -12,12 +12,23 @@ describe("what a link may open", () => {
     ["iism://matches", "/matches"],
     ["iism://applications", "/applications"],
     ["iism://notices", "/notices"],
+    ["iism://batches", "/batches"],
+    ["iism://batches/0b6f6f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b", "/batches/0b6f6f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b"],
     ["iism://notifications", "/notices"],
     ["iism://grievance", "/contact"],
     ["iism://", "/"],
     ["iism://invite/AbCdEf12_-xyz", "/invite/AbCdEf12_-xyz"],
   ])("opens %s as %s", (url, path) => {
     expect(resolveLink(url)).toBe(path);
+  });
+
+  it("opens a batch only for a real id, and the website's batch path the same way (Sprint 102)", () => {
+    expect(resolveLink("/batches/0B6F6F3E-1C2D-4E5F-8A9B-0C1D2E3F4A5B")).toBe(
+      "/batches/0b6f6f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+    );
+    expect(resolveLink("/batches/not-an-id")).toBeNull();
+    expect(resolveLink("/batches/..%2Faccount")).toBeNull();
+    expect(resolveLink("/batches/0b6f6f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b/extra")).toBeNull();
   });
 
   it("understands the website's own paths, so a notice's path and a shared link both work", () => {

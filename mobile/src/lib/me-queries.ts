@@ -15,6 +15,14 @@ import {
   fetchExport,
   withdrawConsent,
 } from "../core/account";
+import {
+  getBatch,
+  listBatches,
+  listBatchInterests,
+  registerBatchInterest,
+  withdrawBatchInterest,
+  type BatchFilter,
+} from "../core/batches";
 import { ApiError, readDetail } from "../core/errors";
 import { listMyMessages, sendMessage, type MessageDraft } from "../core/grievance";
 import {
@@ -52,7 +60,7 @@ import { NOTICE_PAGE_SIZE, nextCursor } from "../core/notices";
 import { reportListing, type Reason, type Target } from "../core/report";
 import type { BulkBody } from "../core/role-picker";
 import { PRIVACY_NOTICE_VERSION } from "../core/sign-in";
-import { api, useCourseBudget, useSignedIn } from "../runtime";
+import { api, useCourseBudget, useLocale, useSignedIn } from "../runtime";
 
 /**
  * The queries and writes about the signed-in candidate. **Every key starts with `"me"`** (see
@@ -147,6 +155,66 @@ export function useApplications() {
 export function useSaved() {
   const { enabled } = useSeeker();
   return useQuery({ queryKey: meKeys.saved, enabled, queryFn: () => listSaved(api) });
+}
+
+// ---------------------------------------------------------------- batches (Sprint 102)
+
+/**
+ * The batches a person can still join, nearest first (the server's order), a page at a time.
+ * **Keyed under `"me"` even for a visitor**: a signed-in answer carries the person's own interest and
+ * must never reach the disk, and a visitor's answer must not be read back as a signed-in one. A
+ * visitor makes the request with no token, which is a public read; it is not kept offline.
+ */
+export function useBatches(filter: BatchFilter) {
+  const locale = useLocale();
+  const signedIn = useSignedIn();
+  return useInfiniteQuery({
+    queryKey: meKeys.batches(locale, signedIn, filter),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => listBatches(api, filter, pageParam),
+    getNextPageParam: (last, all) => {
+      const loaded = all.reduce((n, page) => n + page.items.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
+  });
+}
+
+/** One batch, for a link (a notice, a push): a missing one is the status 404. */
+export function useBatch(id: string) {
+  const locale = useLocale();
+  const signedIn = useSignedIn();
+  return useQuery({
+    queryKey: meKeys.batch(locale, signedIn, id),
+    queryFn: () => getBatch(api, id),
+  });
+}
+
+export function useBatchInterests() {
+  const { enabled } = useSeeker();
+  return useQuery({ queryKey: meKeys.batchInterests, enabled, queryFn: () => listBatchInterests(api) });
+}
+
+/** Registering or withdrawing changes the seats, the card's own state and the person's list. */
+function batchesChanged(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: [ME_KEY, "batches"] });
+  void qc.invalidateQueries({ queryKey: [ME_KEY, "batch"] });
+  void qc.invalidateQueries({ queryKey: meKeys.batchInterests });
+}
+
+export function useRegisterBatchInterest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { batchId: string; message: string }) => registerBatchInterest(api, v.batchId, v.message),
+    onSuccess: () => batchesChanged(qc),
+  });
+}
+
+export function useWithdrawBatchInterest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (interestId: string) => withdrawBatchInterest(api, interestId),
+    onSuccess: () => batchesChanged(qc),
+  });
 }
 
 export function useInterests() {

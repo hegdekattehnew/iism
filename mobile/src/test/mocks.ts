@@ -270,6 +270,50 @@ export const interest = (n: number, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+export const batch = (n: number, extra: Record<string, unknown> = {}) => ({
+  id: `00000000-0000-4000-8000-00000000000${n}`,
+  course: {
+    slug: `welding-${n}`,
+    title: `Welding basics ${n}`,
+    fee_inr: 4000,
+    available: true,
+    own: false,
+    provider: { slug: "seller", name: "Seller Academy", is_verified: true },
+  },
+  centre: {
+    slug: "hadapsar",
+    name: "Hadapsar Centre",
+    location_district: "Pune",
+    location_state: "Maharashtra",
+    is_verified: true,
+  },
+  organisation: { slug: "partner", name: "Partner Skills", is_verified: false },
+  label: "Morning batch",
+  starts_on: "2026-11-09",
+  ends_on: "2026-12-09",
+  seats: 20,
+  seats_left: 12,
+  mode: "in_person",
+  schedule: "Mon to Fri, 9 to 1",
+  fee_effective: 4000,
+  fee_is_override: false,
+  phase: "open",
+  cancel_reason: null,
+  reach: "district",
+  my_interest: null,
+  ...extra,
+});
+
+export const batchInterest = (n: number, extra: Record<string, unknown> = {}) => ({
+  id: `bi${n}`,
+  batch: batch(n),
+  status: "registered",
+  message: null,
+  registered_at: "2026-10-20T09:00:00Z",
+  updated_at: "2026-10-20T09:00:00Z",
+  ...extra,
+});
+
 export const profile = (extra: Record<string, unknown> = {}) => ({
   id: "p1",
   full_name: "Asha Rao",
