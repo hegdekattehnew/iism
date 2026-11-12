@@ -121,6 +121,9 @@ TEMPLATES = (
     # and a link). Fixed words, never anything about another person.
     "batch_starting",
     "batch_full",
+    # Sprint 103. An email to the organisation that runs a batch: learners who registered have
+    # waited more than three days for a reply. A count and a link, nothing about who.
+    "batch_replies_owed",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

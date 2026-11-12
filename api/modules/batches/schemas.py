@@ -142,6 +142,18 @@ class DeliverableCourses(BaseModel):
     total: int
 
 
+class BatchConversion(BaseModel):
+    """How registrations have turned out, counted over the organisation's published batches (a
+    draft has no learners and a cancelled batch is not a result): each figure is a **step** of the
+    funnel, so `registered >= answered >= enrolled >= attended`. A learner who withdrew is in none
+    of them (the row keeps the fact and loses the person). Counts, never a learner."""
+
+    registered: int = 0
+    answered: int = 0
+    enrolled: int = 0
+    attended: int = 0
+
+
 class BatchOverview(BaseModel):
     """What a delivering organisation (or a centre) has to look at today: counts first, then the
     next few that start. Every figure is counted where the rows are, never read off a page."""
@@ -159,6 +171,7 @@ class BatchOverview(BaseModel):
     # batches not yet over, and since when the longest has waited (Sprint 100).
     replies_owed: int = 0
     oldest_reply_owed_since: datetime | None = None
+    conversion: BatchConversion = Field(default_factory=BatchConversion)
     upcoming: list[BatchOut]
 
 
@@ -179,6 +192,9 @@ class CourseBatchesRowOut(BaseModel):
     finished: int
     seats: int
     enrolled: int
+    # Learners with a live interest (registered, contacted, enrolled or attended), summed over
+    # these batches: a count, never a person (Sprint 103).
+    interested: int = 0
 
 
 class CourseBatchesOut(BaseModel):

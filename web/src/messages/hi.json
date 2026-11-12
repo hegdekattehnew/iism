@@ -2420,7 +2420,8 @@
       "finished": "{count} पूरे",
       "seats": "{seats} में से {enrolled} सीटें उनके हिसाब से भरी",
       "noteWho": "संचालक",
-      "reviewed": "हमारी टीम ने जाँचा"
+      "reviewed": "हमारी टीम ने जाँचा",
+      "interested": "{count, plural, one {# शिक्षार्थी इच्छुक} other {# शिक्षार्थी इच्छुक}}"
     }
   },
   "batches": {
@@ -2528,7 +2529,14 @@
       "all": "सभी बैच",
       "nothingNext": "अभी कुछ शुरू होने वाला नहीं है।",
       "repliesOwed": "जवाब की प्रतीक्षा में शिक्षार्थी",
-      "oldestWaiting": "सबसे लंबे समय से {date} से"
+      "oldestWaiting": "सबसे लंबे समय से {date} से",
+      "conversionHeading": "पंजीकरण का नतीजा क्या रहा",
+      "conversionNote": "आपके प्रकाशित बैचों में गिना गया। जिसने नाम वापस ले लिया, वह इनमें से किसी में नहीं है।",
+      "registered": "पंजीकृत",
+      "answered": "जवाब मिला",
+      "enrolled": "नामांकित",
+      "attended": "उपस्थित हुए",
+      "ofRegistered": "पंजीकृत लोगों में से {percent}%"
     },
     "uploadLink": "फ़ाइल से कई जोड़ें"
   },

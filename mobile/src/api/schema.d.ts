@@ -4204,6 +4204,35 @@ export interface components {
              */
             is_verified: boolean;
         };
+        /**
+         * BatchConversion
+         * @description How registrations have turned out, counted over the organisation's published batches (a
+         *     draft has no learners and a cancelled batch is not a result): each figure is a **step** of the
+         *     funnel, so `registered >= answered >= enrolled >= attended`. A learner who withdrew is in none
+         *     of them (the row keeps the fact and loses the person). Counts, never a learner.
+         */
+        BatchConversion: {
+            /**
+             * Registered
+             * @default 0
+             */
+            registered: number;
+            /**
+             * Answered
+             * @default 0
+             */
+            answered: number;
+            /**
+             * Enrolled
+             * @default 0
+             */
+            enrolled: number;
+            /**
+             * Attended
+             * @default 0
+             */
+            attended: number;
+        };
         /** BatchCourseOut */
         BatchCourseOut: {
             /** Slug */
@@ -4449,6 +4478,7 @@ export interface components {
             replies_owed: number;
             /** Oldest Reply Owed Since */
             oldest_reply_owed_since?: string | null;
+            conversion?: components["schemas"]["BatchConversion"];
             /** Upcoming */
             upcoming: components["schemas"]["BatchOut"][];
         };
@@ -5183,6 +5213,11 @@ export interface components {
             seats: number;
             /** Enrolled */
             enrolled: number;
+            /**
+             * Interested
+             * @default 0
+             */
+            interested: number;
         };
         /** CourseDetail */
         CourseDetail: {

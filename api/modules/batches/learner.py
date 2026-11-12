@@ -388,6 +388,8 @@ async def register(
         existing.status = "registered"
         existing.contact_shared_at = now
         existing.contact_revoked_at = None
+        # A new request is a new wait: the organisation may be reminded of this one again.
+        existing.reply_reminder_at = None
         if message is not None:
             existing.message = message
         interest = existing

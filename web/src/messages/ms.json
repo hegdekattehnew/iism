@@ -2420,7 +2420,8 @@
       "finished": "{count} finished",
       "seats": "{enrolled} of {seats} seats marked as taken by them",
       "noteWho": "Delivered by",
-      "reviewed": "Reviewed by our team"
+      "reviewed": "Reviewed by our team",
+      "interested": "{count, plural, one {# learner interested} other {# learners interested}}"
     }
   },
   "batches": {
@@ -2528,7 +2529,14 @@
       "all": "All batches",
       "nothingNext": "Nothing is about to start.",
       "repliesOwed": "Learners waiting for a reply",
-      "oldestWaiting": "the longest since {date}"
+      "oldestWaiting": "the longest since {date}",
+      "conversionHeading": "How registrations have turned out",
+      "conversionNote": "Counted over your published batches. A learner who withdrew is in none of these.",
+      "registered": "Registered",
+      "answered": "Got a reply",
+      "enrolled": "Enrolled",
+      "attended": "Attended",
+      "ofRegistered": "{percent}% of those who registered"
     },
     "uploadLink": "Add many from a file"
   },

@@ -40,6 +40,7 @@ from api.modules.batches.models import (
 )
 from api.modules.batches.schemas import (
     BatchCentreOut,
+    BatchConversion,
     BatchCourseOut,
     BatchFields,
     BatchIn,
@@ -293,6 +294,31 @@ SOON_DAYS = 7
 FILLING_DAYS = 14
 
 
+async def conversion(db: AsyncSession, *scope: ColumnElement[bool]) -> BatchConversion:
+    """How registrations have turned out over the published batches the clauses select (all of
+    them when none is given: `scripts/report_conversion_metrics.py` calls it that way, so the
+    funnel the product shows and the one the metrics script prints are one query).
+
+    Each figure is a step, so each is at least the next: registered (any live interest), answered
+    (contacted or beyond), enrolled (holds a seat) and attended. A withdrawn row is in none of them.
+    """
+    state = BatchInterest.status
+    row = (
+        await db.execute(
+            select(
+                func.count().filter(state.in_(LIVE_INTEREST_STATUSES)),
+                func.count().filter(state.in_(("contacted", "enrolled", "attended"))),
+                func.count().filter(state.in_(TAKEN_STATUSES)),
+                func.count().filter(state == "attended"),
+            )
+            .select_from(BatchInterest)
+            .join(Batch, Batch.id == BatchInterest.batch_id)
+            .where(Batch.status == "published", *scope)
+        )
+    ).one()
+    return BatchConversion(registered=row[0], answered=row[1], enrolled=row[2], attended=row[3])
+
+
 async def overview(db: AsyncSession, tenant: Tenant) -> BatchOverview:
     """The home's figures: what is waiting to be published, what starts this week, what is running,
     how many seats are still free in classes that begin within a fortnight, and what needs a look.
@@ -362,7 +388,9 @@ async def overview(db: AsyncSession, tenant: Tenant) -> BatchOverview:
         )
     ).one()
     drafts, starting, running, seats, batches_with_seats, unavailable = row
+    funnel = await conversion(db, _scope(tenant))
     return BatchOverview(
+        conversion=funnel,
         drafts=drafts,
         starting_soon=starting,
         running=running,
@@ -383,9 +411,10 @@ async def of_my_courses(db: AsyncSession, seller: Tenant) -> CourseBatchesOut:
     centre = aliased(Tenant)
     organisation = aliased(Tenant)
     enrolled = _enrolled().label("enrolled")
+    interested = _interested().label("interested")
     rows = (
         await db.execute(
-            select(Batch, Course, organisation, enrolled)
+            select(Batch, Course, organisation, enrolled, interested)
             .join(Course, Course.id == Batch.course_id)
             .join(centre, centre.id == Batch.centre_id)
             .join(organisation, organisation.id == centre.parent_id)
@@ -396,7 +425,7 @@ async def of_my_courses(db: AsyncSession, seller: Tenant) -> CourseBatchesOut:
     ).all()
     today = today_ist()
     grouped: dict[tuple[uuid.UUID, uuid.UUID], CourseBatchesRowOut] = {}
-    for batch, course, org, enrolled_count in rows:
+    for batch, course, org, enrolled_count, interested_count in rows:
         key = (course.id, org.id)
         item = grouped.get(key)
         if item is None:
@@ -415,6 +444,7 @@ async def of_my_courses(db: AsyncSession, seller: Tenant) -> CourseBatchesOut:
         item.batches += 1
         item.seats += batch.seats
         item.enrolled += enrolled_count
+        item.interested += int(interested_count or 0)
         now = phases.phase(
             status=batch.status,
             starts_on=batch.starts_on,

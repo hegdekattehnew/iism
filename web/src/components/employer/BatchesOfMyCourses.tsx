@@ -53,6 +53,8 @@ export function BatchesOfMyCourses({ org }: { org: string }) {
                   </p>
                   <p className="mt-1 text-sm text-muted">
                     {t("seats", { enrolled: r.enrolled, seats: r.seats })}
+                    {" · "}
+                    {t("interested", { count: r.interested })}
                   </p>
                 </CardBody>
               </Card>

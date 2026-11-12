@@ -6,10 +6,14 @@ import { Link } from "@/i18n/navigation";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   AlertTriangleIcon,
+  AwardIcon,
   CalendarIcon,
+  CheckCircleIcon,
+  CheckIcon,
   ClockIcon,
   InboxIcon,
   InfoIcon,
+  UserIcon,
   UsersIcon,
 } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui";
@@ -19,7 +23,8 @@ import { useBatchOverview } from "@/lib/batches";
  * What a delivering organisation (or a centre) has to look at today (Sprint 99, BL-18.6, BL-22.7):
  * what waits to be published, what starts this week, what is running, how many seats are still free
  * in classes about to begin, and what needs a look. **Counted where the rows are** (`/batches/overview`),
- * never from the page of batches beside it. The figures are on the page before they arrive (a dash,
+ * never from the page of batches beside it. Below them, how registrations have turned out (the
+ * funnel's four steps, counted by the server; the share is arithmetic on two of its counts). The figures are on the page before they arrive (a dash,
  * never a zero), so nothing below them moves; `showNext` adds the next few that start, for the
  * organisation's home, where the full list is not on the page.
  */
@@ -82,6 +87,38 @@ export function BatchOverviewPanel({ org, showNext = false }: { org: string; sho
           className="min-w-0"
         />
       </div>
+      <h3 className="pt-1 text-sm font-medium">{t("conversionHeading")}</h3>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {(
+          [
+            ["registered", <UserIcon key="r" />],
+            ["answered", <CheckIcon key="a" />],
+            ["enrolled", <CheckCircleIcon key="e" />],
+            ["attended", <AwardIcon key="t" />],
+          ] as const
+        ).map(([step, icon]) => {
+          // The generated type makes the block optional (it has a default); an older server's answer
+          // has none, which reads as no registrations, never as a crash.
+          const value = d ? (d.conversion?.[step] ?? 0) : null;
+          const registered = d?.conversion?.registered ?? 0;
+          return (
+            <MetricTile
+              key={step}
+              icon={icon}
+              value={value}
+              label={t(step)}
+              // The first step is the whole; each later one is a share of it, only when there is one.
+              secondary={
+                step !== "registered" && value !== null && registered > 0
+                  ? t("ofRegistered", { percent: Math.round((value / registered) * 100) })
+                  : undefined
+              }
+              className="min-w-0"
+            />
+          );
+        })}
+      </div>
+      <p className="text-xs text-muted">{t("conversionNote")}</p>
       {showNext && (
         // Three rows of a fixed height are reserved whether or not they are filled (Sprint 99): the
         // list arrives after the figures, and what is under it must not move when it does.

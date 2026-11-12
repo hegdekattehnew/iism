@@ -1,0 +1,15 @@
+{
+  "sprint": 103,
+  "date": "2026-11-12",
+  "what": "Demo data for the four situations, a conversion funnel and reply reminders to centres (migration 0065)",
+  "method": "The built-in browser on the dev API and web server, signed in as the seeded delivering-only organisation (kaushal@demo.iism.example); first-load bytes from `npm run build:e2e` + `route-bundle-stats.json`; phone bundle from `make mobile-check`.",
+  "seed": {"organisations": 2, "centres": 5, "courses": 2, "batches": 10, "learners": 11, "second_run_adds": 0},
+  "browser": {
+    "funnel_as_the_delivering_organisation": {"registered": 9, "answered": 6, "enrolled": 5, "attended": 1, "shares": "67%, 56%, 11% of those who registered", "matches_rows": true},
+    "replies_owed": {"count": 3, "oldest_since": "2026-11-07"},
+    "hindi_360px": {"document_width": 360, "text_outside_screen_at_100": 0, "controls_under_44px": 0, "note": "at 200% the existing 'Next to start' rows (truncated by design) run past the screen; not part of this change"}
+  },
+  "first_load_bytes": {"ceiling": 700000, "/admin": 665637, "/profile": 664295, "/employer/[org]/batches": 661995, "/matches": 659771, "closest_headroom": 34363, "note": "the batches page grew 635 B (it was 661,360)"},
+  "phone_bundle_bytes": {"android_hermes": 3629034, "ceiling": 3800000, "headroom": 170966, "note": "unchanged: the phone does not read the overview"},
+  "tests": {"backend": 2389, "web": 1565, "mobile": 882, "mutation_checks_backend": 16, "survivors": "one, closed (a draft the writers cannot produce, forced as a row)"}
+}

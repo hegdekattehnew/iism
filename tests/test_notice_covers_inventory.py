@@ -124,6 +124,7 @@ EXCUSED: dict[type, dict[str, str]] = {
         "profile_id": "the link to the person",
         "status": "the state of an interest the notice names",
         "contact_revoked_at": "the withdrawal the notice names",
+        "reply_reminder_at": "a stamp of when the organisation was reminded",
         "created_at": "a row stamp",
         "updated_at": "a row stamp",
     },

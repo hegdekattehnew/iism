@@ -37,7 +37,7 @@ from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
 from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
-from api.modules.batches.tasks import send_batch_reminders
+from api.modules.batches.tasks import send_batch_reminders, send_reply_reminders
 from api.modules.grievances import purge_expired_grievances
 from api.modules.matching.tasks import refresh_embeddings
 from api.modules.moderation import purge_expired_reports
@@ -108,6 +108,10 @@ class WorkerSettings:
         # three days is a date, so an hour late costs nothing, and the sweep is one indexed read on
         # `start_notice_at` that finds nothing on most ticks.
         cron(send_batch_reminders, minute={15}, run_at_startup=False),
+        # Once a day at 10:00 IST (Sprint 103): an organisation is reminded, once per learner, that
+        # registered learners have waited more than three days. One email per organisation, a count
+        # and a link; a morning mail, so a reply can happen the same day.
+        cron(send_reply_reminders, hour={4}, minute={30}, run_at_startup=False),
         # Every two minutes (Sprint 36, BL-5.1): a published job or a saved
         # skill set should have a semantic-similarity term within minutes,
         # not by the next hourly sweep -- and it is cheap when nothing is

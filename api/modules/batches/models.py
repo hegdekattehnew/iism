@@ -148,6 +148,11 @@ class BatchInterest(Base):
     contact_revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # When the organisation was reminded that this learner was still waiting (Sprint 103): stamped
+    # before the reminder is queued, so a learner is mentioned once, ever.
+    reply_reminder_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

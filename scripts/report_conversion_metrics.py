@@ -22,6 +22,7 @@ from sqlalchemy import select
 
 from api.core.database import dispose_engine, get_sessionmaker
 from api.modules.analytics.models import AnalyticsEvent
+from api.modules.batches.service import conversion as batch_conversion
 from api.modules.interests.provider_service import enrolment_conversion  # noqa: F401
 
 
@@ -58,6 +59,7 @@ async def main() -> None:
     async with sessionmaker() as db:
         recommended, opened = await click_through(db)
         total_interests, enrolled = await enrolment_conversion(db)
+        batches = await batch_conversion(db)
 
     print("ADR-025 conversion metrics (see ADR-047 for what this does and does not close)")
     print()
@@ -79,6 +81,20 @@ async def main() -> None:
         )
     else:
         print("enrolment conversion:   0 interests recorded -- nothing to convert yet")
+
+    if batches.registered:
+        print(
+            f"batch conversion:       {batches.registered} registered -> "
+            f"{batches.answered} answered "
+            f"({batches.answered / batches.registered:.1%}) -> {batches.enrolled} enrolled "
+            f"({batches.enrolled / batches.registered:.1%}) -> {batches.attended} attended "
+            f"({batches.attended / batches.registered:.1%}); a withdrawal is in none, and "
+            "enrolment is the centre's own report"
+        )
+    else:
+        print(
+            "batch conversion:       0 registrations in published batches -- nothing to convert yet"
+        )
 
     await dispose_engine()
 

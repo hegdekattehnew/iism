@@ -42,6 +42,12 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "Somebody has registered interest in a batch of {course} at {centre}.\n\n"
             "Open your batches to see who, and how long they have waited:\n{link}\n",
         ),
+        "batch_replies_owed": (
+            "Learners are waiting for a reply",
+            "{count} learners who registered interest in your batches have waited more than "
+            "three days for a reply.\n\n"
+            "Open your batches to see who, and to mark them contacted or enrolled:\n{link}\n",
+        ),
         "job_alert": (
             "A new vacancy that matches you: {vacancy}",
             "{organisation} has published {vacancy}, and it matches the "
@@ -192,6 +198,12 @@ TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
             "{course} के एक बैच में किसी की रुचि है",
             "{centre} में {course} के एक बैच में किसी ने रुचि दर्ज की है।\n\n"
             "कौन है और कितने समय से प्रतीक्षा में है, यह देखने के लिए अपने बैच खोलें:\n{link}\n",
+        ),
+        "batch_replies_owed": (
+            "शिक्षार्थी जवाब का इंतज़ार कर रहे हैं",
+            "आपके बैचों में रुचि दर्ज करने वाले {count} शिक्षार्थी तीन दिन से ज़्यादा से "
+            "जवाब का इंतज़ार कर रहे हैं।\n\n"
+            "कौन हैं यह देखने और उन्हें संपर्क किया या नामांकित चिह्नित करने के लिए अपने बैच खोलें:\n{link}\n",
         ),
         "job_alert": (
             "आपसे मेल खाती एक नई रिक्ति: {vacancy}",
