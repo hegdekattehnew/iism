@@ -270,6 +270,7 @@ export function MatchBrowser() {
                   <div className="space-y-3">
                     <CourseBudgetControl />
                     <SuggestedCourses
+                      withBatches
                       courses={courses}
                       onOpen={(slug) => reportCourseOpened(slug, m.job.slug)}
                     />

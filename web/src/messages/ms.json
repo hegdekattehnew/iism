@@ -1478,7 +1478,10 @@
     "batchInterestStatus": {
       "contacted": "They got in touch",
       "enrolled": "Enrolled"
-    }
+    },
+    "batchStarting": "The batch of {course} at {centre} starts on {date}. You hold a seat.",
+    "batchStartingWaiting": "The batch of {course} at {centre} starts on {date}. Ask the centre whether there is a seat for you.",
+    "batchFull": "The batch of {course} at {centre} is now full."
   },
   "searchPage": {
     "title": "Results for “{q}”",
@@ -2032,7 +2035,9 @@
     "overBudget": "Over your budget",
     "closesGap": "Closes {closed} of {total} of your gap",
     "budgetLabel": "What would you pay for a course? (₹)",
-    "budgetClear": "Clear"
+    "budgetClear": "Clear",
+    "batchesHeading": "Next batches of these courses",
+    "batchRow": "{course}: starts {date} at {centre}"
   },
   "reportListing": {
     "openJob": "Report this vacancy",
@@ -2640,7 +2645,13 @@
       "withdrawn": "Withdrawn"
     },
     "nextHeading": "Next batches of this course",
-    "seeAll": "See all {count} batches of this course"
+    "seeAll": "See all {count} batches of this course",
+    "details": "Batch details",
+    "closedNote": {
+      "cancelled": "This batch was cancelled.",
+      "running": "This batch has already started.",
+      "finished": "This batch has ended."
+    }
   },
   "batchInterest": {
     "heading": "Batches you asked about",
@@ -2689,5 +2700,11 @@
     "enrolledNamed": "Enrolled: {name}",
     "attended": "Attended",
     "attendedNamed": "Attended: {name}"
+  },
+  "batchPage": {
+    "back": "All batches",
+    "notAvailable": "This batch is not available",
+    "notAvailableHint": "It may have been removed, or the link may be wrong. See the batches that are open now.",
+    "seeBatches": "See open batches"
   }
 }

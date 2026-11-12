@@ -112,6 +112,9 @@ class Batch(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cancel_reason: Mapped[str | None] = mapped_column(default=None)
+    # Set when the learners were told this batch is about to start (Sprint 101, BL-20.4), **before**
+    # they are queued: a crash costs the rest of that batch's reminders and never sends one twice.
+    start_notice_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), default=None
     )

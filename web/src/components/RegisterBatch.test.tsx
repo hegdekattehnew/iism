@@ -65,6 +65,23 @@ describe("RegisterBatch: who is offered the button", () => {
   });
 });
 
+describe("RegisterBatch: a batch that cannot be joined (Sprint 101)", () => {
+  it.each([
+    ["cancelled", "This batch was cancelled."],
+    ["running", "This batch has already started."],
+    ["finished", "This batch has ended."],
+  ] as const)("says why instead of offering the button: %s", (phase, words) => {
+    renderUi(<RegisterBatch batch={publicBatch({ phase })} />);
+    expect(screen.getByText(words)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("still offers the button for an open one", async () => {
+    renderUi(<RegisterBatch batch={publicBatch({ phase: "open" })} />);
+    expect(await screen.findByRole("button", { name: /Register interest/ })).toBeTruthy();
+  });
+});
+
 describe("RegisterBatch: the consent moment", () => {
   it("names the centre and the organisation behind it before anything is shared", async () => {
     renderUi(<RegisterBatch batch={publicBatch()} />);

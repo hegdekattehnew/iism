@@ -116,6 +116,11 @@ TEMPLATES = (
     # contacted or enrolled, an in-app notice to the learner.
     "batch_interest_registered",
     "batch_interest_status_changed",
+    # Sprint 101, BL-20.4. In-app notices to a learner with a live interest in a batch: it starts
+    # soon (a day, the course and the centre; whether they hold a seat) and it filled (the course
+    # and a link). Fixed words, never anything about another person.
+    "batch_starting",
+    "batch_full",
 )
 
 STATUSES = ("pending", "sent", "failed", "skipped")

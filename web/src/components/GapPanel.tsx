@@ -124,7 +124,7 @@ export function GapPanel({ applicationId }: { applicationId: string }) {
           ) : (
             <div className="mt-1.5 space-y-3">
               <CourseBudgetControl />
-              <SuggestedCourses courses={courses} />
+              <SuggestedCourses courses={courses} withBatches />
             </div>
           )}
         </div>

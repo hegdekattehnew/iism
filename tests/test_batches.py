@@ -2112,3 +2112,160 @@ async def test_registering_again_after_withdrawing_brings_the_contact_back_on_th
     )
     assert row is not None and row.status == "registered"
     assert row.contact_revoked_at is None and row.contact_shared_at is not None
+
+
+# --------------------------------------------- notices: starting soon and full (Sprint 101)
+
+from api.modules.batches import reminders as batch_reminders  # noqa: E402
+
+
+async def _notices(db: AsyncSession, template: str, user_id: uuid.UUID | None = None):
+    query = select(Notification).where(Notification.template == template)
+    if user_id is not None:
+        query = query.where(Notification.recipient_id == user_id)
+    return list((await db.scalars(query.execution_options(populate_existing=True))).all())
+
+
+async def _interested(client, db, batch, status="registered", name="Asha Rao"):
+    """A learner who registered for `batch`, then (if asked) marked by the centre; their user id."""
+    headers, user_id, _ = await _learner(client, db, name)
+    made = await _interest_in(client, headers, batch)
+    assert made.status_code == 201, made.text
+    return headers, user_id, made.json()["id"]
+
+
+async def test_a_learner_with_a_live_interest_is_told_once_that_the_batch_starts_soon(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w, start=2, seats=10)
+    _, waiting, _ = await _interested(client, db, batch, name="Waiting")
+    _, seated, seated_interest = await _interested(client, db, batch, name="Seated")
+    gone_h, gone, gone_interest = await _interested(client, db, batch, name="Gone")
+    await client.patch(
+        f"/org/{w['partner']}/batches/{batch}/learners/{seated_interest}",
+        headers=w["partner_h"],
+        json={"status": "enrolled"},
+    )
+    await client.post(f"/me/batch-interests/{gone_interest}/withdraw", headers=gone_h)
+
+    first = await batch_reminders.sweep(db)
+    assert first == {"batches": 1, "notices": 2}
+    mine = await _notices(db, "batch_starting", seated)
+    assert len(mine) == 1 and mine[0].channel == "in_app"
+    assert mine[0].payload["enrolled"] is True and mine[0].payload["path"] == f"/batches/{batch}"
+    assert set(mine[0].payload) == {"course", "centre", "starts_on", "enrolled", "path"}
+    assert (await _notices(db, "batch_starting", waiting))[0].payload["enrolled"] is False
+    assert await _notices(db, "batch_starting", gone) == [], "a withdrawn learner is not told"
+    assert (await _row(db, batch)).start_notice_at is not None
+
+    again = await batch_reminders.sweep(db)
+    assert again == {"batches": 0, "notices": 0}, "told once, ever"
+    assert len(await _notices(db, "batch_starting")) == 2
+
+
+async def test_only_a_published_batch_starting_within_three_days_is_announced(client, db, world):
+    w = world
+    soon = await _open_world(client, w, start=3)
+    later = await _open_world(client, w, start=4)
+    started = await _open_world(client, w, start=1)
+    draft = await _plan_at(client, w, start=1)
+    cancelled = await _open_world(client, w, start=2)
+    for b in (soon, later, started, cancelled):
+        await _interested(client, db, b)
+    # It started after they registered: the sweep must leave it alone.
+    await _set(db, started, starts_on=today_ist() - timedelta(days=1))
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+
+    result = await batch_reminders.sweep(db)
+    assert result["batches"] == 1
+    assert (await _row(db, soon)).start_notice_at is not None
+    for b in (later, started, draft, cancelled):
+        assert (await _row(db, b)).start_notice_at is None, b
+
+
+async def test_the_stamp_comes_before_the_notices_so_a_crash_never_repeats_one(
+    client, db, world, monkeypatch
+):
+    w = world
+    batch = await _open_world(client, w, start=1)
+    _, user, _ = await _interested(client, db, batch)
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("the queue is down")
+
+    monkeypatch.setattr(batch_reminders, "tell_starting", boom)
+    with pytest.raises(RuntimeError):
+        await batch_reminders.sweep(db)
+    monkeypatch.undo()
+    assert (await _row(db, batch)).start_notice_at is not None
+    assert await batch_reminders.sweep(db) == {"batches": 0, "notices": 0}
+    assert await _notices(db, "batch_starting", user) == []
+
+
+async def test_the_learners_still_waiting_are_told_when_the_last_seat_goes(client, db, world):
+    w = world
+    batch = await _open_world(client, w, seats=2)
+    _, first, first_i = await _interested(client, db, batch, name="First")
+    _, second, second_i = await _interested(client, db, batch, name="Second")
+    _, third, third_i = await _interested(client, db, batch, name="Third")
+    _, fourth, fourth_i = await _interested(client, db, batch, name="Fourth")
+    mark = lambda i, s: client.patch(  # noqa: E731
+        f"/org/{w['partner']}/batches/{batch}/learners/{i}",
+        headers=w["partner_h"],
+        json={"status": s},
+    )
+    await mark(fourth_i, "contacted")
+    assert (await mark(first_i, "enrolled")).status_code == 200
+    assert await _notices(db, "batch_full") == [], "a seat is still free"
+
+    assert (await mark(second_i, "enrolled")).status_code == 200
+    told = {n.recipient_id for n in await _notices(db, "batch_full")}
+    assert told == {third, fourth}, "the two still waiting, whatever their status"
+    one = (await _notices(db, "batch_full", third))[0]
+    assert set(one.payload) == {"course", "centre", "path"} and one.channel == "in_app"
+
+    # Moving an enrolled learner on (attended) takes no new seat and tells nobody again.
+    await _set(db, batch, starts_on=today_ist())
+    assert (await mark(second_i, "attended")).status_code == 200
+    assert len(await _notices(db, "batch_full")) == 2
+
+
+async def test_a_one_seat_batch_tells_the_waiting_once_and_never_a_withdrawn_learner(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w, seats=1)
+    _, taker, taker_i = await _interested(client, db, batch, name="Taker")
+    _, waiting, _ = await _interested(client, db, batch, name="Waiting")
+    gone_h, gone, gone_i = await _interested(client, db, batch, name="Gone")
+    await client.post(f"/me/batch-interests/{gone_i}/withdraw", headers=gone_h)
+    url = f"/org/{w['partner']}/batches/{batch}/learners/{taker_i}"
+
+    assert (
+        await client.patch(url, headers=w["partner_h"], json={"status": "enrolled"})
+    ).status_code == 200
+    assert {n.recipient_id for n in await _notices(db, "batch_full")} == {waiting}
+    assert await _notices(db, "batch_full", gone) == [], "a withdrawn learner is not told"
+    assert await _notices(db, "batch_full", taker) == []
+
+    # The enrolled learner comes: no new seat, so nobody is told it is full a second time.
+    await _set(db, batch, starts_on=today_ist())
+    done = await client.patch(url, headers=w["partner_h"], json={"status": "attended"})
+    assert done.status_code == 200
+    assert len(await _notices(db, "batch_full")) == 1
+
+
+async def test_several_courses_can_be_asked_for_at_once(client, db, world):
+    w = world
+    one = await _open_world(client, w, start=20)
+    other_course = await _course(client, w["seller_h"], w["seller"], w["skill"], "Fitting basics")
+    two = await _open_world(client, w, start=21, course=other_course)
+    third_course = await _course(client, w["seller_h"], w["seller"], w["skill"], "Painting basics")
+    await _open_world(client, w, start=22, course=third_course)
+
+    got = await client.get("/batches", params=[("courses", w["course"]), ("courses", other_course)])
+    assert got.status_code == 200, got.text
+    assert {b["id"] for b in got.json()["items"]} == {one, two}
+    assert got.json()["total"] == 2
+    assert len((await client.get("/batches")).json()["items"]) == 3

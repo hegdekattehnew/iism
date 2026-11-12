@@ -173,6 +173,8 @@ export type PublicFilters = {
   maxFee: string;
   mode: string;
   course?: string;
+  /** Several courses at once: the courses that would close a match's gap (Sprint 101). */
+  courses?: string[];
 };
 
 export const PUBLIC_PAGE = 12;
@@ -200,6 +202,7 @@ export function usePublicBatches(filters: PublicFilters, signedIn: boolean, limi
             max_fee: filters.maxFee ? Number(filters.maxFee) : undefined,
             mode: (filters.mode || undefined) as PublicBatch["mode"] | undefined,
             course: filters.course || undefined,
+            courses: filters.courses && filters.courses.length > 0 ? filters.courses : undefined,
             limit,
             offset: pageParam,
           },
@@ -211,6 +214,24 @@ export function usePublicBatches(filters: PublicFilters, signedIn: boolean, limi
     getNextPageParam: (last, all) => {
       const loaded = all.reduce((n, page) => n + page.items.length, 0);
       return loaded < last.total ? loaded : undefined;
+    },
+    retry: false,
+  });
+}
+
+/**
+ * One batch, for a link a learner holds (a notice, a bookmark). Carries the caller's own interest
+ * when signed in, so it is keyed by that. A missing, draft or taken-down batch is the status 404.
+ */
+export function useBatch(id: string, signedIn: boolean) {
+  return useQuery({
+    queryKey: [...PUBLIC_BATCHES, "one", id, signedIn] as const,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/batches/{batch_id}", {
+        params: { path: { batch_id: id } },
+      });
+      if (error || !data) throw new Error(String(response.status));
+      return data;
     },
     retry: false,
   });

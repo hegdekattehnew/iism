@@ -23,12 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.clock import today_ist
 from api.modules.analytics import record
-from api.modules.batches.models import TAKEN_STATUSES, BatchInterest
+from api.modules.batches.models import TAKEN_STATUSES, Batch, BatchInterest
 from api.modules.batches.schemas import BatchLearnerContactOut, BatchLearnerOut, BatchLearnersOut
 from api.modules.batches.service import _enrolled_of, _locked, get_batch
 from api.modules.identity.models import Tenant, User
 from api.modules.marketplace.models import CandidateProfile, Course
-from api.modules.notifications import enqueue
+from api.modules.notifications import enqueue, enqueue_many
 
 # The rank of "still to answer": an unanswered learner comes first, the one who has waited longest
 # at the top, then the rest in the order they came.
@@ -95,6 +95,7 @@ async def set_status(
             status.HTTP_409_CONFLICT, "This interest has been withdrawn by the learner"
         )
     taking = new_status in TAKEN_STATUSES and interest.status not in TAKEN_STATUSES
+    taken = 0
     if new_status == "attended":
         if interest.status not in TAKEN_STATUSES:
             raise HTTPException(
@@ -113,6 +114,9 @@ async def set_status(
             )
     changed = interest.status != new_status
     interest.status = new_status
+    if taking and taken + 1 >= batch.seats:
+        # This is the seat that fills it: tell the learners still waiting, in the same transaction.
+        await _tell_waiting_it_is_full(db, batch, except_interest=interest.id)
     if changed and new_status != "attended":
         profile = await db.get(CandidateProfile, interest.profile_id)
         learner = await db.get(User, profile.user_id) if profile is not None else None
@@ -148,3 +152,47 @@ async def set_status(
         payload={"status": new_status},
     )
     return await learners_of(db, tenant, batch_id)
+
+
+async def _tell_waiting_it_is_full(
+    db: AsyncSession, batch: Batch, *, except_interest: uuid.UUID
+) -> None:
+    """Tell everybody who registered and has not been given a seat that there are none left.
+
+    Fixed words: the course, the centre and a link. Never who took the last seat. Does not commit.
+    """
+    course = await db.get(Course, batch.course_id)
+    centre = await db.get(Tenant, batch.centre_id)
+    if course is None or centre is None:
+        return
+    rows = (
+        await db.execute(
+            select(CandidateProfile.user_id, User.preferred_locale)
+            .select_from(BatchInterest)
+            .join(CandidateProfile, CandidateProfile.id == BatchInterest.profile_id)
+            .join(User, User.id == CandidateProfile.user_id)
+            .where(
+                BatchInterest.batch_id == batch.id,
+                BatchInterest.id != except_interest,
+                BatchInterest.status.in_(("registered", "contacted")),
+            )
+        )
+    ).all()
+    await enqueue_many(
+        db,
+        [
+            {
+                "recipient_kind": "user",
+                "recipient_id": user_id,
+                "channel": "in_app",
+                "template": "batch_full",
+                "locale": locale or "en",
+                "payload": {
+                    "course": course.title,
+                    "centre": centre.name,
+                    "path": f"/batches/{batch.id}",
+                },
+            }
+            for user_id, locale in rows
+        ],
+    )

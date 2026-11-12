@@ -1,0 +1,28 @@
+{
+  "sprint": 101,
+  "date": "2026-11-12",
+  "what": "Notices, a page for one batch, and the nearest batch of a match's courses (BL-20.4, BL-20.2 and BL-20.3 completed)",
+  "method": "Built-in browser on the dev API, worker and web server: a seller, a delivering organisation, two batches (one starting in two days, one with two seats), three learners; the starting sweep run for real, the full notice raised by the centre enrolling two learners; the waiting learner's notices page and the batch page opened from its link, 360 px, root font 100% and 200%, Hindi. First-load bytes from `npm run build:e2e` + `route-bundle-stats.json`. Phone bundle from `make check-mobile-budget`.",
+  "browser": {
+    "notices_page_as_a_waiting_learner": "two unread notices in English: 'starts on Nov 14, 2026. Ask the centre whether there is a seat for you.' and 'is now full.', each with an Open link",
+    "batch_page_hindi_360px": {"document_width_100": 360, "document_width_200": 360, "text_outside_screen": 0, "controls_under_44px": 0, "note": "opened from the notice's own link; shows 24 of 25 seats left (one enrolled)"},
+    "not_checked_in_the_browser": "the nearest batch inside a match's details and 'why not me' (needs a job, a gap and a course that closes it): covered by component tests only"
+  },
+  "found_by_running_it": [
+    "the first version of the nearest-batches block was imported statically by SuggestedCourses and put about 7 KB on /matches and /applications (found by the budget script): it is a lazy chunk now, with a source test"
+  ],
+  "first_load_bytes": {
+    "ceiling": 700000,
+    "/admin": 665637,
+    "/profile": 664295,
+    "/employer/[org]/batches": 661360,
+    "/matches": 659771,
+    "/applications": 656783,
+    "/batches": 652639,
+    "/batches/[id]": 648999,
+    "closest_headroom": 34363,
+    "note": "/matches and /applications were 666,629 and 663,643 before the block became a lazy chunk"
+  },
+  "phone_bundle_bytes": {"android_hermes": 3780768, "ceiling": 3800000, "headroom": 19232, "note": "grew 1,779 B from the new words in the three catalogues (the phone carries the web's messages whole). Sprint 102's screens come out of 19,232 B: sync only the namespaces the phone uses, or raise the ceiling."},
+  "tests": {"backend": 2377, "web": 1563, "mobile": 816, "mutation_checks_backend": 19, "mutation_checks_web": 26, "survivors": "two backend survivors closed (an attended move telling again on a one-seat batch, a withdrawn learner told it is full); three web survivors closed (a far batch's warning tone, the match screen not asking, a notice's date read in a zone west of Greenwich)"}
+}

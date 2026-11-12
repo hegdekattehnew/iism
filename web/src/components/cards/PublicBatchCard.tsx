@@ -36,7 +36,16 @@ function Mark({ children }: { children: ReactNode }) {
  *
  * What the learner does next is a `footer` the list passes in (register, or take it back).
  */
-export function PublicBatchCard({ batch: b, footer }: { batch: PublicBatch; footer?: ReactNode }) {
+export function PublicBatchCard({
+  batch: b,
+  footer,
+  detailsLink = true,
+}: {
+  batch: PublicBatch;
+  footer?: ReactNode;
+  /** A link to the batch's own page; the page itself leaves it out. */
+  detailsLink?: boolean;
+}) {
   const t = useTranslations("publicBatches");
   const format = useFormatter();
   const date = (value: string) =>
@@ -107,6 +116,14 @@ export function PublicBatchCard({ batch: b, footer }: { batch: PublicBatch; foot
           {b.fee_is_override && <span>{t("feeSetByCentre")}</span>}
           {b.schedule && <span>{b.schedule}</span>}
         </p>
+        {detailsLink && (
+          <Link
+            href={`/batches/${b.id}`}
+            className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
+          >
+            {t("details")}
+          </Link>
+        )}
         {footer}
       </CardBody>
     </Card>

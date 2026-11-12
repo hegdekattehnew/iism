@@ -40,6 +40,36 @@ const match = (n: number, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+const suggestion = {
+  slug: "welding",
+  title: "Welding basics",
+  mode: "offline",
+  language: "both",
+  duration_hours: 100,
+  fee_inr: 1000,
+  closes: ["Control infection"],
+  closes_count: 1,
+  gap_size: 1,
+  covers_mandatory: 1,
+  location_state: null,
+  location_district: null,
+  starts_on: null,
+  seats_left: null,
+  reach: "unknown",
+  started: false,
+  full: false,
+  within_budget: null,
+  attendable: true,
+};
+
+const batchRow = {
+  id: "b1",
+  course: { slug: "welding", title: "Welding basics" },
+  centre: { name: "Hadapsar Centre" },
+  starts_on: "2026-11-09",
+  reach: "district",
+};
+
 function serve(items: unknown[], total = items.length) {
   GET.mockImplementation(async (path: string) => {
     if (path === "/me/matches") return { data: { items, total, has_skills: true } };
@@ -102,6 +132,30 @@ describe("a match card", () => {
     expect(
       (await screen.findByRole("button", { name: "All matches" })).getAttribute("aria-expanded"),
     ).toBe("true");
+  });
+
+  it("shows the nearest batch of the courses that close the gap (Sprint 101)", async () => {
+    GET.mockImplementation(async (path: string) => {
+      if (path === "/me/matches")
+        return { data: { items: [match(1)], total: 1, has_skills: true } };
+      if (path === "/me/matches/{slug}")
+        return {
+          data: {
+            courses: [{ ...suggestion, slug: "welding", title: "Welding basics" }],
+            entry: null,
+          },
+        };
+      if (path === "/batches") return { data: { items: [batchRow], total: 1 } };
+      return { data: undefined };
+    });
+    renderUi(<MatchBrowser />);
+    fireEvent.click(await screen.findByRole("button", { name: "See courses that close this" }));
+    expect(
+      await screen.findByRole("heading", { name: "Next batches of these courses" }),
+    ).toBeTruthy();
+    const asked = GET.mock.calls.find((c) => c[0] === "/batches")!;
+    expect(asked[1].params.query.courses).toEqual(["welding"]);
+    expect(screen.getByRole("link", { name: /starts Nov 9, 2026 at Hadapsar Centre/ })).toBeTruthy();
   });
 
   it("keeps the report behind Details, closed", async () => {
