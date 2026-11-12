@@ -104,6 +104,6 @@ describe("the consent banner", () => {
   });
 
   it("holds this build's version equal to the sentence's: the date is the one in the notice file", () => {
-    expect(PRIVACY_NOTICE_VERSION).toBe("2026-10-17");
+    expect(PRIVACY_NOTICE_VERSION).toBe("2026-10-24");
   });
 });

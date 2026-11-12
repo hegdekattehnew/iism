@@ -354,3 +354,19 @@ describe("the hiring forms mirror the server's limits", () => {
     expect(lib).toContain("NOTES_MAX = 2000");
   });
 });
+
+
+/** The batch interest note's limit is the server's, read from its source (Sprint 100). */
+describe("the batch interest form mirrors the server's limits", () => {
+  const root = join(SRC, "..", "..");
+  const schemas = readFileSync(join(root, "api/modules/batches/schemas.py"), "utf8");
+  const form = read("components/RegisterBatch.tsx");
+
+  it("the note length", () => {
+    const at = schemas.indexOf("class BatchInterestIn");
+    expect(at).toBeGreaterThan(-1);
+    expect(schemas.slice(at, at + 400)).toContain("max_length=1_000");
+    const field = form.slice(form.indexOf('name="message"'), form.indexOf('name="message"') + 200);
+    expect(field).toContain("maxLength={1000}");
+  });
+});

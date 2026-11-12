@@ -1864,6 +1864,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/{org_slug}/batches/{batch_id}/learners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Batch Learners
+         * @description Who registered interest in this batch, the longest-waiting unanswered first, with the contact
+         *     they chose to share (gone once they withdraw).
+         */
+        get: operations["batch_learners_org__org_slug__batches__batch_id__learners_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/{org_slug}/batches/{batch_id}/learners/{interest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Learner Status
+         * @description Mark a learner contacted, enrolled (takes a seat) or attended (after it started).
+         */
+        patch: operations["set_learner_status_org__org_slug__batches__batch_id__learners__interest_id__patch"];
+        trace?: never;
+    };
+    "/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Batches
+         * @description Batches a person can still join, nearest first, then soonest, then cheapest. Nothing is
+         *     hidden by where the person is: a batch in another state is last, not gone.
+         */
+        get: operations["public_batches_batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public Batch */
+        get: operations["public_batch_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/batch-interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Batch Interests */
+        get: operations["my_batch_interests_me_batch_interests_get"];
+        put?: never;
+        /**
+         * Register Interest
+         * @description Tell the centre that runs a batch you want it, sharing your name and contact with it.
+         */
+        post: operations["register_interest_me_batch_interests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/batch-interests/{interest_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Batch Interest
+         * @description Take it back. The centre keeps the fact and loses your contact details.
+         */
+        post: operations["withdraw_batch_interest_me_batch_interests__interest_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/training-organisations": {
         parameters: {
             query?: never;
@@ -4135,6 +4255,84 @@ export interface components {
             /** Centre Slug */
             centre_slug?: string | null;
         };
+        /** BatchInterestIn */
+        BatchInterestIn: {
+            /** Batch Id */
+            batch_id: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * BatchInterestOut
+         * @description The learner's own view of an interest: the batch (even a cancelled one) and their status.
+         */
+        BatchInterestOut: {
+            /** Id */
+            id: string;
+            batch: components["schemas"]["PublicBatchOut"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted" | "enrolled" | "attended";
+            /** Message */
+            message?: string | null;
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * BatchLearnerContactOut
+         * @description The disclosure itself: present only while an interest is live.
+         */
+        BatchLearnerContactOut: {
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * BatchLearnerOut
+         * @description One interest, as the centre and its organisation's owners and admins see it.
+         */
+        BatchLearnerOut: {
+            /** Interest Id */
+            interest_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted" | "enrolled" | "attended";
+            /**
+             * Registered At
+             * Format: date-time
+             */
+            registered_at: string;
+            /** Message */
+            message?: string | null;
+            /** Location State */
+            location_state?: string | null;
+            /** Location District */
+            location_district?: string | null;
+            contact?: components["schemas"]["BatchLearnerContactOut"] | null;
+        };
+        /** BatchLearnersOut */
+        BatchLearnersOut: {
+            batch: components["schemas"]["BatchOut"];
+            /** Items */
+            items: components["schemas"]["BatchLearnerOut"][];
+            /** Total */
+            total: number;
+        };
         /** BatchList */
         BatchList: {
             /** Items */
@@ -4244,6 +4442,13 @@ export interface components {
             unfilled_batches: number;
             /** Unavailable */
             unavailable: number;
+            /**
+             * Replies Owed
+             * @default 0
+             */
+            replies_owed: number;
+            /** Oldest Reply Owed Since */
+            oldest_reply_owed_since?: string | null;
             /** Upcoming */
             upcoming: components["schemas"]["BatchOut"][];
         };
@@ -4779,6 +4984,17 @@ export interface components {
             managers: components["schemas"]["MemberOut"][];
             /** Invitations */
             invitations: components["schemas"]["InvitationOut"][];
+        };
+        /**
+         * CentreStatusIn
+         * @description What a centre may set. `registered` and `withdrawn` are the learner's.
+         */
+        CentreStatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "contacted" | "enrolled" | "attended";
         };
         /** CertificationOut */
         CertificationOut: {
@@ -6726,6 +6942,19 @@ export interface components {
             nsqf_level?: number | null;
         };
         /**
+         * MyInterestRef
+         * @description The signed-in learner's own interest in a batch, when they have one.
+         */
+        MyInterestRef: {
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "registered" | "withdrawn" | "contacted" | "enrolled" | "attended";
+        };
+        /**
          * NotesIn
          * @description A private note on an applicant. Blank clears it.
          */
@@ -7465,6 +7694,76 @@ export interface components {
              * @enum {string}
              */
             status: "contacted" | "enrolled";
+        };
+        /** PublicBatchList */
+        PublicBatchList: {
+            /** Items */
+            items: components["schemas"]["PublicBatchOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /**
+         * PublicBatchOut
+         * @description A batch as a learner sees it: what decides whether to go, and nothing about anybody else.
+         *
+         *     **No count of interested learners, no enrolled count, no draft**: seats left is the one figure,
+         *     derived. The centre's street address is not here (the place is district and state); the fee is
+         *     the centre's own statement when it set one, and says so.
+         */
+        PublicBatchOut: {
+            /** Id */
+            id: string;
+            course: components["schemas"]["BatchCourseOut"];
+            centre: components["schemas"]["BatchCentreOut"];
+            organisation: components["schemas"]["BatchOrgOut"];
+            /** Label */
+            label?: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Seats */
+            seats: number;
+            /** Seats Left */
+            seats_left: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "in_person" | "hybrid" | "online";
+            /** Schedule */
+            schedule?: string | null;
+            /** Fee Effective */
+            fee_effective?: number | null;
+            /**
+             * Fee Is Override
+             * @default false
+             */
+            fee_is_override: boolean;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "open" | "full" | "running" | "finished" | "cancelled";
+            /** Cancel Reason */
+            cancel_reason?: ("by_organisation" | "arrangement_ended" | "course_unavailable" | "centre_closed") | null;
+            /**
+             * Reach
+             * @default unknown
+             * @enum {string}
+             */
+            reach: "online" | "district" | "state" | "unknown" | "elsewhere";
+            my_interest?: components["schemas"]["MyInterestRef"] | null;
         };
         /** QualificationRefOut */
         QualificationRefOut: {
@@ -11797,6 +12096,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_learners_org__org_slug__batches__batch_id__learners_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchLearnersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_learner_status_org__org_slug__batches__batch_id__learners__interest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+                interest_id: string;
+                org_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CentreStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchLearnersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_batches_batches_get: {
+        parameters: {
+            query?: {
+                state_id?: string | null;
+                district_id?: string | null;
+                starts_within?: number | null;
+                max_fee?: number | null;
+                course?: string | null;
+                mode?: ("in_person" | "hybrid" | "online") | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBatchList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_batch_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_batch_interests_me_batch_interests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchInterestOut"][];
+                };
+            };
+        };
+    };
+    register_interest_me_batch_interests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchInterestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchInterestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_batch_interest_me_batch_interests__interest_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchInterestOut"];
                 };
             };
             /** @description Validation Error */

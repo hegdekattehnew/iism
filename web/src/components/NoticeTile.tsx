@@ -11,6 +11,7 @@ import {
   InboxIcon,
   InfoIcon,
   TargetIcon,
+  UsersIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -30,6 +31,7 @@ const ICONS: Record<string, ReactElement> = {
   course_interest_status_changed: <BookOpenIcon />,
   sponsor_offer: <AwardIcon />,
   batch_cancelled: <CalendarIcon />,
+  batch_interest_status_changed: <UsersIcon />,
   grievance_update: <InfoIcon />,
 };
 

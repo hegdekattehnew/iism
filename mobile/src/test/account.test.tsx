@@ -26,9 +26,9 @@ const me = (extra: Record<string, unknown> = {}) => ({
 });
 /** What `GET /me/account/consent` says (Sprint 72): agreed to the notice in force, nothing withdrawn. */
 const consentState = (extra: Record<string, unknown> = {}) => ({
-  consent_version: "2026-10-17",
+  consent_version: "2026-10-24",
   consented_at: "2026-10-01T10:00:00+00:00",
-  notice_version: "2026-10-17",
+  notice_version: "2026-10-24",
   current: true,
   withdrawn: false,
   consent_withdrawn_at: null,
@@ -66,7 +66,7 @@ describe("what you agreed to", () => {
   it("names the notice and the day, and opens the privacy notice on the website", async () => {
     served();
     await renderScreen(<Account />);
-    expect(await screen.findByText("You agreed to the privacy notice of 2026-10-17 on 1 Oct 2026.")).toBeTruthy();
+    expect(await screen.findByText("You agreed to the privacy notice of 2026-10-24 on 1 Oct 2026.")).toBeTruthy();
     await press("Read the privacy notice");
     expect(open).toHaveBeenCalledWith("http://localhost:3000/en/privacy");
   });
@@ -120,7 +120,7 @@ describe("withdrawing consent, and coming back (Sprint 72)", () => {
     await renderScreen(<Account />);
     await press("Confirm and switch my account back on");
     await settle();
-    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-17" } });
+    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-24" } });
   });
 
   it("asks a person whose notice changed to read and confirm, and blocks nothing", async () => {
@@ -130,7 +130,7 @@ describe("withdrawing consent, and coming back (Sprint 72)", () => {
     expect(screen.getByRole("button", { name: "Withdraw my consent…" })).toBeTruthy();
     await press("I have read it and I am 18 or over");
     await settle();
-    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-17" } });
+    expect(api.POST).toHaveBeenCalledWith("/me/account/consent", { body: { consent_version: "2026-10-24" } });
   });
 
   it("shows the server's sentence when withdrawing is refused, and that the session ended on a 401", async () => {
