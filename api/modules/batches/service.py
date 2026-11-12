@@ -34,6 +34,7 @@ from api.modules.analytics import record
 from api.modules.batches import phases
 from api.modules.batches.models import (
     LIVE_INTEREST_STATUSES,
+    TAKEN_STATUSES,
     Batch,
     BatchInterest,
 )
@@ -73,7 +74,7 @@ COURSES_MAX = 500
 def _enrolled() -> ScalarSelect[int]:
     return (
         select(func.count())
-        .where(BatchInterest.batch_id == Batch.id, BatchInterest.status == "enrolled")
+        .where(BatchInterest.batch_id == Batch.id, BatchInterest.status.in_(TAKEN_STATUSES))
         .scalar_subquery()
     )
 
@@ -347,6 +348,19 @@ async def overview(db: AsyncSession, tenant: Tenant) -> BatchOverview:
         limit=5,
         soonest_first=True,
     )
+    owed, since = (
+        await db.execute(
+            select(func.count(), func.min(BatchInterest.created_at))
+            .select_from(BatchInterest)
+            .join(Batch, Batch.id == BatchInterest.batch_id)
+            .where(
+                BatchInterest.status == "registered",
+                _scope(tenant),
+                Batch.status == "published",
+                Batch.ends_on >= today,
+            )
+        )
+    ).one()
     drafts, starting, running, seats, batches_with_seats, unavailable = row
     return BatchOverview(
         drafts=drafts,
@@ -355,6 +369,8 @@ async def overview(db: AsyncSession, tenant: Tenant) -> BatchOverview:
         unfilled_seats=max(0, int(seats or 0)),
         unfilled_batches=batches_with_seats,
         unavailable=unavailable,
+        replies_owed=int(owed or 0),
+        oldest_reply_owed_since=since,
         upcoming=upcoming,
     )
 
@@ -591,7 +607,7 @@ async def _enrolled_of(db: AsyncSession, batch_id: uuid.UUID) -> int:
         await db.scalar(
             select(func.count())
             .select_from(BatchInterest)
-            .where(BatchInterest.batch_id == batch_id, BatchInterest.status == "enrolled")
+            .where(BatchInterest.batch_id == batch_id, BatchInterest.status.in_(TAKEN_STATUSES))
         )
     ) or 0
 

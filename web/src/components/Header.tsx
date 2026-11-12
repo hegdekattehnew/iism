@@ -17,6 +17,7 @@ import { useOrgDelivers, useOrgType } from "@/lib/org";
 const SEEKER_NAV = [
   { key: "jobs", href: "/jobs" },
   { key: "courses", href: "/courses" },
+  { key: "batches", href: "/batches" },
   { key: "skills", href: "/skills" },
   { key: "howItWorks", href: "/#how-it-works" },
 ] as const;
@@ -124,7 +125,7 @@ export function Header() {
                 key={key}
                 href={href}
                 aria-current={href === current ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-muted hover:text-foreground ${
+                className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-muted hover:text-foreground ${
                   href === current ? "bg-accent-soft text-foreground" : "text-muted"
                 }`}
               >
