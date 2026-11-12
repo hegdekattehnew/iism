@@ -24,6 +24,8 @@ import {
   postedText,
   type Translate,
 } from "@/lib/job-text";
+import { levelLine, levelOrAbove } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 import { payLine, yearlyLine } from "@/lib/pay";
 import { ratingDisplay } from "@/lib/reputation";
 import { presentRequirements } from "@/lib/requirements";
@@ -39,6 +41,7 @@ export default async function JobDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("jobsPage");
   const say = t as unknown as Translate;
+  const tl = (await getTranslations("levels")) as unknown as LevelSay;
 
   const { data, error, response } = await api.GET(
     "/jobs/{slug}",
@@ -103,7 +106,7 @@ export default async function JobDetailPage({
         {data.nsqf_level_min != null && (
           <Badge size="md" className="font-medium">
             <TargetIcon className="h-4 w-4" />
-            {t("minLevel", { level: data.nsqf_level_min })}
+            {levelOrAbove(data.nsqf_level_min, tl)}
           </Badge>
         )}
         {days !== null && (
@@ -114,6 +117,9 @@ export default async function JobDetailPage({
         )}
       </div>
 
+      {levelLine(data.nsqf_level_min, tl) && (
+        <p className="mt-2 text-sm text-muted">{levelLine(data.nsqf_level_min, tl)}</p>
+      )}
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
       {/* The organisation's mark beside who and where, as on the card in the list (Sprint 85). */}
       <div className="mt-3 flex items-center gap-3">

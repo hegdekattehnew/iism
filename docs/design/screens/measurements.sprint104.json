@@ -1,0 +1,43 @@
+{
+  "sprint": 104,
+  "date": "2026-11-12",
+  "what": "Plain levels on the seeker's pages (BL-22.5, ADR-105) and the self-assessment designed (BL-20.6, ADR-104, no build)",
+  "method": "The built-in browser on the dev web server and API: a vacancy of level 3 and a course of level 4.5 in Hindi at 360 px, at 100% and 200% root text; first-load bytes from `npm run build:e2e` + `route-bundle-stats.json`; phone bundle from `make mobile-check`.",
+  "browser": {
+    "vacancy_level_3_hindi": {
+      "badge": "अर्ध-कुशल कामगार या उससे ऊपर (स्तर 3)",
+      "line": "present",
+      "framework_name": false,
+      "overflow_100": 0,
+      "overflow_200": 0
+    },
+    "course_level_4_5_hindi": {
+      "badge": "कुशल कामगार से वरिष्ठ कुशल कामगार के बीच, स्तर 4.5",
+      "line": "none, by design",
+      "framework_name": false,
+      "overflow_100": 0,
+      "overflow_200": 0
+    }
+  },
+  "first_load_bytes": {
+    "ceiling": 700000,
+    "/admin": 665637,
+    "/profile": 664908,
+    "/employer/[org]/batches": 661995,
+    "closest_headroom": 34363,
+    "note": "/profile grew 613 B (the role picker's words)"
+  },
+  "phone_bundle_bytes": {
+    "android_hermes": 3634135,
+    "ceiling": 3800000,
+    "headroom": 165865,
+    "before": 3629034
+  },
+  "tests": {
+    "backend": 2394,
+    "web": 1604,
+    "mobile": 904,
+    "mutation_checks": 17,
+    "survivors": "four: three closed with tests, one equivalent and removed"
+  }
+}

@@ -8,6 +8,8 @@ import { ButtonLink } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangleIcon, AwardIcon, TargetIcon } from "@/components/ui/icons";
 import { api } from "@/lib/api";
+import { levelLabel, levelLine } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 // Rendered per request: skills change as the taxonomy is imported, and there is
 // no build-time guarantee the API is reachable.
@@ -23,6 +25,7 @@ export default async function SkillDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("skillsPage");
+  const tl = (await getTranslations("levels")) as unknown as LevelSay;
 
   const { data, error, response } = await api.GET(
     "/skills/{slug}",
@@ -60,7 +63,7 @@ export default async function SkillDetailPage({
         <Badge size="md" className="font-medium">
           <TargetIcon className="h-4 w-4" />
           {data.nsqf_level != null
-            ? t("level", { level: data.nsqf_level })
+            ? (levelLabel(data.nsqf_level, tl) ?? t("noLevel"))
             : t("noLevel")}
         </Badge>
         {data.nos_code && (
@@ -81,6 +84,9 @@ export default async function SkillDetailPage({
         </p>
       )}
 
+      {data.nsqf_level != null && levelLine(data.nsqf_level, tl) && (
+        <p className="mt-2 text-sm text-muted">{levelLine(data.nsqf_level, tl)}</p>
+      )}
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
 
       {description && (

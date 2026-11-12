@@ -105,7 +105,7 @@ describe("RolePicker — finding the role", () => {
     });
     const row = await screen.findByRole("button", { name: /General Duty Assistant/ });
     expect(row.textContent).toContain("CII/HSS/Q5101");
-    expect(row.textContent).toContain("NSQF 3");
+    expect(row.textContent).toContain("Semi-skilled worker, level 3");
     expect(row.textContent).toContain("4 standards");
     // Otherwise "General Duty Assistant" for "ward boy" looks like a mistake.
     expect(row.textContent).toContain("Matched “ward boy”");

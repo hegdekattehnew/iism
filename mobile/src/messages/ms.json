@@ -7,7 +7,6 @@
     "clear": "Clear",
     "allTypes": "All types",
     "allLevels": "All levels",
-    "level": "NSQF level {level}",
     "levelShort": "Level {level}",
     "noLevel": "No level assigned",
     "type": {
@@ -96,7 +95,6 @@
     "optional": "Useful",
     "importance": "Importance {n} of 5",
     "backToJobs": "All jobs",
-    "minLevel": "NSQF level {level} and above",
     "experienceLabel": "Experience",
     "salaryLabel": "Salary",
     "salaryMonthly": "About ₹{min}–{max} a month",
@@ -151,7 +149,6 @@
     "skillsTaught": "Skills taught",
     "teachesToLevel": "to level {level}",
     "backToCourses": "All courses",
-    "level": "NSQF level {level}",
     "feeLabel": "Fee",
     "durationLabel": "Duration",
     "placeNotStated": "Place not stated",
@@ -177,6 +174,35 @@
     "startedLabel": "Started",
     "startedAsk": "This group has begun. Ask the provider whether you can still join, or when the next one starts.",
     "verifiedBy": "Reviewed by our team."
+  },
+  "levels": {
+    "name": {
+      "l1": "Basic helper",
+      "l2": "Helper",
+      "l3": "Semi-skilled worker",
+      "l4": "Skilled worker",
+      "l5": "Senior skilled worker",
+      "l6": "Supervisor or technician",
+      "l7": "Degree level",
+      "l8": "Master's level",
+      "l9": "Advanced specialist",
+      "l10": "Doctoral level"
+    },
+    "line": {
+      "l1": "Simple tasks with close guidance.",
+      "l2": "Everyday tasks with some guidance.",
+      "l3": "Does the job's usual tasks without constant supervision.",
+      "l4": "Does the job well on their own and handles usual problems.",
+      "l5": "Handles harder problems and can guide others.",
+      "l6": "Plans and supervises work, and fixes complex faults.",
+      "l7": "Needs a degree-level education.",
+      "l8": "Needs a master's-level education.",
+      "l9": "Advanced specialist work.",
+      "l10": "Top-level specialist or research work."
+    },
+    "between": "{lower} to {upper}",
+    "labelled": "{name}, level {level}",
+    "orAbove": "{name} or above (level {level})"
   },
   "skillLinks": {
     "jobsTitle": "Jobs needing this skill",
@@ -375,7 +401,6 @@
       "prompt": "What work do you do?",
       "placeholder": "e.g. ward boy, delivery, cashier, electrician",
       "standardsCount": "{count, plural, one {# standard} other {# standards}}",
-      "level": "NSQF {level}",
       "matchedVia": "Matched “{term}”",
       "variants": "{count} versions of this qualification — showing the fullest",
       "noRoles": "No job by that name yet. Try another word, or search the standards directly below.",
@@ -453,10 +478,10 @@
     "coverageLabel": "{percent}% of the weighted requirements",
     "coverageWeighted": "{percent}% of what this role requires, weighted by importance",
     "cappedBy": "{count, plural, one {# mandatory standard missing} other {# mandatory standards missing}}",
-    "levelHeading": "NSQF level",
-    "levelLabel": "NSQF level {attained} against a required {required}",
-    "levelMet": "Meets the NSQF {required} floor this role sets",
-    "levelShort": "NSQF {attained} against the {required} this role asks for"
+    "levelHeading": "Level",
+    "levelLabel": "Level {attained} against a required {required}",
+    "levelMet": "Meets the level {required} this role asks for",
+    "levelShort": "Level {attained} against the {required} this role asks for"
   },
   "account": {
     "title": "Your account",
@@ -692,7 +717,6 @@
     "title": "Where you could move next",
     "subtitle": "Roles that build on the one you do now, and what it would take to get there.",
     "startingFrom": "Starting from",
-    "level": "Level {level}",
     "guessed": "We picked this from your profile. If it is not your role, change it.",
     "changeRole": "Change role",
     "keepRole": "Keep this role",

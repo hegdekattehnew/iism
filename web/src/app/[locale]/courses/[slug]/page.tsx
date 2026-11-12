@@ -22,6 +22,8 @@ import {
 import { TrustStrip } from "@/components/ui/trust-strip";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { levelLabel, levelLine } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 import { creditsText, type Translate } from "@/lib/job-text";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,7 @@ export default async function CourseDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("coursesPage");
+  const tl = (await getTranslations("levels")) as unknown as LevelSay;
   const format = await getFormatter();
 
   const { data, error, response } = await api.GET(
@@ -90,11 +93,14 @@ export default async function CourseDetailPage({
         {data.nsqf_level != null && (
           <Badge size="md" className="font-medium">
             <TargetIcon className="h-4 w-4" />
-            {t("level", { level: data.nsqf_level })}
+            {levelLabel(data.nsqf_level, tl)}
           </Badge>
         )}
       </div>
 
+      {levelLine(data.nsqf_level, tl) && (
+        <p className="mt-2 text-sm text-muted">{levelLine(data.nsqf_level, tl)}</p>
+      )}
       <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
       {/* The provider's mark beside its name, as on the card in the list (Sprint 85). The name is a
           link to the organisation's own page (Sprint 94, ADR-102). */}

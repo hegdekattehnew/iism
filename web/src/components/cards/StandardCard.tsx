@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { IconTile } from "@/components/ui/icon-tile";
 import { AwardIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
+import { levelLabel } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 export type StandardRow = {
   slug: string;
@@ -94,6 +96,7 @@ export function StandardCard({
 }) {
   const t = useTranslations("skillsPage");
   const tType = useTranslations("skillsPage.type");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   return (
     <Link
       href={`/skills/${row.slug}`}
@@ -106,7 +109,7 @@ export function StandardCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {row.skill_type && <Badge tone={TYPE_TONE[row.skill_type]}>{tType(row.skill_type)}</Badge>}
-            {row.nsqf_level != null && <Badge>{t("levelShort", { level: formatLevel(row.nsqf_level) })}</Badge>}
+            {row.nsqf_level != null && <Badge>{levelLabel(row.nsqf_level, tl)}</Badge>}
             {/* Why this sorts where it does, and a real signal of how central the unit is to the framework. */}
             {!compact && (row.qp_count ?? 0) > 0 && (
               <span className="text-xs text-muted">{t("usedInQps", { count: row.qp_count ?? 0 })}</span>

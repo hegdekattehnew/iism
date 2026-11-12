@@ -45,7 +45,7 @@ describe("StandardCard", () => {
   it("shows the kind and the level as chips, and how many qualifications use it", () => {
     renderUi(<StandardCard row={ROW} lookalike={false} />);
     expect(screen.getByText("Technical").className).toContain("bg-accent-soft");
-    expect(screen.getByText("Level 4.5").className).toContain("bg-surface-muted");
+    expect(screen.getByText("Skilled worker to senior skilled worker, level 4.5").className).toContain("bg-surface-muted");
     expect(screen.getByText(/3/, { selector: "span.text-muted" })).toBeTruthy();
   });
 
@@ -62,7 +62,7 @@ describe("StandardCard", () => {
   it("draws no kind chip for a row that carries no kind (search results may not)", () => {
     renderUi(<StandardCard row={{ ...ROW, skill_type: undefined }} lookalike={false} />);
     expect(screen.queryByText("Technical")).toBeNull();
-    expect(screen.getByText("Level 4.5")).toBeTruthy();
+    expect(screen.getByText("Skilled worker to senior skilled worker, level 4.5")).toBeTruthy();
   });
 
   it("names the code and the qualification it belongs to, and a council once", () => {
@@ -103,7 +103,7 @@ describe("StandardCard", () => {
     expect(screen.queryByText("Prepare and clean the equipment a ward uses.")).toBeNull();
     expect(screen.queryByText(/qualifications?$/, { selector: "span.text-muted" })).toBeNull();
     expect(screen.getByText("Technical")).toBeTruthy();
-    expect(screen.getByText("Level 4.5")).toBeTruthy();
+    expect(screen.getByText("Skilled worker to senior skilled worker, level 4.5")).toBeTruthy();
     expect(screen.getByText("HSS/N5113")).toBeTruthy();
   });
 

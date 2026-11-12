@@ -6,10 +6,12 @@ import { useSkill, useSkillCourses, useSkillJobs } from "../../src/lib/queries";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { RecordState, Section } from "../../src/ui/detail";
+import { levelLabel, type LevelSay } from "../../src/core/level-words";
 
 export default function SkillDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const t = useTranslations("skillsPage");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const tl = useTranslations("skillLinks");
   const router = useRouter();
   const query = useSkill(slug);
@@ -26,7 +28,7 @@ export default function SkillDetail() {
           <>
             <BadgeRow>
               <Badge tone="brand" label={t(`type.${skill.skill_type}`)} />
-              {skill.nsqf_level != null ? <Badge label={t("level", { level: skill.nsqf_level })} /> : null}
+              {skill.nsqf_level != null ? <Badge label={levelLabel(skill.nsqf_level, tw) ?? ""} /> : null}
             </BadgeRow>
             <Text variant="title">{skill.name}</Text>
             {skill.nos_code ? (

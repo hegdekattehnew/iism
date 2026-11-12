@@ -6,6 +6,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { CalendarIcon, MapPinIcon, RupeeIcon } from "@/components/ui/icons";
 import { Link } from "@/i18n/navigation";
 import { creditsText, type Translate } from "@/lib/job-text";
+import { levelLabel } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 export const COURSE_MODES = ["online", "offline", "hybrid"] as const;
 
@@ -41,6 +43,7 @@ export function feeLabel(c: Pick<Course, "fee_inr">, t: ReturnType<typeof useTra
  */
 export function CourseCard({ course: c }: { course: Course }) {
   const t = useTranslations("coursesPage");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const format = useFormatter();
   const credits = creditsText(c.qualification_credits, t as unknown as Translate);
   const place = c.mode === "online" ? null : [c.location_district, c.location_state].filter(Boolean).join(", ");
@@ -85,7 +88,7 @@ export function CourseCard({ course: c }: { course: Course }) {
           {t(`mode.${c.mode}`)}
         </span>
         <span>{t(`language.${c.language}`)}</span>
-        {c.nsqf_level != null && <span>{t("level", { level: c.nsqf_level })}</span>}
+        {c.nsqf_level != null && <span>{levelLabel(c.nsqf_level, tl)}</span>}
         {credits && <span>{credits}</span>}
         {c.duration_hours != null && <span>{t("duration", { hours: c.duration_hours })}</span>}
       </p>

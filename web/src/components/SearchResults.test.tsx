@@ -82,6 +82,12 @@ beforeEach(() => {
 });
 
 describe("SearchResults", () => {
+  it("says a role's level in plain words, and never the framework's name (BL-22.5)", async () => {
+    const { container } = renderUi(<SearchResults query="General Duty Assistant" />);
+    expect(await screen.findByText(/Semi-skilled worker, level 3/)).toBeTruthy();
+    expect(container.textContent).not.toMatch(/NSQF/);
+  });
+
   it("answers a job title with jobs first, then roles, then standards", async () => {
     const { container } = renderUi(<SearchResults query="General Duty Assistant" />);
     await screen.findByText("Chennai, Tamil Nadu");
@@ -157,7 +163,7 @@ describe("StandardOrigin", () => {
     expect(await screen.findByText("Healthcare")).toBeTruthy();
     expect(screen.queryByText("Healthcare · Healthcare")).toBeNull();
     // Level is one of the few things that tells twins apart.
-    expect(screen.getByText("Level 4.5")).toBeTruthy();
+    expect(screen.getByText("Skilled worker to senior skilled worker, level 4.5")).toBeTruthy();
   });
 });
 

@@ -12,10 +12,12 @@ import { ReportPanel } from "../../src/ui/ReportPanel";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
+import { levelLabel, type LevelSay } from "../../src/core/level-words";
 
 export default function CourseDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const t = useTranslations("coursesPage");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const router = useRouter();
   const monthName = useMonthName();
   const signedIn = useSignedIn();
@@ -32,7 +34,7 @@ export default function CourseDetail() {
             <BadgeRow>
               <Badge tone="brand" label={t(`mode.${course.mode}`)} />
               <Badge label={t(`language.${course.language}`)} />
-              {course.nsqf_level != null ? <Badge label={t("level", { level: course.nsqf_level })} /> : null}
+              {course.nsqf_level != null ? <Badge label={levelLabel(course.nsqf_level, tw) ?? ""} /> : null}
             </BadgeRow>
             <Text variant="title">{course.title}</Text>
             <Text variant="lead" tone="muted">

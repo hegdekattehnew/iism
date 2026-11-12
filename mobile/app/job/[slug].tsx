@@ -18,10 +18,12 @@ import { ReportPanel } from "../../src/ui/ReportPanel";
 import { space, useColours } from "../../src/theme";
 import { Badge, BadgeRow, Button, Card, Screen, Text } from "../../src/ui";
 import { Fact, Facts, RecordState, Section, SignInToMatch } from "../../src/ui/detail";
+import { levelOrAbove, type LevelSay } from "../../src/core/level-words";
 
 export default function JobDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const t = useTranslations("jobsPage");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const router = useRouter();
   const c = useColours();
   const signedIn = useSignedIn();
@@ -60,7 +62,7 @@ export default function JobDetail() {
           <>
             <BadgeRow>
               <Badge tone="brand" label={t(`employmentType.${job.employment_type}`)} />
-              {job.nsqf_level_min != null ? <Badge label={t("minLevel", { level: job.nsqf_level_min })} /> : null}
+              {job.nsqf_level_min != null ? <Badge label={levelOrAbove(job.nsqf_level_min, tw) ?? ""} /> : null}
               {days !== null ? <Badge tone="warning" label={t("closesIn", { days })} /> : null}
             </BadgeRow>
             <Text variant="title">{job.title}</Text>

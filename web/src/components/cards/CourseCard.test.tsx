@@ -72,6 +72,15 @@ describe("CourseCard", () => {
     expect(none.container.textContent).not.toMatch(/credit/i);
   });
 
+  it("says the level in plain words with its number, never the framework's name (BL-22.5)", () => {
+    const whole = renderUi(<CourseCard course={{ ...COURSE, nsqf_level: 4 }} />);
+    expect(whole.container.textContent).toContain("Skilled worker, level 4");
+    expect(whole.container.textContent).not.toMatch(/NSQF/);
+    whole.unmount();
+    const half = renderUi(<CourseCard course={{ ...COURSE, nsqf_level: 4.5 }} />);
+    expect(half.container.textContent).toContain("Skilled worker to senior skilled worker, level 4.5");
+  });
+
   it("is a link to the course", () => {
     renderUi(<CourseCard course={COURSE} />);
     expect(screen.getByRole("link").getAttribute("href")).toBe("/courses/phlebotomy-pune");

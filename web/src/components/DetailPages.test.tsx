@@ -146,10 +146,29 @@ describe("the vacancy page", () => {
   it("keeps the type, the level and (when near) the closing date as chips with an icon", async () => {
     serve({ ...JOB, closes_at: new Date(Date.now() + 3 * 86_400_000 - 1000).toISOString() });
     await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
-    for (const text of ["Full time", "NSQF level 3 and above", "Closes in 3 days"]) {
+    for (const text of ["Full time", "Semi-skilled worker or above (level 3)", "Closes in 3 days"]) {
       const chip = screen.getByText(text);
       expect(chip.querySelector("svg"), String(text)).toBeTruthy();
     }
+  });
+
+  it("says the level in plain words and one line of what it means, and never the framework's name", async () => {
+    serve(JOB);
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(screen.getByText("Semi-skilled worker or above (level 3)")).toBeTruthy();
+    expect(
+      screen.getByText("Does the job's usual tasks without constant supervision."),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/NSQF/);
+  });
+
+  it("says a half level as the space between two steps, with no line of its own", async () => {
+    serve({ ...JOB, nsqf_level_min: 3.5 });
+    await show(JobDetailPage({ params: Promise.resolve({ slug: "gda-chennai" }) }));
+    expect(
+      screen.getByText("Semi-skilled worker to skilled worker or above (level 3.5)"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Does the job/)).toBeNull();
   });
 
   it("lists each required standard as a 44 px link, mandatory ones marked, with a chevron", async () => {
@@ -202,6 +221,16 @@ describe("the vacancy page", () => {
 });
 
 describe("the course page", () => {
+  it("says the level in plain words with one line of what it means", async () => {
+    serve(COURSE);
+    await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
+    expect(screen.getByText("Skilled worker, level 4")).toBeTruthy();
+    expect(
+      screen.getByText("Does the job well on their own and handles usual problems."),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/NSQF/);
+  });
+
   it("shows fee, length, place, start, qualification and seats as facts with an icon each", async () => {
     serve(COURSE);
     const { container } = await show(CourseDetailPage({ params: Promise.resolve({ slug: "gda-certificate" }) }));
@@ -493,7 +522,7 @@ describe("the standard page", () => {
     });
     await show(SkillDetailPage({ params: Promise.resolve({ slug: "hand-hygiene" }) }));
     expect(screen.getByText("Technical").querySelector("svg")).toBeTruthy();
-    expect(screen.getByText("NSQF level 4").querySelector("svg")).toBeTruthy();
+    expect(screen.getByText("Skilled worker, level 4").querySelector("svg")).toBeTruthy();
     const notice = screen.getByText(/no longer|retired|superseded/i);
     expect(notice.querySelector("svg")).toBeTruthy();
   });
