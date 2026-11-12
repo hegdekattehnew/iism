@@ -1007,6 +1007,8 @@ async def test_a_seller_sees_counts_of_how_its_courses_are_run_and_nothing_else(
     full = await _plan_at(client, w, start=25, seats=1)
     await _publish(client, w, full)
     await _interest(db, full, "enrolled")
+    await _interest(db, open_batch, "registered")
+    await _interest(db, open_batch, "withdrawn")
     running = await _plan_at(client, w, start=2)
     await _publish(client, w, running)
     await _set(db, running, starts_on=today_ist())
@@ -1036,10 +1038,11 @@ async def test_a_seller_sees_counts_of_how_its_courses_are_run_and_nothing_else(
         1,
     )
     assert (row["seats"], row["enrolled"]) == (10 + 1 + 10 + 10, 2)
+    assert row["interested"] == 3, "two seated and one waiting; the one who withdrew is not counted"
     # Counts and the delivering organisation: no learner, centre, contact or batch id.
     assert set(row) == {
         *("course", "organisation", "batches", "open", "full", "running", "finished"),
-        *("seats", "enrolled"),
+        *("seats", "enrolled", "interested"),
     }
     assert set(row["organisation"]) == {"slug", "name", "is_verified"}
     text = got.text
@@ -2269,3 +2272,157 @@ async def test_several_courses_can_be_asked_for_at_once(client, db, world):
     assert {b["id"] for b in got.json()["items"]} == {one, two}
     assert got.json()["total"] == 2
     assert len((await client.get("/batches")).json()["items"]) == 3
+
+
+# ------------------------------------------------------------- replies owed (Sprint 103)
+
+
+async def _wait(db: AsyncSession, interest_id: str, days: int) -> None:
+    """Make a registration `days` old: the only way to wait without waiting."""
+    await db.execute(
+        update(BatchInterest)
+        .where(BatchInterest.id == uuid.UUID(interest_id))
+        .values(created_at=func.now() - timedelta(days=days))
+    )
+    await db.commit()
+
+
+async def _reminded(db: AsyncSession, interest_id: str):
+    row = await db.scalar(
+        select(BatchInterest)
+        .where(BatchInterest.id == uuid.UUID(interest_id))
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None
+    return row.reply_reminder_at
+
+
+async def test_an_organisation_is_reminded_once_of_learners_waiting_past_three_days(
+    client, db, world
+):
+    w = world
+    batch = await _open_world(client, w, start=20)
+    other = await _open_world(client, w, start=21)
+    _, _, one = await _interested(client, db, batch, name="One")
+    _, _, two = await _interested(client, db, other, name="Two")
+    for interest in (one, two):
+        await _wait(db, interest, 4)
+
+    first = await batch_reminders.sweep_replies(db)
+    assert first == {"organisations": 1, "emails": 1}, "two batches, one organisation, one email"
+    sent = await _notices(db, "batch_replies_owed")
+    assert len(sent) == 1
+    assert sent[0].channel == "email" and sent[0].recipient_kind == "tenant"
+    assert sent[0].payload == {"count": 2, "path": f"/employer/{w['partner']}/batches"}, (
+        "a count and a link, nothing about who"
+    )
+    assert await _reminded(db, one) is not None and await _reminded(db, two) is not None
+
+    assert await batch_reminders.sweep_replies(db) == {"organisations": 0, "emails": 0}
+    assert len(await _notices(db, "batch_replies_owed")) == 1, "each learner is mentioned once"
+
+
+async def test_only_a_learner_still_waiting_in_a_live_batch_is_counted(client, db, world):
+    w = world
+    batch = await _open_world(client, w, start=20)
+    ended = await _open_world(client, w, start=21)
+    cancelled = await _open_world(client, w, start=22)
+    waiting = {}
+    for name, b in (
+        ("recent", batch),
+        ("answered", batch),
+        ("enrolled", batch),
+        ("withdrawn", batch),
+        ("ended", ended),
+        ("cancelled", cancelled),
+    ):
+        h, _, waiting[name] = await _interested(client, db, b, name=name)
+        if name == "withdrawn":
+            await client.post(f"/me/batch-interests/{waiting[name]}/withdraw", headers=h)
+        if name in ("answered", "enrolled"):
+            await client.patch(
+                f"/org/{w['partner']}/batches/{b}/learners/{waiting[name]}",
+                headers=w["partner_h"],
+                json={"status": "contacted" if name == "answered" else "enrolled"},
+            )
+    for name, interest in waiting.items():
+        if name != "recent":
+            await _wait(db, interest, 5)
+    await _set(
+        db,
+        ended,
+        starts_on=today_ist() - timedelta(days=9),
+        ends_on=today_ist() - timedelta(days=1),
+    )
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+    # A draft cannot hold a learner through any writer, so the row is forced: a reminder must still
+    # not count somebody waiting on a class nobody has published.
+    draft = await _plan_at(client, w, start=25)
+    await _interest(db, draft, "registered")
+    await db.execute(
+        update(BatchInterest)
+        .where(BatchInterest.batch_id == uuid.UUID(draft))
+        .values(created_at=func.now() - timedelta(days=6))
+    )
+    await db.commit()
+
+    assert await batch_reminders.sweep_replies(db) == {"organisations": 0, "emails": 0}
+    assert await _notices(db, "batch_replies_owed") == []
+    assert await _reminded(db, waiting["recent"]) is None
+
+
+async def test_the_stamp_comes_before_the_email_so_a_crash_never_repeats_one(
+    client, db, world, monkeypatch
+):
+    w = world
+    batch = await _open_world(client, w, start=20)
+    _, _, interest = await _interested(client, db, batch)
+    await _wait(db, interest, 4)
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("the queue is down")
+
+    monkeypatch.setattr(batch_reminders, "tell_organisations", boom)
+    with pytest.raises(RuntimeError):
+        await batch_reminders.sweep_replies(db)
+    monkeypatch.undo()
+    assert await _reminded(db, interest) is not None
+    assert await batch_reminders.sweep_replies(db) == {"organisations": 0, "emails": 0}
+    assert await _notices(db, "batch_replies_owed") == []
+
+
+async def test_registering_again_after_withdrawing_is_a_new_wait(client, db, world):
+    w = world
+    batch = await _open_world(client, w, start=20)
+    headers, _, interest = await _interested(client, db, batch)
+    await _wait(db, interest, 4)
+    await batch_reminders.sweep_replies(db)
+    assert await _reminded(db, interest) is not None
+
+    await client.post(f"/me/batch-interests/{interest}/withdraw", headers=headers)
+    again = await _interest_in(client, headers, batch)
+    assert again.status_code == 201, again.text
+    assert await _reminded(db, interest) is None, "a new request is a new wait"
+
+
+async def test_the_overview_says_how_registrations_turned_out_in_steps(client, db, world):
+    w = world
+    batch = await _open_world(client, w, start=20, seats=20)
+    draft = await _plan_at(client, w, start=25)
+    cancelled = await _open_world(client, w, start=26)
+    for status in ("registered", "registered", "contacted", "enrolled", "attended", "withdrawn"):
+        await _interest(db, batch, status)
+    await _interest(db, draft, "enrolled")  # a draft has no learners; a row there is not a result
+    await _interest(db, cancelled, "enrolled")
+    await client.post(f"/org/{w['partner']}/batches/{cancelled}/cancel", headers=w["partner_h"])
+
+    got = await client.get(f"/org/{w['partner']}/batches/overview", headers=w["partner_h"])
+    assert got.status_code == 200, got.text
+    funnel = got.json()["conversion"]
+    assert funnel == {"registered": 5, "answered": 3, "enrolled": 2, "attended": 1}, (
+        "each figure is a step, so each is at least the next; a withdrawal is in none"
+    )
+    assert set(funnel) == {"registered", "answered", "enrolled", "attended"}
+
+    seller = await client.get(f"/org/{w['seller']}/batches/overview", headers=w["seller_h"])
+    assert seller.status_code in (403, 404), "a seller that does not deliver has no such home"

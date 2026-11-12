@@ -57,6 +57,10 @@ seed: ## Seed the taxonomy, marketplace inventory and demo candidates (idempoten
 	$(NO_TIMEOUT) $(PY) scripts/seed_marketplace.py
 	$(NO_TIMEOUT) $(PY) scripts/seed_candidates.py
 
+.PHONY: seed-batches
+seed-batches: ## Add demonstration batches for the four situations of ADR-102 (run after `make seed`; idempotent)
+	$(NO_TIMEOUT) $(PY) scripts/seed_batches.py
+
 .PHONY: grant-staff
 grant-staff: ## Grant operator authority: make grant-staff ADDRESS=ops@example.com TIER=support [APPLY=1] [REVOKE=1]
 	$(NO_TIMEOUT) $(PY) scripts/grant_staff.py $(ADDRESS) $(if $(TIER),--tier $(TIER),) $(if $(REVOKE),--revoke,) $(if $(APPLY),--apply,)

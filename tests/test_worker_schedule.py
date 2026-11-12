@@ -36,6 +36,7 @@ EXPECTED_CRONS = {
     "cron:send_job_alerts": "no candidate hears about a vacancy they did not go looking for",
     "cron:close_expired_jobs": "a closing date never closes anything",
     "cron:send_batch_reminders": "a learner is never told the batch they asked about starts soon",
+    "cron:send_reply_reminders": "a centre is never reminded that learners wait for a reply",
     "cron:purge_expired_analytics": "events are kept past their retention period",
     "cron:purge_expired_notifications": "delivered email and read notices are kept for ever",
     "cron:purge_expired_reports": "closed reports, and reports about a listing that no longer "

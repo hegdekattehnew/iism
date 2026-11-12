@@ -24,3 +24,15 @@ async def send_batch_reminders(ctx: dict[str, Any]) -> dict[str, int]:
     except Exception as error:  # noqa: BLE001 - a cron must not kill the worker
         log.warning("batches.reminders_failed", error=str(error)[:300])
         return {"batches": 0, "notices": 0}
+
+
+async def send_reply_reminders(ctx: dict[str, Any]) -> dict[str, int]:
+    """Remind each organisation, once, of learners who have waited past three days for a reply."""
+    from api.modules.batches.reminders import sweep_replies
+
+    try:
+        async with get_sessionmaker()() as db:
+            return await sweep_replies(db)
+    except Exception as error:  # noqa: BLE001 - a cron must not kill the worker
+        log.warning("batches.reply_reminders_failed", error=str(error)[:300])
+        return {"organisations": 0, "emails": 0}

@@ -21,6 +21,7 @@ const item = (over: Record<string, unknown> = {}) => ({
   finished: 1,
   seats: 51,
   enrolled: 2,
+  interested: 3,
   ...over,
 });
 const ok = (data: unknown) => ({ data, error: undefined, response: { status: 200 } });
@@ -41,7 +42,9 @@ describe("BatchesOfMyCourses", () => {
     for (const text of ["1 open", "1 full", "1 running", "1 finished"]) {
       expect(screen.getByText(text)).toBeTruthy();
     }
-    expect(screen.getByText("2 of 51 seats marked as taken by them")).toBeTruthy();
+    expect(
+      screen.getByText(/2 of 51 seats marked as taken by them · 3 learners interested/),
+    ).toBeTruthy();
     // An organisation that has not been reviewed is not accused: the mark is simply absent.
     expect(screen.queryByText("Reviewed by our team")).toBeNull();
     expect(screen.queryByText(/not verified|not yet/i)).toBeNull();

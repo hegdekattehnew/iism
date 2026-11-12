@@ -27,6 +27,7 @@ const overview = (over: Record<string, unknown> = {}) => ({
   unavailable: 4,
   replies_owed: 5,
   oldest_reply_owed_since: "2026-10-12T09:00:00Z",
+  conversion: { registered: 20, answered: 10, enrolled: 5, attended: 2 },
   upcoming: [upcoming(1), upcoming(2), upcoming(3), upcoming(4), upcoming(5)],
   ...over,
 });
@@ -60,19 +61,52 @@ describe("BatchOverviewPanel", () => {
     expect(screen.getByText("the longest since Oct 12, 2026")).toBeTruthy();
   });
 
+  it("says how registrations turned out, each step from the server and as a share of the first", async () => {
+    GET.mockResolvedValue(ok(overview()));
+    renderUi(<BatchOverviewPanel org="acme" />);
+    expect(await screen.findByText("How registrations have turned out")).toBeTruthy();
+    const step = async (label: string, figure: string) => {
+      const text = () => screen.getByText(label).closest("div")?.parentElement?.textContent ?? "";
+      await vi.waitFor(() => expect(text()).toContain(figure));
+    };
+    await step("Registered", "20");
+    await step("Got a reply", "10");
+    await step("Enrolled", "5");
+    await step("Attended", "2");
+    // A share of those who registered, for each later step; the first is the whole and has none.
+    expect(screen.getByText("50% of those who registered")).toBeTruthy();
+    expect(screen.getByText("25% of those who registered")).toBeTruthy();
+    expect(screen.getByText("10% of those who registered")).toBeTruthy();
+    expect(screen.getAllByText(/of those who registered/)).toHaveLength(3);
+    expect(screen.getByText(/A learner who withdrew is in none of these/)).toBeTruthy();
+  });
+
+  it("shows no share when nobody has registered, and the steps as true zeros", async () => {
+    GET.mockResolvedValue(
+      ok(overview({ conversion: { registered: 0, answered: 0, enrolled: 0, attended: 0 } })),
+    );
+    renderUi(<BatchOverviewPanel org="acme" />);
+    await screen.findByText("How registrations have turned out");
+    await vi.waitFor(() =>
+      expect(screen.getByText("Registered").closest("div")?.parentElement?.textContent).toContain("0"),
+    );
+    expect(screen.queryByText(/of those who registered/)).toBeNull();
+    expect(screen.queryByText(/NaN|Infinity/)).toBeNull();
+  });
+
   it("is on the page before it arrives, with a dash and never a zero", () => {
     GET.mockReturnValue(new Promise(() => undefined));
     renderUi(<BatchOverviewPanel org="acme" />);
     expect(screen.getByText("Starting this week")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(5);
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(9);
   });
 
   it("shows a true zero as 0", async () => {
-    GET.mockResolvedValue(ok(overview({ starting_soon: 0, drafts: 0, running: 0, unfilled_seats: 0, unfilled_batches: 0, unavailable: 0, replies_owed: 0, oldest_reply_owed_since: null, upcoming: [] })));
+    GET.mockResolvedValue(ok(overview({ starting_soon: 0, drafts: 0, running: 0, unfilled_seats: 0, unfilled_batches: 0, unavailable: 0, replies_owed: 0, oldest_reply_owed_since: null, conversion: { registered: 0, answered: 0, enrolled: 0, attended: 0 }, upcoming: [] })));
     renderUi(<BatchOverviewPanel org="acme" />);
     await screen.findByText("in 0 batches");
-    expect(screen.getAllByText("0").length).toBe(6);
+    expect(screen.getAllByText("0").length).toBe(10);
     expect(screen.queryByText(/the longest since/)).toBeNull();
   });
 
