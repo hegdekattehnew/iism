@@ -227,6 +227,14 @@ test("a learner finds a batch, registers interest, and the centre enrols them", 
   await expect(page.getByText(`Delivered by E2E Learn Partner ${id} at Baner ${id}`)).toBeVisible();
   await checkPage(page, "interests, with a batch");
 
+  // ---- the batch has a page of its own (where a notice lands), with the same card and no link to itself
+  await page.getByRole("link", { name: "Batch details" }).click();
+  await expect(page.getByRole("heading", { name: "Batch details", level: 1 })).toBeVisible();
+  await expect(page.getByText(`Delivered by E2E Learn Partner ${id} at Baner ${id}`)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Batch details" })).toHaveCount(0);
+  await checkPage(page, "one batch");
+  await page.goto("/en/interests");
+
   // ---- the organisation sees them, marks them enrolled, and a seat is taken
   const orgContext = await browser.newContext({ baseURL: "http://localhost:3100", locale: "en-IN" });
   const orgPage = await orgContext.newPage();

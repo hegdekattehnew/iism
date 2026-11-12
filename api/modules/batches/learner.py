@@ -237,6 +237,7 @@ async def list_public(
     starts_within: int | None,
     max_fee: int | None,
     course_slug: str | None,
+    course_slugs: Sequence[str] | None = None,
     mode: str | None,
     limit: int,
     offset: int,
@@ -259,6 +260,9 @@ async def list_public(
         conditions.append(fee <= max_fee)
     if course_slug is not None:
         conditions.append(Course.slug == course_slug)
+    if course_slugs:
+        # Several courses at once (Sprint 101): the courses that would close a match's gap.
+        conditions.append(Course.slug.in_(course_slugs))
     if mode is not None:
         conditions.append(Batch.mode == mode)
     total_query = (

@@ -169,6 +169,79 @@ describe("Notices", () => {
       expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/interests");
     });
 
+    it("words a batch that starts soon, by whether the learner holds a seat (Sprint 101)", async () => {
+      const payload = (enrolled: boolean) => ({
+        course: "Welding basics",
+        centre: "Hadapsar Centre",
+        starts_on: "2026-11-09",
+        enrolled,
+        path: "/batches/b1",
+      });
+      GET.mockResolvedValue({
+        data: [notice({ template: "batch_starting", payload: payload(true) })],
+        error: undefined,
+      });
+      const a = renderUi(<Notices />);
+      expect(
+        await screen.findByText(
+          "The batch of Welding basics at Hadapsar Centre starts on Nov 9, 2026. You hold a seat.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/batches/b1");
+      a.unmount();
+
+      GET.mockResolvedValue({
+        data: [notice({ template: "batch_starting", payload: payload(false) })],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+      expect(
+        await screen.findByText(
+          "The batch of Welding basics at Hadapsar Centre starts on Nov 9, 2026. Ask the centre whether there is a seat for you.",
+        ),
+      ).toBeTruthy();
+    });
+
+    it("reads the day of a batch in UTC, so it is the same day in every time zone", async () => {
+      // A calendar day is formatted as UTC: in a zone west of Greenwich, local midnight is the day before.
+      {
+        GET.mockResolvedValue({
+          data: [
+            notice({
+              template: "batch_starting",
+              payload: {
+                course: "Welding basics",
+                centre: "Hadapsar Centre",
+                starts_on: "2026-11-09",
+                enrolled: true,
+                path: "/batches/b1",
+              },
+            }),
+          ],
+          error: undefined,
+        });
+        renderUi(<Notices />, { timeZone: "America/Los_Angeles" });
+        expect(await screen.findByText(/starts on Nov 9, 2026\./)).toBeTruthy();
+      }
+    });
+
+    it("words a batch that filled, and has no date to read when the payload carries none", async () => {
+      GET.mockResolvedValue({
+        data: [
+          notice({
+            template: "batch_full",
+            payload: { course: "Welding basics", centre: "Hadapsar Centre", path: "/batches/b1" },
+          }),
+        ],
+        error: undefined,
+      });
+      renderUi(<Notices />);
+      expect(
+        await screen.findByText("The batch of Welding basics at Hadapsar Centre is now full."),
+      ).toBeTruthy();
+      expect(screen.queryByText("You have an update.")).toBeNull();
+    });
+
     it("words a sponsorship offer, naming the organisation, the standard and the course", async () => {
       GET.mockResolvedValue({
         data: [

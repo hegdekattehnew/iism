@@ -1478,7 +1478,10 @@
     "batchInterestStatus": {
       "contacted": "उन्होंने संपर्क किया",
       "enrolled": "नामांकित"
-    }
+    },
+    "batchStarting": "{centre} में {course} का बैच {date} को शुरू हो रहा है। आपके पास सीट है।",
+    "batchStartingWaiting": "{centre} में {course} का बैच {date} को शुरू हो रहा है। केंद्र से पूछें कि आपके लिए सीट है या नहीं।",
+    "batchFull": "{centre} में {course} का बैच अब भर गया है।"
   },
   "searchPage": {
     "title": "“{q}” के परिणाम",
@@ -2032,7 +2035,9 @@
     "overBudget": "आपके बजट से ऊपर",
     "closesGap": "आपकी {total} कमियों में से {closed} पूरी करता है",
     "budgetLabel": "आप किसी कोर्स के लिए कितना देंगे? (₹)",
-    "budgetClear": "हटाएँ"
+    "budgetClear": "हटाएँ",
+    "batchesHeading": "इन पाठ्यक्रमों के अगले बैच",
+    "batchRow": "{course}: {centre} में {date} को शुरू"
   },
   "reportListing": {
     "openJob": "इस रिक्ति की शिकायत करें",
@@ -2640,7 +2645,13 @@
       "withdrawn": "वापस ली गई"
     },
     "nextHeading": "इस पाठ्यक्रम के अगले बैच",
-    "seeAll": "इस पाठ्यक्रम के सभी {count} बैच देखें"
+    "seeAll": "इस पाठ्यक्रम के सभी {count} बैच देखें",
+    "details": "बैच का विवरण",
+    "closedNote": {
+      "cancelled": "यह बैच रद्द कर दिया गया।",
+      "running": "यह बैच शुरू हो चुका है।",
+      "finished": "यह बैच समाप्त हो चुका है।"
+    }
   },
   "batchInterest": {
     "heading": "जिन बैचों के बारे में आपने पूछा",
@@ -2689,5 +2700,11 @@
     "enrolledNamed": "नामांकित: {name}",
     "attended": "उपस्थित हुए",
     "attendedNamed": "उपस्थित हुए: {name}"
+  },
+  "batchPage": {
+    "back": "सभी बैच",
+    "notAvailable": "यह बैच उपलब्ध नहीं है",
+    "notAvailableHint": "हो सकता है इसे हटा दिया गया हो, या लिंक गलत हो। अभी खुले बैच देखें।",
+    "seeBatches": "खुले बैच देखें"
   }
 }

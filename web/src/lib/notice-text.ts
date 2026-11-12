@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 /**
  * The one place a notice is put into words (Sprint 60, BL-14.9).
@@ -30,6 +30,7 @@ export function noticePath(notice: NoticeData): string | null {
 
 export function useNoticeText(): (notice: NoticeData) => string {
   const t = useTranslations("notices");
+  const format = useFormatter();
   return (notice) => {
     const vacancy = String(notice.payload.vacancy ?? "");
     const organisation = String(notice.payload.organisation ?? "");
@@ -64,6 +65,22 @@ export function useNoticeText(): (notice: NoticeData) => string {
         return t("batchCancelled", {
           course: String(notice.payload.course ?? ""),
           reason: t(`batchReason.${String(notice.payload.reason ?? "by_organisation")}`),
+        });
+      case "batch_starting": {
+        // A calendar day, not a moment: read as UTC so it is the same day in every zone.
+        const day = new Date(`${String(notice.payload.starts_on ?? "")}T00:00:00Z`);
+        return t(notice.payload.enrolled === true ? "batchStarting" : "batchStartingWaiting", {
+          course: String(notice.payload.course ?? ""),
+          centre: String(notice.payload.centre ?? ""),
+          date: Number.isNaN(day.getTime())
+            ? ""
+            : format.dateTime(day, { dateStyle: "medium", timeZone: "UTC" }),
+        });
+      }
+      case "batch_full":
+        return t("batchFull", {
+          course: String(notice.payload.course ?? ""),
+          centre: String(notice.payload.centre ?? ""),
         });
       case "batch_interest_status_changed":
         return t("batchInterestStatusChanged", {

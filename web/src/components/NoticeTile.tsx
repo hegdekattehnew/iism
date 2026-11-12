@@ -8,10 +8,12 @@ import {
   BookOpenIcon,
   BriefcaseIcon,
   CalendarIcon,
+  ClockIcon,
   InboxIcon,
   InfoIcon,
   TargetIcon,
   UsersIcon,
+  XCircleIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -32,6 +34,8 @@ const ICONS: Record<string, ReactElement> = {
   sponsor_offer: <AwardIcon />,
   batch_cancelled: <CalendarIcon />,
   batch_interest_status_changed: <UsersIcon />,
+  batch_starting: <ClockIcon />,
+  batch_full: <XCircleIcon />,
   grievance_update: <InfoIcon />,
 };
 

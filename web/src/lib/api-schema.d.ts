@@ -12186,6 +12186,7 @@ export interface operations {
                 starts_within?: number | null;
                 max_fee?: number | null;
                 course?: string | null;
+                courses?: string[] | null;
                 mode?: ("in_person" | "hybrid" | "online") | null;
                 limit?: number;
                 offset?: number;

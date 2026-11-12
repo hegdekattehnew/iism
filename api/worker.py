@@ -37,6 +37,7 @@ from api.core.tasks import WorkerSettings as _Tasks
 from api.core.tasks import publish_heartbeat
 from api.modules.alerts.tasks import close_expired_jobs, send_job_alerts
 from api.modules.analytics.tasks import purge_expired_analytics
+from api.modules.batches.tasks import send_batch_reminders
 from api.modules.grievances import purge_expired_grievances
 from api.modules.matching.tasks import refresh_embeddings
 from api.modules.moderation import purge_expired_reports
@@ -103,6 +104,10 @@ class WorkerSettings:
         # late costs nothing, and checking every minute would be a query per
         # minute forever to catch something that happens rarely.
         cron(close_expired_jobs, minute={0}, run_at_startup=False),
+        # Hourly, at a quarter past (Sprint 101, BL-20.4). A reminder that a batch starts within
+        # three days is a date, so an hour late costs nothing, and the sweep is one indexed read on
+        # `start_notice_at` that finds nothing on most ticks.
+        cron(send_batch_reminders, minute={15}, run_at_startup=False),
         # Every two minutes (Sprint 36, BL-5.1): a published job or a saved
         # skill set should have a semantic-similarity term within minutes,
         # not by the next hourly sweep -- and it is cheap when nothing is

@@ -83,6 +83,11 @@ export function RegisterBatch({ batch }: { batch: PublicBatch }) {
         </div>
       ) : batch.phase === "full" ? (
         <p className="text-sm text-muted">{t("fullNote")}</p>
+      ) : batch.phase !== "open" ? (
+        // Cancelled, running or finished: nothing to press, and the server would refuse it.
+        <p className="text-sm text-muted">
+          {t(`closedNote.${batch.phase === "cancelled" ? "cancelled" : batch.phase === "finished" ? "finished" : "running"}`)}
+        </p>
       ) : !confirming ? (
         <Button
           aria-label={t("registerNamed", { name: batch.course.title })}

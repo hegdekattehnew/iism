@@ -73,6 +73,39 @@ beforeEach(() => {
   });
 });
 
+describe("why not me: the nearest batch of those courses (Sprint 101)", () => {
+  it("asks for the batches of the gap's courses and shows the nearest", async () => {
+    GET.mockImplementation(async (path: string) =>
+      path === "/batches"
+        ? {
+            data: {
+              items: [
+                {
+                  id: "b1",
+                  course: { slug: "wound-care", title: "Wound care" },
+                  centre: { name: "Hadapsar Centre" },
+                  starts_on: "2026-11-09",
+                  reach: "district",
+                },
+              ],
+              total: 1,
+            },
+            error: undefined,
+          }
+        : { data: GAP, error: undefined, response: { status: 200 } },
+    );
+    renderUi(<GapPanel applicationId="a1" />);
+    expect(
+      await screen.findByRole("heading", { name: "Next batches of these courses" }),
+    ).toBeTruthy();
+    const asked = GET.mock.calls.find((c) => c[0] === "/batches")!;
+    expect(asked[1].params.query.courses).toEqual(["wound-care"]);
+    expect(screen.getByRole("link", { name: /Wound care: starts Nov 9, 2026/ }).getAttribute("href")).toBe(
+      "/batches/b1",
+    );
+  });
+});
+
 describe("why not me: the courses that close the gap, as a person can take them", () => {
   it("asks without a budget until the person gives one", async () => {
     renderUi(<GapPanel applicationId="a1" />);

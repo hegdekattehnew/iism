@@ -27,6 +27,7 @@ export function BatchInterestCard({
   footer?: ReactNode;
 }) {
   const t = useTranslations("batchInterest");
+  const tb = useTranslations("publicBatches");
   const format = useFormatter();
   const b = interest.batch;
   const look = BATCH_INTEREST_LOOK[interest.status];
@@ -67,6 +68,12 @@ export function BatchInterestCard({
             </span>
           )}
         </div>
+        <Link
+          href={`/batches/${b.id}`}
+          className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
+        >
+          {tb("details")}
+        </Link>
         {cancelled && (
           <Alert tone="warning" role={undefined} className="mt-3">
             {t(`cancelled.${b.cancel_reason ?? "by_organisation"}`)}

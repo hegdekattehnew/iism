@@ -127,7 +127,18 @@ describe("PublicBatchCard", () => {
   it("renders what the list passes as its footer, and is not itself a link", () => {
     renderUi(<PublicBatchCard batch={batch()} footer={<button>Register</button>} />);
     expect(screen.getByRole("button", { name: "Register" })).toBeTruthy();
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    // The course, and the batch's own page (Sprint 101): two links, neither wrapping the card.
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("links to the batch's own page as a 44 px target, and the page itself leaves it out", () => {
+    const a = renderUi(<PublicBatchCard batch={batch({ id: "b9" })} />);
+    const link = screen.getByRole("link", { name: "Batch details" });
+    expect(link.getAttribute("href")).toBe("/batches/b9");
+    expect(link.className).toContain("min-h-11");
+    a.unmount();
+    renderUi(<PublicBatchCard batch={batch()} detailsLink={false} />);
+    expect(screen.queryByRole("link", { name: "Batch details" })).toBeNull();
   });
 });
 
@@ -143,6 +154,13 @@ describe("BatchInterestCard", () => {
   ] as const)("draws %s as the word %s with a shape", (status, word) => {
     renderUi(<BatchInterestCard interest={interest({ status })} />);
     expect(screen.getByText(word, { selector: "span" }).querySelector("svg")).toBeTruthy();
+  });
+
+  it("links to the batch's own page", () => {
+    renderUi(<BatchInterestCard interest={interest({ batch: batch({ id: "b7" }) })} />);
+    const link = screen.getByRole("link", { name: "Batch details" });
+    expect(link.getAttribute("href")).toBe("/batches/b7");
+    expect(link.className).toContain("min-h-11");
   });
 
   it("makes the course link a 44 px target", () => {

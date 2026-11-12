@@ -201,7 +201,7 @@ function onIntlError(error: Error & { code?: string }): void {
   if (error.code === "MISSING_MESSAGE") throw error;
 }
 
-export function renderUi(ui: ReactElement) {
+export function renderUi(ui: ReactElement, options: { timeZone?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -210,7 +210,7 @@ export function renderUi(ui: ReactElement) {
         messages={messages}
         // Pinned, not the machine's: a formatted date must not depend on where
         // the test happens to run. India-first, so India's zone.
-        timeZone="Asia/Kolkata"
+        timeZone={options.timeZone ?? "Asia/Kolkata"}
         onError={onIntlError}
       >
         {ui}
