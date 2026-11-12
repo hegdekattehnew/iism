@@ -6,6 +6,7 @@ import { isSignedOut } from "../src/core/errors";
 import { useInstantDate } from "../src/lib/months";
 import { useInterests, useWithdrawInterest } from "../src/lib/me-queries";
 import { space } from "../src/theme";
+import { MyBatches } from "../src/ui/MyBatches";
 import { SeekerGate } from "../src/ui/gate";
 import { Badge, BadgeRow, Card, FailureNotice, SkeletonRows } from "../src/ui/list";
 import { Button, Notice, Screen, Text } from "../src/ui/primitives";
@@ -20,6 +21,7 @@ export default function Interests() {
       <Text variant="title">{t("pageTitle")}</Text>
       <SeekerGate prompt={t("pageSubtitle")}>
         <List />
+        <MyBatches />
       </SeekerGate>
     </Screen>
   );

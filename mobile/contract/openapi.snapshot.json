@@ -1884,6 +1884,786 @@
       }
     }
   },
+  "GET /batches": {
+    "parameters": [
+      {
+        "in": "query",
+        "name": "state_id",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "district_id",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "starts_within",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "max_fee",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "course",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "courses",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 30,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "mode",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "enum": [
+                "in_person",
+                "hybrid",
+                "online"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "properties": {
+                      "cancel_reason": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "by_organisation",
+                              "arrangement_ended",
+                              "course_unavailable",
+                              "centre_closed"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "centre": {
+                        "properties": {
+                          "is_verified": {
+                            "type": "boolean"
+                          },
+                          "location_district": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "location_state": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "course": {
+                        "properties": {
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "fee_inr": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "own": {
+                            "type": "boolean"
+                          },
+                          "provider": {
+                            "properties": {
+                              "is_verified": {
+                                "type": "boolean"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "title",
+                          "provider"
+                        ],
+                        "type": "object"
+                      },
+                      "ends_on": {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      "fee_effective": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "fee_is_override": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "mode": {
+                        "enum": [
+                          "in_person",
+                          "hybrid",
+                          "online"
+                        ],
+                        "type": "string"
+                      },
+                      "my_interest": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "enum": [
+                                  "registered",
+                                  "withdrawn",
+                                  "contacted",
+                                  "enrolled",
+                                  "attended"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "organisation": {
+                        "properties": {
+                          "is_verified": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "phase": {
+                        "enum": [
+                          "draft",
+                          "open",
+                          "full",
+                          "running",
+                          "finished",
+                          "cancelled"
+                        ],
+                        "type": "string"
+                      },
+                      "reach": {
+                        "enum": [
+                          "online",
+                          "district",
+                          "state",
+                          "unknown",
+                          "elsewhere"
+                        ],
+                        "type": "string"
+                      },
+                      "schedule": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "seats": {
+                        "type": "integer"
+                      },
+                      "seats_left": {
+                        "type": "integer"
+                      },
+                      "starts_on": {
+                        "format": "date",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "course",
+                      "centre",
+                      "organisation",
+                      "starts_on",
+                      "ends_on",
+                      "seats",
+                      "seats_left",
+                      "mode",
+                      "phase"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "offset": {
+                  "type": "integer"
+                },
+                "total": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "items",
+                "total",
+                "limit",
+                "offset"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /batches/{batch_id}": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "batch_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "cancel_reason": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "by_organisation",
+                        "arrangement_ended",
+                        "course_unavailable",
+                        "centre_closed"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "centre": {
+                  "properties": {
+                    "is_verified": {
+                      "type": "boolean"
+                    },
+                    "location_district": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "location_state": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "course": {
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "fee_inr": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "own": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "properties": {
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "title",
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                "ends_on": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "fee_effective": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "fee_is_override": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "mode": {
+                  "enum": [
+                    "in_person",
+                    "hybrid",
+                    "online"
+                  ],
+                  "type": "string"
+                },
+                "my_interest": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "enum": [
+                            "registered",
+                            "withdrawn",
+                            "contacted",
+                            "enrolled",
+                            "attended"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "organisation": {
+                  "properties": {
+                    "is_verified": {
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "phase": {
+                  "enum": [
+                    "draft",
+                    "open",
+                    "full",
+                    "running",
+                    "finished",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "reach": {
+                  "enum": [
+                    "online",
+                    "district",
+                    "state",
+                    "unknown",
+                    "elsewhere"
+                  ],
+                  "type": "string"
+                },
+                "schedule": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "seats": {
+                  "type": "integer"
+                },
+                "seats_left": {
+                  "type": "integer"
+                },
+                "starts_on": {
+                  "format": "date",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "course",
+                "centre",
+                "organisation",
+                "starts_on",
+                "ends_on",
+                "seats",
+                "seats_left",
+                "mode",
+                "phase"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
   "GET /courses": {
     "parameters": [
       {
@@ -4350,6 +5130,308 @@
                 }
               },
               "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "GET /me/batch-interests": {
+    "parameters": [],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "items": {
+                "properties": {
+                  "batch": {
+                    "properties": {
+                      "cancel_reason": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "by_organisation",
+                              "arrangement_ended",
+                              "course_unavailable",
+                              "centre_closed"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "centre": {
+                        "properties": {
+                          "is_verified": {
+                            "type": "boolean"
+                          },
+                          "location_district": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "location_state": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "course": {
+                        "properties": {
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "fee_inr": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "own": {
+                            "type": "boolean"
+                          },
+                          "provider": {
+                            "properties": {
+                              "is_verified": {
+                                "type": "boolean"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "title",
+                          "provider"
+                        ],
+                        "type": "object"
+                      },
+                      "ends_on": {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      "fee_effective": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "fee_is_override": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "mode": {
+                        "enum": [
+                          "in_person",
+                          "hybrid",
+                          "online"
+                        ],
+                        "type": "string"
+                      },
+                      "my_interest": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "enum": [
+                                  "registered",
+                                  "withdrawn",
+                                  "contacted",
+                                  "enrolled",
+                                  "attended"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "organisation": {
+                        "properties": {
+                          "is_verified": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "phase": {
+                        "enum": [
+                          "draft",
+                          "open",
+                          "full",
+                          "running",
+                          "finished",
+                          "cancelled"
+                        ],
+                        "type": "string"
+                      },
+                      "reach": {
+                        "enum": [
+                          "online",
+                          "district",
+                          "state",
+                          "unknown",
+                          "elsewhere"
+                        ],
+                        "type": "string"
+                      },
+                      "schedule": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "seats": {
+                        "type": "integer"
+                      },
+                      "seats_left": {
+                        "type": "integer"
+                      },
+                      "starts_on": {
+                        "format": "date",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "course",
+                      "centre",
+                      "organisation",
+                      "starts_on",
+                      "ends_on",
+                      "seats",
+                      "seats_left",
+                      "mode",
+                      "phase"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "registered_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "registered",
+                      "withdrawn",
+                      "contacted",
+                      "enrolled",
+                      "attended"
+                    ],
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "batch",
+                  "status",
+                  "registered_at",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             }
           }
         }
@@ -10093,6 +11175,738 @@
                 "job",
                 "status",
                 "applied_at",
+                "updated_at"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/batch-interests": {
+    "parameters": [],
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "batch_id": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "maxLength": 1000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "batch_id"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "201": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "batch": {
+                  "properties": {
+                    "cancel_reason": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "by_organisation",
+                            "arrangement_ended",
+                            "course_unavailable",
+                            "centre_closed"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "centre": {
+                      "properties": {
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "location_district": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "location_state": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "course": {
+                      "properties": {
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "fee_inr": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "own": {
+                          "type": "boolean"
+                        },
+                        "provider": {
+                          "properties": {
+                            "is_verified": {
+                              "type": "boolean"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "slug": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "slug",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "title",
+                        "provider"
+                      ],
+                      "type": "object"
+                    },
+                    "ends_on": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "fee_effective": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fee_is_override": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "mode": {
+                      "enum": [
+                        "in_person",
+                        "hybrid",
+                        "online"
+                      ],
+                      "type": "string"
+                    },
+                    "my_interest": {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "registered",
+                                "withdrawn",
+                                "contacted",
+                                "enrolled",
+                                "attended"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "organisation": {
+                      "properties": {
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "phase": {
+                      "enum": [
+                        "draft",
+                        "open",
+                        "full",
+                        "running",
+                        "finished",
+                        "cancelled"
+                      ],
+                      "type": "string"
+                    },
+                    "reach": {
+                      "enum": [
+                        "online",
+                        "district",
+                        "state",
+                        "unknown",
+                        "elsewhere"
+                      ],
+                      "type": "string"
+                    },
+                    "schedule": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "seats": {
+                      "type": "integer"
+                    },
+                    "seats_left": {
+                      "type": "integer"
+                    },
+                    "starts_on": {
+                      "format": "date",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "course",
+                    "centre",
+                    "organisation",
+                    "starts_on",
+                    "ends_on",
+                    "seats",
+                    "seats_left",
+                    "mode",
+                    "phase"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "registered_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "registered",
+                    "withdrawn",
+                    "contacted",
+                    "enrolled",
+                    "attended"
+                  ],
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "batch",
+                "status",
+                "registered_at",
+                "updated_at"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "properties": {
+                      "ctx": {
+                        "type": "object"
+                      },
+                      "input": {},
+                      "loc": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "msg": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "msg",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "POST /me/batch-interests/{interest_id}/withdraw": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "interest_id",
+        "required": true,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      }
+    ],
+    "requestBody": null,
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "batch": {
+                  "properties": {
+                    "cancel_reason": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "by_organisation",
+                            "arrangement_ended",
+                            "course_unavailable",
+                            "centre_closed"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "centre": {
+                      "properties": {
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "location_district": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "location_state": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "course": {
+                      "properties": {
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "fee_inr": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "own": {
+                          "type": "boolean"
+                        },
+                        "provider": {
+                          "properties": {
+                            "is_verified": {
+                              "type": "boolean"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "slug": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "slug",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "title",
+                        "provider"
+                      ],
+                      "type": "object"
+                    },
+                    "ends_on": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "fee_effective": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fee_is_override": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "mode": {
+                      "enum": [
+                        "in_person",
+                        "hybrid",
+                        "online"
+                      ],
+                      "type": "string"
+                    },
+                    "my_interest": {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "registered",
+                                "withdrawn",
+                                "contacted",
+                                "enrolled",
+                                "attended"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "organisation": {
+                      "properties": {
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "phase": {
+                      "enum": [
+                        "draft",
+                        "open",
+                        "full",
+                        "running",
+                        "finished",
+                        "cancelled"
+                      ],
+                      "type": "string"
+                    },
+                    "reach": {
+                      "enum": [
+                        "online",
+                        "district",
+                        "state",
+                        "unknown",
+                        "elsewhere"
+                      ],
+                      "type": "string"
+                    },
+                    "schedule": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "seats": {
+                      "type": "integer"
+                    },
+                    "seats_left": {
+                      "type": "integer"
+                    },
+                    "starts_on": {
+                      "format": "date",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "course",
+                    "centre",
+                    "organisation",
+                    "starts_on",
+                    "ends_on",
+                    "seats",
+                    "seats_left",
+                    "mode",
+                    "phase"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "registered_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "registered",
+                    "withdrawn",
+                    "contacted",
+                    "enrolled",
+                    "attended"
+                  ],
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "batch",
+                "status",
+                "registered_at",
                 "updated_at"
               ],
               "type": "object"

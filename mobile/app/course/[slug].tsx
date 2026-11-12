@@ -7,6 +7,7 @@ import { useCourse } from "../../src/lib/queries";
 import { useMonthName } from "../../src/lib/months";
 import { useSignedIn } from "../../src/runtime";
 import { InterestPanel } from "../../src/ui/InterestPanel";
+import { NextBatches } from "../../src/ui/NextBatches";
 import { ReportPanel } from "../../src/ui/ReportPanel";
 import { space } from "../../src/theme";
 import { Badge, BadgeRow, Card, Screen, Text } from "../../src/ui";
@@ -82,6 +83,7 @@ export default function CourseDetail() {
               </View>
             </Section>
 
+            <NextBatches course={course.slug} />
             <InterestPanel courseSlug={course.slug} organisation={course.tenant.name} />
             <ReportPanel target="course" slug={course.slug} />
 

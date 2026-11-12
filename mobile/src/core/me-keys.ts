@@ -26,6 +26,13 @@ export const meKeys = {
   applications: [ME_KEY, "applications"] as const,
   saved: [ME_KEY, "saved"] as const,
   interests: [ME_KEY, "interests"] as const,
+  // Batches (Sprint 102). A list carries the caller's own interest, so it is keyed by whether anyone is
+  // signed in as well as by language (a visitor's answer must not be read back after signing in), and
+  // the filter is last. `[ME_KEY, "batches"]` and `[ME_KEY, "batch"]` reach every variant.
+  batches: (locale: string, signedIn: boolean, filter: unknown) =>
+    [ME_KEY, "batches", locale, signedIn, filter] as const,
+  batch: (locale: string, signedIn: boolean, id: string) => [ME_KEY, "batch", locale, signedIn, id] as const,
+  batchInterests: [ME_KEY, "batch-interests"] as const,
   notices: [ME_KEY, "notices"] as const,
   unread: [ME_KEY, "unread"] as const,
   messages: [ME_KEY, "messages"] as const,
