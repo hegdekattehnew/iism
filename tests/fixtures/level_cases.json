@@ -1,0 +1,19 @@
+{
+  "note": "One rule, two clients (web/src/lib/level-words.ts, mobile/src/core/level-words.ts): which step of the plain-words ladder a level is. NSQF levels run 1 to 10 and half levels (2.5, 3.5, 4.5, 5.5, 6.5) are real, so a half is the step between its two neighbours, never a rounding. Anything outside 1 to 10, or not a number, is no level at all.",
+  "cases": [
+    {"name": "level 1 is the first step", "level": 1, "shown": "1", "expect": {"kind": "whole", "step": 1}},
+    {"name": "level 4 is a whole step", "level": 4, "shown": "4", "expect": {"kind": "whole", "step": 4}},
+    {"name": "level 10 is the last step", "level": 10, "shown": "10", "expect": {"kind": "whole", "step": 10}},
+    {"name": "4.5 sits between 4 and 5", "level": 4.5, "shown": "4.5", "expect": {"kind": "between", "lower": 4, "upper": 5}},
+    {"name": "2.5 sits between 2 and 3", "level": 2.5, "shown": "2.5", "expect": {"kind": "between", "lower": 2, "upper": 3}},
+    {"name": "6.5 sits between 6 and 7", "level": 6.5, "shown": "6.5", "expect": {"kind": "between", "lower": 6, "upper": 7}},
+    {"name": "a trailing .0 is noise", "level": 4.0, "shown": "4", "expect": {"kind": "whole", "step": 4}},
+    {"name": "a stray fraction is read as the nearest half", "level": 4.4, "shown": "4.5", "expect": {"kind": "between", "lower": 4, "upper": 5}},
+    {"name": "a stray fraction near a whole is that whole", "level": 3.9, "shown": "4", "expect": {"kind": "whole", "step": 4}},
+    {"name": "below 1 is no level", "level": 0, "shown": null, "expect": null},
+    {"name": "above 10 is no level", "level": 11, "shown": null, "expect": null},
+    {"name": "a negative is no level", "level": -2, "shown": null, "expect": null},
+    {"name": "null is no level", "level": null, "shown": null, "expect": null},
+    {"name": "not a number is no level", "level": "NaN", "shown": null, "expect": null}
+  ]
+}

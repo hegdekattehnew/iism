@@ -5,6 +5,7 @@ import { useTranslations } from "use-intl";
 
 import { ApiError, isSignedOut } from "../src/core/errors";
 import { mandatoryFirst } from "../src/core/labels";
+import { levelLabel, type LevelSay } from "../src/core/level-words";
 import { useCareers, useRoleHits, useUpdateProfile } from "../src/lib/me-queries";
 import { space } from "../src/theme";
 import { BudgetField } from "../src/ui/BudgetField";
@@ -36,6 +37,7 @@ export default function Careers() {
 
 function Body() {
   const t = useTranslations("careerPaths");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
@@ -64,7 +66,7 @@ function Body() {
           </Text>
           <Text variant="lead">{ladder.anchor.job_role}</Text>
           <Text tone="muted">
-            {[t("level", { level: ladder.anchor.nsqf_level }), ladder.anchor.sector_name].filter(Boolean).join(" · ")}
+            {[(levelLabel(ladder.anchor.nsqf_level, tw) ?? ""), ladder.anchor.sector_name].filter(Boolean).join(" · ")}
           </Text>
           {ladder.anchor_source === "guessed" ? <Notice tone="warning">{t("guessed")}</Notice> : null}
           {ladder.anchor_confirmed ? (
@@ -142,6 +144,7 @@ function Body() {
 
 function RoleSearch({ onChoose, onKeep }: { onChoose: (slug: string) => void; onKeep: (() => void) | null }) {
   const t = useTranslations("careerPaths");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const [term, setTerm] = useState("");
   const hits = useRoleHits(term);
   return (
@@ -154,7 +157,7 @@ function RoleSearch({ onChoose, onKeep }: { onChoose: (slug: string) => void; on
           key={hit.slug}
           variant="secondary"
           label={hit.job_role}
-          accessibilityLabel={`${hit.job_role}${hit.nsqf_level != null ? `, ${t("level", { level: hit.nsqf_level })}` : ""}`}
+          accessibilityLabel={`${hit.job_role}${hit.nsqf_level != null ? `, ${levelLabel(hit.nsqf_level, tw) ?? ""}` : ""}`}
           onPress={() => onChoose(hit.slug)}
         />
       ))}
@@ -167,6 +170,7 @@ type StepData = NonNullable<ReturnType<typeof useCareers>["data"]>["steps"] exte
 
 function Step({ step, anchorName }: { step: StepData; anchorName: string }) {
   const t = useTranslations("careerPaths");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const tm = useTranslations("matchesPage");
   const [open, setOpen] = useState(false);
   const missing = mandatoryFirst(step.missing ?? []);
@@ -181,7 +185,7 @@ function Step({ step, anchorName }: { step: StepData; anchorName: string }) {
       </BadgeRow>
       <Text variant="lead">{step.role.job_role}</Text>
       <Text tone="muted" variant="small">
-        {[t("level", { level: step.role.nsqf_level }), step.role.sector_name].filter(Boolean).join(" · ")}
+        {[levelLabel(step.role.nsqf_level, tw), step.role.sector_name].filter(Boolean).join(" · ")}
       </Text>
       <Text tone="muted" variant="small">
         {t("basis", { shared: step.basis.shared_standards, total: step.basis.compulsory_count, role: anchorName })}

@@ -210,7 +210,7 @@ describe("one match opened", () => {
     expect(await screen.findByText(/One required standard is missing, which limits this match/)).toBeTruthy();
     expect(screen.getByText("2 mandatory standards missing")).toBeTruthy();
     expect(screen.getByText(/2 years short of the experience/)).toBeTruthy();
-    expect(screen.getByText(/NSQF 3 against the 4 this role asks for/)).toBeTruthy();
+    expect(screen.getByText(/Level 3 against the 4 this role asks for/)).toBeTruthy();
   });
 
   it("lists the courses that close the gap with where, when and what they cost", async () => {

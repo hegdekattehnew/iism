@@ -10,6 +10,7 @@ import { MIN_TOUCH, space, useColours } from "../theme";
 import { Badge, BadgeRow, Card, Chip, ChipRow, FailureNotice, SearchBox, SkeletonRows } from "./list";
 import { Button, Notice, Text } from "./primitives";
 import { SessionExpired } from "./session";
+import { levelLabel, type LevelSay } from "../core/level-words";
 
 /**
  * "What work do you do?", and the national standards behind the answer.
@@ -26,6 +27,7 @@ import { SessionExpired } from "./session";
  */
 export function RolePicker({ held }: { held: ReadonlySet<string> }) {
   const t = useTranslations("profilePage.roles");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const tp = useTranslations("profilePage");
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<RoleHit | null>(null);
@@ -58,7 +60,7 @@ export function RolePicker({ held }: { held: ReadonlySet<string> }) {
       <View style={{ gap: space.md }}>
         <Text variant="lead">{role.job_role}</Text>
         <Text tone="muted" variant="small">
-          {`${role.qp_code}${role.nsqf_level != null ? ` · ${t("level", { level: role.nsqf_level })}` : ""}`}
+          {`${role.qp_code}${role.nsqf_level != null ? ` · ${levelLabel(role.nsqf_level, tw)}` : ""}`}
         </Text>
         <Button variant="secondary" label={t("changeRole")} onPress={reset} />
         <Text>{t("tickPrompt")}</Text>
@@ -155,7 +157,7 @@ export function RolePicker({ held }: { held: ReadonlySet<string> }) {
             {hit.match_kind === "alias" ? <Badge tone="brand" label={t("matchedVia", { term: hit.matched_on })} /> : null}
           </BadgeRow>
           <Text tone="muted" variant="small">
-            {`${hit.qp_code}${hit.nsqf_level != null ? ` · ${t("level", { level: hit.nsqf_level })}` : ""}`}
+            {`${hit.qp_code}${hit.nsqf_level != null ? ` · ${levelLabel(hit.nsqf_level, tw)}` : ""}`}
           </Text>
           {hit.variants > 1 ? (
             <Text tone="muted" variant="small">

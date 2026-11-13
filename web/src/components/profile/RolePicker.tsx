@@ -9,6 +9,8 @@ import { Badge, Button } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { paths } from "@/lib/api-schema";
 import { useProfileMutations } from "@/lib/profile";
+import { levelLabel } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 type RoleHit =
   paths["/roles/search"]["get"]["responses"][200]["content"]["application/json"][number];
@@ -34,6 +36,7 @@ type Standard = RoleStandards["standards"][number];
  */
 export function RolePicker({ held }: { held: Set<string> }) {
   const t = useTranslations("profilePage.roles");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const tp = useTranslations("profilePage");
   const { addSkillsBulk } = useProfileMutations();
 
@@ -112,7 +115,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
             <p className="text-sm font-semibold">{role.job_role}</p>
             <p className="mt-0.5 font-mono text-xs text-muted">
               {role.qp_code}
-              {role.nsqf_level != null && ` · ${t("level", { level: role.nsqf_level })}`}
+              {role.nsqf_level != null && ` · ${levelLabel(role.nsqf_level, tl)}`}
             </p>
           </div>
           <button
@@ -247,7 +250,7 @@ export function RolePicker({ held }: { held: Set<string> }) {
                 </span>
                 <span className="mt-0.5 block font-mono text-xs text-muted">
                   {hit.qp_code}
-                  {hit.nsqf_level != null && ` · ${t("level", { level: hit.nsqf_level })}`}
+                  {hit.nsqf_level != null && ` · ${levelLabel(hit.nsqf_level, tl)}`}
                 </span>
                 {hit.match_kind === "alias" && (
                   <span className="mt-0.5 block text-xs text-brand">

@@ -7,6 +7,7 @@ import { useCourses } from "../../src/lib/queries";
 import { useSeededTerm } from "../../src/lib/term";
 import { useMonthName } from "../../src/lib/months";
 import { Badge, BadgeRow, Button, Card, Chip, ChipRow, ResultList, SearchBox, Text } from "../../src/ui";
+import { levelLabel, type LevelSay } from "../../src/core/level-words";
 
 const MODES = ["online", "offline", "hybrid"] as const;
 
@@ -14,6 +15,7 @@ type Course = NonNullable<ReturnType<typeof useCourses>["data"]>["pages"][number
 
 export default function Courses() {
   const t = useTranslations("coursesPage");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const tb = useTranslations("publicBatches");
   const router = useRouter();
   const monthName = useMonthName();
@@ -50,7 +52,7 @@ export default function Courses() {
             <BadgeRow>
               <Badge tone="brand" label={t(`mode.${course.mode}`)} />
               <Badge label={t(`language.${course.language}`)} />
-              {course.nsqf_level != null ? <Badge label={t("level", { level: course.nsqf_level })} /> : null}
+              {course.nsqf_level != null ? <Badge label={levelLabel(course.nsqf_level, tw) ?? ""} /> : null}
               {creditsText(course.qualification_credits, (k, v) => t(k, v)) ? (
                 <Badge label={creditsText(course.qualification_credits, (k, v) => t(k, v)) ?? ""} />
               ) : null}

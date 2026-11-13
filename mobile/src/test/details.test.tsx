@@ -18,6 +18,14 @@ const standard = (n: number, mandatory: boolean, importance: number) => ({
 });
 
 describe("a vacancy", () => {
+  it("says the level it asks for in plain words with its number (BL-22.5)", async () => {
+    world.params = { slug: "ward-assistant-1" };
+    api.GET.mockResolvedValue(ok(job(1, { nsqf_level_min: 3 })));
+    await renderScreen(<JobDetail />);
+    expect(await screen.findByText("Semi-skilled worker or above (level 3)")).toBeTruthy();
+    expect(screen.queryByText(/NSQF/)).toBeNull();
+  });
+
   it("shows the standards it requires, the ones that gate a hire first", async () => {
     world.params = { slug: "ward-assistant-1" };
     api.GET.mockResolvedValue(
@@ -208,6 +216,13 @@ describe("a vacancy", () => {
 });
 
 describe("a course", () => {
+  it("says the level in plain words with its number, and never the framework's name (BL-22.5)", async () => {
+    api.GET.mockResolvedValue(ok(course(1, { nsqf_level: 4.5 })));
+    await renderScreen(<CourseDetail />);
+    expect(await screen.findByText("Skilled worker to senior skilled worker, level 4.5")).toBeTruthy();
+    expect(screen.queryByText(/NSQF/)).toBeNull();
+  });
+
   it("gives the fee, length, place, the next intake in full and the places left", async () => {
     world.params = { slug: "phlebotomy-1" };
     api.GET.mockResolvedValue(ok(course(1, { seats_left: 3, skills: [{ skill: skill(1), level_taught: 4 }] })));

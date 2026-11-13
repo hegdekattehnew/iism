@@ -38,7 +38,7 @@ describe("SkillBrowser", () => {
     renderUi(<SkillBrowser />);
     expect(await screen.findByRole("heading", { level: 2, name: "Standard number 2" })).toBeTruthy();
     expect(screen.getByText("What standard 2 says.")).toBeTruthy();
-    expect(screen.getAllByText("Level 4.5").length).toBe(3);
+    expect(screen.getAllByText("Skilled worker to senior skilled worker, level 4.5").length).toBe(3);
     expect(screen.getByText("Core").className).toContain("bg-warning-surface");
     expect(screen.getAllByText("3 qualifications").length).toBe(3);
   });

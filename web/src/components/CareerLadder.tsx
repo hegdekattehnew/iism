@@ -14,6 +14,8 @@ import { api } from "@/lib/api";
 import { useCourseBudget } from "@/lib/course-budget";
 import type { paths } from "@/lib/api-schema";
 import { apiErrorFrom, detailOf, isSignedOut } from "@/lib/http";
+import { levelLabel } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 type RoleHit =
   paths["/roles/search"]["get"]["responses"][200]["content"]["application/json"][number];
@@ -35,6 +37,7 @@ type Step = NonNullable<Ladder["steps"]>[number];
  */
 export function CareerLadder() {
   const t = useTranslations("careerPaths");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const [role, setRole] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
   const queryClient = useQueryClient();
@@ -90,7 +93,7 @@ export function CareerLadder() {
           </p>
           <p className="mt-1 text-lg font-semibold">{data.anchor.job_role}</p>
           <p className="text-sm text-muted">
-            {t("level", { level: data.anchor.nsqf_level })}
+            {levelLabel(data.anchor.nsqf_level, tl)}
             {data.anchor.sector_name ? ` · ${data.anchor.sector_name}` : ""}
           </p>
           {data.anchor_source === "guessed" && (
@@ -183,6 +186,7 @@ export function CareerLadder() {
 
 function RoleFinder({ intro, onChoose }: { intro: string; onChoose: (slug: string) => void }) {
   const t = useTranslations("careerPaths");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const [query, setQuery] = useState("");
   const deferred = useDeferredValue(query.trim());
 
@@ -222,7 +226,7 @@ function RoleFinder({ intro, onChoose }: { intro: string; onChoose: (slug: strin
               >
                 <span className="text-sm font-medium">{hit.job_role}</span>
                 <span className="text-xs text-muted">
-                  {hit.nsqf_level != null ? t("level", { level: hit.nsqf_level }) : ""}
+                  {hit.nsqf_level != null ? levelLabel(hit.nsqf_level, tl) : ""}
                   {hit.sector_name ? ` · ${hit.sector_name}` : ""}
                 </span>
               </button>
@@ -244,6 +248,7 @@ function StepCard({
   hasSkills: boolean;
 }) {
   const t = useTranslations("careerPaths");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const tm = useTranslations("matchesPage");
   const [open, setOpen] = useState(false);
   const missing = step.missing ?? [];
@@ -256,7 +261,7 @@ function StepCard({
         <div>
           <h3 className="text-base font-semibold">{step.role.job_role}</h3>
           <p className="text-sm text-muted">
-            {t("level", { level: step.role.nsqf_level })}
+            {levelLabel(step.role.nsqf_level, tl)}
             {step.role.sector_name ? ` · ${step.role.sector_name}` : ""}
           </p>
         </div>

@@ -6,6 +6,7 @@ import { lookalikeNames } from "../../src/core/labels";
 import { useSkills } from "../../src/lib/queries";
 import { useSeededTerm } from "../../src/lib/term";
 import { Badge, BadgeRow, Card, Chip, ChipRow, ResultList, SearchBox, Text } from "../../src/ui";
+import { levelLabel, type LevelSay } from "../../src/core/level-words";
 
 const TYPES = ["technical", "core", "generic"] as const;
 
@@ -18,6 +19,7 @@ type Skill = NonNullable<ReturnType<typeof useSkills>["data"]>["pages"][number][
  */
 export default function Skills() {
   const t = useTranslations("skillsPage");
+  const tw = useTranslations("levels") as unknown as LevelSay;
   const router = useRouter();
   const params = useLocalSearchParams<{ q?: string }>();
   const [q, setQ] = useSeededTerm(params.q);
@@ -51,7 +53,7 @@ export default function Skills() {
         <Card onPress={() => router.push(`/skill/${skill.slug}`)} label={skill.name}>
           <BadgeRow>
             <Badge tone="brand" label={t(`type.${skill.skill_type}`)} />
-            {skill.nsqf_level != null ? <Badge label={t("levelShort", { level: skill.nsqf_level })} /> : null}
+            {skill.nsqf_level != null ? <Badge label={levelLabel(skill.nsqf_level, tw) ?? ""} /> : null}
           </BadgeRow>
           <Text variant="lead">{skill.name}</Text>
           {skill.nos_code ? <Text tone="muted">{skill.nos_code}</Text> : null}

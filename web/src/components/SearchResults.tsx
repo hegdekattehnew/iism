@@ -12,6 +12,8 @@ import { AwardIcon, BriefcaseIcon, ChevronRightIcon, UserIcon } from "@/componen
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import type { paths } from "@/lib/api-schema";
+import { levelLabel } from "@/lib/level-words";
+import type { LevelSay } from "@/lib/level-words";
 
 /**
  * What the homepage search answers: jobs first, then roles, then standards.
@@ -201,6 +203,7 @@ type RoleItem =
  */
 function RoleRow({ role }: { role: RoleItem }) {
   const t = useTranslations("searchPage");
+  const tl = useTranslations("levels") as unknown as LevelSay;
   const [open, setOpen] = useState(false);
   const standards = useQuery({
     queryKey: ["role-standards", role.slug],
@@ -219,7 +222,7 @@ function RoleRow({ role }: { role: RoleItem }) {
       </div>
       <p className="mt-0.5 font-mono text-xs text-muted">
         {role.qp_code}
-        {role.nsqf_level != null && ` · NSQF ${role.nsqf_level}`}
+        {role.nsqf_level != null && ` · ${levelLabel(role.nsqf_level, tl)}`}
         {role.sector_name && ` · ${role.sector_name}`}
       </p>
       {role.match_kind === "alias" && (
